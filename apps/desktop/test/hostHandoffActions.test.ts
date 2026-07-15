@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import { act, cleanup, renderHook } from "@testing-library/react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { useHostHandoffActions } from "../src/hooks/useHostHandoffActions";
 import type { UseHostHandoffActionsOptions } from "../src/hooks/hostHandoffActionTypes";
 import { useAppStore } from "../src/store/appStore";
@@ -53,7 +53,7 @@ const tauriInternals = {
 Object.defineProperty(globalThis, "__TAURI_INTERNALS__", { configurable: true, value: tauriInternals });
 Object.defineProperty(dom.window, "__TAURI_INTERNALS__", { configurable: true, value: tauriInternals });
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-handoff",
   teamId: "team-handoff",
   name: "Handoff",

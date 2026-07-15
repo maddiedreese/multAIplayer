@@ -20,17 +20,11 @@ export interface RegisterRoomRoutesOptions {
   isRoomMode: (value: unknown) => value is RoomRecord["mode"];
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   normalizeOptionalMetadataText: (value: unknown, maxChars: number) => string | null;
-  normalizeRoomProjectPath: (value: unknown) => string | null;
-  normalizeCodexModel: (value: unknown) => string | null;
-  normalizeCodexReasoningEffort: (value: unknown) => RoomRecord["codexReasoningEffort"] | null;
-  normalizeCodexSpeed: (value: unknown) => RoomRecord["codexSpeed"] | null;
   normalizeBrowserAllowedOrigins: (value: unknown) => string[] | null;
   displayNameForUser: (user: AuthSession["user"]) => string;
-  maxCodexModelChars: number;
   maxDeviceIdChars: number;
   maxHostNameChars: number;
   maxRoomNameChars: number;
-  maxRoomProjectPathChars: number;
   maxUserIdChars: number;
   deviceAuthRequired: boolean;
 }

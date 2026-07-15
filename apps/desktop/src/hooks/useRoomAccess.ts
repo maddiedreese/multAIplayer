@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "../lib/localHistory";
 import type { LocalHostUser } from "../lib/roomHost";
 import { browserAccessGateMessage, canHostBrowserAction, canRequestBrowserAccess } from "../lib/browserPolicy";
@@ -10,7 +10,7 @@ import { canRequestWorkspaceAction, canUseLocalWorkspace, localWorkspaceGateMess
 
 interface UseRoomAccessOptions {
   hasSelectedRoom: boolean;
-  selectedRoom: RoomRecord;
+  selectedRoom: ClientRoomRecord;
   localUser: LocalHostUser;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;

@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { codexUsageLimitMessage } from "../lib/codexFailure";
 import { formatMessageTime } from "../lib/appFormatters";
 import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
@@ -9,18 +9,22 @@ interface CodexUsageLimitContext {
   selectedRoomId: () => string;
   publishCodexEvent: (
     event: { turnId: string; status: "failed"; message: string; model: string },
-    room: RoomRecord
+    room: ClientRoomRecord
   ) => Promise<void>;
   appendTerminalLines: (roomId: string, lines: string[]) => void;
-  publishChatMessage: (message: ChatMessage, room: RoomRecord) => Promise<void>;
-  replaceRoom: (room: RoomRecord) => void;
-  publishHostHandoff: (room: RoomRecord, reason: HostHandoffRecord["reason"], messages: ChatMessage[]) => Promise<void>;
+  publishChatMessage: (message: ChatMessage, room: ClientRoomRecord) => Promise<void>;
+  replaceRoom: (room: ClientRoomRecord) => void;
+  publishHostHandoff: (
+    room: ClientRoomRecord,
+    reason: HostHandoffRecord["reason"],
+    messages: ChatMessage[]
+  ) => Promise<void>;
   setHostMessage: (roomId: string, message: string) => void;
 }
 
 export async function handleCodexUsageLimit(
   context: CodexUsageLimitContext,
-  room: RoomRecord,
+  room: ClientRoomRecord,
   turnId: string,
   model: string,
   turnMessages: ChatMessage[],

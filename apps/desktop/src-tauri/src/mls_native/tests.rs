@@ -3,10 +3,11 @@ use super::invites::{
     validate_invite_response_pair,
 };
 use super::{
-    decode_stored_signing_secret, delete_all_history_native, engine_error, fingerprint,
-    is_corruption_error_message, quarantine_store, BasicAppCredential, CapabilityBinding,
-    EncryptRequest, EncryptedStore, MlsEngine, PendingInviteRequestPublic,
-    PendingJoinAdmissionPublic, StoredMlsIdentity,
+    decode_stored_signing_secret, delete_all_history_native, delete_room_local_data_native,
+    engine_error, fingerprint, is_corruption_error_message, quarantine_store,
+    validate_room_config_payload, BasicAppCredential, CapabilityBinding, EncryptRequest,
+    EncryptedStore, MlsEngine, PendingInviteRequestPublic, PendingJoinAdmissionPublic,
+    StoredMlsIdentity,
 };
 
 fn request_binding() -> CapabilityBinding {
@@ -133,12 +134,18 @@ fn native_delete_all_history_removes_ciphertext_and_epoch_secret() {
             30,
         )
         .unwrap();
+    store
+        .put_room_config("history-room", br#"{"eventType":"room.config"}"#)
+        .unwrap();
     delete_all_history_native(&engine, &store, "history-room").unwrap();
     assert!(store
         .latest_history_ciphertext("history-room")
         .unwrap()
         .is_none());
     assert!(engine.decrypt_history("history-room", &encrypted).is_err());
+    assert!(store.room_config("history-room").unwrap().is_some());
+    delete_room_local_data_native(&engine, &store, "history-room").unwrap();
+    assert_eq!(store.room_config("history-room").unwrap(), None);
 }
 
 #[test]
@@ -274,4 +281,31 @@ fn application_encrypt_ipc_does_not_accept_a_caller_supplied_epoch() {
     let mut raced = request;
     raced["authenticatedData"]["epoch"] = serde_json::json!(0);
     assert!(serde_json::from_value::<EncryptRequest>(raced).is_err());
+}
+
+#[test]
+fn native_room_config_validation_is_strict_and_bounded() {
+    let valid = serde_json::json!({
+        "eventType": "room.config", "configRevision": 1, "emittingEpoch": 4,
+        "projectPath": "/Users/example/project", "codexModel": "gpt-5.4",
+        "codexModelPolicy": "pinned", "codexReasoningEffort": "high",
+        "codexReasoningEffortPolicy": "pinned", "codexRawReasoningEnabled": false,
+        "codexSpeed": "standard", "codexServiceTierPolicy": "pinned",
+        "codexSandboxLevel": "workspace_write"
+    });
+    assert_eq!(
+        validate_room_config_payload(&serde_json::to_vec(&valid).unwrap())
+            .unwrap()
+            .emitting_epoch,
+        4
+    );
+    let mut unknown = valid.clone();
+    unknown["accessToken"] = serde_json::json!("must-not-enter-mls");
+    assert!(validate_room_config_payload(&serde_json::to_vec(&unknown).unwrap()).is_err());
+    let mut oversized = valid.clone();
+    oversized["projectPath"] = serde_json::json!("x".repeat(2_049));
+    assert!(validate_room_config_payload(&serde_json::to_vec(&oversized).unwrap()).is_err());
+    let mut invalid_model = valid;
+    invalid_model["codexModel"] = serde_json::json!("model with spaces");
+    assert!(validate_room_config_payload(&serde_json::to_vec(&invalid_model).unwrap()).is_err());
 }

@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { MlsRelayMessage, RoomRecord } from "@multaiplayer/protocol";
+import type { MlsRelayMessage, ClientRoomRecord } from "@multaiplayer/protocol";
 import type { AppStoreState } from "../../store/appStore";
 import type { ChatMessage } from "../../types";
 
@@ -8,7 +8,7 @@ export type RoutedMlsMessage = MlsRelayMessage & { kind: string };
 export interface MlsMessageRouteContext {
   deviceId: string;
   localUser: { id: string; name: string; avatarUrl?: string };
-  roomsRef: MutableRefObject<RoomRecord[]>;
+  roomsRef: MutableRefObject<ClientRoomRecord[]>;
   selectedRoomIdRef: MutableRefObject<string>;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
   markIncomingChatUnread: (
@@ -17,7 +17,7 @@ export interface MlsMessageRouteContext {
     senderDeviceId: string,
     localDeviceId: string
   ) => void;
-  handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
+  handleCodexBrowserOpenCommand: (message: ChatMessage, room: ClientRoomRecord) => boolean;
 }
 
 export type MlsMessageStoreActions = Pick<
@@ -39,6 +39,7 @@ export type MlsMessageStoreActions = Pick<
   | "editRoomMessage"
   | "enqueueCodexApprovalForRoom"
   | "removeQueuedCodexApprovalForRoom"
+  | "replaceRoomRecord"
   | "rememberForgottenRoom"
   | "restoreForgottenRoom"
   | "setApprovalVisibleForRoom"

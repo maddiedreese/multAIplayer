@@ -1,4 +1,4 @@
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { StateCreator } from "zustand";
 import { ensureRoomDefaults } from "../../lib/roomDefaults";
 import {
@@ -13,7 +13,7 @@ import type { AppStoreState } from "../appStore";
 
 export interface WorkspaceUiInitialState {
   teams: TeamRecord[];
-  rooms: RoomRecord[];
+  rooms: ClientRoomRecord[];
   projectPath: string;
   roomId: string;
 }
@@ -24,7 +24,7 @@ export interface WorkspaceUiSlice {
   workspaceBootstrapError: string | null;
   workspaceBootstrapAttempt: number;
   teams: TeamRecord[];
-  rooms: RoomRecord[];
+  rooms: ClientRoomRecord[];
   workspaceError: string | null;
   activeSidebarPanel: SidebarPanel;
   newTeamName: string;
@@ -38,9 +38,9 @@ export interface WorkspaceUiSlice {
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
   upsertTeamRecord: (team: TeamRecord) => void;
-  replaceRooms: (rooms: RoomRecord[]) => void;
-  upsertRoomRecord: (room: RoomRecord) => void;
-  replaceRoomRecord: (room: RoomRecord) => void;
+  replaceRooms: (rooms: ClientRoomRecord[]) => void;
+  upsertRoomRecord: (room: ClientRoomRecord) => void;
+  replaceRoomRecord: (room: ClientRoomRecord) => void;
   markRoomReadById: (roomId: string) => void;
   hydrateRoomReadState: (roomId: string, readState?: LocalRoomReadState) => void;
   markIncomingChatUnread: (roomId: string, activeRoomId: string, senderDeviceId: string, localDeviceId: string) => void;
@@ -56,7 +56,7 @@ export interface WorkspaceUiSlice {
   setSelectedTeam: (teamId: string) => void;
   selectExistingTeamOrFirst: (teams: TeamRecord[]) => void;
   setSelectedRoomId: (roomId: string) => void;
-  selectExistingRoomOrFirst: (rooms: RoomRecord[]) => void;
+  selectExistingRoomOrFirst: (rooms: ClientRoomRecord[]) => void;
   selectWorkspaceRoom: (teamId: string, roomId: string) => void;
   selectTeamRoom: (teamId: string, fallbackRoomId: string) => void;
   setSidebarQuery: (query: string) => void;
@@ -163,7 +163,13 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
     set((state) => {
       const rooms = room.deletedAt
         ? state.rooms.filter((item) => item.id !== room.id)
-        : upsertRoomPreservingUnread(state.rooms, ensureRoomDefaults(room));
+        : upsertRoomPreservingUnread(
+            state.rooms,
+            ensureRoomDefaults(
+              room,
+              state.rooms.find((item) => item.id === room.id)
+            )
+          );
       return {
         rooms,
         selectedRoomId: existingIdOrFirst(rooms, state.selectedRoomId)
@@ -174,7 +180,13 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
     set((state) => {
       const rooms = room.deletedAt
         ? state.rooms.filter((item) => item.id !== room.id)
-        : replaceRoomPreservingUnread(state.rooms, ensureRoomDefaults(room));
+        : replaceRoomPreservingUnread(
+            state.rooms,
+            ensureRoomDefaults(
+              room,
+              state.rooms.find((item) => item.id === room.id)
+            )
+          );
       return {
         rooms,
         selectedRoomId: existingIdOrFirst(rooms, state.selectedRoomId)

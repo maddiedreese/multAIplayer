@@ -1,4 +1,4 @@
-import type { RoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
 import { currentSelectedRoom } from "./selectedWorkspace";
 import { roomLockMessage } from "./appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "./roomScopedUi";
@@ -10,9 +10,9 @@ export async function updateCodexRawReasoningSetting(
   options: {
     selectedRoomId: () => string;
     reportInFlight: (roomId: string) => boolean;
-    replaceRoom: (room: RoomRecord) => void;
+    replaceRoom: (room: ClientRoomRecord) => void;
     publishEvent: (
-      room: RoomRecord,
+      room: ClientRoomRecord,
       event: Omit<RoomSettingsPlaintextPayload, "eventType" | "changedBy" | "changedByUserId">
     ) => Promise<void>;
     context: RoomSettingsMutationContext;

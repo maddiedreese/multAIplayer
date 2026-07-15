@@ -32,7 +32,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
         latest = args.request?.plaintext ?? null;
         return 7;
       }
-      if (command === "mls_history_delete_all") {
+      if (command === "mls_history_delete_all" || command === "mls_room_local_data_delete") {
         latest = null;
         return null;
       }
@@ -77,6 +77,16 @@ test("clearing history deletes every retained epoch in native storage", async ()
     command: "mls_history_delete_all",
     args: { request: { roomId: "room-a" } }
   });
+});
+
+test("forgetting a room removes history and the durable MLS-only room config", async () => {
+  await history.saveHistorySettings("room-a", { enabled: true, retentionDays: 30 });
+  await history.forgetRoomLocalData("room-a");
+  assert.deepEqual(calls.at(-1), {
+    command: "mls_room_local_data_delete",
+    args: { request: { roomId: "room-a" } }
+  });
+  assert.equal(history.hasHistorySettings("room-a"), false);
 });
 
 test("history settings remain non-secret and sanitized", async () => {

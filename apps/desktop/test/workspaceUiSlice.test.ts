@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { useAppStore } from "../src/store/appStore";
 
 const teamA: TeamRecord = { id: "team-a", name: "Team A", members: 1, role: "owner" };
 const teamB: TeamRecord = { id: "team-b", name: "Team B", members: 2 };
 
-const roomA: RoomRecord = {
+const roomA: ClientRoomRecord = {
   id: "room-a",
   teamId: teamA.id,
   name: "Room A",
@@ -24,7 +24,7 @@ const roomA: RoomRecord = {
   unread: 2
 };
 
-const roomB: RoomRecord = {
+const roomB: ClientRoomRecord = {
   ...roomA,
   id: "room-b",
   teamId: teamB.id,

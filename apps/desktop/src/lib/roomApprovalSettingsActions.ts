@@ -1,7 +1,7 @@
 import type {
   ApprovalDelegationPolicy,
   ApprovalPolicy,
-  RoomRecord,
+  ClientRoomRecord,
   RoomSettingsPlaintextPayload
 } from "@multaiplayer/protocol";
 import { roomLockMessage } from "./appRuntime";
@@ -14,9 +14,9 @@ interface ApprovalActionsOptions {
   selectedRoomId: () => string;
   approvalPolicyLabels: Record<string, string>;
   reportInFlight: (roomId: string) => boolean;
-  replaceRoom: (room: RoomRecord) => void;
+  replaceRoom: (room: ClientRoomRecord) => void;
   publishEvent: (
-    room: RoomRecord,
+    room: ClientRoomRecord,
     event: Omit<RoomSettingsPlaintextPayload, "eventType" | "changedBy" | "changedByUserId">
   ) => Promise<void>;
   context: RoomSettingsMutationContext;

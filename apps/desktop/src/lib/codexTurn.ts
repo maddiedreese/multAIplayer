@@ -1,4 +1,4 @@
-import type { CodexTurnSummary, RoomRecord } from "@multaiplayer/protocol";
+import type { CodexTurnSummary, ClientRoomRecord } from "@multaiplayer/protocol";
 import { detectSecretRisks } from "./secretRisks";
 import { reportExpectedFailure } from "./nonFatalReporting";
 
@@ -70,7 +70,7 @@ export const codexMaterialTruncationNotice =
   "[multAIplayer truncated this shared material before framing it for Codex.]";
 
 export function buildCodexApprovalSnapshot<Message extends CodexChatMessage>(
-  room: RoomRecord,
+  room: ClientRoomRecord,
   messages: Message[],
   pendingMessage: Message | undefined,
   terminals: CodexTerminalContext[],
@@ -89,7 +89,7 @@ export function buildCodexApprovalSnapshot<Message extends CodexChatMessage>(
 
 export function buildCodexTurnSummary(
   messages: CodexChatMessage[],
-  room: RoomRecord,
+  room: ClientRoomRecord,
   terminals: CodexTerminalContext[],
   browserRequests: CodexBrowserRequestContext[],
   gitStatus?: CodexGitStatusContext | null,
@@ -243,7 +243,7 @@ export function formatAttachmentForCodex(attachment: CodexChatAttachment): strin
 
 export function detectCodexTurnRiskFlags(
   messages: CodexChatMessage[],
-  room: RoomRecord,
+  room: ClientRoomRecord,
   browserRequests: CodexBrowserRequestContext[] = [],
   gitStatus?: CodexGitStatusContext | null,
   options: CodexTurnContextOptions = {}

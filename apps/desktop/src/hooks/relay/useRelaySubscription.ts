@@ -1,5 +1,5 @@
 import { useEffect, type MutableRefObject } from "react";
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { connectRelay, type RelayClient } from "../../lib/relayClient";
 import { trustedAvatarUrl } from "../../lib/avatarUrl";
 import { ensureRoomDefaults } from "../../lib/roomDefaults";
@@ -15,7 +15,7 @@ import {
   forgetCorruptMlsGroup,
   openMlsGroup
 } from "../../lib/mlsClient";
-import { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } from "../../lib/mlsOutboxDrain";
+import { pendingMlsOutboxRoomIds, recoverRoomAfterJoin } from "../../lib/mlsOutboxDrain";
 import {
   completeMlsRelayAdmission,
   coordinateMlsAdmissionRecoveryWithRetry,
@@ -43,12 +43,12 @@ interface UseRelaySubscriptionOptions {
   devicePublicKeyFingerprint?: string;
   deviceSessionToken: string;
   selectedTeam: string;
-  selectedRoom: RoomRecord;
+  selectedRoom: ClientRoomRecord;
   hasSelectedRoom: boolean;
   inviteAdmissionsByRoom: Record<string, string | undefined>;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
-  roomsRef: MutableRefObject<RoomRecord[]>;
+  roomsRef: MutableRefObject<ClientRoomRecord[]>;
   selectedRoomIdRef: MutableRefObject<string>;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
   markIncomingChatUnread: (
@@ -58,11 +58,11 @@ interface UseRelaySubscriptionOptions {
     localDeviceId: string
   ) => void;
   handleRelayError: (message: string) => void;
-  upsertRoom: (room: RoomRecord) => void;
+  upsertRoom: (room: ClientRoomRecord) => void;
   upsertTeam: (team: TeamRecord) => void;
   refreshTeamMembers: (teamId: string, quiet?: boolean) => Promise<void>;
   handleInviteRequested: (inviteId: string) => Promise<void>;
-  handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
+  handleCodexBrowserOpenCommand: (message: ChatMessage, room: ClientRoomRecord) => boolean;
 }
 
 export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
@@ -271,11 +271,16 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           if (message.type === "joined") {
             const room = current.roomsRef.current.find((candidate) => candidate.id === message.roomId);
             if (room) {
-              void drainMlsOutboxForRoom(client, room, {
-                userId: current.localUser.id,
-                deviceId: current.deviceId,
-                deviceSessionToken: current.deviceSessionToken
-              }).catch(() => {
+              void recoverRoomAfterJoin(
+                client,
+                room,
+                {
+                  userId: current.localUser.id,
+                  deviceId: current.deviceId,
+                  deviceSessionToken: current.deviceSessionToken
+                },
+                seenEnvelopeIds.current
+              ).catch(() => {
                 store.setHostMessageForRoom(
                   room.id,
                   "A durable MLS message is still pending relay delivery and will retry after reconnecting."

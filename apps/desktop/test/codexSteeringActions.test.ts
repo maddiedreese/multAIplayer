@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import type { CodexEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
+import type { CodexEventPlaintextPayload, ClientRoomRecord } from "@multaiplayer/protocol";
 import { createCodexInvokeActions } from "../src/lib/codexInvokeActions";
 import { saveCodexFollowUpBehavior } from "../src/lib/codexFollowUpBehavior";
 import { useAppStore } from "../src/store/appStore";
@@ -29,7 +29,7 @@ const tauriInternals: { invoke: NativeInvoke } = {
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: localStorage });
 Object.defineProperty(globalThis, "window", { configurable: true, value: { __TAURI_INTERNALS__: tauriInternals } });
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-steering",
   teamId: "team-steering",
   name: "Steering",

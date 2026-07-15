@@ -14,7 +14,7 @@ const authConfig: GitHubAuthConfig = {
   scopes: ["read:user", "public_repo"],
   mutationsRequireAuth: true,
   allowedOrigins: ["http://127.0.0.1:1420"],
-  sessionPersistence: "encrypted"
+  sessionPersistence: "identity_only"
 };
 
 const user: SignedInUser = {

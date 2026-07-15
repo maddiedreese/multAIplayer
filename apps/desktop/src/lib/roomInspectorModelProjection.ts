@@ -3,7 +3,7 @@ import {
   defaultCodexReasoningEffort,
   defaultCodexSandboxLevel,
   defaultCodexSpeed,
-  type RoomRecord
+  type ClientRoomRecord
 } from "@multaiplayer/protocol";
 import {
   catalogModelOptions,
@@ -14,7 +14,7 @@ import {
 import type { CodexProbe } from "./localBackend";
 
 export function buildRoomInspectorModelProjection(
-  room: RoomRecord,
+  room: ClientRoomRecord,
   codexProbe: CodexProbe | null,
   customModelDraft?: string
 ) {

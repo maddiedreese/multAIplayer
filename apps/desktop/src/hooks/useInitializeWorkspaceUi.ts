@@ -1,11 +1,11 @@
 import { useLayoutEffect } from "react";
-import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { ChatMessage } from "../types";
 import { useAppStore } from "../store/appStore";
 
 export interface WorkspaceUiSeed {
   initialTeams: TeamRecord[];
-  initialRooms: RoomRecord[];
+  initialRooms: ClientRoomRecord[];
   initialTeamMembersByTeam: Record<string, TeamMemberRecord[]>;
   initialProjectPath: string;
   initialRoomId: string;

@@ -49,7 +49,7 @@ The official invitation transport is an HTTPS universal link, not a custom URL s
 
 ## Official relay deployment
 
-The official free-alpha relay is deployed on Railway at `https://relay.multaiplayer.com` (`wss://relay.multaiplayer.com/rooms`). It is not release-ready until this runbook's persistence, secrets, TLS/WSS, monitoring, OAuth, and backup/restore gates pass. Railway builds `apps/relay/Dockerfile` from `main`; `railway.json` pins the deployment health check, restart policy, drain timing, and the single San Francisco replica. The service uses Railway-managed secrets and a 5 GB persistent volume mounted at `/data`, with SQLite at `/data/relay-store.sqlite`. Railway is an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. A second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
+The official free-alpha relay is deployed on Railway at `https://relay.multaiplayer.com` (`wss://relay.multaiplayer.com/rooms`). It is not release-ready until this runbook's persistence, secrets, TLS/WSS, monitoring, OAuth, and backup/restore gates pass. Railway builds `apps/relay/Dockerfile` from `main`; `railway.json` disables Serverless sleeping and pins the deployment health check, restart policy, drain timing, and the single San Francisco replica. Keeping the relay warm removes wake-up latency but bills its continuous actual CPU and memory use; the Railway project-level hard spending limit remains the cost backstop. The service uses Railway-managed secrets and a 5 GB persistent volume mounted at `/data`, with SQLite at `/data/relay-store.sqlite`. Railway is an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. A second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
 
 Start from `.env.example` and set production values in the same environment that launches the relay. The critical shape is:
 
@@ -57,9 +57,6 @@ Start from `.env.example` and set production values in the same environment that
 NODE_ENV=production
 PORT=8080
 RAILWAY_RUN_UID=0
-GITHUB_CLIENT_ID=...
-GITHUB_OAUTH_SCOPES="read:user repo"
-MULTAIPLAYER_RELAY_SESSION_SECRET=...
 MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT=https://t3.storageapi.dev
 MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET=...
 MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION=auto
@@ -81,7 +78,7 @@ MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true
 MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true
 ```
 
-Generate the stable session secret with a password manager or `openssl rand -base64 32`. Rotating it signs users out. Configure all size, retention, upload, rate, connection, and room quotas from `.env.example`; do not copy a stale second list into this guide.
+The relay stores token-free identity sessions; it has no OAuth-token encryption secret to generate or rotate. Configure all size, retention, upload, rate, connection, and room quotas from `.env.example`; do not copy a stale second list into this guide.
 
 Pin `PORT=8080` and target both the generated and custom Railway domains at port `8080`; otherwise a stale domain target can pass Railway's internal health check while returning `502` publicly. Railway volumes are mounted as `root`, so Railway's documented `RAILWAY_RUN_UID=0` override is required for the relay to write SQLite data under `/data`. This grants root only inside the isolated service container; it does not grant host or Railway control-plane access. Reassess the override if Railway adds managed non-root volume ownership or the image gains a verified privilege-dropping entrypoint.
 

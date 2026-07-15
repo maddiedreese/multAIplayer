@@ -13,11 +13,8 @@ import type { DeletionLedger } from "./deletion-ledger.js";
 
 export interface RegisterGitHubAuthRoutesOptions {
   app: Express;
-  githubClientId: string | undefined;
-  githubOAuthScopes: string[];
   mutationsRequireAuth: boolean;
   allowedCorsOrigins: string[];
-  sessionPersistenceSecret: string | null;
   authSessions: Map<string, AuthSession>;
   store: RelayStore;
   deletionLedger: DeletionLedger | null;
@@ -29,7 +26,6 @@ export interface RegisterGitHubAuthRoutesOptions {
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
   revokeUserPresence: (userId: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
-  maxGitHubDeviceCodeChars: number;
   maxUserIdChars: number;
   maxDisplayNameChars: number;
   maxRoomProjectPathChars: number;
@@ -38,11 +34,8 @@ export interface RegisterGitHubAuthRoutesOptions {
 
 export function registerGitHubAuthRoutes({
   app,
-  githubClientId,
-  githubOAuthScopes,
   mutationsRequireAuth,
   allowedCorsOrigins,
-  sessionPersistenceSecret,
   authSessions,
   store,
   deletionLedger,
@@ -54,7 +47,6 @@ export function registerGitHubAuthRoutes({
   revokeTeamMemberSessions,
   revokeUserPresence,
   normalizeMetadataText,
-  maxGitHubDeviceCodeChars,
   maxUserIdChars,
   maxDisplayNameChars,
   maxRoomProjectPathChars,
@@ -63,104 +55,25 @@ export function registerGitHubAuthRoutes({
   app.get("/auth/config", (_req, res) => {
     res.json({
       provider: "github",
-      configured: Boolean(githubClientId),
-      scopes: githubOAuthScopes,
+      configured: true,
+      scopes: ["read:user", "repo"],
       mutationsRequireAuth,
       allowedOrigins: allowedCorsOrigins,
-      sessionPersistence: sessionPersistenceSecret ? "encrypted" : "memory_only",
+      sessionPersistence: "identity_only",
       accountDeletion: deletionLedger ? "external_ledger_protected" : "unavailable"
     });
   });
 
-  app.post("/auth/github/device/start", async (_req, res) => {
-    if (!githubClientId) {
-      sendRelayError(
-        res,
-        503,
-        "upstream_unavailable",
-        "GitHub OAuth is not configured. Set GITHUB_CLIENT_ID on the relay."
-      );
-      return;
-    }
-
-    const response = await fetchUpstream("https://github.com/login/device/code", {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        client_id: githubClientId,
-        scope: githubOAuthScopes.join(" ")
-      })
-    });
-
-    const responseBody = await response.json();
-    if (!response.ok) {
-      sendRelayError(res, response.status, "upstream_unavailable", "GitHub did not start sign-in.");
-      return;
-    }
-    res.status(response.status).json(responseBody);
-  });
-
-  app.post("/auth/github/device/poll", async (req, res) => {
-    if (!githubClientId) {
-      sendRelayError(
-        res,
-        503,
-        "upstream_unavailable",
-        "GitHub OAuth is not configured. Set GITHUB_CLIENT_ID on the relay."
-      );
-      return;
-    }
-
-    const deviceCode = normalizeMetadataText(req.body?.device_code, maxGitHubDeviceCodeChars);
-    if (!deviceCode) {
-      sendRelayError(res, 400, "invalid_request", "device_code must be a bounded non-empty string");
-      return;
-    }
-
-    const tokenResponse = await fetchUpstream("https://github.com/login/oauth/access_token", {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        client_id: githubClientId,
-        device_code: deviceCode,
-        grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-      })
-    });
-    const tokenBody = (await tokenResponse.json()) as {
-      access_token?: string;
-      error?: string;
-    };
-
-    if (!tokenBody.access_token) {
-      if (tokenBody.error === "authorization_pending") {
-        res.status(202).json({ status: "pending" });
-        return;
-      }
-      if (tokenBody.error === "slow_down") {
-        res.status(202).json({ status: "slow_down", retryAfterSeconds: 5 });
-        return;
-      }
-      if (tokenBody.error === "access_denied") {
-        sendRelayError(res, 400, "invalid_request", "GitHub sign-in was denied.");
-        return;
-      }
-      if (tokenBody.error === "expired_token") {
-        sendRelayError(res, 400, "invalid_request", "The GitHub sign-in code expired. Start sign-in again.");
-        return;
-      }
-      sendRelayError(res, 502, "upstream_unavailable", "GitHub did not complete sign-in.");
+  app.post("/auth/github/verify", async (req, res) => {
+    const accessToken = normalizeMetadataText(req.body?.access_token, maxAccessTokenChars);
+    if (!accessToken) {
+      sendRelayError(res, 400, "invalid_request", "access_token must be a bounded non-empty string");
       return;
     }
 
     const userResponse = await fetchUpstream("https://api.github.com/user", {
       headers: {
-        authorization: `Bearer ${tokenBody.access_token}`,
+        authorization: `Bearer ${accessToken}`,
         accept: "application/vnd.github+json",
         "user-agent": "multAIplayer-alpha"
       }
@@ -184,10 +97,6 @@ export function registerGitHubAuthRoutes({
       : null;
     if (!normalizedUserId || !login || (githubUser.name && !name) || (githubUser.avatar_url && !avatarUrl)) {
       sendRelayError(res, 502, "upstream_unavailable", "GitHub returned unsupported user metadata");
-      return;
-    }
-    if (tokenBody.access_token.length > maxAccessTokenChars) {
-      sendRelayError(res, 502, "upstream_unavailable", "GitHub returned an oversized access token");
       return;
     }
     if (deletionLedger) {
@@ -216,7 +125,6 @@ export function registerGitHubAuthRoutes({
 
     const sessionId = nanoid(32);
     const session: AuthSession = {
-      accessToken: tokenBody.access_token,
       user: {
         id: normalizedUserId,
         login,

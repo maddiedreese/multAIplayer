@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { createRoomActions } from "../src/lib/roomActions";
 import { useAppStore } from "../src/store/appStore";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-a",
   teamId: "team-a",
   name: "Room A",

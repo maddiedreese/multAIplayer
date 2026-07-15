@@ -2,37 +2,23 @@ import { test } from "node:test";
 import { chmod, mkdir, rm } from "node:fs/promises";
 import {
   WebSocket,
+  Database,
   assert,
   createDebugSession,
-  maxSessionCiphertextNonceChars,
   join,
   randomUUID,
   onceOpen,
   patchHostStatus,
   patchRoomSettings,
   postJsonStatus,
-  readFile,
   startRelay,
   tmpdir,
   waitForError,
   waitForStoredState,
   writeFile,
+  type RelayHarness,
   type StoredRelayStateFixture
 } from "../support/relay.js";
-
-test("relay reports memory-only sessions when persistence is disabled or weak", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_SESSION_SECRET: "short-secret"
-  });
-  try {
-    const response = await fetch(`${relay.baseUrl}/auth/config`);
-    assert.equal(response.status, 200);
-    const body = (await response.json()) as { sessionPersistence: string };
-    assert.equal(body.sessionPersistence, "memory_only");
-  } finally {
-    await relay.close();
-  }
-});
 
 test("relay can require auth for workspace mutations", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
@@ -274,10 +260,8 @@ test("hosted account deletion requires explicit confirmation and reports ownersh
 });
 
 test("hosted account deletion removes identity-owned relay data durably and retains shared records", async () => {
-  const secret = "test-session-secret-with-at-least-32-characters";
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SESSION_SECRET: secret
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
   });
   let restarted = null as Awaited<ReturnType<typeof startRelay>> | null;
   try {
@@ -320,8 +304,7 @@ test("hosted account deletion removes identity-owned relay data durably and reta
     await relay.close({ preserveData: true });
     restarted = await startRelay(
       {
-        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-        MULTAIPLAYER_RELAY_SESSION_SECRET: secret
+        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
       },
       undefined,
       relay.dataPath
@@ -387,239 +370,84 @@ test(
   }
 );
 
-test("relay persists auth sessions encrypted when a session secret is configured", async () => {
-  const strongSecret = "test-session-secret-with-at-least-32-characters";
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
-  });
-  let restarted: RelayHarness | null = null;
-  try {
-    const cookie = await createDebugSession(relay.baseUrl, "github:persisted", "persisted");
-    const stored = await waitForStoredState(
-      relay.dataPath,
-      (state) => Array.isArray(state.authSessions) && state.authSessions.length === 1
-    );
-    assert.doesNotMatch(JSON.stringify(stored), /debug-token/);
-    assert.equal(stored.authSessions?.[0]?.encryptedAccessToken?.algorithm, "AES-GCM-256");
-
-    await relay.close({ preserveData: true });
-    restarted = await startRelay(
-      {
-        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-        MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
-      },
-      undefined,
-      relay.dataPath
-    );
-
-    const me = await fetch(`${restarted.baseUrl}/auth/me`, {
-      headers: { cookie }
-    });
-    assert.equal(me.status, 200);
-    const body = (await me.json()) as { user: { id: string; login: string } };
-    assert.equal(body.user.id, "github:persisted");
-    assert.equal(body.user.login, "persisted");
-  } finally {
-    if (restarted) {
-      await restarted.close();
-    } else {
-      await relay.close();
-    }
-  }
-});
-
-test("relay drops malformed encrypted auth sessions loaded from disk", async () => {
-  const strongSecret = "test-session-secret-with-at-least-32-characters";
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
-  });
-  let restarted: RelayHarness | null = null;
-  let relayClosed = false;
-  try {
-    const validCookie = await createDebugSession(relay.baseUrl, "github:valid-session", "valid-session");
-    const stored = await waitForStoredState(
-      relay.dataPath,
-      (state) => Array.isArray(state.authSessions) && state.authSessions.length === 1
-    );
-    const encryptedAccessToken = stored.authSessions?.[0]?.encryptedAccessToken;
-    assert.ok(encryptedAccessToken);
-
-    await relay.close({ preserveData: true });
-    relayClosed = true;
-    stored.authSessions = [
-      stored.authSessions![0],
-      {
-        sessionId: "bad:session",
-        user: { id: "github:bad-session", login: "bad-session" },
-        encryptedAccessToken,
-        expiresAt: Date.now() + 60_000
-      },
-      {
-        sessionId: "bad-login",
-        user: { id: "github:bad-login", login: "x".repeat(121) },
-        encryptedAccessToken,
-        expiresAt: Date.now() + 60_000
-      },
-      {
-        sessionId: "bad-name",
-        user: { id: "github:bad-name", login: "bad-name", name: "bad\nname" },
-        encryptedAccessToken,
-        expiresAt: Date.now() + 60_000
-      },
-      {
-        sessionId: "far-future",
-        user: { id: "github:far-future", login: "far-future" },
-        encryptedAccessToken,
-        expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000
-      },
-      {
-        sessionId: "huge-encrypted-token",
-        user: { id: "github:huge-token", login: "huge-token" },
-        encryptedAccessToken: {
-          algorithm: "AES-GCM-256",
-          nonce: "x".repeat(maxSessionCiphertextNonceChars + 1),
-          ciphertext: "x".repeat(20_000),
-          tag: "x".repeat(maxSessionCiphertextNonceChars + 1)
-        },
-        expiresAt: Date.now() + 60_000
-      }
-    ];
-    await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
-
-    restarted = await startRelay(
-      {
-        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-        MULTAIPLAYER_RELAY_SESSION_SECRET: strongSecret
-      },
-      undefined,
-      relay.dataPath
-    );
-
-    const valid = await fetch(`${restarted.baseUrl}/auth/me`, {
-      headers: { cookie: validCookie }
-    });
-    assert.equal(valid.status, 200);
-
-    for (const sessionId of ["bad%3Asession", "bad-login", "bad-name", "far-future", "huge-encrypted-token"]) {
-      const response = await fetch(`${restarted.baseUrl}/auth/me`, {
-        headers: { cookie: `multaiplayer_session=${sessionId}` }
-      });
-      assert.equal(response.status, 401);
-    }
-  } finally {
-    if (restarted) {
-      await restarted.close();
-    } else if (!relayClosed) {
-      await relay.close();
-    }
-  }
-});
-
-test("relay ignores weak auth session persistence secrets", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_SESSION_SECRET: "short-secret"
-  });
-  let restarted: RelayHarness | null = null;
-  try {
-    const cookie = await createDebugSession(relay.baseUrl, "github:weak-secret", "weak-secret");
-    const stored = await waitForStoredState(relay.dataPath, (state) => Array.isArray(state.authSessions));
-    assert.deepEqual(stored.authSessions, []);
-    assert.doesNotMatch(JSON.stringify(stored), /debug-token/);
-
-    await relay.close({ preserveData: true });
-    restarted = await startRelay(
-      {
-        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-        MULTAIPLAYER_RELAY_SESSION_SECRET: "short-secret"
-      },
-      undefined,
-      relay.dataPath
-    );
-    const me = await fetch(`${restarted.baseUrl}/auth/me`, {
-      headers: { cookie }
-    });
-    assert.equal(me.status, 401);
-  } finally {
-    if (restarted) {
-      await restarted.close();
-    } else {
-      await relay.close();
-    }
-  }
-});
-
-test("relay keeps auth sessions memory-only without a session secret", async () => {
+test("relay persists identity-only sessions and purges legacy token fields", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
   let restarted: RelayHarness | null = null;
+  let closed = false;
   try {
-    const cookie = await createDebugSession(relay.baseUrl, "github:memory-only", "memory-only");
-    const stored = await waitForStoredState(relay.dataPath, (state) => Array.isArray(state.authSessions));
-    assert.deepEqual(stored.authSessions, []);
-    assert.doesNotMatch(JSON.stringify(stored), /debug-token/);
-
+    const cookie = await createDebugSession(relay.baseUrl, "github:persisted", "persisted");
+    const stored = await waitForStoredState(relay.dataPath, (state) => state.authSessions?.length === 1);
+    assert.doesNotMatch(JSON.stringify(stored), /debug-token|accessToken|encryptedAccessToken/);
     await relay.close({ preserveData: true });
+    closed = true;
+    const legacy = stored.authSessions![0] as StoredRelayStateFixture["authSessions"][number] & Record<string, unknown>;
+    legacy.accessToken = "legacy-secret";
+    legacy.encryptedAccessToken = {
+      algorithm: "AES-GCM-256",
+      nonce: "legacy",
+      ciphertext: "legacy-secret",
+      tag: "legacy"
+    };
+    await writeFile(relay.dataPath, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
     restarted = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, undefined, relay.dataPath);
-    const me = await fetch(`${restarted.baseUrl}/auth/me`, {
-      headers: { cookie }
-    });
-    assert.equal(me.status, 401);
+    assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
+    const rewritten = await waitForStoredState(restarted.dataPath, (state) => state.authSessions?.length === 1);
+    assert.doesNotMatch(JSON.stringify(rewritten), /legacy-secret|accessToken|encryptedAccessToken/);
   } finally {
-    if (restarted) {
-      await restarted.close();
-    } else {
-      await relay.close();
-    }
+    if (restarted) await restarted.close();
+    else if (!closed) await relay.close();
   }
 });
 
-test("relay ignores plaintext auth access tokens loaded from disk", async () => {
-  const relay = await startRelay(
-    {
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-      MULTAIPLAYER_RELAY_SESSION_SECRET: "test-session-secret-with-at-least-32-characters"
-    },
-    {
-      version: 1,
-      savedAt: new Date().toISOString(),
-      teams: [],
-      rooms: [],
-      invites: [],
-      authSessions: [
-        {
-          sessionId: "plain-session",
-          accessToken: "debug-token",
-          user: { id: "github:plain", login: "plain" },
-          expiresAt: Date.now() + 60_000
-        }
-      ],
-      encryptedBacklog: []
-    }
-  );
+test("relay purges legacy token fields from normalized SQLite session rows", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_STORAGE: "sqlite"
+  });
+  let restarted: RelayHarness | null = null;
+  let closed = false;
   try {
-    const me = await fetch(`${relay.baseUrl}/auth/me`, {
-      headers: { cookie: "multaiplayer_session=plain-session" }
-    });
-    assert.equal(me.status, 401);
-
+    const cookie = await createDebugSession(relay.baseUrl, "github:sqlite-persisted", "sqlite-persisted");
     await relay.close({ preserveData: true });
-    const stored = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
-    assert.deepEqual(stored.authSessions, []);
-    assert.doesNotMatch(JSON.stringify(stored), /debug-token/);
+    closed = true;
+    const db = new Database(relay.dataPath);
+    const row = db.prepare("select session_id, data_json from relay_auth_sessions limit 1").get() as {
+      session_id: string;
+      data_json: string;
+    };
+    const legacy = JSON.parse(row.data_json) as Record<string, unknown>;
+    legacy.accessToken = "sqlite-legacy-secret";
+    legacy.encryptedAccessToken = { ciphertext: "sqlite-legacy-secret" };
+    db.prepare("update relay_auth_sessions set data_json = ? where session_id = ?").run(
+      JSON.stringify(legacy),
+      row.session_id
+    );
+    db.close();
+    restarted = await startRelay(
+      { MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true", MULTAIPLAYER_RELAY_STORAGE: "sqlite" },
+      undefined,
+      relay.dataPath
+    );
+    assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
+    const verifyDb = new Database(restarted.dataPath, { readonly: true });
+    const rewritten = verifyDb.prepare("select data_json from relay_auth_sessions limit 1").get() as {
+      data_json: string;
+    };
+    verifyDb.close();
+    assert.doesNotMatch(rewritten.data_json, /sqlite-legacy-secret|accessToken|encryptedAccessToken/);
   } finally {
-    await relay.close().catch(() => {});
+    if (restarted) await restarted.close();
+    else if (!closed) await relay.close();
   }
 });
 
-test("relay requires auth in production by default even without GitHub OAuth configured", async () => {
+test("relay requires auth in production while native GitHub OAuth remains available", async () => {
   const relay = await startRelay({ NODE_ENV: "production" });
   try {
     const config = await fetch(`${relay.baseUrl}/auth/config`);
     assert.equal(config.status, 200);
     const configBody = (await config.json()) as { configured: boolean; mutationsRequireAuth: boolean };
-    assert.equal(configBody.configured, false);
+    assert.equal(configBody.configured, true);
     assert.equal(configBody.mutationsRequireAuth, true);
 
     const response = await fetch(`${relay.baseUrl}/teams`);

@@ -1,4 +1,4 @@
-import type { RoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { shutdownCodexRoom } from "./localBackend";
 import { updateRoomSettings } from "./workspaceClient";
@@ -36,9 +36,9 @@ export interface CreateRoomSettingsActionsOptions {
     roomId: string,
     setMessage?: (roomId: string, message: string | null) => void
   ) => boolean;
-  replaceRoom: (room: RoomRecord) => void;
+  replaceRoom: (room: ClientRoomRecord) => void;
   publishRoomSettingsEvent: (
-    room: RoomRecord,
+    room: ClientRoomRecord,
     event: Omit<RoomSettingsPlaintextPayload, "eventType" | "changedBy" | "changedByUserId">
   ) => Promise<void>;
 }
@@ -152,7 +152,7 @@ export function createRoomSettingsActions({
       const previousValue = selectedCodexReasoningEffort;
       const room = await updateRoomSettings(roomId, {
         ...currentRoomSettingsActor(),
-        codexReasoningEffort: nextReasoningEffort as RoomRecord["codexReasoningEffort"],
+        codexReasoningEffort: nextReasoningEffort as ClientRoomRecord["codexReasoningEffort"],
         codexReasoningEffortPolicy: "pinned"
       });
       void shutdownCodexRoom(roomId);
@@ -202,7 +202,7 @@ export function createRoomSettingsActions({
       const previousValue = selectedCodexSpeed;
       const room = await updateRoomSettings(roomId, {
         ...currentRoomSettingsActor(),
-        codexSpeed: nextSpeed as RoomRecord["codexSpeed"],
+        codexSpeed: nextSpeed as ClientRoomRecord["codexSpeed"],
         codexServiceTierPolicy: "pinned"
       });
       void shutdownCodexRoom(roomId);
@@ -261,7 +261,7 @@ export function createRoomSettingsActions({
       const previousValue = selectedCodexSandboxLevel;
       const room = await updateRoomSettings(roomId, {
         ...currentRoomSettingsActor(),
-        codexSandboxLevel: nextSandboxLevel as RoomRecord["codexSandboxLevel"]
+        codexSandboxLevel: nextSandboxLevel as ClientRoomRecord["codexSandboxLevel"]
       });
       void shutdownCodexRoom(roomId);
       replaceRoom(room);

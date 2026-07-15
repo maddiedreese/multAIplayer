@@ -1,12 +1,12 @@
 import type { MutableRefObject } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { RelayClient } from "../lib/relayClient";
 import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexTurn, RelayStatus } from "../types";
 import type { GitStatusSummary, TerminalSnapshot } from "../lib/localBackend";
 
 export interface UseHostHandoffActionsOptions {
   hasSelectedRoom: boolean;
-  selectedRoom: RoomRecord;
+  selectedRoom: ClientRoomRecord;
   selectedRoomIdRef: MutableRefObject<string>;
   isSelectedRoomLocked: boolean;
   isSelectedRoomRevoked: boolean;
@@ -26,7 +26,7 @@ export interface UseHostHandoffActionsOptions {
   gitStatusByRoom: Record<string, GitStatusSummary | null>;
   reportRoomHostMutationInFlight: (roomId: string) => boolean;
   roomSettingsActor: () => { requesterName: string; requesterUserId: string };
-  replaceRoom: (room: RoomRecord) => void;
+  replaceRoom: (room: ClientRoomRecord) => void;
   setHostBusyForRoom: (roomId: string, busy: boolean) => void;
   setHostMessageForRoom: (roomId: string, message: string | null) => void;
   setSelectedHostMessage: (message: string | null) => void;

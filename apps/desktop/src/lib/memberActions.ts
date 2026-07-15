@@ -1,4 +1,4 @@
-import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import { formatTeamMemberName, formatTeamRole } from "./appFormatters";
 import { buildDeviceFingerprintMarkdown } from "./deviceTrust";
 import { removeTeamMember, transferTeamOwnership, updateTeamMemberRole } from "./workspaceClient";
@@ -14,7 +14,7 @@ interface MemberActionsOptions {
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
   removeMembersFromMlsGroup: (
-    room: RoomRecord,
+    room: ClientRoomRecord,
     actor: { id: string; name: string },
     deviceId: string,
     excludedUserIds?: ReadonlySet<string>
@@ -161,7 +161,7 @@ export function createMemberActions({
           (item) => item.userId !== member.userId
         );
       }
-      const failures: Array<{ room: RoomRecord; error: unknown }> = [];
+      const failures: Array<{ room: ClientRoomRecord; error: unknown }> = [];
       for (const room of activeRooms) {
         try {
           await removeMembersFromMlsGroup(room, localUser, deviceId, new Set([member.userId]));

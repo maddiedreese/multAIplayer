@@ -1,4 +1,9 @@
-import { codexModelOptions, defaultCodexModel, type ApprovalPolicy, type RoomRecord } from "@multaiplayer/protocol";
+import {
+  codexModelOptions,
+  defaultCodexModel,
+  type ApprovalPolicy,
+  type ClientRoomRecord
+} from "@multaiplayer/protocol";
 import type { GitDiffResult, ProjectFileContent, TerminalSnapshot } from "./localBackend";
 import { stripTerminalControlSequences } from "./terminalText";
 
@@ -57,7 +62,7 @@ export function buildPullRequestBody(
   ]);
 }
 
-export function buildRoomMarkdown(room: RoomRecord, teamName: string, messages: MarkdownChatMessage[]): string {
+export function buildRoomMarkdown(room: ClientRoomRecord, teamName: string, messages: MarkdownChatMessage[]): string {
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)}`,
     "",
@@ -72,7 +77,7 @@ export function buildRoomMarkdown(room: RoomRecord, teamName: string, messages: 
   ]);
 }
 
-export function buildSelectedMessagesMarkdown(room: RoomRecord, messages: MarkdownChatMessage[]): string {
+export function buildSelectedMessagesMarkdown(room: ClientRoomRecord, messages: MarkdownChatMessage[]): string {
   return compactMarkdown([
     `# ${escapeMarkdown(room.name)} Selected Messages`,
     "",
@@ -114,7 +119,7 @@ export function buildMessageMarkdown(message: MarkdownChatMessage): string {
 }
 
 export function buildCodexOutputMarkdown(
-  room: RoomRecord,
+  room: ClientRoomRecord,
   codexMessage: MarkdownChatMessage,
   messages: MarkdownChatMessage[]
 ): string {
@@ -189,7 +194,7 @@ export function buildProjectMarkdown(
 }
 
 export function buildDiffSummaryMarkdown(
-  room: RoomRecord,
+  room: ClientRoomRecord,
   branch: string,
   files: Array<{ path: string; status: string; added?: number; removed?: number }>,
   selectedDiff: GitDiffResult | null,
@@ -219,7 +224,7 @@ export function buildDiffSummaryMarkdown(
 }
 
 export function buildTerminalMarkdown(
-  room: RoomRecord,
+  room: ClientRoomRecord,
   terminal: TerminalSnapshot | null,
   lines: Array<{ stream: string; text: string }>,
   sensitiveRisks: string[] = []
@@ -277,7 +282,7 @@ function normalizeMarkdownText(value: string): string {
   return value || "_No content._";
 }
 
-function formatHostStatus(room: RoomRecord): string {
+function formatHostStatus(room: ClientRoomRecord): string {
   if (room.hostStatus === "active") return `Hosted by ${room.host}`;
   if (room.hostStatus === "handoff") return `Handoff from ${room.host}`;
   return "No active host";

@@ -7,7 +7,7 @@ import type {
   GitWorkflowEventPlaintextPayload,
   MlsRelayMessage,
   RequestStatusPlaintextPayload,
-  RoomRecord,
+  ClientRoomRecord,
   RoomSettingsPlaintextPayload,
   TerminalResultPlaintextPayload
 } from "@multaiplayer/protocol";
@@ -15,6 +15,7 @@ import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../li
 import type { RelayClient } from "../lib/relayClient";
 import { buildRoomSettingsSystemMessage } from "../lib/roomSettingsMessages";
 import { buildCodexEventLine } from "../lib/activityLines";
+import { publishRoomConfigSnapshot } from "../lib/roomConfigSnapshot";
 import type {
   ChatMessage,
   CodexRoomEvent,
@@ -33,7 +34,7 @@ interface UseRelayPublishersOptions {
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   relayStatus: RelayStatus;
-  selectedRoom: RoomRecord;
+  selectedRoom: ClientRoomRecord;
   deviceId: string;
   localUser: LocalUser;
   approvalPolicyLabels: Record<string, string>;
@@ -86,7 +87,7 @@ export function useRelayPublishers({
     await publishMlsApplicationMessage(client, envelope);
   }
 
-  async function publishPlaintext(room: RoomRecord, kind: string, createdAt: string, payload: unknown) {
+  async function publishPlaintext(room: ClientRoomRecord, kind: string, createdAt: string, payload: unknown) {
     await publishMlsMessage(
       await createMlsApplicationMessage(
         {
@@ -107,7 +108,7 @@ export function useRelayPublishers({
     kind: "terminal.event" | "browser.event",
     requestId: string,
     status: RequestStatusPlaintextPayload["status"],
-    room: RoomRecord = selectedRoom
+    room: ClientRoomRecord = selectedRoom
   ) {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
@@ -115,7 +116,7 @@ export function useRelayPublishers({
     await publishPlaintext(room, kind, payload.decidedAt, payload);
   }
 
-  async function publishLocalPreviewEvent(payload: LocalPreviewRecord, room: RoomRecord = selectedRoom) {
+  async function publishLocalPreviewEvent(payload: LocalPreviewRecord, room: ClientRoomRecord = selectedRoom) {
     appendLocalPreviewEvent(room.id, payload);
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
@@ -132,7 +133,7 @@ export function useRelayPublishers({
       stderr: string;
       error?: string;
     },
-    room: RoomRecord = selectedRoom
+    room: ClientRoomRecord = selectedRoom
   ) {
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
@@ -155,7 +156,7 @@ export function useRelayPublishers({
 
   async function publishGitWorkflowEvent(
     event: Omit<GitWorkflowEventPlaintextPayload, "eventType" | "runner" | "runnerUserId" | "createdAt">,
-    room: RoomRecord = selectedRoom
+    room: ClientRoomRecord = selectedRoom
   ) {
     const payload: GitWorkflowEventPlaintextPayload = {
       eventType: "git.workflow",
@@ -172,7 +173,7 @@ export function useRelayPublishers({
 
   async function publishCodexEvent(
     event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
-    room: RoomRecord = selectedRoom
+    room: ClientRoomRecord = selectedRoom
   ) {
     const payload: CodexEventPlaintextPayload = {
       eventType: "codex.turn",
@@ -191,7 +192,7 @@ export function useRelayPublishers({
 
   async function publishCodexActivity(
     event: Omit<CodexActivityPlaintextPayload, "eventType" | "host" | "hostUserId">,
-    room: RoomRecord = selectedRoom
+    room: ClientRoomRecord = selectedRoom
   ) {
     const payload: CodexActivityPlaintextPayload = {
       eventType: "codex.activity",
@@ -210,7 +211,7 @@ export function useRelayPublishers({
       CodexQueuePlaintextPayload,
       "eventType" | "queueEventId" | "requestedBy" | "requestedByUserId" | "createdAt"
     >,
-    room: RoomRecord = selectedRoom
+    room: ClientRoomRecord = selectedRoom
   ) {
     const payload: CodexQueuePlaintextPayload = {
       eventType: "codex.queue",
@@ -227,7 +228,7 @@ export function useRelayPublishers({
   }
 
   async function publishRoomSettingsEvent(
-    room: RoomRecord,
+    room: ClientRoomRecord,
     event: Omit<RoomSettingsPlaintextPayload, "eventType" | "changedBy" | "changedByUserId">
   ) {
     const payload: RoomSettingsPlaintextPayload = {
@@ -248,11 +249,18 @@ export function useRelayPublishers({
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;
     await publishPlaintext(room, "room.settings", payload.changedAt, payload);
+    await publishRoomConfigSnapshot({
+      client,
+      room,
+      senderUserId: localUser.id,
+      senderDeviceId: deviceId,
+      seenEnvelopeIds: seenEnvelopeIds.current
+    });
   }
 
   async function publishGitHubActionsEvent(
     event: Omit<GitHubActionsEventPlaintextPayload, "eventType" | "checkedBy" | "checkedByUserId">,
-    room: RoomRecord = selectedRoom
+    room: ClientRoomRecord = selectedRoom
   ) {
     const payload: GitHubActionsEventPlaintextPayload = {
       eventType: "github.actions",

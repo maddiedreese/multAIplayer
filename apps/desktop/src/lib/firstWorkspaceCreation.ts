@@ -10,7 +10,7 @@ import {
   defaultCodexSandboxLevel,
   defaultCodexServiceTierPolicy,
   defaultCodexSpeed,
-  type RoomRecord,
+  type ClientRoomRecord,
   type TeamRecord
 } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "./localHistory";
@@ -25,10 +25,10 @@ export interface WorkspaceCreationRuntime {
     name: string,
     projectPath: string,
     settings: RoomCreationSettings
-  ) => Promise<RoomRecord>;
+  ) => Promise<ClientRoomRecord>;
   findTeam: (teamId: string) => TeamRecord | undefined;
   upsertTeam: (team: TeamRecord) => void;
-  upsertRoom: (room: RoomRecord) => void;
+  upsertRoom: (room: ClientRoomRecord) => void;
   selectTeam: (teamId: string) => void;
   selectRoom: (roomId: string) => void;
   restoreRoomAccess: (roomId: string) => void;
@@ -61,7 +61,7 @@ export interface FirstWorkspaceCreationInput {
 }
 
 export type FirstWorkspaceCreationResult =
-  | { status: "success"; team: TeamRecord; room: RoomRecord }
+  | { status: "success"; team: TeamRecord; room: ClientRoomRecord }
   | { status: "partial_team"; team: TeamRecord; existingTeamId: string; error: unknown };
 
 export const firstWorkspaceSafeRoomSettings: RequestedRoomCreationSettings = Object.freeze({
@@ -98,7 +98,7 @@ export async function createWorkspaceRoom(
     WorkspaceCreationRuntime,
     "createTeam" | "findTeam" | "upsertTeam" | "selectTeam" | "loadTeamHistorySettings"
   >
-): Promise<RoomRecord> {
+): Promise<ClientRoomRecord> {
   const created = await runtime.createRoom(plan.teamId, plan.name, plan.projectPath, copyRoomSettings(settings));
   const room = ensureRoomDefaults(created);
   runtime.upsertRoom(room);

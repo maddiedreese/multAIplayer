@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { canHostBrowserAction } from "./browserPolicy";
 import { extractCodexBrowserOpenUrl } from "./codexInvoke";
 import { formatBrowserAccessLabel } from "./browserUi";
@@ -29,7 +29,7 @@ export function createCodexBrowserOpenCommand({
   revokedTeamIds,
   defaultBrowserUrl
 }: CreateCodexBrowserOpenCommandOptions) {
-  return (message: ChatMessage, room: RoomRecord): boolean => {
+  return (message: ChatMessage, room: ClientRoomRecord): boolean => {
     const url = extractCodexBrowserOpenUrl(message.body);
     if (!url) return false;
 

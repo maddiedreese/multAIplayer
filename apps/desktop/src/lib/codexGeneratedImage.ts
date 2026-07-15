@@ -1,5 +1,5 @@
 import { maxEmbeddedAttachmentBytes } from "@multaiplayer/protocol";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { CodexGeneratedImage } from "./localBackend";
 import { encryptMlsBlob } from "./mlsClient";
 import { createAttachmentBlob } from "./workspaceClient";
@@ -11,7 +11,7 @@ const thumbnailTargetBytes = 72_000;
 const thumbnailMaxEdge = 960;
 
 export async function createCodexImageAttachment(
-  room: Pick<RoomRecord, "id" | "teamId">,
+  room: Pick<ClientRoomRecord, "id" | "teamId">,
   image: CodexGeneratedImage
 ): Promise<ChatAttachment> {
   const dataUrl = normalizeGeneratedImageData(image);

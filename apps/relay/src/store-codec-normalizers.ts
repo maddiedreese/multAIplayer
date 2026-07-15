@@ -9,11 +9,6 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultApprovalDelegationPolicy,
-  defaultCodexModel,
-  defaultCodexReasoningEffort,
-  defaultCodexRawReasoningEnabled,
-  defaultCodexSpeed,
-  legacyCodexCatalogSelectionPolicy,
   defaultRoomMode,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
@@ -30,9 +25,6 @@ import {
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,
   normalizeCodexModel,
-  normalizeCodexCatalogSelectionPolicy,
-  normalizeCodexReasoningEffortOrDefault,
-  normalizeCodexSpeedOrDefault,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   normalizeRelayId,
@@ -390,7 +382,6 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
             ? 0
             : undefined,
       name,
-      projectPath: normalizeProjectPath(room.projectPath) ?? "/",
       host,
       hostUserId,
       activeHostDeviceId:
@@ -402,25 +393,6 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
       approvalDelegationPolicy,
       trustedApproverUserIds,
       mode,
-      codexModel: normalizeModel(room.codexModel) ?? defaultCodexModel,
-      codexModelPolicy:
-        normalizeCodexCatalogSelectionPolicy((room as { codexModelPolicy?: unknown }).codexModelPolicy) ??
-        legacyCodexCatalogSelectionPolicy,
-      codexReasoningEffort: normalizeCodexReasoningEffortOrDefault(
-        (room as { codexReasoningEffort?: unknown }).codexReasoningEffort ?? defaultCodexReasoningEffort
-      ),
-      codexReasoningEffortPolicy:
-        normalizeCodexCatalogSelectionPolicy(
-          (room as { codexReasoningEffortPolicy?: unknown }).codexReasoningEffortPolicy
-        ) ?? legacyCodexCatalogSelectionPolicy,
-      codexRawReasoningEnabled:
-        typeof (room as { codexRawReasoningEnabled?: unknown }).codexRawReasoningEnabled === "boolean"
-          ? (room as { codexRawReasoningEnabled: boolean }).codexRawReasoningEnabled
-          : defaultCodexRawReasoningEnabled,
-      codexSpeed: normalizeCodexSpeedOrDefault((room as { codexSpeed?: unknown }).codexSpeed ?? defaultCodexSpeed),
-      codexServiceTierPolicy:
-        normalizeCodexCatalogSelectionPolicy((room as { codexServiceTierPolicy?: unknown }).codexServiceTierPolicy) ??
-        legacyCodexCatalogSelectionPolicy,
       browserAllowedOrigins:
         normalizeBrowserAllowedOrigins((room as { browserAllowedOrigins?: unknown }).browserAllowedOrigins) ??
         defaultBrowserAllowedOrigins,

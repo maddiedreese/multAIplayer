@@ -9,6 +9,8 @@ use sha2::{Digest, Sha256};
 
 const ROOM: &str = "room-desktop";
 const MARKER: &[u8] = b"MLS-PLAINTEXT-MUST-NEVER-REACH-RELAY";
+const PROJECT_PATH_MARKER: &str = "/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY";
+const CODEX_MODEL_MARKER: &str = "sentinel-model-MUST-NEVER-REACH-RELAY";
 
 fn application_aad(
     message_id: &str,
@@ -167,10 +169,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     host.publish_succeeded(ROOM, &add.commit_outbox_id)?;
     next.join_welcome(ROOM, &add.welcome)?;
 
+    let application_plaintext = serde_json::to_vec(&serde_json::json!({
+        "eventType": "room.config",
+        "marker": std::str::from_utf8(MARKER)?,
+        "projectPath": PROJECT_PATH_MARKER,
+        "codexModel": CODEX_MODEL_MARKER
+    }))?;
     let application = host.encrypt_application(
         ROOM,
         "fixture-application-1",
-        MARKER,
+        &application_plaintext,
         application_aad(
             "fixture-application-1",
             "security.fixture",
@@ -181,7 +189,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opened = next
         .process_incoming(ROOM, &application.message)?
         .ok_or("application output missing")?;
-    if opened.payload != MARKER {
+    if opened.payload != application_plaintext {
         return Err("MLS application plaintext mismatch".into());
     }
     host.publish_succeeded(ROOM, &application.outbox_id)?;

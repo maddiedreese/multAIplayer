@@ -19,6 +19,7 @@ function Harness() {
   const search = new URLSearchParams(window.location.search);
   const scenarioName = search.get("scenario") ?? "";
   const presentation = search.get("presentation") === "readme";
+  if (presentation) document.documentElement.dataset.theme = "dark";
   const loader = scenarioModules[scenarioModulePath(scenarioName)];
   const [scenario, setScenario] = React.useState<UiContractScenarioModule | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -48,7 +49,13 @@ function Harness() {
           <span>Simulated boundaries: {scenario.mockedBoundaries.join(", ") || "none"}</span>
         </aside>
       )}
-      <Scenario />
+      {presentation ? (
+        <section className="readme-feature" data-scenario={scenarioName} aria-label="README feature capture">
+          <Scenario />
+        </section>
+      ) : (
+        <Scenario />
+      )}
     </main>
   );
 }

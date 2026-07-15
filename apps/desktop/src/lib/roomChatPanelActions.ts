@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { ChatAttachment, ChatMessage } from "../types";
 import { formatMessageTime } from "./appFormatters";
 import { useAppStore } from "../store/appStore";
@@ -43,7 +43,7 @@ export function createRoomChatPanelActions({
       reason?: string;
       queueSize: number;
     },
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
   pauseGoal: () => void;
   resumeGoal: () => void;
@@ -57,7 +57,7 @@ export function createRoomChatPanelActions({
     roomId: string
   ) => Promise<void>;
   stopLocalPreview: (previewId: string) => Promise<void>;
-  openBrowserUrl: (room: RoomRecord, url: string, reason: string) => void;
+  openBrowserUrl: (room: ClientRoomRecord, url: string, reason: string) => void;
 }) {
   const selectedRoomId = () => useAppStore.getState().selectedRoomId;
   const selectedRoomMessages = () => useAppStore.getState().messagesByRoom[selectedRoomId()] ?? [];

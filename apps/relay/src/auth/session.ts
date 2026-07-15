@@ -1,9 +1,8 @@
 import { sendRelayError } from "../http/errors.js";
 import type { CookieOptions, Response } from "express";
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { parseCookie } from "cookie";
-import { SessionAccessTokenCiphertext, isRecord } from "@multaiplayer/protocol";
+import { isRecord } from "@multaiplayer/protocol";
 import { normalizeMetadataText, normalizeRelayId } from "../limits.js";
 import type { AuthSession } from "../state.js";
 
@@ -29,8 +28,6 @@ export interface StoredAuthSession {
   sessionId: string;
   user: AuthSession["user"];
   expiresAt: number;
-  accessToken?: string;
-  encryptedAccessToken?: SessionAccessTokenCiphertext;
 }
 
 export interface NormalizedStoredAuthSession {
@@ -40,13 +37,10 @@ export interface NormalizedStoredAuthSession {
 
 interface RelayAuthSessionPersistenceOptions {
   authSessionMaxAgeMs: number;
-  maxAccessTokenChars: number;
   maxAuthSessionIdChars: number;
   maxDisplayNameChars: number;
-  maxEncryptedAccessTokenChars: number;
   maxRoomProjectPathChars: number;
   maxUserIdChars: number;
-  sessionPersistenceSecret?: string | null;
 }
 
 export interface RelayAuthSessionPersistence {
@@ -127,79 +121,20 @@ export function parseCookieHeader(header: string | undefined): Map<string, strin
 
 export function createRelayAuthSessionPersistence({
   authSessionMaxAgeMs,
-  maxAccessTokenChars,
   maxAuthSessionIdChars,
   maxDisplayNameChars,
-  maxEncryptedAccessTokenChars,
   maxRoomProjectPathChars,
-  maxUserIdChars,
-  sessionPersistenceSecret
+  maxUserIdChars
 }: RelayAuthSessionPersistenceOptions): RelayAuthSessionPersistence {
-  function sessionPersistenceKey(): Buffer {
-    return Buffer.from(
-      hkdfSync(
-        "sha256",
-        Buffer.from(sessionPersistenceSecret ?? "", "utf8"),
-        "multaiplayer-relay-session-v1",
-        "github-session-access-token",
-        32
-      )
-    );
-  }
-
-  function encryptSessionAccessToken(accessToken: string): StoredAuthSession["encryptedAccessToken"] | null {
-    if (!sessionPersistenceSecret) return null;
-    const nonce = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", sessionPersistenceKey(), nonce, { authTagLength: 16 });
-    const ciphertext = Buffer.concat([cipher.update(accessToken, "utf8"), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    return {
-      algorithm: "AES-GCM-256",
-      nonce: nonce.toString("base64"),
-      ciphertext: ciphertext.toString("base64"),
-      tag: tag.toString("base64")
-    };
-  }
-
-  function decryptStoredAccessToken(stored: Record<string, unknown>): string | null {
-    if (!sessionPersistenceSecret || !isRecord(stored.encryptedAccessToken)) return null;
-    const parsed = SessionAccessTokenCiphertext.safeParse(stored.encryptedAccessToken);
-    if (!parsed.success) return null;
-    const encrypted = parsed.data;
-    if (encrypted.ciphertext.length > maxEncryptedAccessTokenChars || encrypted.ciphertext.length < 1) {
-      return null;
-    }
-    try {
-      const decipher = createDecipheriv(
-        "aes-256-gcm",
-        sessionPersistenceKey(),
-        Buffer.from(encrypted.nonce, "base64"),
-        {
-          authTagLength: 16
-        }
-      );
-      decipher.setAuthTag(Buffer.from(encrypted.tag, "base64"));
-      return Buffer.concat([decipher.update(Buffer.from(encrypted.ciphertext, "base64")), decipher.final()]).toString(
-        "utf8"
-      );
-    } catch {
-      return null;
-    }
-  }
-
   return {
     storedAuthSessions(authSessions) {
-      if (!sessionPersistenceSecret) return [];
       const sessions: StoredAuthSession[] = [];
       for (const [sessionId, session] of authSessions.entries()) {
         if (session.expiresAt <= Date.now()) continue;
-        const encryptedAccessToken = encryptSessionAccessToken(session.accessToken);
-        if (!encryptedAccessToken) continue;
         sessions.push({
           sessionId,
           user: session.user,
-          expiresAt: session.expiresAt,
-          encryptedAccessToken
+          expiresAt: session.expiresAt
         });
       }
       return sessions;
@@ -227,12 +162,9 @@ export function createRelayAuthSessionPersistence({
         return null;
       }
 
-      const accessToken = decryptStoredAccessToken(stored);
-      if (!accessToken || accessToken.length > maxAccessTokenChars) return null;
       return {
         sessionId,
         session: {
-          accessToken,
           user: {
             id: userId,
             login,

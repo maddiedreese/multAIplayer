@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import type { ApprovalPolicy, RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ApprovalPolicy, ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { BrowserAccessRequest, ChatMessage, TerminalCommandRequest } from "../types";
 import { buildSidebarMessageHitRows, buildSidebarRoomRows, buildSidebarTeamRows } from "../lib/sidebarDisplayRows";
 import { findSidebarMessageHits, mergeSearchableMessages, searchMatches } from "../lib/sidebarSearch";
 
 interface UseSidebarNavigationOptions {
   sidebarQuery: string;
-  rooms: RoomRecord[];
+  rooms: ClientRoomRecord[];
   teams: TeamRecord[];
   selectedTeam: string;
   selectedRoomId: string;

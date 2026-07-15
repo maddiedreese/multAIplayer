@@ -232,12 +232,10 @@ test("arbitrary decoded store documents never escape codec normalization", () =>
 test("expiry and pruning use the injected clock", () => {
   const { store, codec: storeCodec } = codec();
   store.authSessions.set("expired", {
-    accessToken: "secret",
     user: { id: "user", login: "user" },
     expiresAt: fixedNow
   });
   store.authSessions.set("active", {
-    accessToken: "secret",
     user: { id: "user", login: "user" },
     expiresAt: fixedNow + 1
   });

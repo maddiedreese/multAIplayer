@@ -345,7 +345,6 @@ async function main() {
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
     MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: frontendUrl,
     MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_SESSION_SECRET: "native-e2e-session-secret-with-at-least-32-characters",
     MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorBinary
   };
   let relay: RelayHarness | undefined;

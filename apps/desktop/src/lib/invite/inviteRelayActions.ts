@@ -27,6 +27,7 @@ import { reportExpectedFailure } from "../nonFatalReporting";
 import { getRelayHttpUrl } from "../appConfig";
 import { retryAfterDeviceSessionExpiry } from "../deviceSession";
 import { assertInviteApprovalEpoch, recoverInviteApproval, type PendingInviteApproval } from "./inviteApprovalRecovery";
+import { publishRoomConfigSnapshot } from "../roomConfigSnapshot";
 
 type InviteRelayActionOptions = Pick<UseInviteActionsOptions, "relayRef" | "seenEnvelopeIds" | "selectedRoomIdRef">;
 const inviteDecisionsInFlight = new Set<string>();
@@ -269,6 +270,16 @@ export function createInviteRelayActions(
         (session) => useAppStore.getState().replaceDeviceSessionToken(session.token)
       );
       await markMlsPublishSucceeded(room.id, welcome.id);
+      const configRelay = relayRef.current;
+      if (!configRelay) throw new Error("Relay is unavailable for the encrypted room configuration snapshot.");
+      await publishRoomConfigSnapshot({
+        client: configRelay,
+        room,
+        senderUserId: context.localUser.id,
+        senderDeviceId: deviceId,
+        seenEnvelopeIds: seenEnvelopeIds.current,
+        incrementRevision: true
+      });
       approvedInviteOutboxes.delete(request.id);
       validatedRequests.delete(request.id);
       store.updateInviteRequestStatus(room.id, request.id, "approved");

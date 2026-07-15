@@ -297,6 +297,23 @@ pub(crate) struct EncryptRequest {
     pub(super) authenticated_data: ApplicationAuthenticatedDataInput,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct RoomConfigPayload {
+    pub(super) event_type: String,
+    pub(super) config_revision: u64,
+    pub(super) emitting_epoch: u64,
+    pub(super) project_path: String,
+    pub(super) codex_model: String,
+    pub(super) codex_model_policy: String,
+    pub(super) codex_reasoning_effort: String,
+    pub(super) codex_reasoning_effort_policy: String,
+    pub(super) codex_raw_reasoning_enabled: bool,
+    pub(super) codex_speed: String,
+    pub(super) codex_service_tier_policy: String,
+    pub(super) codex_sandbox_level: String,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct IncomingRequest {

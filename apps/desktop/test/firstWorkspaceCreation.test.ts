@@ -6,10 +6,10 @@ import {
   type WorkspaceCreationRuntime
 } from "../src/lib/firstWorkspaceCreation";
 import type { RoomCreationSettings } from "../src/lib/workspaceClient";
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 
 const team: TeamRecord = { id: "team-first", name: "Core", members: 1, role: "owner" };
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-first",
   teamId: team.id,
   name: "Desktop",

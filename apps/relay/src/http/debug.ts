@@ -82,7 +82,6 @@ export function registerDebugRoutes({
     }
     const sessionId = nanoid(32);
     const session: AuthSession = {
-      accessToken: "debug-token",
       user: { id: userId, login: normalizedLogin, name: normalizedName },
       expiresAt: Date.now() + ttlMs
     };

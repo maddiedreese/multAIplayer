@@ -8,11 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { WebSocket } from "ws";
-import {
-  codexReasoningEffortIds,
-  maxSessionCiphertextNonceChars,
-  maxRoomProjectPathChars
-} from "@multaiplayer/protocol";
+import { codexReasoningEffortIds, maxRoomProjectPathChars } from "@multaiplayer/protocol";
 
 const relayPackageRoot = fileURLToPath(new URL("../..", import.meta.url));
 const mockValidatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
@@ -64,7 +60,7 @@ export {
   tmpdir,
   writeFile
 };
-export { codexReasoningEffortIds, maxSessionCiphertextNonceChars, maxRoomProjectPathChars };
+export { codexReasoningEffortIds, maxRoomProjectPathChars };
 export async function startRelay(
   extraEnv: NodeJS.ProcessEnv = {},
   storedState?: StoredRelayStateFixture,

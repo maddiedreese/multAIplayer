@@ -11,6 +11,7 @@ import {
   applyStoredRelayMutations,
   applyStoredRelayMutationsInTransaction,
   loadNormalizedRelayState,
+  purgeLegacyRoomConfigFields,
   saveMlsBacklogRows,
   saveNormalizedRelayState
 } from "./sqlite-state-repository.js";
@@ -54,7 +55,12 @@ export class SqliteRelayPersistence implements RelayPersistence {
   }
 
   async finalizeLoad(state: () => unknown): Promise<void> {
-    if (!this.pendingLegacyImport || !this.legacyJsonImportPath) return;
+    if (!this.pendingLegacyImport || !this.legacyJsonImportPath) {
+      const normalized = state();
+      const normalizedRooms = isRecord(normalized) && Array.isArray(normalized.rooms) ? normalized.rooms : null;
+      if (normalizedRooms) this.timedWrite(() => purgeLegacyRoomConfigFields(this.getDb(), normalizedRooms));
+      return;
+    }
     this.timedWrite(() => saveNormalizedRelayState(this.getDb(), state(), this.legacyJsonImportPath!));
     try {
       await this.renameLegacyFile(this.legacyJsonImportPath, availableMigrationBackupPath(this.legacyJsonImportPath));

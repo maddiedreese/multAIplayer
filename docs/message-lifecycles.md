@@ -34,6 +34,15 @@ These traces describe the native protocol-v2 path. A normal browser receives onl
 
 The relay cannot decrypt the MLS message and does not parse its application event kind.
 
+## Life of room configuration
+
+1. The active host selects a local project path and Codex model/tuning settings. Room create/settings HTTP requests omit these fields, and the relay rejects legacy clients that try to send them.
+2. The desktop constructs a complete `room.config` snapshot. Rust enforces its exact schema, path/model bounds, closed policy values, positive revision, and current emitting epoch.
+3. Before producing the outbound PrivateMessage, Rust saves the validated snapshot in the local SQLCipher MLS application store. The SQLCipher wrapping key is held in the operating-system credential store. This record supports retry after a webview loss, reconnect, or process restart without reading configuration from the relay.
+4. The host publishes the MLS-encrypted snapshot after a config change, after each Add, and after host handoff. The relay receives only normal MLS ciphertext and routing metadata.
+5. A member accepts only a snapshot authenticated as coming from the active host and newer by epoch/revision. A new member with no pre-join backlog shows configuration as pending until the post-Add snapshot arrives.
+6. **Clear history** deletes retained history but leaves the latest configuration record available to the active room. **Forget on this device** deletes both local history and that durable config record.
+
 ## Life of a membership Commit
 
 1. An approved invite or removal gives the active host a bounded membership intent.
@@ -42,6 +51,15 @@ The relay cannot decrypt the MLS message and does not parse its application even
 4. Peers independently reject a Commit unless its authenticated sender leaf is the current host leaf and its ciphersuite is the pinned suite.
 5. On success, peers persist new state and derive/store that epoch's local-history exporter secret. Removed members cannot process later epochs.
 6. A stale concurrent Commit is rejected so the host reloads current state and rebases the intended operation.
+
+## Life of member-only room configuration
+
+1. A room is created at the relay with public room/team and host metadata only. The selected project path and Codex model/tuning values remain on the host.
+2. Native Rust validates the complete bounded `room.config` payload, its revision, and its current MLS epoch before producing a PrivateMessage.
+3. The host publishes a snapshot after room creation, configuration changes, each Add Commit in the new epoch, reconnect/startup recovery, and host handoff. The durable application outbox preserves retry ordering when publication is interrupted.
+4. Recipients require the authenticated MLS sender to match the active host and accept only the highest epoch/revision tuple.
+5. A new member has no pre-join backlog and shows configuration pending until the post-Add snapshot arrives. It never falls back to relay room fields.
+6. Removed members cannot decrypt later-epoch snapshots. The relay sees the ordinary opaque MLS envelope and routing metadata, not the project path or Codex configuration.
 
 ## Life of an invite
 

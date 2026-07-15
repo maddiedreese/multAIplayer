@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   clearShellExecutionGrants,
   getGitStatus,
@@ -35,7 +35,7 @@ interface TerminalActionsOptions {
     kind: "terminal.event" | "browser.event",
     requestId: string,
     status: "approved" | "denied",
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
   publishTerminalResult: (
     request: TerminalCommandRequest,
@@ -47,7 +47,7 @@ interface TerminalActionsOptions {
       stderr: string;
       error?: string;
     },
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
 }
 
@@ -60,7 +60,7 @@ export function createTerminalActions({
   publishTerminalResult
 }: TerminalActionsOptions) {
   const currentContext = () => currentSelectedRoomContext();
-  function currentTerminalState(selectedRoom: RoomRecord) {
+  function currentTerminalState(selectedRoom: ClientRoomRecord) {
     const store = useAppStore.getState();
     const roomTerminals = store.terminals.filter((terminal) => terminal.roomId === selectedRoom.id);
     const selectedTerminalId = store.terminalRuntimeByRoom[selectedRoom.id]?.selectedTerminalId;
@@ -71,7 +71,7 @@ export function createTerminalActions({
     };
   }
 
-  function currentRoomLock(selectedRoom: RoomRecord) {
+  function currentRoomLock(selectedRoom: ClientRoomRecord) {
     const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
     return (
       selectedRoom.archivedAt != null ||

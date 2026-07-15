@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { GitHubActionsEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
+import type { GitHubActionsEventPlaintextPayload, ClientRoomRecord } from "@multaiplayer/protocol";
 import { listGitHubActionRuns, type GitHubAuthConfig, type SignedInUser } from "../lib/authClient";
 import {
   checkGitHubActionsReadiness,
@@ -20,8 +20,8 @@ interface LocalUser {
 
 interface UseGitHubActionsRefreshOptions {
   hasSelectedRoom: boolean;
-  selectedRoom: RoomRecord;
-  roomsRef: MutableRefObject<RoomRecord[]>;
+  selectedRoom: ClientRoomRecord;
+  roomsRef: MutableRefObject<ClientRoomRecord[]>;
   actionsBusyRef: MutableRefObject<Record<string, boolean>>;
   gitWorkflowDraftsRef: MutableRefObject<Record<string, Partial<GitWorkflowDraft>>>;
   forgottenRoomIds: Set<string>;
@@ -33,7 +33,7 @@ interface UseGitHubActionsRefreshOptions {
   setActionsBusyForRoom: (roomId: string, busy: boolean) => void;
   publishGitHubActionsEvent: (
     event: Omit<GitHubActionsEventPlaintextPayload, "eventType" | "checkedBy" | "checkedByUserId">,
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
 }
 
@@ -55,7 +55,7 @@ export function useGitHubActionsRefresh({
   const setActionsMessageForRoom = useAppStore((state) => state.setActionsMessageForRoom);
   const recordGitHubActionsRefreshForRoom = useAppStore((state) => state.recordGitHubActionsRefreshForRoom);
 
-  async function refreshGitHubActions(roomArg?: RoomRecord, targetArg?: GitHubActionsTarget) {
+  async function refreshGitHubActions(roomArg?: ClientRoomRecord, targetArg?: GitHubActionsTarget) {
     const room = roomArg ?? (hasSelectedRoom ? selectedRoom : null);
     if (!room) {
       return;

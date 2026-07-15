@@ -6,7 +6,6 @@ import {
   RoomRecord,
   isRecord,
   maxAttachmentBlobTypeChars,
-  maxSessionCiphertextNonceChars,
   maxProjectPathChars,
   maxRoomNameChars,
   maxRoomProjectPathChars
@@ -14,7 +13,6 @@ import {
 
 test("semantic protocol limits share their canonical values", () => {
   assert.equal(maxRoomProjectPathChars, maxProjectPathChars);
-  assert.equal(maxSessionCiphertextNonceChars, 4_096);
 });
 
 test("isRecord identifies non-null objects", () => {

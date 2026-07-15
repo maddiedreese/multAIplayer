@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { markMlsPublishSucceeded, mlsGroupState, removeMlsMember } from "../mlsClient";
 import { clearAndRebaseStaleMlsCommit } from "../mlsCommitRebase";
 import { useAppStore } from "../../store/appStore";
@@ -13,7 +13,7 @@ type RoomMembershipActionOptions = Pick<
 /** Publishes host-authorized MLS Remove commits with persist-before-send ordering. */
 export function createMembershipCommitActions(options: RoomMembershipActionOptions) {
   async function removeMembersFromMlsGroup(
-    room: RoomRecord,
+    room: ClientRoomRecord,
     localUser: { id: string; name: string },
     deviceId: string,
     excludedUserIds: ReadonlySet<string> = new Set<string>()

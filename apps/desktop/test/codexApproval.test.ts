@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { canApproveCodexTurn, shouldResetCodexApprovalForRoomUpdate } from "../src/lib/codexApproval";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-codex",
   teamId: "team-core",
   name: "Codex",

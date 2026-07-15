@@ -7,8 +7,8 @@
 <p align="center"><strong>Build with Codex. Together.</strong></p>
 
 <p align="center">
-  A native macOS workspace where trusted teammates share an encrypted project room,<br>
-  propose work, and follow one active host's local Codex session in real time.
+  Multiplayer Codex for trusted teams: talk through the work, steer one shared Codex session,<br>
+  review what it changes, and move the active host between teammates.
 </p>
 
 <p align="center">
@@ -22,52 +22,56 @@
 > [!IMPORTANT]
 > multAIplayer is a free, open-source alpha for Apple silicon Macs running macOS 11 or later. No supported public build has been published yet. The website will enable its download only after a Developer ID-signed and notarized release passes the release gates.
 
-## See the app
+## Multiplayer Codex, built around your project
+
+Start a private room around a local project, invite the people you trust, and work with Codex as a team. Everyone can follow the conversation, propose the next turn, see structured progress, review changes, and keep the work moving. One active host at a time provides the project, local tools, credentials, and Codex account; hosting can be handed to another verified member when the work moves to their machine.
+
+## Start together, stay in control
 
 <p align="center">
-  <img src="docs/assets/screens/onboarding.png" width="49%" alt="multAIplayer welcome screen with create and join choices">
-  <img src="docs/assets/screens/safe-defaults.png" width="49%" alt="multAIplayer safe defaults review screen">
+  <img src="docs/assets/screens/onboarding.png" width="49%" alt="Create a multiplayer Codex workspace or join a trusted teammate's invitation">
+  <img src="docs/assets/screens/safe-defaults.png" width="49%" alt="Review safe defaults before entering a multiplayer Codex room">
 </p>
+
+## Work with Codex in the room
 
 <p align="center">
-  <img src="docs/assets/screens/codex-room.png" width="72%" alt="A multAIplayer room showing a teammate message and expandable Codex activity">
+  <img src="docs/assets/screens/codex-room.png" width="78%" alt="A teammate request, Codex result, and expandable activity shown inside a shared room">
 </p>
 
-These images are deterministic captures of the current production components and styles with representative local data—not concept art. Regenerate them with `npm run docs:screenshots` after a visible UI change.
+## How a room works
 
-## What it does
+Each room connects your team to one active host's project and Codex session:
 
-Each room connects a team conversation to one selected project folder and one active host:
+1. Create a workspace, attach a project, and invite trusted teammates—or join a room you were invited to.
+2. Discuss the work in the room and propose Codex turns together.
+3. The active host reviews what the turn will share and what access it requests before Codex starts.
+4. Codex works locally on the host's machine while the room shows progress, approvals, edits, Git activity, and results.
+5. Hand hosting to another verified member when the team needs their project checkout, tools, or credentials.
 
-1. A teammate writes normally or proposes a Codex turn.
-2. The active host reviews what will be shared and what local authority the turn requests.
-3. The host's own Codex app-server works in the selected project using the host's local account and credentials.
-4. The room receives encrypted chat, approvals, structured Codex progress, diffs, Git activity, and results.
-5. Host authority can be handed to another verified member through an explicit MLS-backed transfer.
+Alongside chat and Codex, the room brings together project files and diffs, terminals, Git and GitHub workflows, encrypted attachments, Codex thread forks, and subagent activity. See [Using the app](docs/using-the-app.md) for a tour.
 
-The desktop also provides project files and diffs, PTY terminals, Git and GitHub workflows, multi-tab in-room browsing, encrypted attachments, local-preview sharing, Codex thread forks, and normalized subagent activity. See [Using the app](docs/using-the-app.md) for the complete surface tour.
+## What sharing a room means
 
-## The trust boundary
+A room is for people you trust to collaborate on the active host's project. Members can see the context the host shares and can request actions involving the project, terminal, Git, GitHub, and Codex session. The active host stays responsible for reviewing approvals and choosing the access Codex receives.
 
-Room membership is controlled access to the active host's machine. Admitted members can see shared project context and request actions involving the host's project, terminal, browser, Git, GitHub, and Codex session. The host remains responsible for reviewing approvals.
-
-- Room traffic uses RFC 9420 MLS through a Rust-owned native boundary.
-- The relay stores routing and membership metadata, public device material, opaque MLS records, encrypted blobs, invites, and encrypted OAuth sessions. It is designed not to receive plaintext chat, attachment contents, project files, terminal output, or Codex/OpenAI credentials.
-- The relay's GitHub proxy necessarily handles repository and pull-request fields for operations the user requests. The official OAuth grant is `read:user repo`, covering both public and private repositories the user can access.
+- Chat, shared Codex activity, and attachments travel through RFC 9420 MLS encryption owned by the native Rust boundary.
+- The relay coordinates rooms and membership. It is designed not to receive plaintext chat, attachment contents, project files, host-local project paths, Codex model configuration, terminal output, or Codex/OpenAI credentials.
+- GitHub sign-in requests `read:user repo` so repository workflows can work with both public and private repositories the user can access. The native app keeps the token in macOS Keychain and calls GitHub directly for pull requests and Actions; the relay observes it only during sign-in identity verification and immediately discards it. Local Git uses the host's existing credentials.
 - Invite links contain a private, single-use bearer capability in the URL fragment. Share the complete link only through a private channel; never paste it into an issue, log, diagnostic, or support request.
-- MLS integration, host-authority policy, invite HPKE flow, and encrypted storage have extensive automated evidence but no independent professional audit. Encryption is the intended and tested boundary, not an independently verified guarantee.
+- This is alpha software. Its encryption and host-authority boundaries have extensive automated test coverage, but they have not received an independent professional security audit.
 
 Read the [threat model](docs/threat-model.md), [cryptography architecture](docs/cryptography.md), [alpha limitations](docs/alpha-limitations.md), and [security policy](SECURITY.md) before using private projects.
 
-## Hosted alpha service
+## The free alpha
 
-The official free-alpha relay is live on Railway at `https://relay.multaiplayer.com` and `wss://relay.multaiplayer.com/rooms`. It uses GitHub Device Flow for identity, encrypted persistent sessions, and authenticated workspace access. There is no separate multAIplayer password or billing account.
+The official relay is live on Railway at `https://relay.multaiplayer.com` and `wss://relay.multaiplayer.com/rooms`. GitHub Device Flow identifies members, so there is no separate multAIplayer password, subscription, or billing account.
 
 The service is free, experimental, and has no uptime, recovery, or response-time guarantee. Keep normal Git and project backups. The Profile drawer can delete hosted account data after owned teams are transferred or deleted and hosted rooms are handed off; shared encrypted records, other members' copies, local room state, GitHub's OAuth grant, and backup rotation are separate deletion boundaries.
 
 Hosted use is governed by the [Privacy Policy](https://multaiplayer.com/privacy) and [Terms of Service](https://multaiplayer.com/terms). The [self-hosting guide](docs/self-hosting.md) covers independent relay deployments, and [If this project goes unmaintained](docs/if-unmaintained.md) explains the continuity plan.
 
-## Run it locally
+## Build the app locally
 
 Prerequisites are Node.js 22, npm, Rust/Cargo, Xcode command-line tools, and Codex. On macOS:
 
@@ -78,7 +82,7 @@ npm run doctor
 npm run tauri:dev
 ```
 
-Set `GITHUB_CLIENT_ID` in `.env` to use GitHub sign-in. A stable `MULTAIPLAYER_RELAY_SESSION_SECRET` keeps encrypted OAuth sessions readable across relay restarts. The root development command starts the local relay and frontend used by Tauri; a normal browser intentionally receives only the native-app notice and never initializes a workspace, identity, relay connection, diagnostics, or MLS state.
+GitHub sign-in uses the public OAuth client id embedded in the native build; no client secret is required or supported. Self-built native clients can override the client id and pinned relay origin at compile time as documented in [Self-hosting](docs/self-hosting.md). The root development command starts the local relay and the frontend used by Tauri. multAIplayer is a native app; opening the development URL in a normal browser shows only an install notice.
 
 Useful verification commands:
 
@@ -96,7 +100,7 @@ npm run verify
 | --- | --- |
 | `apps/desktop` | React desktop UI and the Tauri/Rust native boundary |
 | `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, HPKE invites, encrypted state, and history/blob exporters |
-| `apps/relay` | Authenticated HTTP/WebSocket relay, persistence, quotas, and GitHub proxy |
+| `apps/relay` | Authenticated HTTP/WebSocket relay, identity verification, persistence, and quotas |
 | `packages/protocol` | Shared wire records and runtime validation |
 | `packages/codex` | Codex app-server client and compatibility contract |
 | `packages/git`, `packages/github` | Host-side Git and GitHub adapters |

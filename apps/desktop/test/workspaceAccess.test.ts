@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   canRequestWorkspaceAction,
   canUseLocalWorkspace,
@@ -9,7 +9,7 @@ import {
   roomFileActionInFlightMessage
 } from "../src/lib/workspaceAccess";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-workspace",
   teamId: "team-core",
   name: "Workspace",

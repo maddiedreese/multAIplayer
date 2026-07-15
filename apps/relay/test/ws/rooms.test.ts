@@ -68,7 +68,6 @@ test("invite admission requires the exact approved user and device and consumes 
   const session = {
     socket: {} as never,
     authSession: {
-      accessToken: "token",
       user: { id: "github:joiner", login: "joiner" },
       expiresAt: Date.now() + 60_000
     },

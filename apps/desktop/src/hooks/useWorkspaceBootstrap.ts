@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { loadWorkspace } from "../lib/workspaceClient";
 import { ensureRoomDefaults } from "../lib/roomDefaults";
+import { useAppStore } from "../store/appStore";
 
 interface UseWorkspaceBootstrapOptions {
   relayHttpUrl: string;
@@ -14,9 +15,9 @@ interface UseWorkspaceBootstrapOptions {
   authenticatedUserId: string | null;
   bootstrapAttempt: number;
   replaceTeams: (teams: TeamRecord[]) => void;
-  replaceRooms: (rooms: RoomRecord[]) => void;
+  replaceRooms: (rooms: ClientRoomRecord[]) => void;
   selectExistingTeamOrFirst: (teams: TeamRecord[]) => void;
-  selectExistingRoomOrFirst: (rooms: RoomRecord[]) => void;
+  selectExistingRoomOrFirst: (rooms: ClientRoomRecord[]) => void;
   setWorkspaceStatusError: (message: string | null) => void;
   beginWorkspaceBootstrap: () => void;
   completeWorkspaceBootstrap: () => void;
@@ -42,7 +43,13 @@ export function useWorkspaceBootstrap({
     loadWorkspace()
       .then((snapshot) => {
         if (cancelled) return;
-        const nextRooms = snapshot.rooms.map(ensureRoomDefaults);
+        const currentRooms = useAppStore.getState().rooms;
+        const nextRooms = snapshot.rooms.map((room) =>
+          ensureRoomDefaults(
+            room,
+            currentRooms.find((current) => current.id === room.id)
+          )
+        );
         replaceTeams(snapshot.teams);
         replaceRooms(nextRooms);
         selectExistingTeamOrFirst(snapshot.teams);

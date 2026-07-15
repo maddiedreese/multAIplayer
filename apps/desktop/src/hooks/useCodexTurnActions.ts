@@ -140,6 +140,10 @@ export function useCodexTurnActions({
     const { model, reasoningEffort, speed } = resolvedSettings;
     const sandboxLevel = room.codexSandboxLevel ?? defaultCodexSandboxLevel;
     const projectPath = room.projectPath;
+    if (room.configPending) {
+      setHostMessageForRoom(roomId, "Waiting for the active host's encrypted room configuration.");
+      return;
+    }
     if (!hasActionableCodexTurnContext(turnSummary)) {
       setPendingCodexApprovalForRoom(roomId, null);
       setApprovalVisibleForRoom(roomId, false);

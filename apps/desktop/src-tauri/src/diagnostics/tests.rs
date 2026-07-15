@@ -172,7 +172,7 @@ fn capture_and_export_redact_urls_and_tokens() {
     };
     let mut unsafe_entry = entry(1);
     unsafe_entry.detail = Some(
-        "https://user:password@relay.example.com/invites?token=secret gho_abcdefghijklmnopqrstuvwxyz1234567890"
+        "https://user:password@relay.example.com/invites?token=secret gho_abcdefghijklmnopqrstuvwxyz1234567890 ghp_GITHUB_TOKEN_MUST_NEVER_ENTER_DIAGNOSTICS_0123456789"
             .to_string(),
     );
     state.record(unsafe_entry, now()).expect("record");
@@ -185,6 +185,7 @@ fn capture_and_export_redact_urls_and_tokens() {
     assert!(!serialized.contains("token=secret"));
     assert!(!serialized.contains("password"));
     assert!(!serialized.contains("gho_"));
+    assert!(!serialized.contains("ghp_GITHUB_TOKEN"));
     assert!(!serialized.contains("abcdefghijklmnopqrstuvwxyz1234567890"));
     assert!(serialized.contains("[redacted-token]"));
     let _ = fs::remove_dir_all(path.parent().expect("parent"));
@@ -201,7 +202,7 @@ fn native_bundle_normalizes_context_and_never_exposes_unredacted_entries() {
     };
     state.record(entry(1), now()).expect("record");
     state.lock_store().expect("lock").entries[0].detail = Some(
-        "legacy https://relay.example.com/path?secret=leaked abcdefghijklmnopqrstuvwxyz1234567890"
+        "legacy https://relay.example.com/path?secret=leaked abcdefghijklmnopqrstuvwxyz1234567890 ghp_GITHUB_TOKEN_MUST_NEVER_ENTER_EXPORTS_0123456789"
             .to_string(),
     );
     let context = DiagnosticExportContext {
@@ -225,6 +226,7 @@ fn native_bundle_normalizes_context_and_never_exposes_unredacted_entries() {
     assert!(!serialized.contains("password"));
     assert!(!serialized.contains("secret=leaked"));
     assert!(!serialized.contains("abcdefghijklmnopqrstuvwxyz1234567890"));
+    assert!(!serialized.contains("ghp_GITHUB_TOKEN"));
     assert!(serialized.contains("[redacted-token]"));
     let _ = fs::remove_dir_all(path.parent().expect("parent"));
 }

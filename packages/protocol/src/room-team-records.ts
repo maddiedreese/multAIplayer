@@ -60,7 +60,6 @@ export const RoomRecord = z.object({
   teamId: TeamId,
   acceptedMlsEpoch: z.number().int().nonnegative().optional(),
   name: z.string().min(1).max(maxRoomNameChars),
-  projectPath: z.string().min(1).max(maxRoomProjectPathChars),
   host: z.string().min(1).max(maxDisplayNameChars),
   hostUserId: UserId.optional(),
   activeHostDeviceId: DeviceId.optional(),
@@ -69,22 +68,31 @@ export const RoomRecord = z.object({
   approvalDelegationPolicy: z.enum(["host_only", "members_can_request", "members_can_approve", "trusted_members_only"]),
   trustedApproverUserIds: z.array(UserId).max(50),
   mode: RoomModeSchema,
-  codexModel: z.string().min(1).max(maxCodexModelChars),
-  codexModelPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexReasoningEffort: z.enum(codexReasoningEffortIds).optional(),
-  codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexRawReasoningEnabled: z.boolean().optional(),
-  codexSpeed: z.enum(["standard", "fast"]).optional(),
-  codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexSandboxLevel: z
-    .enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"])
-    .optional(),
   browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
   browserProfilePersistent: z.boolean(),
   unread: z.number().int().nonnegative(),
   archivedAt: z.string().datetime().optional(),
   deletedAt: z.string().datetime().optional()
 });
+
+/** Member-only room configuration. This shape must never be accepted or persisted by the relay. */
+export const RoomConfig = z.object({
+  projectPath: z.string().min(1).max(maxRoomProjectPathChars),
+  codexModel: z.string().min(1).max(maxCodexModelChars),
+  codexModelPolicy: z.enum(["auto", "pinned"]),
+  codexReasoningEffort: z.enum(codexReasoningEffortIds),
+  codexReasoningEffortPolicy: z.enum(["auto", "pinned"]),
+  codexRawReasoningEnabled: z.boolean(),
+  codexSpeed: z.enum(["standard", "fast"]),
+  codexServiceTierPolicy: z.enum(["auto", "pinned"]),
+  codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"]),
+  configRevision: z.number().int().nonnegative(),
+  configEpoch: z.number().int().nonnegative(),
+  configPending: z.boolean()
+});
+
+/** Desktop projection of public relay metadata plus the latest authenticated MLS configuration. */
+export const ClientRoomRecord = RoomRecord.merge(RoomConfig);
 
 export const InviteRecord = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
@@ -170,6 +178,8 @@ export type TeamMemberRecord = z.infer<typeof TeamMemberRecord>;
 export type DeviceRecord = z.infer<typeof DeviceRecord>;
 export type RoomModeSchema = z.infer<typeof RoomModeSchema>;
 export type RoomRecord = z.infer<typeof RoomRecord>;
+export type RoomConfig = z.infer<typeof RoomConfig>;
+export type ClientRoomRecord = z.infer<typeof ClientRoomRecord>;
 export type InviteRecord = z.infer<typeof InviteRecord>;
 export type InviteJoinRequestRecord = z.infer<typeof InviteJoinRequestRecord>;
 export type InviteResponseRecord = z.infer<typeof InviteResponseRecord>;

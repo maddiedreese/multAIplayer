@@ -45,7 +45,7 @@ function installAuthResponses(options: {
         scopes: ["read:user"],
         mutationsRequireAuth: options.mutationsRequireAuth,
         allowedOrigins: ["http://127.0.0.1:1420"],
-        sessionPersistence: "memory_only"
+        sessionPersistence: "identity_only"
       });
     }
     if (url.endsWith("/auth/me")) {
@@ -107,7 +107,7 @@ test("failed auth configuration settles fail closed and retries config plus curr
             scopes: ["read:user"],
             mutationsRequireAuth: true,
             allowedOrigins: ["http://127.0.0.1:1420"],
-            sessionPersistence: "memory_only"
+            sessionPersistence: "identity_only"
           });
     }
     if (url.endsWith("/auth/me")) {

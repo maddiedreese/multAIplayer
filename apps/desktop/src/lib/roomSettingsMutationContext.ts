@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { currentSelectedRoom, currentSelectedRoomContext } from "./selectedWorkspace";
 import { omitRecordKey } from "./setUtils";
@@ -16,7 +16,7 @@ export function createRoomSettingsMutationContext(
     const localUser = currentSelectedRoomContext()?.localUser;
     return { requesterName: localUser?.name ?? "Local user", requesterUserId: localUser?.id ?? "local" };
   };
-  const currentRoomAccess = (room: RoomRecord) => {
+  const currentRoomAccess = (room: ClientRoomRecord) => {
     const store = useAppStore.getState();
     const revoked = store.revokedRoomIds.has(room.id) || store.revokedTeamIds.has(room.teamId);
     return { revoked, locked: room.archivedAt != null || store.forgottenRoomIds.has(room.id) || revoked };

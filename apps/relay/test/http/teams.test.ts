@@ -32,8 +32,7 @@ test("relay scopes authenticated workspace access to team members and admits inv
       headers: { "content-type": "application/json", cookie: peerCookie },
       body: JSON.stringify({
         teamId: "team-core",
-        name: "Peer room",
-        projectPath: "/tmp/multaiplayer"
+        name: "Peer room"
       })
     });
     assert.equal(deniedRoom.status, 403);
@@ -177,7 +176,6 @@ function approvedInviteFixture(deviceId: string) {
         id: "room-desktop",
         teamId: "team-core",
         name: "Desktop app",
-        projectPath: "/tmp/multaiplayer",
         host: "Maddie",
         hostUserId: "github:maddiedreese",
         hostStatus: "active",
@@ -342,7 +340,7 @@ test("relay archives restores and deletes teams with their rooms", async () => {
     const createInArchivedTeam = await fetch(`${relay.baseUrl}/rooms`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie: ownerCookie },
-      body: JSON.stringify({ teamId: "team-core", name: "Archived Child", projectPath: "/tmp/project" })
+      body: JSON.stringify({ teamId: "team-core", name: "Archived Child" })
     });
     assert.equal(createInArchivedTeam.status, 409);
 

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, StrictMode, type ReactNode } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { UseInviteActionsOptions } from "../src/lib/invite/inviteActionTypes";
 import { useInviteActions, usePendingInviteRecovery } from "../src/hooks/useInviteActions";
 import { useAppStore } from "../src/store/appStore";
@@ -36,7 +36,7 @@ function StrictModeWrapper({ children }: { children: ReactNode }) {
   return createElement(StrictMode, null, children);
 }
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-invite",
   teamId: "team-alpha",
   name: "Invite",

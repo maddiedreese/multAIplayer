@@ -14,9 +14,7 @@ export {
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
-  maxSessionCiphertextNonceChars,
   maxGitHubActionRuns,
-  maxGitHubDeviceCodeChars,
   maxGitWorkflowResults,
   maxHostNameChars,
   maxLongTextChars,
@@ -46,8 +44,6 @@ export type {
   RelayHttpErrorResponse as RelayHttpErrorResponseType
 } from "./http-errors.js";
 
-export { SessionAccessTokenCiphertext } from "./session-crypto.js";
-
 export {
   BrowserRequestPlaintextPayload,
   ChatDeletePlaintextPayload,
@@ -67,6 +63,7 @@ export {
   LocalPreviewPlaintextPayload,
   RequestStatusPlaintextPayload,
   RoomSettingsPlaintextPayload,
+  RoomConfigPlaintextPayload,
   TerminalRequestPlaintextPayload,
   TerminalResultPlaintextPayload,
   WorkspaceFileSaveRequestPlaintextPayload,
@@ -114,6 +111,8 @@ export {
   InviteResponseRecord,
   RoomModeSchema,
   RoomRecord,
+  RoomConfig,
+  ClientRoomRecord,
   TeamMemberRecord,
   TeamRecord,
   TeamRole

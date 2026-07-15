@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
@@ -18,7 +18,7 @@ export function buildFallbackInvitedRoom({
   teamId: string;
   roomId: string;
   roomName: string;
-}): RoomRecord {
+}): ClientRoomRecord {
   return ensureRoomDefaults({
     id: roomId,
     teamId,

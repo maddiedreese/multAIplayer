@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
@@ -57,7 +57,7 @@ export function createFileActions({
   reportRoomFileActionInFlight
 }: FileActionsOptions) {
   const currentContext = () => currentSelectedRoomContext();
-  function currentRoomAccess(selectedRoom: RoomRecord) {
+  function currentRoomAccess(selectedRoom: ClientRoomRecord) {
     const store = useAppStore.getState();
     const revoked = store.revokedRoomIds.has(selectedRoom.id) || store.revokedTeamIds.has(selectedRoom.teamId);
     return {
@@ -275,7 +275,7 @@ export function createFileActions({
     await writeSelectedFileContent(room, path, content);
   }
 
-  async function requestFileSaveApproval(room: RoomRecord, file: ProjectFileContent, content: string) {
+  async function requestFileSaveApproval(room: ClientRoomRecord, file: ProjectFileContent, content: string) {
     const request: WorkspaceFileSaveRequest = {
       eventType: "workspace.file.save",
       id: crypto.randomUUID(),
@@ -326,7 +326,7 @@ export function createFileActions({
     }
   }
 
-  async function writeSelectedFileContent(room: RoomRecord, path: string, content: string): Promise<boolean> {
+  async function writeSelectedFileContent(room: ClientRoomRecord, path: string, content: string): Promise<boolean> {
     if (reportRoomFileActionInFlight(room.id)) return false;
     setFileBusyForRoom(room.id, true);
     setFileMessageForRoom(room.id, null);
@@ -359,7 +359,7 @@ export function createFileActions({
   }
 
   async function publishFileSaveStatus(
-    room: RoomRecord,
+    room: ClientRoomRecord,
     requestId: string,
     status: RequestStatusPlaintextPayload["status"]
   ) {

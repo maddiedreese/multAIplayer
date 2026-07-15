@@ -6,8 +6,6 @@ import type { RelayStorageBackend } from "./persistence.js";
 export interface RelayConfig {
   nodeEnv: string;
   port: number;
-  githubClientId: string | undefined;
-  githubOAuthScopes: string[];
   dataPath: string;
   storageBackend: RelayStorageBackend;
   legacyJsonImportPath: string | null;
@@ -21,7 +19,6 @@ export interface RelayConfig {
   attachmentBlobUploadWindowMs: number;
   jsonBodyLimitBytes: number;
   mlsMessageMaxBytes: number;
-  sessionPersistenceSecret: string | null;
   deletionLedger:
     | {
         backend: "file";
@@ -100,8 +97,6 @@ export function loadRelayConfig(): RelayConfig {
   return {
     nodeEnv,
     port: parseIntegerEnv(process.env.PORT, 4321, 1, 65_535),
-    githubClientId: process.env.GITHUB_CLIENT_ID,
-    githubOAuthScopes: parseGitHubScopes(process.env.GITHUB_OAUTH_SCOPES),
     dataPath: resolve(
       process.env.MULTAIPLAYER_RELAY_DATA_PATH ??
         `.multaiplayer/relay-store.${storageBackend === "sqlite" ? "sqlite" : "json"}`
@@ -145,7 +140,6 @@ export function loadRelayConfig(): RelayConfig {
       4096,
       5_000_000
     ),
-    sessionPersistenceSecret: normalizeSessionPersistenceSecret(process.env.MULTAIPLAYER_RELAY_SESSION_SECRET),
     deletionLedger,
     metricsToken: normalizeMetricsToken(process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN),
     debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),
@@ -221,10 +215,6 @@ function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
     hmacKey,
     protectionSeconds
   };
-}
-
-function parseGitHubScopes(value: string | undefined): string[] {
-  return parseListEnv(value ?? "read:user repo");
 }
 
 function parseStorageBackend(value: string | undefined): RelayStorageBackend {
@@ -324,16 +314,6 @@ function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean 
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
   if (["0", "false", "no", "off"].includes(normalized)) return false;
   return fallback;
-}
-
-function normalizeSessionPersistenceSecret(value: string | undefined): string | null {
-  const secret = value?.trim();
-  if (!secret) return null;
-  if (secret.length < 32) {
-    logRelayEvent("warn", "weak_session_secret_disables_persistence", { minimumCharacters: 32 });
-    return null;
-  }
-  return secret;
 }
 
 function normalizeMetricsToken(value: string | undefined): string | null {

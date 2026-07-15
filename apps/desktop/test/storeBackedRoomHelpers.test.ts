@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { createCodexBrowserOpenCommand } from "../src/lib/codexBrowserOpenCommand";
 import { buildRoomNotices } from "../src/lib/roomNotices";
 import { useAppStore } from "../src/store/appStore";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-store-helpers",
   teamId: "team-store-helpers",
   name: "Store helpers",

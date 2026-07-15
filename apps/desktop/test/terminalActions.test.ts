@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { createTerminalActions } from "../src/lib/terminalActions";
 import type { TerminalSnapshot } from "../src/lib/localBackend";
 import { useAppStore } from "../src/store/appStore";
 import type { TerminalCommandRequest } from "../src/types";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-terminal-actions",
   teamId: "team-terminal-actions",
   name: "Terminal Actions",

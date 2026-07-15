@@ -9,7 +9,7 @@ import {
   type CodexCatalogSelectionPolicy,
   type CodexReasoningEffort,
   type CodexSpeed,
-  type RoomRecord
+  type ClientRoomRecord
 } from "@multaiplayer/protocol";
 import type { CodexModelOption, CodexProbe } from "./localBackend";
 
@@ -25,7 +25,7 @@ export interface ResolvedCodexRunSettings {
 }
 
 type RoomCodexIntent = Pick<
-  RoomRecord,
+  ClientRoomRecord,
   | "codexModel"
   | "codexModelPolicy"
   | "codexReasoningEffort"

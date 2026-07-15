@@ -26,10 +26,10 @@ import { inspectorAttentionCounts } from "../lib/inspectorAttention";
 import { canUseRoomChat } from "../lib/chatPolicy";
 import { canControlRoomTerminal } from "../lib/terminalAccess";
 import type { LocalHostUser } from "../lib/roomHost";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 interface UseSelectedRoomRuntimeOptions {
-  selectedRoom: RoomRecord;
+  selectedRoom: ClientRoomRecord;
   selectedRoomId: string;
   localUser: LocalHostUser;
   isSelectedRoomLocked: boolean;

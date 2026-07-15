@@ -3,6 +3,46 @@ import { isRecord, type MlsRelayMessage } from "@multaiplayer/protocol";
 import type { RoomKey } from "./state.js";
 import type { StoredRelayMutation } from "./persistence-types.js";
 
+const legacyRoomConfigFields = [
+  "projectPath",
+  "codexModel",
+  "codexModelPolicy",
+  "codexReasoningEffort",
+  "codexReasoningEffortPolicy",
+  "codexRawReasoningEnabled",
+  "codexSpeed",
+  "codexServiceTierPolicy",
+  "codexSandboxLevel"
+] as const;
+
+/** Rewrites legacy room rows and compacts SQLite so removed host-local values do not survive in pages or WAL. */
+export function purgeLegacyRoomConfigFields(db: Database.Database, normalizedRooms: unknown[]): number {
+  const byId = new Map<string, unknown>();
+  for (const room of normalizedRooms) {
+    if (isRecord(room) && typeof room.id === "string") byId.set(room.id, room);
+  }
+  const rows = db.prepare("select id, data_json from relay_rooms").all() as Array<{ id: string; data_json: string }>;
+  const legacyIds = rows.flatMap((row) => {
+    try {
+      const parsed = JSON.parse(row.data_json) as unknown;
+      return isRecord(parsed) && legacyRoomConfigFields.some((field) => Object.hasOwn(parsed, field)) ? [row.id] : [];
+    } catch {
+      return [];
+    }
+  });
+  if (legacyIds.length === 0) return 0;
+  const update = db.prepare("update relay_rooms set data_json = ? where id = ?");
+  db.transaction(() => {
+    for (const id of legacyIds) {
+      const normalized = byId.get(id);
+      if (normalized) update.run(JSON.stringify(normalized), id);
+    }
+  })();
+  db.pragma("wal_checkpoint(TRUNCATE)");
+  db.exec("VACUUM");
+  return legacyIds.length;
+}
+
 export function loadNormalizedRelayState(db: Database.Database): unknown | null {
   const version = db.prepare("select value from relay_meta where key = ?").get("version") as
     { value?: unknown } | undefined;

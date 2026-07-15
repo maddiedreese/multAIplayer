@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { BrowserRequestPlaintextPayload, MlsRelayMessage, RoomRecord } from "@multaiplayer/protocol";
+import type { BrowserRequestPlaintextPayload, MlsRelayMessage, ClientRoomRecord } from "@multaiplayer/protocol";
 import { resetBrowserProfile } from "./localBackend";
 import type { RelayClient } from "./relayClient";
 import { canActOnRoomBrowserRequest, findRoomBrowserRequest, roomBrowserRequestMessage } from "./browserPolicy";
@@ -21,7 +21,7 @@ interface BrowserActionsOptions {
     kind: "terminal.event" | "browser.event",
     requestId: string,
     status: "approved" | "denied",
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
 }
 
@@ -238,7 +238,7 @@ export function createBrowserActions({
     openRoomBrowserForUrl(room, nextUrl, "Opened by the active host.");
   }
 
-  function openRoomBrowserForUrl(room: RoomRecord, url: string, reason: string) {
+  function openRoomBrowserForUrl(room: ClientRoomRecord, url: string, reason: string) {
     const request: BrowserAccessRequest = {
       id: crypto.randomUUID(),
       requester: currentContext()?.localUser.name ?? "Local user",
@@ -255,7 +255,7 @@ export function createBrowserActions({
     openEmbeddedRoomBrowser(room, request.url);
   }
 
-  function openEmbeddedRoomBrowser(room: RoomRecord, url: string) {
+  function openEmbeddedRoomBrowser(room: ClientRoomRecord, url: string) {
     const store = useAppStore.getState();
     store.openEmbeddedBrowserForRoom(room.id, url);
     if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {

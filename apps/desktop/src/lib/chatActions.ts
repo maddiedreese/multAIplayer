@@ -4,7 +4,7 @@ import type {
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
   MlsRelayMessage,
-  RoomRecord
+  ClientRoomRecord
 } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { canUseRoomChat, roomChatGateMessage } from "./chatPolicy";
@@ -32,7 +32,7 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
     return state.rooms.find((room) => room.id === state.selectedRoomId);
   };
 
-  async function publishChatMessage(message: ChatMessage, roomArg?: RoomRecord) {
+  async function publishChatMessage(message: ChatMessage, roomArg?: ClientRoomRecord) {
     const room = roomArg ?? currentSelectedRoom();
     if (!room) return;
     const { forgottenRoomIds, revokedRoomIds, revokedTeamIds } = useAppStore.getState();
@@ -189,7 +189,7 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
     await publishMlsApplicationMessage(client, envelope);
   }
 
-  function canMutateSelectedMessage(message: ChatMessage, selectedRoom: RoomRecord) {
+  function canMutateSelectedMessage(message: ChatMessage, selectedRoom: ClientRoomRecord) {
     const { forgottenRoomIds, revokedRoomIds, revokedTeamIds, codexRuntimeByRoom } = useAppStore.getState();
     const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
     const isSelectedRoomLocked =

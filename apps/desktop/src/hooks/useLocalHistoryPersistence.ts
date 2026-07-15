@@ -4,7 +4,7 @@ import { pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import { localRoomReadStateForHistory } from "../lib/roomUnread";
 import { terminalsForLocalHistory } from "../lib/terminalState";
 import type { TerminalSnapshot } from "../lib/localBackend";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type {
   BrowserAccessRequest,
   ChatMessage,
@@ -35,7 +35,7 @@ interface UseLocalHistoryPersistenceOptions {
   hasSelectedRoom: boolean;
   selectedRoomId: string;
   selectedRoomTeamId: string;
-  selectedRoom: RoomRecord;
+  selectedRoom: ClientRoomRecord;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;

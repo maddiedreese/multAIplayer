@@ -8,6 +8,8 @@ import {
   codexModelOptions,
   type ApprovalDelegationPolicy,
   type CodexCatalogSelectionPolicy,
+  type CodexReasoningEffort,
+  type CodexSpeed,
   type RoomRecord,
   type TeamRole
 } from "@multaiplayer/protocol";
@@ -123,27 +125,25 @@ export function normalizeCodexModel(value: unknown, maxCodexModelChars: number):
   return model;
 }
 
-export function normalizeCodexReasoningEffort(value: unknown): RoomRecord["codexReasoningEffort"] | null {
+export function normalizeCodexReasoningEffort(value: unknown): CodexReasoningEffort | null {
   const effort = String(value ?? "").trim();
-  return codexReasoningEffortOptions.some((option) => option.id === effort)
-    ? (effort as RoomRecord["codexReasoningEffort"])
-    : null;
+  return codexReasoningEffortOptions.some((option) => option.id === effort) ? (effort as CodexReasoningEffort) : null;
 }
 
-export function normalizeCodexSpeed(value: unknown): RoomRecord["codexSpeed"] | null {
+export function normalizeCodexSpeed(value: unknown): CodexSpeed | null {
   const speed = String(value ?? "").trim();
-  return codexSpeedOptions.some((option) => option.id === speed) ? (speed as RoomRecord["codexSpeed"]) : null;
+  return codexSpeedOptions.some((option) => option.id === speed) ? (speed as CodexSpeed) : null;
 }
 
 export function normalizeCodexCatalogSelectionPolicy(value: unknown): CodexCatalogSelectionPolicy | null {
   return value === "auto" || value === "pinned" ? value : null;
 }
 
-export function normalizeCodexReasoningEffortOrDefault(value: unknown): RoomRecord["codexReasoningEffort"] {
+export function normalizeCodexReasoningEffortOrDefault(value: unknown): CodexReasoningEffort {
   return normalizeCodexReasoningEffort(value) ?? defaultCodexReasoningEffort;
 }
 
-export function normalizeCodexSpeedOrDefault(value: unknown): RoomRecord["codexSpeed"] {
+export function normalizeCodexSpeedOrDefault(value: unknown): CodexSpeed {
   return normalizeCodexSpeed(value) ?? defaultCodexSpeed;
 }
 

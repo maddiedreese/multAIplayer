@@ -33,7 +33,7 @@ export async function clearEncryptedHistory(roomId: string): Promise<void> {
 }
 
 export async function forgetRoomLocalData(roomId: string): Promise<void> {
-  await clearEncryptedHistory(roomId);
+  await invokeNative("mls_room_local_data_delete", { request: { roomId } });
   localStorage.removeItem(settingsKey(roomId));
 }
 
