@@ -20,7 +20,7 @@ required-features = ["test-fixtures"]
 
 [dependencies]
 base64 = "=0.22.1"
-aes-gcm = "=0.10.3"
+aes-gcm = "=0.11.0"
 hpke = { version = "=0.14.0", default-features = false, features = ["alloc", "getrandom", "aes", "nistp"] }
 hmac = "=0.12.1"
 mls-rs = { version = "=0.55.2", default-features = false, features = ["std", "private_message", "prior_epoch", "custom_proposal", "fast_serialize", "external_client", "sqlcipher-bundled"] }
