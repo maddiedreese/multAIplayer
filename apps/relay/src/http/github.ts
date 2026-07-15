@@ -2,6 +2,7 @@ import type { CookieOptions, Express } from "express";
 import type { AuthSession, RelayStore } from "../state.js";
 import { registerGitHubAuthRoutes } from "../auth/github.js";
 import { registerGitHubProxyRoutes } from "./githubProxy.js";
+import type { DeletionLedger } from "../auth/deletion-ledger.js";
 
 interface RegisterGitHubRoutesOptions {
   app: Express;
@@ -12,6 +13,7 @@ interface RegisterGitHubRoutesOptions {
   sessionPersistenceSecret: string | null;
   authSessions: Map<string, AuthSession>;
   store: RelayStore;
+  deletionLedger: DeletionLedger | null;
   authSessionMaxAgeMs: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
   getAuthSession: (sessionId: unknown) => AuthSession | null;

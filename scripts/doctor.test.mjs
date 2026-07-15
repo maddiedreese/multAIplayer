@@ -11,6 +11,14 @@ const productionRelayEnv = {
   ...process.env,
   GITHUB_CLIENT_ID: "dummy-client-id",
   MULTAIPLAYER_RELAY_SESSION_SECRET: "12345678901234567890123456789012",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT: "https://bucket.example.test",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET: "relay-deletions",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION: "auto",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID: "dummy-access-key",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY: "12345678901234567890123456789012",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE: "virtual-host",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY: "abcdefghijklmnopqrstuvwxzy123456",
+  MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS: "7776000",
   MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com,https://app.multaiplayer.com",
   MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
   MULTAIPLAYER_RELAY_DEBUG: "false",
@@ -55,6 +63,7 @@ test("production relay doctor accepts a hardened representative environment", ()
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: configured with exact http\(s\) origins/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_RATE_LIMITS: rate limits enabled/);
+  assert.match(result.stdout, /production external deletion ledger: S3-compatible ledger configured/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_STORAGE: sqlite storage configured/);
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_DATA_PATH: configured/);
   assert.match(result.stdout, /production MULTAIPLAYER_MLS_VALIDATOR_PATH: configured executable/);
@@ -63,6 +72,15 @@ test("production relay doctor accepts a hardened representative environment", ()
   assert.match(result.stdout, /production MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER: configured/);
   assert.doesNotMatch(result.stdout, /\bcargo:/);
   assert.doesNotMatch(result.stdout, /\brustc:/);
+});
+
+test("production relay doctor rejects an unsafe deletion-ledger protection horizon", () => {
+  const result = runProductionDoctor({
+    ...productionRelayEnv,
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS: "7689600"
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /protection horizon >= 7776000 seconds/);
 });
 
 test("production relay doctor rejects a missing MLS validator executable", () => {

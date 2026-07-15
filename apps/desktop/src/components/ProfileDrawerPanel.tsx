@@ -1,6 +1,7 @@
 import { ClipboardList, ExternalLink, X } from "lucide-react";
 import { GitHubIcon } from "./GitHubIcon";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { DeviceIdentity } from "../lib/deviceIdentity";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
 import { saveNativeDiagnosticBundle } from "../lib/diagnostics";
@@ -24,6 +25,7 @@ export function ProfileDrawerPanel({
   deviceIdentity,
   deviceIdentityMessage,
   relaySessionPersistence,
+  codexAccountPanel = <CodexAccountPanel />,
   onRotateDeviceIdentity,
   onHostedAccountDeleted,
   onSignIn,
@@ -38,6 +40,7 @@ export function ProfileDrawerPanel({
   deviceIdentity: DeviceIdentity | null;
   deviceIdentityMessage: string | null;
   relaySessionPersistence: string;
+  codexAccountPanel?: ReactNode;
   onRotateDeviceIdentity: () => void;
   onHostedAccountDeleted: () => void;
   onSignIn: () => void;
@@ -68,6 +71,12 @@ export function ProfileDrawerPanel({
       setDeletionResult(result);
       if (result.status === "deleted") {
         setDeletionConfirmation("");
+        onHostedAccountDeleted();
+      } else if (result.status === "pending") {
+        setDeletionConfirmation("");
+        setDeletionStatus(
+          "The relay durably accepted the deletion request and signed this identity out. Primary cleanup is pending and will be retried before the relay next accepts traffic."
+        );
         onHostedAccountDeleted();
       } else if (result.status === "indeterminate") {
         setDeletionStatus(
@@ -144,7 +153,7 @@ export function ProfileDrawerPanel({
       </button>
       {diagnosticsMessage && <div className="workflow-message">{diagnosticsMessage}</div>}
 
-      <CodexAccountPanel />
+      {codexAccountPanel}
 
       {currentUser ? (
         <button className="ghost-wide" onClick={onSignOut}>
@@ -233,6 +242,11 @@ export function ProfileDrawerPanel({
           {deletionResult?.status === "deleted" && (
             <div className="workflow-message" role="status">
               Hosted account data deleted. This app has cleared its signed-in workspace state.
+            </div>
+          )}
+          {deletionResult?.status === "pending" && (
+            <div className="workflow-message" role="status">
+              Deletion request protected and pending primary cleanup. This identity has been signed out.
             </div>
           )}
         </section>
