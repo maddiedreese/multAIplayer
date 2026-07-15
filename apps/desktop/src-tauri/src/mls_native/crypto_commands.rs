@@ -1,6 +1,6 @@
 use super::*;
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_device_auth_sign(
     request: DeviceAuthRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -21,7 +21,7 @@ pub(crate) fn mls_device_auth_sign(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_generate_key_package(
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<KeyPackagePublish> {
@@ -45,7 +45,7 @@ pub(crate) fn mls_generate_key_package(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_create_group(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -55,7 +55,7 @@ pub(crate) fn mls_create_group(
     })?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_join_welcome(
     request: JoinRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -66,7 +66,7 @@ pub(crate) fn mls_join_welcome(
     })?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_encrypt_application(
     request: EncryptRequest,
     state: tauri::State<'_, MlsNativeState>,

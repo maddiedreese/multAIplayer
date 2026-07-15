@@ -108,7 +108,7 @@ pub(crate) struct ArchiveOpened {
     archive: ArchiveBody,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn room_archive_export(
     request: ArchiveExportRequest,
 ) -> crate::command_error::CommandResult<ArchiveLibraryEntry> {
@@ -119,7 +119,7 @@ pub(crate) fn room_archive_export(
     Ok(entry_for("export", &opened, envelope.len() as u64))
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn room_archive_import(
     request: ArchiveImportRequest,
     app: tauri::AppHandle,
@@ -145,7 +145,7 @@ pub(crate) fn room_archive_import(
     )?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn room_archive_list(
     app: tauri::AppHandle,
 ) -> crate::command_error::CommandResult<Vec<ArchiveLibraryEntry>> {
@@ -156,7 +156,7 @@ pub(crate) fn room_archive_list(
     Ok(entries)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn room_archive_open(
     request: ArchiveOpenRequest,
     app: tauri::AppHandle,
@@ -172,7 +172,7 @@ pub(crate) fn room_archive_open(
     Ok(ArchiveOpened { entry, archive })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn room_archive_delete(
     request: ArchiveDeleteRequest,
     app: tauri::AppHandle,

@@ -1,6 +1,6 @@
 use super::*;
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_group_state(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -28,7 +28,7 @@ pub(crate) fn mls_group_state(
     })?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_blob_encrypt(
     request: BlobEncryptRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -38,7 +38,7 @@ pub(crate) fn mls_blob_encrypt(
         engine.encrypt_blob(&request.room_id, request.blob_id.as_bytes(), &plaintext)
     })?)
 }
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_blob_prepare(
     request: BlobPrepareRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -47,7 +47,7 @@ pub(crate) fn mls_blob_prepare(
         engine.prepare_blob(&request.room_id, request.blob_id.as_bytes())
     })?)
 }
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_blob_decrypt(
     request: BlobDecryptRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -58,7 +58,7 @@ pub(crate) fn mls_blob_decrypt(
     .map(|v| STANDARD.encode(v))?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_history_save(
     request: HistorySaveRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -80,7 +80,7 @@ pub(crate) fn mls_history_save(
     Ok(epoch)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_history_retention_set(
     request: HistoryRetentionRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -93,7 +93,7 @@ pub(crate) fn mls_history_retention_set(
     })?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_history_load(
     request: HistoryEpochRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -115,7 +115,7 @@ pub(crate) fn mls_history_load(
     .map(|value| Some(STANDARD.encode(value)))?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_history_delete(
     request: HistoryEpochRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -128,7 +128,7 @@ pub(crate) fn mls_history_delete(
     })?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_history_load_latest(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -150,7 +150,7 @@ pub(crate) fn mls_history_load_latest(
     .map(|value| Some(STANDARD.encode(value)))?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_history_delete_all(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -174,7 +174,7 @@ pub(crate) fn mls_history_delete_all(
     )?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_room_local_data_delete(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,

@@ -1,6 +1,6 @@
 use super::*;
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_identity_initialize(
     request: IdentityInitializeRequest,
     state: tauri::State<'_, MlsNativeState>,

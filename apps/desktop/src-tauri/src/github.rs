@@ -181,7 +181,7 @@ struct GitHubActionRun {
 
 mod auth;
 pub use auth::*;
-#[tauri::command]
+#[typed_tauri_command::command]
 pub async fn github_create_pull_request(
     request: PullRequestInput,
 ) -> crate::command_error::CommandResult<PullRequestResult> {
@@ -226,7 +226,7 @@ async fn github_create_pull_request_inner(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub async fn github_list_action_runs(
     request: ActionRunsInput,
 ) -> crate::command_error::CommandResult<ActionRunsResult> {

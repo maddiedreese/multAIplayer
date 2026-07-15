@@ -90,7 +90,7 @@ pub(crate) struct GitWorkflowRequest {
     push: bool,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn git_status(cwd: String) -> crate::command_error::CommandResult<GitStatusSummary> {
     ensure_existing_dir(&cwd)?;
 
@@ -144,7 +144,7 @@ pub(crate) fn git_status(cwd: String) -> crate::command_error::CommandResult<Git
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn git_remote_origin(cwd: String) -> crate::command_error::CommandResult<GitRemoteInfo> {
     ensure_existing_dir(&cwd)?;
 
@@ -167,7 +167,7 @@ pub(crate) fn git_remote_origin(cwd: String) -> crate::command_error::CommandRes
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn git_create_patch(cwd: String) -> crate::command_error::CommandResult<GitPatchResult> {
     ensure_existing_dir(&cwd)?;
     let status = git_status(cwd.clone())?;
@@ -234,7 +234,7 @@ pub(crate) fn git_create_patch(cwd: String) -> crate::command_error::CommandResu
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn git_clone_repository(
     request: GitCloneRequest,
 ) -> crate::command_error::CommandResult<GitCloneResult> {
@@ -269,7 +269,7 @@ pub(crate) fn git_clone_repository(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn git_apply_patch(
     request: GitApplyPatchRequest,
 ) -> crate::command_error::CommandResult<GitApplyPatchResult> {
@@ -301,7 +301,7 @@ pub(crate) fn git_apply_patch(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn run_git_workflow(
     request: GitWorkflowRequest,
 ) -> crate::command_error::CommandResult<Vec<CommandResult>> {

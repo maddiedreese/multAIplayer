@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import nativeCommandErrorCodeMap from "../native-command-error-codes.json";
 import { invokeNative, NativeCommandError, normalizeNativeCommandError } from "../src/lib/platform/nativeCommandError";
 
 test("structured Tauri rejections become Error instances with stable codes", async () => {
@@ -18,17 +19,7 @@ test("structured Tauri rejections become Error instances with stable codes", asy
 });
 
 test("the frontend accepts every code serialized by the native command contract", () => {
-  const codes = [
-    "crypto_error",
-    "internal_error",
-    "invalid_argument",
-    "not_found",
-    "process_error",
-    "requires_rejoin",
-    "storage_error",
-    "unauthorized",
-    "unavailable"
-  ] as const;
+  const codes = Object.keys(nativeCommandErrorCodeMap) as (keyof typeof nativeCommandErrorCodeMap)[];
   for (const code of codes) assert.equal(normalizeNativeCommandError({ code, message: "copy" }).code, code);
 });
 

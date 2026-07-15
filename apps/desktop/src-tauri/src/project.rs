@@ -80,7 +80,7 @@ pub(crate) struct GitDiffResult {
     pub(crate) diff: String,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn project_files(
     request: ProjectFileSearchRequest,
 ) -> crate::command_error::CommandResult<Vec<ProjectFileEntry>> {
@@ -94,7 +94,7 @@ pub(crate) fn project_files(
     Ok(results)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn project_file_read(
     request: ProjectFileReadRequest,
 ) -> crate::command_error::CommandResult<ProjectFileContent> {
@@ -223,7 +223,7 @@ fn verified_project_image_media_type(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn project_file_write(
     request: ProjectFileWriteRequest,
 ) -> crate::command_error::CommandResult<ProjectFileWriteResult> {
@@ -321,7 +321,7 @@ fn safe_project_write_path(root: &Path, relative_path: &str) -> Result<PathBuf, 
     ))
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn git_diff_file(
     request: GitDiffRequest,
 ) -> crate::command_error::CommandResult<GitDiffResult> {

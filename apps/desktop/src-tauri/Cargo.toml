@@ -8,7 +8,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [workspace]
-members = ["crates/codex-activity-projection", "crates/mls-core"]
+members = ["crates/codex-activity-projection", "crates/mls-core", "crates/typed-tauri-command"]
 resolver = "2"
 
 [lib]
@@ -36,6 +36,7 @@ reqwest = { version = "=0.12.28", default-features = false, features = ["json", 
 semver = "=1.0.28"
 sha2 = "=0.10.9"
 tauri = { version = "=2.11.5", features = ["unstable"] }
+typed-tauri-command = { path = "crates/typed-tauri-command" }
 tauri-plugin-dialog = "=2.7.1"
 tauri-plugin-notification = "=2.3.3"
 tauri-plugin-opener = "=2.5.4"

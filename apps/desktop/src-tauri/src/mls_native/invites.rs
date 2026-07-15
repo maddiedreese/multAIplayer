@@ -21,7 +21,7 @@ pub(super) fn serialize_directed_invite_request(
     .map_err(|_| "Invite request recovery is invalid".to_string())
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_invite_capability_issue(
 ) -> crate::command_error::CommandResult<CapabilityIssueResponse> {
     let mut issued = issue_capability();
@@ -41,7 +41,7 @@ pub(crate) fn mls_invite_capability_issue(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_invite_request_seal(
     request: InviteRequestSealRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -107,7 +107,7 @@ pub(crate) fn mls_invite_request_seal(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_invite_request_open(
     request: InviteRequestOpenRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -152,7 +152,7 @@ pub(crate) fn mls_invite_request_open(
         requester_signature_key_fingerprint: validated.signature_key_fingerprint,
     })
 }
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_invite_approve(
     request: InviteApproveRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -257,7 +257,7 @@ pub(crate) fn mls_invite_approve(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_invite_deny(
     request: InviteDenyRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -325,7 +325,7 @@ pub(crate) fn mls_invite_deny(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_invite_response_accept(
     request: InviteResponseAcceptRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -394,7 +394,7 @@ fn accept_invite_response(
     })
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_pending_invite_requests_list(
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<Vec<PendingInviteRequestPublic>> {
@@ -422,7 +422,7 @@ pub(crate) fn mls_pending_invite_requests_list(
         .and_then(|requests| requests)?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_pending_invite_response_accept(
     request: PendingInviteResponseAcceptRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -447,7 +447,7 @@ pub(crate) fn mls_pending_invite_response_accept(
     )?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_pending_invite_complete(
     request: PendingInviteCompleteRequest,
     state: tauri::State<'_, MlsNativeState>,
@@ -484,7 +484,7 @@ fn ensure_pending_invite_identity(
     Ok(())
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_join_admissions_list(
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<Vec<PendingJoinAdmissionPublic>> {
@@ -505,7 +505,7 @@ pub(crate) fn mls_join_admissions_list(
     )
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn mls_join_admission_complete(
     request: JoinAdmissionCompleteRequest,
     state: tauri::State<'_, MlsNativeState>,

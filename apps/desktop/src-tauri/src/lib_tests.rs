@@ -2,11 +2,39 @@ use super::*;
 use crate::output::*;
 use crate::validation::*;
 use crate::workspace::{ensure_existing_dir, ensure_within_project_root};
+use std::collections::BTreeSet;
 use std::fs::{self, create_dir_all, write};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+#[test]
+fn ipc_audit_covers_every_registered_command_exactly_once() {
+    let audit = include_str!("../../../../docs/tauri-ipc-boundary-audit.md");
+    let audited = audit
+        .lines()
+        .filter_map(|line| line.strip_prefix("| `"))
+        .filter_map(|line| line.split_once('`').map(|(command, _)| command))
+        .collect::<Vec<_>>();
+    let audited_set = audited.iter().copied().collect::<BTreeSet<_>>();
+    let registered_set = REGISTERED_COMMANDS.iter().copied().collect::<BTreeSet<_>>();
+
+    assert_eq!(
+        audited.len(),
+        audited_set.len(),
+        "the IPC audit contains duplicate command rows"
+    );
+    assert_eq!(
+        REGISTERED_COMMANDS.len(),
+        registered_set.len(),
+        "the Tauri registration inventory contains duplicate commands"
+    );
+    assert_eq!(
+        audited_set, registered_set,
+        "the IPC audit is out of sync with the registered Tauri command set"
+    );
+}
 
 #[test]
 fn safe_project_path_allows_project_relative_files() {

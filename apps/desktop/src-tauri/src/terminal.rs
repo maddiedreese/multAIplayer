@@ -72,7 +72,7 @@ pub(crate) struct TerminalWriteRequest {
     authorization_token: String,
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn terminal_start(
     state: State<'_, TerminalState>,
     authorization_state: State<'_, ShellAuthorizationState>,
@@ -158,7 +158,7 @@ pub(crate) fn terminal_start(
     Ok(snapshot_terminal(&id, session)?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn terminal_list(
     state: State<'_, TerminalState>,
     room_id: String,
@@ -178,7 +178,7 @@ pub(crate) fn terminal_list(
     Ok(snapshots)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn terminal_read(
     state: State<'_, TerminalState>,
     id: String,
@@ -194,7 +194,7 @@ pub(crate) fn terminal_read(
     Ok(snapshot_terminal(&id, session)?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn terminal_write(
     state: State<'_, TerminalState>,
     authorization_state: State<'_, ShellAuthorizationState>,
@@ -238,7 +238,7 @@ pub(crate) fn terminal_write(
     Ok(snapshot_terminal(&request.id, session)?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) fn terminal_stop(
     state: State<'_, TerminalState>,
     id: String,

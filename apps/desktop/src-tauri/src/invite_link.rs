@@ -40,7 +40,7 @@ impl NativeInviteState {
     }
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub fn take_pending_native_invite(
     state: tauri::State<'_, NativeInviteState>,
 ) -> crate::command_error::CommandResult<Option<NativeInvitePayload>> {

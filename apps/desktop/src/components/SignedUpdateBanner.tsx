@@ -7,6 +7,25 @@ export function releaseVerificationUrl(version: string) {
   return `https://github.com/maddiedreese/multAIplayer/blob/${tag}/docs/reproducible-builds.md#verify-the-published-artifact`;
 }
 
+export const manualReleaseVerificationUrl =
+  "https://github.com/maddiedreese/multAIplayer/blob/main/docs/reproducible-builds.md#verify-the-published-artifact";
+export const independentUpdaterKeyUrl = "https://multaiplayer.com/security/updater-key";
+
+export function UpdateVerificationWarning() {
+  return (
+    <div className="update-banner security" role="status">
+      <strong>Update check could not be verified</strong>
+      <span>Nothing was downloaded or installed. Use the manually verifiable release path before updating.</span>
+      <a href={manualReleaseVerificationUrl} target="_blank" rel="noreferrer">
+        Manual verification
+      </a>
+      <a href={independentUpdaterKeyUrl} target="_blank" rel="noreferrer">
+        Updater key fingerprint
+      </a>
+    </div>
+  );
+}
+
 export function SignedUpdateBanner({
   notice,
   installStatus,

@@ -240,7 +240,7 @@ impl ShellAuthorizationState {
     }
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) async fn authorize_shell_execution(
     app: AppHandle,
     state: State<'_, ShellAuthorizationState>,
@@ -328,7 +328,7 @@ pub(crate) async fn authorize_shell_execution(
     Ok(state.issue(&request_for_issue)?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) async fn clear_shell_execution_grants(
     app: AppHandle,
     state: State<'_, ShellAuthorizationState>,
@@ -360,7 +360,7 @@ pub(crate) async fn clear_shell_execution_grants(
     Ok(state.clear_exact_command_grants(&room_id)?)
 }
 
-#[tauri::command]
+#[typed_tauri_command::command]
 pub(crate) async fn authorize_terminal_input(
     app: AppHandle,
     state: State<'_, ShellAuthorizationState>,

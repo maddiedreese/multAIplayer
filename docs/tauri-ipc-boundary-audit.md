@@ -1,13 +1,15 @@
 # Tauri IPC boundary audit
 
 Status: manual review completed 2026-07-15. Registration source:
-`apps/desktop/src-tauri/src/lib.rs` (`tauri::generate_handler!`). This is a
+`apps/desktop/src-tauri/src/lib.rs` (`declare_registered_commands!`). This is a
 review snapshot, not a claim that the command surface is automatically proven
-safe. Re-run it whenever that registration list or a listed command changes.
+safe. A Rust test requires the audited command rows to match that compiler-owned
+registration inventory exactly; changing a command's behavior still requires
+manual review of its row.
 
 ## Review model
 
-All 99 registered commands were read against four questions:
+All 100 registered commands were read against four questions:
 
 1. Can the return value contain credentials, cryptographic secrets, plaintext,
    local file contents, account identity, or other sensitive material?
@@ -94,6 +96,7 @@ of the trusted computing base for every custom command below.
 | Command                           | Output              | Rust input and authority/state result                                                                                                                                                              |
 | --------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `app_version`                     | public              | No input or mutable state.                                                                                                                                                                         |
+| `take_updater_auth_failure`       | public              | No input; atomically reads and clears only the comparator's boolean authentication-failure signal. It exposes no manifest, key, signature, URL, or release metadata.                               |
 | `take_pending_native_invite`      | credential-adjacent | One-shot take from bounded native state; the OS URL parser restricts HTTPS hosts, path, ID, and fragment size. Returns the invite bearer to the trusted main webview by design.                    |
 | `open_trusted_authentication_url` | none                | Provider allowlist; HTTPS, host, port, credentials, GitHub path, and URL length checked before the system opener. No ambient auth state is returned.                                               |
 | `record_diagnostic`               | none                | Diagnostic fields and serialized line size are bounded/redacted; native app-log path, regular-file and private-mode checks apply. Safe before persistence initialization: returns unavailable.     |
@@ -243,7 +246,8 @@ room/group/epoch/pending transition is absent or incompatible.
 
 When adding or changing a registered command, update its row with the concrete
 native validator, authority source, state prerequisite, and sensitive output.
-Do not use `check-tauri-command-errors.mjs` as evidence of authorization: it
-checks error shape only. Any new plaintext, private-key operation, arbitrary
-path, URL opener, process launch, network origin, or cross-room list requires a
-fresh threat-model decision, not just an entry in this inventory.
+The exact-set test prevents a registration from landing without a row, but it
+cannot judge whether the row or implementation is safe. Any new plaintext,
+private-key operation, arbitrary path, URL opener, process launch, network
+origin, or cross-room list requires a fresh threat-model decision, not just an
+entry in this inventory.

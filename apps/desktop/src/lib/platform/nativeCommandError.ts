@@ -1,27 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
+import nativeCommandErrorCodeMap from "../../../native-command-error-codes.json";
 
-export type NativeCommandErrorCode =
-  | "crypto_error"
-  | "internal_error"
-  | "invalid_argument"
-  | "not_found"
-  | "process_error"
-  | "requires_rejoin"
-  | "storage_error"
-  | "unauthorized"
-  | "unavailable";
+export type NativeCommandErrorCode = keyof typeof nativeCommandErrorCodeMap;
 
-const nativeCommandErrorCodes = new Set<NativeCommandErrorCode>([
-  "crypto_error",
-  "internal_error",
-  "invalid_argument",
-  "not_found",
-  "process_error",
-  "requires_rejoin",
-  "storage_error",
-  "unauthorized",
-  "unavailable"
-]);
+const nativeCommandErrorCodes = new Set<NativeCommandErrorCode>(
+  Object.keys(nativeCommandErrorCodeMap) as NativeCommandErrorCode[]
+);
 
 export class NativeCommandError extends Error {
   override readonly name = "NativeCommandError";

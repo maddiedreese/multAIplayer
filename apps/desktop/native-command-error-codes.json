@@ -1,0 +1,11 @@
+{
+  "crypto_error": true,
+  "internal_error": true,
+  "invalid_argument": true,
+  "not_found": true,
+  "process_error": true,
+  "requires_rejoin": true,
+  "storage_error": true,
+  "unauthorized": true,
+  "unavailable": true
+}
