@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::output::{
-    bound_command_output, bound_text_chars, git_status_label, normalize_no_index_patch,
+    bound_text_chars, git_status_label, normalize_no_index_patch, redact_and_bound_command_output,
 };
 use crate::validation::{
     ensure_git_patch, ensure_git_remote_url, ensure_safe_branch_name, normalize_commit_message,
@@ -263,8 +263,8 @@ pub(crate) fn git_clone_repository(
         path: target_arg,
         command: format!("git clone {} {}", request.remote_url, target.display()),
         status: output.status.code(),
-        stdout: bound_command_output(&output.stdout),
-        stderr: bound_command_output(&output.stderr),
+        stdout: redact_and_bound_command_output(&output.stdout),
+        stderr: redact_and_bound_command_output(&output.stderr),
     })
 }
 
@@ -293,8 +293,8 @@ pub(crate) fn git_apply_patch(
         command: "git apply --whitespace=nowarn -".to_string(),
         cwd: request.cwd,
         status: output.status.code(),
-        stdout: bound_command_output(&output.stdout),
-        stderr: bound_command_output(&output.stderr),
+        stdout: redact_and_bound_command_output(&output.stdout),
+        stderr: redact_and_bound_command_output(&output.stderr),
     })
 }
 
@@ -332,8 +332,8 @@ pub(crate) fn run_git_workflow(
             command: format!("git {}", args.join(" ")),
             cwd: request.cwd.clone(),
             status: output.status.code(),
-            stdout: bound_command_output(&output.stdout),
-            stderr: bound_command_output(&output.stderr),
+            stdout: redact_and_bound_command_output(&output.stdout),
+            stderr: redact_and_bound_command_output(&output.stderr),
         };
         let success = output.status.success();
         results.push(result);

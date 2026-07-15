@@ -68,6 +68,8 @@ export interface RelayConfig {
     roomsPerUser: number;
   };
   totalRoomCapPerUser: number;
+  liveKeyPackageCapPerUser: number;
+  liveInviteCapPerUser: number;
 }
 
 export function loadRelayConfig(): RelayConfig {
@@ -171,18 +173,20 @@ export function loadRelayConfig(): RelayConfig {
       teamsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP, 25, 0, 10_000),
       roomsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP, 100, 0, 100_000)
     },
-    totalRoomCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER, 500, 1, 100_000)
+    totalRoomCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER, 500, 1, 100_000),
+    liveKeyPackageCapPerUser: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER,
+      250,
+      1,
+      100_000
+    ),
+    liveInviteCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER, 100, 1, 100_000)
   };
 }
 
 function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
-  const filePath = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH?.trim() ?? "";
-  const endpoint = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT?.trim() ?? "";
-  const bucket = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET?.trim() ?? "";
-  const region = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION?.trim() ?? "";
-  const accessKeyId = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID?.trim() ?? "";
-  const secretAccessKey = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY?.trim() ?? "";
-  const hmacKey = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY?.trim() ?? "";
+  const settings = deletionLedgerSettings();
+  const { filePath, endpoint, bucket, region, accessKeyId, secretAccessKey, hmacKey } = settings;
   const urlStyle = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE?.trim() || "path";
   const protectionSeconds = parseIntegerEnv(
     process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS,
@@ -214,6 +218,18 @@ function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
     urlStyle,
     hmacKey,
     protectionSeconds
+  };
+}
+
+function deletionLedgerSettings() {
+  return {
+    filePath: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH?.trim() ?? "",
+    endpoint: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT?.trim() ?? "",
+    bucket: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET?.trim() ?? "",
+    region: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION?.trim() ?? "",
+    accessKeyId: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID?.trim() ?? "",
+    secretAccessKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY?.trim() ?? "",
+    hmacKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY?.trim() ?? ""
   };
 }
 

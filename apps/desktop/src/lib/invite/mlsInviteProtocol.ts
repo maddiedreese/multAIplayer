@@ -1,4 +1,4 @@
-import type { MlsInviteCapabilityBinding, MlsInviteSealedPayload } from "../mlsClient";
+import type { MlsInviteCapabilityBinding, MlsInviteSealedPayload } from "../mls/mlsClient";
 
 export interface DirectedMlsInviteCiphertext {
   version: 3;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { beforeEach } from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { RelayPublishRejectedError } from "../src/lib/relayClient";
+import { RelayPublishRejectedError } from "../src/lib/relay/relayClient";
 
 let outboxItems: unknown[] = [];
 const retired: Array<{ roomId: string; messageId: string }> = [];
@@ -31,7 +31,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
 });
 
 const { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds, recoverRoomAfterJoin } =
-  await import("../src/lib/mlsOutboxDrain");
+  await import("../src/application/mls/mlsOutboxDrain");
 
 beforeEach(() => {
   retired.length = 0;

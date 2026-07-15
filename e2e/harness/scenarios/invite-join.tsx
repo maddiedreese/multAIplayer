@@ -1,8 +1,11 @@
 import React from "react";
 import { EncryptedInvitePanel } from "../../../apps/desktop/src/components/EncryptedInvitePanel";
 import { RoomChatComposer } from "../../../apps/desktop/src/components/RoomChatComposer";
-import { parseInviteInput } from "../../../apps/desktop/src/lib/inviteActionsHelpers";
-import { decodeNoSecretRoomInvite, encodeNoSecretRoomInvite } from "../../../apps/desktop/src/lib/noSecretRoomInvite";
+import { parseInviteInput } from "../../../apps/desktop/src/lib/invite/inviteActionsHelpers";
+import {
+  decodeNoSecretRoomInvite,
+  encodeNoSecretRoomInvite
+} from "../../../apps/desktop/src/lib/invite/noSecretRoomInvite";
 import type { InviteJoinRequest } from "../../../apps/desktop/src/types";
 
 export const description =

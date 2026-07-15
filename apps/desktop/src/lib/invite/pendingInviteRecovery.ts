@@ -1,6 +1,6 @@
-import type { MlsInviteCapabilityBinding, PendingMlsInviteRequest } from "../mlsClient";
-import { RelayHttpError } from "../httpResponse";
-import { reportExpectedFailure } from "../nonFatalReporting";
+import type { MlsInviteCapabilityBinding, PendingMlsInviteRequest } from "../mls/mlsClient";
+import { RelayHttpError } from "../core/httpResponse";
+import { reportExpectedFailure } from "../core/nonFatalReporting";
 
 interface DirectedResponse {
   responseBinding: unknown;

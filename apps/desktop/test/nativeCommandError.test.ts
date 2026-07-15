@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { invokeNative, NativeCommandError, normalizeNativeCommandError } from "../src/lib/nativeCommandError";
+import { invokeNative, NativeCommandError, normalizeNativeCommandError } from "../src/lib/platform/nativeCommandError";
 
 test("structured Tauri rejections become Error instances with stable codes", async () => {
   const binding = async () => {

@@ -1,11 +1,19 @@
 import { sendRelayError } from "./errors.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Express, Response } from "express";
-import { KeyPackageUpload, pinnedMlsCiphersuite, type KeyPackageRecord } from "@multaiplayer/protocol";
+import {
+  KeyPackageUpload,
+  pinnedMlsCiphersuite,
+  type InviteRecord,
+  type InviteJoinRequestRecord,
+  type KeyPackageRecord,
+  type RoomRecord
+} from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
 import type { KeyPackageValidator } from "../mls/key-package-validator.js";
 import { isCanonicalPaddedBase64 } from "../opaque.js";
 import { hasDeviceSession } from "./device-auth.js";
+import { commitValidatedKeyPackages, type KeyPackageUploadCommitResult } from "./key-package-upload-transaction.js";
 
 const maxBatchSize = 20;
 const maxLivePackagesPerDevice = 50;
@@ -19,6 +27,8 @@ interface Options {
   allowRead: (session: AuthSession | null, res: Response) => boolean;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
   saveRelayStore: () => Promise<void>;
+  liveKeyPackageCapPerUser: number;
+  recordQuotaRejection?: (type: string) => void;
 }
 
 export function registerKeyPackageRoutes({
@@ -28,7 +38,9 @@ export function registerKeyPackageRoutes({
   getAuthSession,
   allowRead,
   allowMutation,
-  saveRelayStore
+  saveRelayStore,
+  liveKeyPackageCapPerUser,
+  recordQuotaRejection
 }: Options) {
   app.post("/devices/:deviceId/key-packages", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
@@ -59,70 +71,36 @@ export function registerKeyPackageRoutes({
     ) {
       return void sendRelayError(res, 409, "conflict", "KeyPackage live limit exceeded.");
     }
-    const accepted: KeyPackageRecord[] = [];
-    const seen = new Set<string>();
-    for (const candidate of req.body.keyPackages as unknown[]) {
-      const parsed = KeyPackageUpload.safeParse(candidate);
-      if (
-        !parsed.success ||
-        parsed.data.keyPackage.length > maxEncodedKeyPackageChars ||
-        seen.has(parsed.success ? parsed.data.id : "")
-      ) {
-        return void sendRelayError(res, 400, "key_package_invalid", "Invalid or duplicate KeyPackage.");
-      }
-      seen.add(parsed.data.id);
-      if (
-        parsed.data.ciphersuite !== pinnedMlsCiphersuite ||
-        !isCanonicalPaddedBase64(parsed.data.keyPackage, maxEncodedKeyPackageChars)
-      ) {
-        return void sendRelayError(res, 400, "key_package_invalid", "Invalid KeyPackage encoding or ciphersuite.");
-      }
-      if (!constantTimeEqual(parsed.data.keyPackageHash, hashKeyPackage(parsed.data.keyPackage))) {
-        return void sendRelayError(res, 400, "key_package_invalid", "KeyPackage hash mismatch.");
-      }
-      if (store.keyPackages.has(parsed.data.id)) {
-        return void sendRelayError(res, 409, "conflict", "KeyPackage id already exists.");
-      }
-      const registeredDevice = store.getDevice(session.user.id, deviceId);
-      if (!registeredDevice)
-        return void sendRelayError(res, 400, "key_package_invalid", "Registered device identity is required.");
-      const validated = await validator.validate(parsed.data, {
-        userId: session.user.id,
-        deviceId,
-        signaturePublicKey: registeredDevice.signaturePublicKey,
-        signatureKeyFingerprint: registeredDevice.signatureKeyFingerprint
-      });
-      if (
-        !validated ||
-        validated.userId !== session.user.id ||
-        validated.deviceId !== deviceId ||
-        validated.ciphersuite !== pinnedMlsCiphersuite ||
-        !constantTimeEqual(validated.signaturePublicKey, registeredDevice.signaturePublicKey) ||
-        !constantTimeEqual(validated.signatureKeyFingerprint, registeredDevice.signatureKeyFingerprint)
-      ) {
-        return void sendRelayError(
-          res,
-          400,
-          "key_package_invalid",
-          "KeyPackage credential does not match its uploader."
-        );
-      }
-      accepted.push({
-        ...parsed.data,
-        userId: session.user.id,
-        deviceId,
-        credentialIdentity: validated.credentialIdentity,
-        createdAt: new Date().toISOString()
-      });
-    }
-    for (const item of accepted) store.setKeyPackage(item);
-    try {
-      await saveRelayStore();
-    } catch {
-      for (const item of accepted) store.deleteKeyPackage(item.id);
-      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist KeyPackages.");
-    }
-    res.status(201).json({ count: store.keyPackagesForDevice(session.user.id, deviceId).length });
+    if (
+      rejectAccountKeyPackageQuota(
+        store,
+        session.user.id,
+        req.body.keyPackages.length,
+        liveKeyPackageCapPerUser,
+        res,
+        recordQuotaRejection
+      )
+    )
+      return;
+    const accepted = await validateKeyPackageBatch(
+      req.body.keyPackages as unknown[],
+      store,
+      validator,
+      session,
+      deviceId,
+      res
+    );
+    if (!accepted) return;
+    const committed = await commitValidatedKeyPackages({
+      store,
+      userId: session.user.id,
+      deviceId,
+      accepted,
+      accountLimit: liveKeyPackageCapPerUser,
+      deviceLimit: maxLivePackagesPerDevice,
+      persist: saveRelayStore
+    });
+    respondToKeyPackageCommit(committed, liveKeyPackageCapPerUser, res, recordQuotaRejection);
   });
 
   app.get("/devices/:deviceId/key-packages/count", (req, res) => {
@@ -137,45 +115,36 @@ export function registerKeyPackageRoutes({
   });
 
   app.post("/rooms/:roomId/key-packages/:userId/:deviceId/consume", async (req, res) => {
+    const body = req.body as Record<string, unknown>;
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
     if (!session)
       return void sendRelayError(res, 401, "authentication_required", "Sign in before consuming a KeyPackage.");
-    const room = store.getRoom(String(req.params.roomId ?? ""));
-    const hostDeviceId = String(req.body?.hostDeviceId ?? "");
+    const room = store.getRoom(String(req.params.roomId));
+    const hostDeviceId = String(body.hostDeviceId ?? "");
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, hostDeviceId))
       return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
     if (!room) return void sendRelayError(res, 404, "room_not_found", "Room not found.");
-    if (
-      room.hostStatus !== "active" ||
-      room.hostUserId !== session.user.id ||
-      room.activeHostDeviceId !== hostDeviceId
-    ) {
+    if (!isActiveRoomHost(room, session.user.id, hostDeviceId)) {
       return void sendRelayError(res, 403, "forbidden", "Only the active host device may consume KeyPackages.");
     }
-    const invite = store.getInvite(String(req.body?.inviteId ?? ""));
-    if (!invite || invite.roomId !== room.id || invite.teamId !== room.teamId) {
+    const invite = store.getInvite(String(body.inviteId ?? ""));
+    if (!inviteMatchesRoom(invite, room)) {
       return void sendRelayError(res, 403, "forbidden", "A valid room invite approval is required.");
     }
-    const keyPackageId = String(req.body?.keyPackageId ?? "");
-    const keyPackageHash = String(req.body?.keyPackageHash ?? "");
-    const request = Array.from(store.inviteRequests.values()).find(
-      (candidate) =>
-        candidate.inviteId === invite.id &&
-        candidate.requesterUserId === String(req.params.userId) &&
-        candidate.requesterDeviceId === String(req.params.deviceId) &&
-        candidate.keyPackageId === keyPackageId &&
-        candidate.keyPackageHash === keyPackageHash
-    );
+    const keyPackageId = String(body.keyPackageId ?? "");
+    const keyPackageHash = String(body.keyPackageHash ?? "");
+    const request = findMatchingInviteRequest(store, invite.id, {
+      userId: String(req.params.userId),
+      deviceId: String(req.params.deviceId),
+      keyPackageId,
+      keyPackageHash
+    });
     if (!request)
       return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
     const item = store.keyPackages.get(keyPackageId);
     if (!item) {
-      if (
-        invite.approvedUserId === String(req.params.userId) &&
-        invite.approvedDeviceId === String(req.params.deviceId) &&
-        invite.keyPackageHash === keyPackageHash
-      ) {
+      if (inviteAlreadyConsumed(invite, String(req.params.userId), String(req.params.deviceId), keyPackageHash)) {
         return void res.json({
           alreadyConsumed: true,
           keyPackageId,
@@ -186,11 +155,7 @@ export function registerKeyPackageRoutes({
       }
       return void sendRelayError(res, 404, "key_package_unavailable", "No KeyPackage is available.");
     }
-    if (
-      item.userId !== String(req.params.userId) ||
-      item.deviceId !== String(req.params.deviceId) ||
-      item.keyPackageHash !== keyPackageHash
-    )
+    if (!keyPackageMatchesRequest(item, String(req.params.userId), String(req.params.deviceId), keyPackageHash))
       return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
     // In-memory deletion is serialized by the JS event loop. SQLite persistence
     // receives the deletion in the same immediate save cycle.
@@ -210,6 +175,184 @@ export function registerKeyPackageRoutes({
     }
     res.json({ keyPackage: item });
   });
+}
+
+function respondToKeyPackageCommit(
+  result: KeyPackageUploadCommitResult,
+  accountLimit: number,
+  res: Response,
+  recordQuotaRejection?: (type: string) => void
+): void {
+  if (result.status === "accepted") return void res.status(201).json({ count: result.count });
+  if (result.status === "device_quota") {
+    return void sendRelayError(res, 409, "conflict", "KeyPackage live limit exceeded.");
+  }
+  if (result.status === "conflict") {
+    return void sendRelayError(res, 409, "conflict", "KeyPackage id already exists.");
+  }
+  if (result.status === "persistence_unavailable") {
+    return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist KeyPackages.");
+  }
+  recordQuotaRejection?.("live_key_packages_per_user");
+  sendRelayError(res, 429, "quota_exceeded", "Account KeyPackage quota exceeded.", {
+    quota: {
+      type: "live_key_packages_per_user",
+      limit: accountLimit,
+      used: result.used,
+      remaining: Math.max(0, accountLimit - result.used)
+    }
+  });
+}
+
+async function validateKeyPackageBatch(
+  candidates: unknown[],
+  store: RelayStore,
+  validator: KeyPackageValidator,
+  session: AuthSession,
+  deviceId: string,
+  res: Response
+): Promise<KeyPackageRecord[] | null> {
+  const accepted: KeyPackageRecord[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const item = await validateUploadedKeyPackage(candidate, seen, store, validator, session, deviceId, res);
+    if (!item) return null;
+    accepted.push(item);
+  }
+  return accepted;
+}
+
+async function validateUploadedKeyPackage(
+  candidate: unknown,
+  seen: Set<string>,
+  store: RelayStore,
+  validator: KeyPackageValidator,
+  session: AuthSession,
+  deviceId: string,
+  res: Response
+): Promise<KeyPackageRecord | null> {
+  const parsed = KeyPackageUpload.safeParse(candidate);
+  if (
+    !parsed.success ||
+    parsed.data.keyPackage.length > maxEncodedKeyPackageChars ||
+    seen.has(parsed.success ? parsed.data.id : "")
+  ) {
+    return keyPackageUploadError(res, 400, "key_package_invalid", "Invalid or duplicate KeyPackage.");
+  }
+  seen.add(parsed.data.id);
+  if (
+    parsed.data.ciphersuite !== pinnedMlsCiphersuite ||
+    !isCanonicalPaddedBase64(parsed.data.keyPackage, maxEncodedKeyPackageChars)
+  ) {
+    return keyPackageUploadError(res, 400, "key_package_invalid", "Invalid KeyPackage encoding or ciphersuite.");
+  }
+  if (!constantTimeEqual(parsed.data.keyPackageHash, hashKeyPackage(parsed.data.keyPackage))) {
+    return keyPackageUploadError(res, 400, "key_package_invalid", "KeyPackage hash mismatch.");
+  }
+  if (store.keyPackages.has(parsed.data.id))
+    return keyPackageUploadError(res, 409, "conflict", "KeyPackage id already exists.");
+  const device = store.getDevice(session.user.id, deviceId);
+  if (!device) return keyPackageUploadError(res, 400, "key_package_invalid", "Registered device identity is required.");
+  const validated = await validator.validate(parsed.data, {
+    userId: session.user.id,
+    deviceId,
+    signaturePublicKey: device.signaturePublicKey,
+    signatureKeyFingerprint: device.signatureKeyFingerprint
+  });
+  if (!validatedUploaderMatches(validated, session.user.id, deviceId, device)) {
+    return keyPackageUploadError(res, 400, "key_package_invalid", "KeyPackage credential does not match its uploader.");
+  }
+  return {
+    ...parsed.data,
+    userId: session.user.id,
+    deviceId,
+    credentialIdentity: validated.credentialIdentity,
+    createdAt: new Date().toISOString()
+  };
+}
+
+function validatedUploaderMatches(
+  value: Awaited<ReturnType<KeyPackageValidator["validate"]>>,
+  userId: string,
+  deviceId: string,
+  device: NonNullable<ReturnType<RelayStore["getDevice"]>>
+): value is NonNullable<typeof value> {
+  if (!value || value.userId !== userId || value.deviceId !== deviceId) return false;
+  if (value.ciphersuite !== pinnedMlsCiphersuite) return false;
+  return (
+    constantTimeEqual(value.signaturePublicKey, device.signaturePublicKey) &&
+    constantTimeEqual(value.signatureKeyFingerprint, device.signatureKeyFingerprint)
+  );
+}
+
+function keyPackageUploadError(
+  res: Response,
+  status: number,
+  code: "key_package_invalid" | "conflict",
+  message: string
+): null {
+  sendRelayError(res, status, code, message);
+  return null;
+}
+
+function isActiveRoomHost(room: RoomRecord, userId: string, deviceId: string): boolean {
+  return room.hostStatus === "active" && room.hostUserId === userId && room.activeHostDeviceId === deviceId;
+}
+
+function inviteMatchesRoom(invite: InviteRecord | undefined, room: RoomRecord): invite is InviteRecord {
+  return Boolean(invite && invite.roomId === room.id && invite.teamId === room.teamId);
+}
+
+function findMatchingInviteRequest(
+  store: RelayStore,
+  inviteId: string,
+  expected: { userId: string; deviceId: string; keyPackageId: string; keyPackageHash: string }
+): InviteJoinRequestRecord | undefined {
+  return Array.from(store.inviteRequests.values()).find(
+    (candidate) =>
+      candidate.inviteId === inviteId &&
+      candidate.requesterUserId === expected.userId &&
+      candidate.requesterDeviceId === expected.deviceId &&
+      candidate.keyPackageId === expected.keyPackageId &&
+      candidate.keyPackageHash === expected.keyPackageHash
+  );
+}
+
+function inviteAlreadyConsumed(
+  invite: InviteRecord,
+  userId: string,
+  deviceId: string,
+  keyPackageHash: string
+): boolean {
+  return (
+    invite.approvedUserId === userId && invite.approvedDeviceId === deviceId && invite.keyPackageHash === keyPackageHash
+  );
+}
+
+function keyPackageMatchesRequest(item: KeyPackageRecord, userId: string, deviceId: string, hash: string): boolean {
+  return item.userId === userId && item.deviceId === deviceId && item.keyPackageHash === hash;
+}
+
+function rejectAccountKeyPackageQuota(
+  store: RelayStore,
+  userId: string,
+  requested: number,
+  limit: number,
+  res: Response,
+  recordQuotaRejection?: (type: string) => void
+): boolean {
+  const used = Array.from(store.keyPackages.values()).filter((item) => item.userId === userId).length;
+  if (used + requested <= limit) return false;
+  recordQuotaRejection?.("live_key_packages_per_user");
+  sendRelayError(res, 429, "quota_exceeded", "Account KeyPackage quota exceeded.", {
+    quota: {
+      type: "live_key_packages_per_user",
+      limit,
+      used,
+      remaining: Math.max(0, limit - used)
+    }
+  });
+  return true;
 }
 
 function hashKeyPackage(encoded: string): string {

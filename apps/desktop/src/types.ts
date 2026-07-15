@@ -12,10 +12,10 @@ import type {
   TerminalRequestPlaintextPayload,
   WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
-import type { TerminalSnapshot } from "./lib/localBackend";
-import type { CodexTurnRiskFlag } from "./lib/codexTurn";
-import type { LocalPreviewCandidate } from "./lib/localPreview";
-import type { SidebarPanelName } from "./components/DesktopSidebar";
+import type { TerminalSnapshot } from "./lib/platform/localBackend";
+import type { CodexTurnRiskFlag } from "./lib/codex/codexTurn";
+import type { LocalPreviewCandidate } from "./lib/files/localPreview";
+import type { SidebarPanelName } from "./lib/core/uiTypes";
 
 export interface ChatMessage {
   id: string;
@@ -155,6 +155,8 @@ export interface HostHandoffRecord extends HostHandoffPlaintextPayload {
   candidateUserId?: string;
   candidateDeviceId?: string;
   candidateLeaf?: number;
+  /** Device-local acknowledgement; never transmitted as authority or protocol state. */
+  patchAppliedLocally?: boolean;
 }
 
 export type LocalPreviewRecord = LocalPreviewPlaintextPayload;

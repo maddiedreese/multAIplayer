@@ -5,9 +5,9 @@ import {
   defaultCodexSandboxLevel,
   defaultCodexSpeed
 } from "@multaiplayer/protocol";
-import { resolveFilePreviewTab } from "../lib/filePreview";
-import { resolveGitWorkflowDraft } from "../lib/gitWorkflowDraft";
-import { embeddedAttachmentBytes } from "../lib/appFormatters";
+import { resolveFilePreviewTab } from "../lib/files/filePreview";
+import { resolveGitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
+import { embeddedAttachmentBytes } from "../lib/formatting/appFormatters";
 import type { BrowserByRoom } from "../store/slices/browserSlice";
 import type { CodexRuntimeByRoom } from "../store/slices/codexHostHandoffSlice";
 import type { FilePanelByRoom } from "../store/slices/filePanelSlice";
@@ -60,25 +60,34 @@ export function useSelectedRoomValues({
   defaultBrowserReason
 }: UseSelectedRoomValuesOptions) {
   const roomId = selectedRoom.id ?? selectedRoomId;
-  const selectedCodexModel = selectedRoom.codexModel ?? defaultCodexModel;
-  const selectedCodexReasoningEffort = selectedRoom.codexReasoningEffort ?? defaultCodexReasoningEffort;
-  const selectedCodexSpeed = selectedRoom.codexSpeed ?? defaultCodexSpeed;
-  const selectedCodexSandboxLevel = selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel;
-  const messages = messagesByRoom[roomId] ?? [];
-  const roomSettings = roomSettingsByRoom[roomId] ?? {};
-  const roomChat = roomChatByRoom[roomId] ?? {};
+  const { selectedCodexModel, selectedCodexReasoningEffort, selectedCodexSpeed, selectedCodexSandboxLevel } =
+    selectCodexDefaults(selectedRoom);
+  const sources = selectRoomValueSources(
+    {
+      messagesByRoom,
+      roomSettingsByRoom,
+      roomChatByRoom,
+      codexRuntimeByRoom,
+      browserByRoom,
+      gitWorkflowRuntimeByRoom,
+      terminalRuntimeByRoom,
+      filePanelByRoom,
+      inviteByRoom
+    },
+    roomId
+  );
+  const { messages, roomSettings, roomChat, codexRuntime, browser, gitRuntime, terminalRuntime, filePanel, invite } =
+    sources;
   const replyToMessageId = roomChat.replyToMessageId ?? null;
-  const codexRuntime = codexRuntimeByRoom[roomId] ?? {};
-  const browser = browserByRoom[roomId] ?? {};
-  const gitRuntime = gitWorkflowRuntimeByRoom[roomId] ?? {};
   const gitWorkflow = gitRuntime.workflow ?? {};
   const githubActions = gitRuntime.actions ?? {};
-  const terminalRuntime = terminalRuntimeByRoom[roomId] ?? {};
-  const filePanel = filePanelByRoom[roomId] ?? {};
-  const invite = inviteByRoom[roomId] ?? {};
   const selectedDiff = filePanel.selectedDiff ?? null;
-  const historyMessage = historyMessagesByRoom[roomId] ?? null;
-  const teamHistoryMessage = teamHistoryMessagesByTeam[selectedTeam || "__no-team"] ?? null;
+  const { historyMessage, teamHistoryMessage } = selectHistoryMessages(
+    historyMessagesByRoom,
+    teamHistoryMessagesByTeam,
+    roomId,
+    selectedTeam
+  );
   const pendingAttachments: ChatAttachment[] = roomChat.pendingAttachments ?? [];
   const markdownCopyFallback: MarkdownCopyFallback | null = filePanel.markdownCopyFallback ?? null;
 
@@ -112,6 +121,55 @@ export function useSelectedRoomValues({
     teamHistoryMessage,
     visibleHistoryMessage: historyMessage ?? teamHistoryMessage,
     markdownCopyFallback
+  };
+}
+
+function selectRoomValueSources(
+  sources: Pick<
+    UseSelectedRoomValuesOptions,
+    | "messagesByRoom"
+    | "roomSettingsByRoom"
+    | "roomChatByRoom"
+    | "codexRuntimeByRoom"
+    | "browserByRoom"
+    | "gitWorkflowRuntimeByRoom"
+    | "terminalRuntimeByRoom"
+    | "filePanelByRoom"
+    | "inviteByRoom"
+  >,
+  roomId: string
+) {
+  return {
+    messages: sources.messagesByRoom[roomId] ?? [],
+    roomSettings: sources.roomSettingsByRoom[roomId] ?? {},
+    roomChat: sources.roomChatByRoom[roomId] ?? {},
+    codexRuntime: sources.codexRuntimeByRoom[roomId] ?? {},
+    browser: sources.browserByRoom[roomId] ?? {},
+    gitRuntime: sources.gitWorkflowRuntimeByRoom[roomId] ?? {},
+    terminalRuntime: sources.terminalRuntimeByRoom[roomId] ?? {},
+    filePanel: sources.filePanelByRoom[roomId] ?? {},
+    invite: sources.inviteByRoom[roomId] ?? {}
+  };
+}
+
+function selectCodexDefaults(room: ClientRoomRecord) {
+  return {
+    selectedCodexModel: room.codexModel ?? defaultCodexModel,
+    selectedCodexReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
+    selectedCodexSpeed: room.codexSpeed ?? defaultCodexSpeed,
+    selectedCodexSandboxLevel: room.codexSandboxLevel ?? defaultCodexSandboxLevel
+  };
+}
+
+function selectHistoryMessages(
+  messagesByRoom: Record<string, string | null>,
+  messagesByTeam: Record<string, string | null>,
+  roomId: string,
+  teamId: string
+) {
+  return {
+    historyMessage: messagesByRoom[roomId] ?? null,
+    teamHistoryMessage: messagesByTeam[teamId || "__no-team"] ?? null
   };
 }
 

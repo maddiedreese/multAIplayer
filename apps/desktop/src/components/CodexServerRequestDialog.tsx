@@ -6,9 +6,9 @@ import {
   respondCodexServerRequest,
   type CodexServerRequest,
   type CodexServerResponse
-} from "../lib/localBackend";
-import { isTauriRuntime } from "../lib/localBackend/runtime";
-import { reportExpectedFailure, reportNonFatal } from "../lib/nonFatalReporting";
+} from "../lib/platform/localBackend";
+import { isTauriRuntime } from "../lib/platform/localBackend/runtime";
+import { reportExpectedFailure, reportNonFatal } from "../lib/core/nonFatalReporting";
 
 interface ResolvedRequestEvent {
   requestKey: string;
@@ -239,7 +239,7 @@ export function describeCodexServerRequest(request: CodexServerRequest): CodexSe
     questions: [],
     canAccept: () => true
   };
-  if (request.method.includes("commandExecution") || request.method === "execCommandApproval") {
+  if (isCommandApprovalMethod(request.method)) {
     const legacy = request.method === "execCommandApproval";
     return {
       ...base,
@@ -348,6 +348,10 @@ export function describeCodexServerRequest(request: CodexServerRequest): CodexSe
   };
 }
 
+function isCommandApprovalMethod(method: string): boolean {
+  return method.includes("commandExecution") || method === "execCommandApproval";
+}
+
 function describeMcpForm(params: Record<string, unknown>): {
   questions: CodexRequestQuestion[];
   content: (answers: Record<string, CodexRequestAnswer>) => Record<string, unknown>;
@@ -394,7 +398,7 @@ function describeMcpForm(params: Record<string, unknown>): {
         if (question.required) entries.push([question.id, false]);
         continue;
       }
-      if (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0)) {
+      if (answerMissing(answer)) {
         continue;
       }
       entries.push([question.id, question.kind === "number" ? Number(answer) : answer]);
@@ -402,44 +406,48 @@ function describeMcpForm(params: Record<string, unknown>): {
     return Object.fromEntries(entries);
   };
   const canAccept = (answers: Record<string, CodexRequestAnswer>) =>
-    questions.every((question) => {
-      const answer = answers[question.id];
-      if (question.kind === "boolean") return answer === undefined || typeof answer === "boolean";
-      if (
-        !question.required &&
-        (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0))
-      )
-        return true;
-      if (
-        question.required &&
-        (answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0))
-      )
-        return false;
-      if (question.kind === "multiselect") {
-        return (
-          Array.isArray(answer) &&
-          (question.min === undefined || answer.length >= question.min) &&
-          (question.max === undefined || answer.length <= question.max) &&
-          answer.every((value) => question.options.some((option) => option.value === value))
-        );
-      }
-      if (typeof answer !== "string") return false;
-      if (question.kind === "number") {
-        const number = Number(answer);
-        return (
-          Number.isFinite(number) &&
-          (!question.integer || Number.isInteger(number)) &&
-          (question.min === undefined || number >= question.min) &&
-          (question.max === undefined || number <= question.max)
-        );
-      }
-      return (
-        (question.min === undefined || answer.length >= question.min) &&
-        (question.max === undefined || answer.length <= question.max) &&
-        (!question.options.length || question.options.some((option) => option.value === answer))
-      );
-    });
+    questions.every((question) => questionAcceptsAnswer(question, answers[question.id]));
   return { questions, content, canAccept };
+}
+
+function questionAcceptsAnswer(question: CodexRequestQuestion, answer: CodexRequestAnswer | undefined): boolean {
+  if (question.kind === "boolean") return answer === undefined || typeof answer === "boolean";
+  if (answer === undefined) return !question.required;
+  if (answerMissing(answer)) return !question.required;
+  if (question.kind === "multiselect") return validMultiselectAnswer(question, answer);
+  if (typeof answer !== "string") return false;
+  return question.kind === "number" ? validNumberAnswer(question, answer) : validTextAnswer(question, answer);
+}
+
+function validMultiselectAnswer(question: CodexRequestQuestion, answer: CodexRequestAnswer): boolean {
+  return (
+    Array.isArray(answer) &&
+    (question.min === undefined || answer.length >= question.min) &&
+    (question.max === undefined || answer.length <= question.max) &&
+    answer.every((value) => question.options.some((option) => option.value === value))
+  );
+}
+
+function validNumberAnswer(question: CodexRequestQuestion, answer: string): boolean {
+  const number = Number(answer);
+  return (
+    Number.isFinite(number) &&
+    (!question.integer || Number.isInteger(number)) &&
+    (question.min === undefined || number >= question.min) &&
+    (question.max === undefined || number <= question.max)
+  );
+}
+
+function validTextAnswer(question: CodexRequestQuestion, answer: string): boolean {
+  return (
+    (question.min === undefined || answer.length >= question.min) &&
+    (question.max === undefined || answer.length <= question.max) &&
+    (!question.options.length || question.options.some((option) => option.value === answer))
+  );
+}
+
+function answerMissing(answer: CodexRequestAnswer | undefined): boolean {
+  return answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0);
 }
 
 function enumOptions(field: Record<string, unknown>): Array<{ value: string; label: string }> {

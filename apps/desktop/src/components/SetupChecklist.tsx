@@ -1,5 +1,5 @@
 import { ArrowRight, Check, Circle, X } from "lucide-react";
-import type { OnboardingProgress } from "../lib/onboardingState";
+import type { OnboardingProgress } from "../lib/onboarding/onboardingState";
 
 const labels = {
   connect_codex: "Connect Codex",

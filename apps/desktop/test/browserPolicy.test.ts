@@ -11,7 +11,7 @@ import {
   normalizeBrowserAllowedOrigins,
   roomBrowserRequestMessage,
   shouldAutoApproveBrowserRequest
-} from "../src/lib/browserPolicy";
+} from "../src/lib/browser/browserPolicy";
 
 const room: ClientRoomRecord = {
   id: "room-browser",

@@ -5,6 +5,7 @@ import { RelayHttpErrorCode, RelayHttpErrorResponse } from "../src/index.js";
 test("relay HTTP errors expose stable discriminants and allow bounded context fields", () => {
   assert.equal(RelayHttpErrorCode.parse("authentication_required"), "authentication_required");
   assert.equal(RelayHttpErrorCode.parse("account_deletion_blocked"), "account_deletion_blocked");
+  assert.equal(RelayHttpErrorCode.parse("account_restricted"), "account_restricted");
   assert.equal(
     RelayHttpErrorResponse.parse({
       error: "Slow down before retrying.",

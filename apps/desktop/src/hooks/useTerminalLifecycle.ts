@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { listTerminals, readTerminal } from "../lib/localBackend";
-import { mergeTerminalSnapshots } from "../lib/terminalState";
+import { listTerminals, readTerminal } from "../lib/platform/localBackend";
+import { mergeTerminalSnapshots } from "../lib/terminal/terminalState";
 import { useAppStore } from "../store/appStore";
 
 interface UseTerminalLifecycleOptions {

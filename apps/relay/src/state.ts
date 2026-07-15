@@ -16,6 +16,8 @@ export type RoomKey = `${string}:${string}`;
 
 export type RelayStoreMutationEntity =
   | "authSessions"
+  | "accountRestrictions"
+  | "accountQuotaRecords"
   | "teams"
   | "rooms"
   | "invites"
@@ -120,6 +122,21 @@ export interface AppliedDeletionLedgerEntry {
   appliedAt: string;
 }
 
+export interface AccountRestriction {
+  userId: string;
+  reasonCode: string;
+  createdAt: string;
+  expiresAt?: string;
+}
+
+export interface AccountQuotaRecord {
+  key: string;
+  userId: string;
+  quota: "daily_team_creations" | "daily_room_creations" | "attachment_upload_bytes";
+  used: number;
+  resetAt: number;
+}
+
 export interface RelayStore {
   sessions: Map<WebSocket, ClientSession>;
   roomSockets: Map<RoomKey, Set<WebSocket>>;
@@ -128,6 +145,8 @@ export interface RelayStore {
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   mlsBacklog: Map<RoomKey, MlsRelayMessage[]>;
   authSessions: Map<string, AuthSession>;
+  accountRestrictions: Map<string, AccountRestriction>;
+  accountQuotaRecords: Map<string, AccountQuotaRecord>;
   teams: Map<string, TeamRecord>;
   rooms: Map<string, RoomRecord>;
   invites: Map<string, InviteRecord>;
@@ -185,6 +204,8 @@ export class InMemoryRelayStore implements RelayStore {
   readonly roomPresence = new Map<RoomKey, Map<string, PresenceRecord>>();
   readonly mlsBacklog = this.trackedMap<RoomKey, MlsRelayMessage[]>("mlsBacklog");
   readonly authSessions = this.trackedMap<string, AuthSession>("authSessions");
+  readonly accountRestrictions = this.trackedMap<string, AccountRestriction>("accountRestrictions");
+  readonly accountQuotaRecords = this.trackedMap<string, AccountQuotaRecord>("accountQuotaRecords");
   readonly teams = this.trackedMap<string, TeamRecord>("teams");
   readonly rooms = this.trackedMap<string, RoomRecord>("rooms");
   readonly invites = this.trackedMap<string, InviteRecord>("invites");

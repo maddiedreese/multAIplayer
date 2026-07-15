@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canActOnRoomInviteRequest, findRoomInviteRequest, roomInviteRequestMessage } from "../src/lib/inviteApproval";
+import {
+  canActOnRoomInviteRequest,
+  findRoomInviteRequest,
+  roomInviteRequestMessage
+} from "../src/lib/invite/inviteApproval";
 
 const request = {
   id: "invite-request-1",

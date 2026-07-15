@@ -1,5 +1,5 @@
 import { BookOpen, CheckCircle2, RotateCcw } from "lucide-react";
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/productLinks";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/core/productLinks";
 
 export function HelpDrawerPanel({
   completedSteps,

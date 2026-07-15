@@ -2,9 +2,9 @@ import { FitAddon } from "@xterm/addon-fit";
 import * as xtermModule from "@xterm/xterm";
 import { Check, Copy, Maximize2, Minimize2, Plus, Play, Square, Terminal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { TerminalLine, TerminalSnapshot } from "../lib/localBackend";
+import type { TerminalLine, TerminalSnapshot } from "../lib/platform/localBackend";
 import { InlineSecretWarning } from "./common";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 
 type XTermConstructor = typeof import("@xterm/xterm").Terminal;
 const xtermCompat = xtermModule as unknown as {
@@ -228,129 +228,40 @@ export function TerminalPanel({
 
   return (
     <section className={`panel terminal-panel ${terminalExpanded ? "expanded" : ""}`} ref={terminalPanelRef}>
-      <div className="panel-title">
-        <span>Terminals</span>
-        <div className="panel-title-actions">
-          <button
-            className="primary-tool"
-            onClick={onOpenInteractiveTerminal}
-            disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal}
-          >
-            <Plus size={14} /> New terminal
-          </button>
-          <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
-            <Copy size={14} /> Markdown
-          </button>
-          <button
-            className="ghost"
-            onClick={onRevokeExactCommandGrants}
-            disabled={!canApproveTerminal || terminalBusy}
-            title="Open a native confirmation to revoke remembered command text for this room"
-          >
-            <X size={14} /> Revoke repeats
-          </button>
-          <button
-            className="ghost icon-only terminal-expand-button"
-            onClick={() => setTerminalExpanded((current) => !current)}
-            aria-label={terminalExpanded ? "Return terminal to column" : "Expand terminal"}
-            title={terminalExpanded ? "Return to column" : "Expand"}
-          >
-            {terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-        </div>
-      </div>
+      <TerminalPanelTitle
+        {...{
+          canReadLocalWorkspace,
+          terminalBusy,
+          canApproveTerminal,
+          terminalExpanded,
+          onOpenInteractiveTerminal,
+          onCopyMarkdown,
+          onRevokeExactCommandGrants
+        }}
+        onToggleExpanded={() => setTerminalExpanded((current) => !current)}
+      />
 
-      {(codexEvents.length > 0 || commandRequests.length > 0) && (
-        <div className="terminal-requests">
-          {codexEvents.map((event) => (
-            <div
-              className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`}
-              key={event.key}
-            >
-              <div>
-                <strong>{event.statusLabel}</strong>
-                <span>{event.message}</span>
-                <small>{event.detail}</small>
-              </div>
-              <small>{event.host}</small>
-            </div>
-          ))}
-          {commandRequests.map((request) => (
-            <div className={`terminal-request ${request.status}`} key={request.id}>
-              <div>
-                <strong>{request.command}</strong>
-                <span>
-                  {request.requester} · {request.cwd}
-                </span>
-              </div>
-              <small>{request.status}</small>
-              {request.status === "pending" && (
-                <div className="terminal-request-warning">
-                  <InlineSecretWarning
-                    risks={["Approving runs this shell command on the host account, not inside a project sandbox."]}
-                    compact
-                  />
-                </div>
-              )}
-              {request.status === "pending" && (
-                <div>
-                  <button
-                    onClick={() => onApproveTerminalRequest(request.id)}
-                    disabled={!canApproveTerminal || terminalBusy}
-                    title={`Approve ${request.command}`}
-                    aria-label={`Approve ${request.command}`}
-                  >
-                    <Check size={13} />
-                  </button>
-                  <button
-                    onClick={() => onDenyTerminalRequest(request.id)}
-                    disabled={!canApproveTerminal || terminalBusy}
-                    title={`Deny ${request.command}`}
-                    aria-label={`Deny ${request.command}`}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              )}
-              {request.risks.length > 0 && (
-                <div className="terminal-request-warning">
-                  <InlineSecretWarning
-                    risks={request.risks}
-                    detail="Review before approving this command on the host machine."
-                    compact
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <TerminalRequests
+        {...{
+          codexEvents,
+          commandRequests,
+          canApproveTerminal,
+          terminalBusy,
+          onApproveTerminalRequest,
+          onDenyTerminalRequest
+        }}
+      />
 
-      {roomTerminals.length > 0 && (
-        <div className="terminal-tabs">
-          {roomTerminals.map((terminal) => (
-            <div key={terminal.id} className={`terminal-tab ${terminal.id === selectedTerminalId ? "active" : ""}`}>
-              <button type="button" className="terminal-tab-select" onClick={() => onSelectTerminal(terminal.id)}>
-                <Terminal size={13} />
-                {terminal.name}
-              </button>
-              <span>{terminal.running ? "live" : (terminal.exitStatus ?? "done")}</span>
-              {terminal.id === selectedTerminalId && (
-                <button
-                  type="button"
-                  className="terminal-tab-close"
-                  onClick={onStopTerminal}
-                  disabled={!selectedTerminalCanControl || !terminal.running || terminalBusy}
-                  title={`Close ${terminal.name}`}
-                  aria-label={`Close ${terminal.name}`}
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <TerminalTabs
+        {...{
+          roomTerminals,
+          selectedTerminalId,
+          onSelectTerminal,
+          onStopTerminal,
+          selectedTerminalCanControl,
+          terminalBusy
+        }}
+      />
 
       <div
         className="terminal-output xterm-output"
@@ -389,6 +300,193 @@ export function TerminalPanel({
 
       {terminalError && <div className="workflow-message">{terminalError}</div>}
     </section>
+  );
+}
+
+function TerminalRequests({
+  codexEvents,
+  commandRequests,
+  canApproveTerminal,
+  terminalBusy,
+  onApproveTerminalRequest,
+  onDenyTerminalRequest
+}: {
+  codexEvents: CodexEventDisplay[];
+  commandRequests: TerminalCommandRequestDisplay[];
+  canApproveTerminal: boolean;
+  terminalBusy: boolean;
+  onApproveTerminalRequest: (id: string) => void;
+  onDenyTerminalRequest: (id: string) => void;
+}) {
+  if (!codexEvents.length && !commandRequests.length) return null;
+  return (
+    <div className="terminal-requests">
+      {codexEvents.map((event) => (
+        <div
+          className={`terminal-request ${event.status === "failed" ? "denied" : event.status === "completed" ? "approved" : "pending"}`}
+          key={event.key}
+        >
+          <div>
+            <strong>{event.statusLabel}</strong>
+            <span>{event.message}</span>
+            <small>{event.detail}</small>
+          </div>
+          <small>{event.host}</small>
+        </div>
+      ))}
+      {commandRequests.map((request) => (
+        <TerminalCommandRequest
+          key={request.id}
+          {...{ request, canApproveTerminal, terminalBusy, onApproveTerminalRequest, onDenyTerminalRequest }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TerminalPanelTitle({
+  canReadLocalWorkspace,
+  terminalBusy,
+  canApproveTerminal,
+  terminalExpanded,
+  onOpenInteractiveTerminal,
+  onCopyMarkdown,
+  onRevokeExactCommandGrants,
+  onToggleExpanded
+}: {
+  canReadLocalWorkspace: boolean;
+  terminalBusy: boolean;
+  canApproveTerminal: boolean;
+  terminalExpanded: boolean;
+  onOpenInteractiveTerminal: () => void;
+  onCopyMarkdown: () => void;
+  onRevokeExactCommandGrants: () => void;
+  onToggleExpanded: () => void;
+}) {
+  return (
+    <div className="panel-title">
+      <span>Terminals</span>
+      <div className="panel-title-actions">
+        <button
+          className="primary-tool"
+          onClick={onOpenInteractiveTerminal}
+          disabled={!canReadLocalWorkspace || terminalBusy || !canApproveTerminal}
+        >
+          <Plus size={14} /> New terminal
+        </button>
+        <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
+          <Copy size={14} /> Markdown
+        </button>
+        <button className="ghost" onClick={onRevokeExactCommandGrants} disabled={!canApproveTerminal || terminalBusy}>
+          <X size={14} /> Revoke repeats
+        </button>
+        <button
+          className="ghost icon-only terminal-expand-button"
+          onClick={onToggleExpanded}
+          aria-label={terminalExpanded ? "Return terminal to column" : "Expand terminal"}
+        >
+          {terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TerminalTabs({
+  roomTerminals,
+  selectedTerminalId,
+  onSelectTerminal,
+  onStopTerminal,
+  selectedTerminalCanControl,
+  terminalBusy
+}: {
+  roomTerminals: TerminalSnapshot[];
+  selectedTerminalId: string | null;
+  onSelectTerminal: (id: string) => void;
+  onStopTerminal: () => void;
+  selectedTerminalCanControl: boolean;
+  terminalBusy: boolean;
+}) {
+  if (!roomTerminals.length) return null;
+  return (
+    <div className="terminal-tabs">
+      {roomTerminals.map((terminal) => {
+        const selected = terminal.id === selectedTerminalId;
+        return (
+          <div key={terminal.id} className={`terminal-tab ${selected ? "active" : ""}`}>
+            <button type="button" className="terminal-tab-select" onClick={() => onSelectTerminal(terminal.id)}>
+              <Terminal size={13} />
+              {terminal.name}
+            </button>
+            <span>{terminal.running ? "live" : (terminal.exitStatus ?? "done")}</span>
+            {selected && (
+              <button
+                type="button"
+                className="terminal-tab-close"
+                onClick={onStopTerminal}
+                disabled={!selectedTerminalCanControl || !terminal.running || terminalBusy}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TerminalCommandRequest({
+  request,
+  canApproveTerminal,
+  terminalBusy,
+  onApproveTerminalRequest,
+  onDenyTerminalRequest
+}: {
+  request: TerminalCommandRequestDisplay;
+  canApproveTerminal: boolean;
+  terminalBusy: boolean;
+  onApproveTerminalRequest: (id: string) => void;
+  onDenyTerminalRequest: (id: string) => void;
+}) {
+  const pending = request.status === "pending";
+  return (
+    <div className={`terminal-request ${request.status}`}>
+      <div>
+        <strong>{request.command}</strong>
+        <span>
+          {request.requester} · {request.cwd}
+        </span>
+      </div>
+      <small>{request.status}</small>
+      {pending && (
+        <div className="terminal-request-warning">
+          <InlineSecretWarning
+            risks={["Approving runs this shell command on the host account, not inside a project sandbox."]}
+            compact
+          />
+        </div>
+      )}
+      {pending && (
+        <div>
+          <button onClick={() => onApproveTerminalRequest(request.id)} disabled={!canApproveTerminal || terminalBusy}>
+            <Check size={13} />
+          </button>
+          <button onClick={() => onDenyTerminalRequest(request.id)} disabled={!canApproveTerminal || terminalBusy}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
+      {request.risks.length > 0 && (
+        <div className="terminal-request-warning">
+          <InlineSecretWarning
+            risks={request.risks}
+            detail="Review before approving this command on the host machine."
+            compact
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

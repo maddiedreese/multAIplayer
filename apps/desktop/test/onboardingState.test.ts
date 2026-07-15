@@ -10,7 +10,7 @@ import {
   saveOnboardingState,
   type OnboardingEvent,
   type OnboardingState
-} from "../src/lib/onboardingState";
+} from "../src/lib/onboarding/onboardingState";
 
 class MemoryStorage {
   readonly values = new Map<string, string>();

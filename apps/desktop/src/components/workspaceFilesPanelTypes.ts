@@ -1,5 +1,10 @@
-import type { FilePreviewTab } from "../lib/filePreview";
-import type { GitDiffResult, GitStatusSummary, ProjectFileContent, ProjectFileEntry } from "../lib/localBackend";
+import type { FilePreviewTab } from "../lib/files/filePreview";
+import type {
+  GitDiffResult,
+  GitStatusSummary,
+  ProjectFileContent,
+  ProjectFileEntry
+} from "../lib/platform/localBackend";
 import type { WorkspaceFileSaveRequest } from "../types";
 
 export interface WorkspaceFilesPanelProps {

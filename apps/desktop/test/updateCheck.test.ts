@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compareVersions, fetchUpdateNotice, normalizeUpdateManifest } from "../src/lib/updateCheck";
+import { compareVersions, fetchUpdateNotice, normalizeUpdateManifest } from "../src/lib/core/updateCheck";
 
 test("compareVersions compares release versions", () => {
   assert.equal(compareVersions("0.1.1-alpha.0", "0.1.0-alpha.0"), 1);

@@ -1,5 +1,5 @@
 import { Code2, FileCode2 } from "lucide-react";
-import type { FilePreviewTab } from "../lib/filePreview";
+import type { FilePreviewTab } from "../lib/files/filePreview";
 
 export function FilePreviewTabs({
   activeTab,

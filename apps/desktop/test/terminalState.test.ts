@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { replaceRoomTerminalSnapshots } from "../src/lib/terminalState";
+import { replaceRoomTerminalSnapshots } from "../src/lib/terminal/terminalState";
 
 const alphaTerminal = { id: "alpha:dev", roomId: "alpha", name: "dev", running: true };
 const betaTerminal = { id: "beta:dev", roomId: "beta", name: "dev", running: true };

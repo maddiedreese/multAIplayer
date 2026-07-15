@@ -63,29 +63,38 @@ export function parseRelayClientMessage(
 }
 
 function relayClientMessagePreflightError(options: RelayWebSocketConnectionOptions, message: unknown): string | null {
-  const { isRecord, normalizeMetadataText: normalize } = options.validation;
-  const {
-    mlsMessageMaxBytes,
-    maxDeviceIdChars,
-    maxDisplayNameChars,
-    maxEnvelopeIdChars,
-    maxMlsMessageChars,
-    maxPublicKeyFingerprintChars,
-    maxRoomProjectPathChars,
-    maxUserIdChars
-  } = options.limits;
+  const { isRecord } = options.validation;
   if (!isRecord(message) || typeof message.type !== "string") return null;
   if (message.type === "join" || message.type === "subscribe.team" || message.type === "subscribe.workspace") {
-    if (
-      typeof message.userId === "string" &&
-      typeof message.deviceId === "string" &&
-      !isBoundedSocketIdentity(options, message.userId, message.deviceId)
-    ) {
-      return "WebSocket user and device ids must be bounded strings without control characters.";
-    }
-    return null;
+    return socketIdentityPreflightError(options, message);
   }
-  if (message.type === "publish" && isRecord(message.message)) {
+  if (message.type === "publish") return publishPreflightError(options, message);
+  if (message.type === "presence") return presencePreflightError(options, message);
+  return null;
+}
+
+function socketIdentityPreflightError(
+  options: RelayWebSocketConnectionOptions,
+  message: Record<string, unknown>
+): string | null {
+  if (
+    typeof message.userId === "string" &&
+    typeof message.deviceId === "string" &&
+    !isBoundedSocketIdentity(options, message.userId, message.deviceId)
+  ) {
+    return "WebSocket user and device ids must be bounded strings without control characters.";
+  }
+  return null;
+}
+
+function publishPreflightError(
+  options: RelayWebSocketConnectionOptions,
+  message: Record<string, unknown>
+): string | null {
+  const { isRecord, normalizeMetadataText: normalize } = options.validation;
+  const { mlsMessageMaxBytes, maxDeviceIdChars, maxEnvelopeIdChars, maxMlsMessageChars, maxUserIdChars } =
+    options.limits;
+  if (isRecord(message.message)) {
     const envelope = message.message;
     if (
       typeof envelope.id === "string" &&
@@ -102,26 +111,31 @@ function relayClientMessagePreflightError(options: RelayWebSocketConnectionOptio
       return `MLS message exceeds relay limits (${mlsMessageMaxBytes} bytes max).`;
     }
   }
-  if (message.type === "presence") {
-    if (typeof message.displayName === "string" && !normalize(message.displayName, maxDisplayNameChars)) {
-      return presenceLimitError;
-    }
-    if (
-      message.avatarUrl !== undefined &&
-      typeof message.avatarUrl === "string" &&
-      !normalize(message.avatarUrl, maxRoomProjectPathChars)
-    ) {
-      return presenceLimitError;
-    }
-    if (
-      message.publicKeyFingerprint !== undefined &&
-      typeof message.publicKeyFingerprint === "string" &&
-      !normalize(message.publicKeyFingerprint, maxPublicKeyFingerprintChars)
-    ) {
-      return presenceLimitError;
-    }
+  return null;
+}
+
+function presencePreflightError(
+  options: RelayWebSocketConnectionOptions,
+  message: Record<string, unknown>
+): string | null {
+  const { normalizeMetadataText: normalize } = options.validation;
+  const { maxDisplayNameChars, maxPublicKeyFingerprintChars, maxRoomProjectPathChars } = options.limits;
+  if (typeof message.displayName === "string" && !normalize(message.displayName, maxDisplayNameChars)) {
+    return presenceLimitError;
+  }
+  if (invalidOptionalText(message.avatarUrl, maxRoomProjectPathChars, normalize)) return presenceLimitError;
+  if (invalidOptionalText(message.publicKeyFingerprint, maxPublicKeyFingerprintChars, normalize)) {
+    return presenceLimitError;
   }
   return null;
+}
+
+function invalidOptionalText(
+  value: unknown,
+  maxChars: number,
+  normalize: (value: unknown, maxChars: number) => string | null
+): boolean {
+  return value !== undefined && typeof value === "string" && !normalize(value, maxChars);
 }
 
 export const presenceLimitError =

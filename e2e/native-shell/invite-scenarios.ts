@@ -128,7 +128,7 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
       const results = (page.__multaiplayerGroupStateResults ??= {});
       results[key] = undefined;
       const storeModule = "/src/store/appStore.ts";
-      const mlsModule = "/src/lib/mlsClient.ts";
+      const mlsModule = "/src/lib/mls/mlsClient.ts";
       void Promise.all([import(/* @vite-ignore */ storeModule), import(/* @vite-ignore */ mlsModule)])
         .then(([{ useAppStore }, { mlsGroupState }]) => {
           const room = useAppStore

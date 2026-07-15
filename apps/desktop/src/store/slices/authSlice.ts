@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../../lib/authClient";
+import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../../lib/identity/authClient";
 import type { AppStoreState } from "../appStore";
 
 export interface AuthSlice {

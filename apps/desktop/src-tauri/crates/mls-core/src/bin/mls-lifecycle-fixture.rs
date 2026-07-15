@@ -243,7 +243,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .find(|member| member.credential.device_id == next_device)
         .ok_or("next host missing from roster")?
         .leaf;
-    let handoff = host.transfer_host(ROOM, next_leaf, next_device.to_owned())?;
+    let handoff = host.transfer_host(
+        ROOM,
+        next_leaf,
+        next_device.to_owned(),
+        "fixture-handoff".into(),
+    )?;
     let authorization = host.host_transfer_authorization(ROOM, &handoff.outbox_id)?;
     let canonical_authorization = serde_json::to_vec(&authorization)?;
     let signed = host_signer.sign_host_transfer(&canonical_authorization)?;

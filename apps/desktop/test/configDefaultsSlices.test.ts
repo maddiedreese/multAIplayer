@@ -40,8 +40,8 @@ Object.defineProperty(globalThis, "window", {
 });
 
 const { useAppStore } = await import("../src/store/appStore");
-const { saveTeamHistorySettings } = await import("../src/lib/localHistory");
-const { saveTeamRoomDefaults } = await import("../src/lib/teamRoomDefaults");
+const { saveTeamHistorySettings } = await import("../src/lib/history/localHistory");
+const { saveTeamRoomDefaults } = await import("../src/lib/team/teamRoomDefaults");
 
 test.beforeEach(() => {
   localStorage.clear();

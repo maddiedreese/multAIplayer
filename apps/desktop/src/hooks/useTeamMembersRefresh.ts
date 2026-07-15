@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
-import { loadTeamMembers } from "../lib/workspaceClient";
-import { RelayHttpError } from "../lib/httpResponse";
+import { loadTeamMembers } from "../application/workspace/workspaceClient";
+import { RelayHttpError } from "../lib/core/httpResponse";
 import { useAppStore } from "../store/appStore";
 
 interface UseTeamMembersRefreshOptions {

@@ -12,7 +12,7 @@ import { ProjectPanel } from "./ProjectPanel";
 import { RoomMembersPanel, TeamRosterPanel } from "./RosterPanels";
 import { TerminalPanel } from "./TerminalPanel";
 import { WorkspaceFilesPanel } from "./WorkspaceFilesPanel";
-import type { InspectorTab } from "./RoomInspectorPanel";
+import type { InspectorTab } from "../lib/core/uiTypes";
 import type { HostHandoffRecord, InviteJoinRequest } from "../types";
 
 export function RoomInspectorWorkPanel({

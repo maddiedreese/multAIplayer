@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   canContinueSelectedWorkspaceAfterAdmissionRecovery,
   runRelayWorkspaceStartupBarrier
-} from "../src/lib/relayWorkspaceStartup";
+} from "../src/lib/relay/relayWorkspaceStartup";
 
 test("workspace startup defers team and room continuation until admission recovery completes", async () => {
   const calls: string[] = [];

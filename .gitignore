@@ -15,7 +15,9 @@ playwright-report/
 test-results/
 coverage/
 coverage-critical/
+coverage-host-actions/
 **/.stryker-tmp/
 **/reports/mutation/
+**/reports/soak/
 reports/native-shell-e2e/
 reports/native-macos-smoke/

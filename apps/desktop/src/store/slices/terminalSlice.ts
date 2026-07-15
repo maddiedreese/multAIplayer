@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
-import type { TerminalSnapshot } from "../../lib/localBackend";
-import { omitRecordKey } from "../../lib/setUtils";
-import { replaceRoomTerminalSnapshots, upsertTerminal } from "../../lib/terminalState";
+import type { TerminalSnapshot } from "../../lib/platform/localBackend";
+import { omitRecordKey } from "../../lib/core/setUtils";
+import { replaceRoomTerminalSnapshots, upsertTerminal } from "../../lib/terminal/terminalState";
 import type { TerminalCommandRequest } from "../../types";
 import type { AppStoreState } from "../appStore";
 

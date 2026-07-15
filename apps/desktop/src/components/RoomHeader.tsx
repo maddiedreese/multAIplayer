@@ -1,9 +1,15 @@
 import { ChevronDown, Copy, FileText, Globe2, MonitorUp, Terminal, UsersRound, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { InspectorTab } from "./RoomInspectorPanel";
-import { closeRoomBrowserSurface } from "../lib/browserSurfaceEvents";
+import type { InspectorTab } from "../lib/core/uiTypes";
+import { closeRoomBrowserSurface } from "../lib/browser/browserSurfaceEvents";
 
 type HostStatus = "active" | "handoff" | "offline";
+const roomToolTabs: Array<{ id: InspectorTab; label: string; icon: ReactNode }> = [
+  { id: "files", label: "Files", icon: <FileText size={16} /> },
+  { id: "terminal", label: "Terminal", icon: <Terminal size={16} /> },
+  { id: "browser", label: "Browser", icon: <Globe2 size={16} /> },
+  { id: "room", label: "Room", icon: <UsersRound size={16} /> }
+];
 
 export type HeaderModelOption = {
   id: string;
@@ -79,9 +85,6 @@ export function RoomHeader({
   onClearSelectedMessages: () => void;
   onShareLocalPreview: () => void;
 }) {
-  const knownModel = modelOptions.some((option) => option.id === selectedModel);
-  const knownReasoningEffort = reasoningOptions.some((option) => option.id === selectedReasoningEffort);
-  const knownSpeed = speedOptions.some((option) => option.id === selectedSpeed);
   const [roomNameDraft, setRoomNameDraft] = useState(roomName);
   useEffect(() => setRoomNameDraft(roomName), [roomName]);
   const commitRoomName = () => {
@@ -89,13 +92,6 @@ export function RoomHeader({
     if (nextName && nextName !== roomName) onRenameRoom(nextName);
     else setRoomNameDraft(roomName);
   };
-  const toolTabs: Array<{ id: InspectorTab; label: string; icon: ReactNode }> = [
-    { id: "files", label: "Files", icon: <FileText size={16} /> },
-    { id: "terminal", label: "Terminal", icon: <Terminal size={16} /> },
-    { id: "browser", label: "Browser", icon: <Globe2 size={16} /> },
-    { id: "room", label: "Room", icon: <UsersRound size={16} /> }
-  ];
-
   return (
     <header className="room-header">
       <div className="room-heading">
@@ -134,22 +130,7 @@ export function RoomHeader({
           }}
         />
       </div>
-      <nav className="room-tool-nav" aria-label="Room tools">
-        {toolTabs.map((tab) => (
-          <button
-            className={activeInspectorTab === tab.id ? "active" : ""}
-            key={tab.id}
-            onClick={() => {
-              if (tab.id !== "browser") closeRoomBrowserSurface();
-              onSelectInspectorTab(tab.id);
-            }}
-            aria-pressed={activeInspectorTab === tab.id}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </nav>
+      <RoomToolNav activeTab={activeInspectorTab} onSelect={onSelectInspectorTab} />
       <div className="header-actions">
         <div className="host-controls">
           <button
@@ -162,96 +143,203 @@ export function RoomHeader({
             Handoff
           </button>
         </div>
-        <label
-          className="header-model-switcher"
-          title={isActiveHost ? "Switch Codex model for this room" : "Only the active host can switch models"}
-        >
-          <select
-            aria-label="Codex host model"
-            value={knownModel ? selectedModel : "custom"}
-            disabled={!hasRoom || roomLocked || settingsBusy || !isActiveHost}
-            onChange={(event) => {
-              if (event.target.value !== "custom") {
-                onSelectModel(event.target.value);
-              }
-            }}
-          >
-            {modelOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-            {!knownModel && <option value="custom">{modelLabel}</option>}
-          </select>
-        </label>
-        <label
-          className="header-model-switcher"
-          title={isActiveHost ? "Switch Codex reasoning for this room" : "Only the active host can switch reasoning"}
-        >
-          <select
-            aria-label="Codex reasoning"
-            value={knownReasoningEffort ? selectedReasoningEffort : "medium"}
-            disabled={!hasRoom || roomLocked || settingsBusy || !isActiveHost}
-            onChange={(event) => onSelectReasoningEffort(event.target.value)}
-          >
-            {reasoningOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-            {!knownReasoningEffort && <option value={selectedReasoningEffort}>{reasoningLabel}</option>}
-          </select>
-        </label>
-        <label
-          className="header-model-switcher"
-          title={isActiveHost ? "Switch Codex speed for this room" : "Only the active host can switch speed"}
-        >
-          <select
-            aria-label="Codex speed"
-            value={knownSpeed ? selectedSpeed : "standard"}
-            disabled={!hasRoom || roomLocked || settingsBusy || !isActiveHost}
-            onChange={(event) => onSelectSpeed(event.target.value)}
-          >
-            {speedOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-            {!knownSpeed && <option value={selectedSpeed}>{speedLabel}</option>}
-          </select>
-        </label>
-        <button className="header-copy" onClick={onCopyRoomMarkdown} disabled={!hasRoom}>
-          <Copy size={14} />
-          Markdown
-        </button>
-        <button className="header-copy" onClick={onShareLocalPreview} disabled={!hasRoom || roomLocked}>
-          <MonitorUp size={14} />
-          Share local preview
-        </button>
-        <button
-          className={markdownSelectionMode ? "header-copy active" : "header-copy"}
-          onClick={() => {
-            if (markdownSelectionMode && selectedCount > 0) {
-              onCopySelectedMarkdown();
-            } else {
-              onToggleMarkdownSelection();
-            }
+        <CodexHeaderSelectors
+          {...{
+            hasRoom,
+            roomLocked,
+            settingsBusy,
+            isActiveHost,
+            selectedModel,
+            modelLabel,
+            modelOptions,
+            selectedReasoningEffort,
+            reasoningLabel,
+            reasoningOptions,
+            selectedSpeed,
+            speedLabel,
+            speedOptions,
+            onSelectModel,
+            onSelectReasoningEffort,
+            onSelectSpeed
           }}
-          disabled={!hasRoom}
-        >
-          <Copy size={14} />
-          {markdownSelectionMode ? (selectedCount ? `Copy ${selectedCount}` : "Select messages") : "Selected"}
-        </button>
-        {markdownSelectionMode && (
-          <button
-            className="header-copy"
-            onClick={selectedCount > 0 ? onClearSelectedMessages : onToggleMarkdownSelection}
-          >
-            <X size={14} />
-            {selectedCount > 0 ? "Clear" : "Done"}
-          </button>
-        )}
+        />
+        <HeaderMarkdownActions
+          hasRoom={hasRoom}
+          roomLocked={roomLocked}
+          selectionMode={markdownSelectionMode}
+          selectedCount={selectedCount}
+          onCopyRoom={onCopyRoomMarkdown}
+          onSharePreview={onShareLocalPreview}
+          onCopySelected={onCopySelectedMarkdown}
+          onToggleSelection={onToggleMarkdownSelection}
+          onClearSelection={onClearSelectedMessages}
+        />
       </div>
     </header>
+  );
+}
+
+function CodexHeaderSelectors(
+  props: Pick<
+    Parameters<typeof RoomHeader>[0],
+    | "hasRoom"
+    | "roomLocked"
+    | "settingsBusy"
+    | "isActiveHost"
+    | "selectedModel"
+    | "modelLabel"
+    | "modelOptions"
+    | "selectedReasoningEffort"
+    | "reasoningLabel"
+    | "reasoningOptions"
+    | "selectedSpeed"
+    | "speedLabel"
+    | "speedOptions"
+    | "onSelectModel"
+    | "onSelectReasoningEffort"
+    | "onSelectSpeed"
+  >
+) {
+  const disabled = !props.hasRoom || props.roomLocked || props.settingsBusy || !props.isActiveHost;
+  return (
+    <>
+      <HeaderSelector
+        label="Codex host model"
+        value={props.selectedModel}
+        fallbackValue="custom"
+        fallbackLabel={props.modelLabel}
+        options={props.modelOptions}
+        disabled={disabled}
+        onChange={(value) => {
+          if (value !== "custom") props.onSelectModel(value);
+        }}
+      />
+      <HeaderSelector
+        label="Codex reasoning"
+        value={props.selectedReasoningEffort}
+        fallbackValue="medium"
+        fallbackLabel={props.reasoningLabel}
+        options={props.reasoningOptions}
+        disabled={disabled}
+        onChange={props.onSelectReasoningEffort}
+      />
+      <HeaderSelector
+        label="Codex speed"
+        value={props.selectedSpeed}
+        fallbackValue="standard"
+        fallbackLabel={props.speedLabel}
+        options={props.speedOptions}
+        disabled={disabled}
+        onChange={props.onSelectSpeed}
+      />
+    </>
+  );
+}
+
+function HeaderSelector({
+  label,
+  value,
+  fallbackValue,
+  fallbackLabel,
+  options,
+  disabled,
+  onChange
+}: {
+  label: string;
+  value: string;
+  fallbackValue: string;
+  fallbackLabel: string;
+  options: readonly HeaderModelOption[];
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const known = options.some((option) => option.id === value);
+  return (
+    <label className="header-model-switcher">
+      <select
+        aria-label={label}
+        value={known ? value : fallbackValue}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+        {!known && <option value={fallbackValue === "custom" ? "custom" : value}>{fallbackLabel}</option>}
+      </select>
+    </label>
+  );
+}
+
+function HeaderMarkdownActions({
+  hasRoom,
+  roomLocked,
+  selectionMode,
+  selectedCount,
+  onCopyRoom,
+  onSharePreview,
+  onCopySelected,
+  onToggleSelection,
+  onClearSelection
+}: {
+  hasRoom: boolean;
+  roomLocked: boolean;
+  selectionMode: boolean;
+  selectedCount: number;
+  onCopyRoom: () => void;
+  onSharePreview: () => void;
+  onCopySelected: () => void;
+  onToggleSelection: () => void;
+  onClearSelection: () => void;
+}) {
+  const copySelected = () => {
+    if (selectionMode && selectedCount > 0) onCopySelected();
+    else onToggleSelection();
+  };
+  return (
+    <>
+      <button className="header-copy" onClick={onCopyRoom} disabled={!hasRoom}>
+        <Copy size={14} /> Markdown
+      </button>
+      <button className="header-copy" onClick={onSharePreview} disabled={!hasRoom || roomLocked}>
+        <MonitorUp size={14} /> Share local preview
+      </button>
+      <button
+        className={selectionMode ? "header-copy active" : "header-copy"}
+        onClick={copySelected}
+        disabled={!hasRoom}
+      >
+        <Copy size={14} />
+        {selectionMode ? (selectedCount ? `Copy ${selectedCount}` : "Select messages") : "Selected"}
+      </button>
+      {selectionMode && (
+        <button className="header-copy" onClick={selectedCount > 0 ? onClearSelection : onToggleSelection}>
+          <X size={14} /> {selectedCount > 0 ? "Clear" : "Done"}
+        </button>
+      )}
+    </>
+  );
+}
+
+function RoomToolNav({ activeTab, onSelect }: { activeTab: InspectorTab; onSelect: (tab: InspectorTab) => void }) {
+  return (
+    <nav className="room-tool-nav" aria-label="Room tools">
+      {roomToolTabs.map((tab) => (
+        <button
+          className={activeTab === tab.id ? "active" : ""}
+          key={tab.id}
+          onClick={() => {
+            if (tab.id !== "browser") closeRoomBrowserSurface();
+            onSelect(tab.id);
+          }}
+          aria-pressed={activeTab === tab.id}
+        >
+          {tab.icon}
+          <span>{tab.label}</span>
+        </button>
+      ))}
+    </nav>
   );
 }

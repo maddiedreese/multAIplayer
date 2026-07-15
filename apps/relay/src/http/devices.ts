@@ -22,22 +22,8 @@ interface RegisterDeviceRoutesOptions {
   maxUserIdChars: number;
 }
 
-export function registerDeviceRoutes({
-  app,
-  store,
-  getAuthSession,
-  allowRead,
-  allowMutation,
-  scheduleStoreSave,
-  normalizeMetadataText,
-  normalizeOptionalMetadataText,
-  displayNameForUser,
-  maxDisplayNameChars,
-  maxDeviceIdChars,
-  maxPublicKeyFingerprintChars,
-  maxPublicKeyJwkChars,
-  maxUserIdChars
-}: RegisterDeviceRoutesOptions) {
+export function registerDeviceRoutes(options: RegisterDeviceRoutesOptions) {
+  const { app, store, getAuthSession, allowRead, allowMutation, scheduleStoreSave } = options;
   app.post("/devices", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
@@ -46,55 +32,17 @@ export function registerDeviceRoutes({
       return;
     }
 
-    const requestedUserId = normalizeOptionalMetadataText(req.body?.userId, maxUserIdChars);
-    if (requestedUserId === null) {
-      sendRelayError(
-        res,
-        400,
-        "invalid_request",
-        `userId must be up to ${maxUserIdChars} characters without control characters`
-      );
-      return;
-    }
-    if (session && requestedUserId && requestedUserId !== session.user.id) {
-      sendRelayError(res, 403, "forbidden", "Device user id must match the signed-in GitHub user.");
-      return;
-    }
-    const userId = session.user.id;
-    const deviceId = normalizeMetadataText(req.body?.deviceId, maxDeviceIdChars);
-    const displayName = session
-      ? normalizeMetadataText(displayNameForUser(session.user), maxDisplayNameChars)
-      : normalizeMetadataText(req.body?.displayName, maxDisplayNameChars);
-    const signaturePublicKey = normalizeMetadataText(req.body?.signaturePublicKey, maxPublicKeyJwkChars);
-    const hpkePublicKey = normalizeMetadataText(req.body?.hpkePublicKey, maxPublicKeyJwkChars);
-    const signatureKeyFingerprint = normalizeMetadataText(
-      req.body?.signatureKeyFingerprint,
-      maxPublicKeyFingerprintChars
-    );
-    const hpkeKeyFingerprint = normalizeMetadataText(req.body?.hpkeKeyFingerprint, maxPublicKeyFingerprintChars);
-    if (!userId || !deviceId || !displayName) {
-      sendRelayError(res, 400, "invalid_request", "userId, deviceId, and displayName are required");
-      return;
-    }
-    if (!signaturePublicKey || !hpkePublicKey || !signatureKeyFingerprint || !hpkeKeyFingerprint) {
-      sendRelayError(res, 400, "invalid_request", "MLS signature and HPKE public keys and fingerprints are required");
-      return;
-    }
-    if (
-      !validP256Spki(signaturePublicKey, maxPublicKeyJwkChars) ||
-      !validP256HpkeKey(hpkePublicKey, maxPublicKeyJwkChars)
-    ) {
-      sendRelayError(res, 400, "invalid_request", "MLS signature and HPKE keys must be canonical P-256 public keys.");
-      return;
-    }
-
-    if (
-      !constantTimeTextEqual(signatureKeyFingerprint, fingerprintPublicKey(signaturePublicKey)) ||
-      !constantTimeTextEqual(hpkeKeyFingerprint, fingerprintPublicKey(hpkePublicKey))
-    ) {
-      sendRelayError(res, 400, "invalid_request", "Public key fingerprint does not match the registered key.");
-      return;
-    }
+    const identity = normalizeDeviceRegistration(options, req.body, session, res);
+    if (!identity) return;
+    const {
+      userId,
+      deviceId,
+      displayName,
+      signaturePublicKey,
+      hpkePublicKey,
+      signatureKeyFingerprint,
+      hpkeKeyFingerprint
+    } = identity;
 
     const now = new Date().toISOString();
     const existing = store.getDevice(userId, deviceId);
@@ -157,6 +105,75 @@ export function validP256Spki(value: string, maxChars: number): boolean {
   } catch {
     return false;
   }
+}
+
+type DeviceRegistrationIdentity = Pick<
+  DeviceRecord,
+  | "userId"
+  | "deviceId"
+  | "displayName"
+  | "signaturePublicKey"
+  | "signatureKeyFingerprint"
+  | "hpkePublicKey"
+  | "hpkeKeyFingerprint"
+>;
+
+function normalizeDeviceRegistration(
+  options: RegisterDeviceRoutesOptions,
+  body: Record<string, unknown> | undefined,
+  session: AuthSession,
+  res: Response
+): DeviceRegistrationIdentity | null {
+  const requestedUserId = options.normalizeOptionalMetadataText(body?.userId, options.maxUserIdChars);
+  if (requestedUserId === null) return deviceRegistrationError(res, "userId is invalid or exceeds its limit.");
+  if (requestedUserId && requestedUserId !== session.user.id) {
+    sendRelayError(res, 403, "forbidden", "Device user id must match the signed-in GitHub user.");
+    return null;
+  }
+  const identity = normalizedDeviceIdentityFields(options, body, session);
+  if (!identity) return deviceRegistrationError(res, "Device identity fields and public keys are required.");
+  if (!validP256Spki(identity.signaturePublicKey, options.maxPublicKeyJwkChars)) {
+    return deviceRegistrationError(res, "MLS signature and HPKE keys must be canonical P-256 public keys.");
+  }
+  if (!validP256HpkeKey(identity.hpkePublicKey, options.maxPublicKeyJwkChars)) {
+    return deviceRegistrationError(res, "MLS signature and HPKE keys must be canonical P-256 public keys.");
+  }
+  if (!deviceFingerprintsMatch(identity)) {
+    return deviceRegistrationError(res, "Public key fingerprint does not match the registered key.");
+  }
+  return identity;
+}
+
+function normalizedDeviceIdentityFields(
+  options: RegisterDeviceRoutesOptions,
+  body: Record<string, unknown> | undefined,
+  session: AuthSession
+): DeviceRegistrationIdentity | null {
+  const normalize = options.normalizeMetadataText;
+  const identity = {
+    userId: session.user.id,
+    deviceId: normalize(body?.deviceId, options.maxDeviceIdChars),
+    displayName: normalize(options.displayNameForUser(session.user), options.maxDisplayNameChars),
+    signaturePublicKey: normalize(body?.signaturePublicKey, options.maxPublicKeyJwkChars),
+    hpkePublicKey: normalize(body?.hpkePublicKey, options.maxPublicKeyJwkChars),
+    signatureKeyFingerprint: normalize(body?.signatureKeyFingerprint, options.maxPublicKeyFingerprintChars),
+    hpkeKeyFingerprint: normalize(body?.hpkeKeyFingerprint, options.maxPublicKeyFingerprintChars)
+  };
+  return Object.values(identity).every((value) => Boolean(value)) ? (identity as DeviceRegistrationIdentity) : null;
+}
+
+function deviceFingerprintsMatch(identity: DeviceRegistrationIdentity): boolean {
+  const signatureMatches = constantTimeTextEqual(
+    identity.signatureKeyFingerprint,
+    fingerprintPublicKey(identity.signaturePublicKey)
+  );
+  const hpkeMatches = constantTimeTextEqual(identity.hpkeKeyFingerprint, fingerprintPublicKey(identity.hpkePublicKey));
+  return signatureMatches && hpkeMatches;
+}
+
+function deviceRegistrationError(res: Response, message: string): null {
+  sendRelayError(res, 400, "invalid_request", message);
+  return null;
 }
 
 export function validP256HpkeKey(value: string, maxChars: number): boolean {

@@ -177,6 +177,12 @@ Room notifications can be muted per room. Muting affects local notifications/unr
 
 Team defaults control settings for newly created rooms, including local history retention, default approval policy, default model, browser profile persistence, and whether new room invites require host approval.
 
+### Encrypted room export and read-only import
+
+Open **Room settings → Encrypted room archives** to export the selected room. The same library also appears in **Account**, so imports remain reachable while signed out, offline, or without a live room. Enter a passphrase of at least 12 bytes twice, choose a `.multai.age` destination, and keep the passphrase separately; multAIplayer does not store it or offer password recovery. The file uses the interoperable age passphrase format and is written owner-only. The export contains normalized display history available on this device at export time. Pending terminal/browser/file approvals, queued Codex turns, host handoffs, invite state, MLS/device secrets, Codex session/thread ids, browser profiles, running terminals, and attachment-blob ciphertext are omitted. Inline attachment and resolved file-review content can still be sensitive, so use a strong unique passphrase.
+
+**Import archive** decrypts and validates a selected archive, stores its still-encrypted bytes in the native archive library, and opens an inert view. The library list intentionally shows only “Locked archive,” import time, and encrypted size until the correct passphrase is entered; plaintext room/team names are not indexed. Opened messages and activity pass through the normal local-history validators. Import never adds a room to the sidebar, restores membership, sends an event, starts a process, grants an approval, or restores MLS state. Deleting an imported archive removes its encrypted library copy but does not delete an external export file. See [Encrypted room archives](room-archives.md) for bounds and recovery limits.
+
 ## Updates
 
 The app checks `https://multaiplayer.com/releases/latest.json` when the app shell mounts and shows an in-app banner when the manifest contains a newer version. A manifest with `security: true` is labelled **Security update available**. The banner opens the manifest's HTTPS download URL; the alpha does not download, install, or restart automatically. When a supported public build is available, it will be signed and notarized, published through GitHub Releases, and installed manually by the user. No supported public build has been published yet.

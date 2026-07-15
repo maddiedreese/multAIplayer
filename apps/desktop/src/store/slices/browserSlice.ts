@@ -1,8 +1,8 @@
 import type { StateCreator } from "zustand";
-import { omitRecordKey } from "../../lib/setUtils";
+import { omitRecordKey } from "../../lib/core/setUtils";
 import type { BrowserAccessRequest, BrowserStatus } from "../../types";
 import type { AppStoreState } from "../appStore";
-import { reportExpectedFailure } from "../../lib/nonFatalReporting";
+import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
 
 export interface BrowserRoomState {
   requests?: BrowserAccessRequest[];

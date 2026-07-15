@@ -1,6 +1,6 @@
 import React from "react";
 import { AlertTriangle, Bot, Check, KeyRound, X } from "lucide-react";
-import type { CodexTurnRiskFlag } from "../lib/codexTurn";
+import type { CodexTurnRiskFlag } from "../lib/codex/codexTurn";
 import { ApprovalItem, StatusPill } from "./common";
 
 export type CodexApprovalSummaryDisplay = {

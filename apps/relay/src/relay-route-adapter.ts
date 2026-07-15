@@ -56,10 +56,10 @@ interface RegisterRelayRouteAdapterOptions {
   roomManager: ReturnType<typeof createRelayRoomSocketManager>;
   keyPackageValidator: KeyPackageValidator;
   scheduleStoreSave: () => void;
-  addTeamMember: (teamId: string, userId: string, role?: "owner" | "admin" | "member") => void;
   revokeTeamInvites: (teamId: string) => void;
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
   deletionLedger: DeletionLedger | null;
+  isAccountRestricted: (userId: string) => boolean;
 }
 
 export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOptions) {
@@ -73,6 +73,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     setAuthSession: auth.setAuthSession,
     deleteAuthSession: auth.deleteAuthSession,
     deletionLedger: options.deletionLedger,
+    isAccountRestricted: options.isAccountRestricted,
     authSessionMaxAgeMs: auth.authSessionMaxAgeMs,
     authCookieOptions: auth.authCookieOptions,
     getAuthSession: auth.getAuthSession,
@@ -120,6 +121,8 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     maxCiphertextCharactersForBlob,
     isExpiredAttachmentBlob: codec.isExpiredAttachmentBlob,
     inviteTtlDays: config.inviteTtlDays,
+    liveInviteCapPerUser: config.liveInviteCapPerUser,
+    liveKeyPackageCapPerUser: config.liveKeyPackageCapPerUser,
     canAccessRoom: authz.canAccessRoom,
     teamIdsForUser: authz.teamIdsForUser,
     isTeamMember: authz.isTeamMember,
@@ -127,7 +130,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     canSetTeamMemberRole: authz.canSetTeamMemberRole,
     canRemoveTeamMember: authz.canRemoveTeamMember,
     transferTeamOwnership: authz.transferTeamOwnership,
-    addTeamMember: options.addTeamMember,
     revokeTeamInvites: options.revokeTeamInvites,
     revokeTeamMemberSessions: roomManager.revokeTeamMemberSessions,
     revokeUserPresence: roomManager.revokeUserPresence,

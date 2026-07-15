@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
-import { RelayHttpError } from "../src/lib/httpResponse";
+import { RelayHttpError } from "../src/lib/core/httpResponse";
 
 let challengeRequests = 0;
 let sessionRequests = 0;
@@ -42,7 +42,7 @@ const {
   establishDeviceSession,
   recoverDeviceSessionForRelayError,
   retryAfterDeviceSessionExpiry
-} = await import("../src/lib/deviceSession");
+} = await import("../src/lib/identity/deviceSession");
 
 beforeEach(() => {
   challengeRequests = 0;

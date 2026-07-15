@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
-import { createNativeInviteIntake, type NativeInvitePayload } from "../src/lib/nativeInviteIntake";
+import { createNativeInviteIntake, type NativeInvitePayload } from "../src/lib/invite/nativeInviteIntake";
 import { useNativeInviteIntake } from "../src/hooks/useNativeInviteIntake";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {

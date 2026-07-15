@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { createCodexBrowserOpenCommand } from "../src/lib/codexBrowserOpenCommand";
-import { buildRoomNotices } from "../src/lib/roomNotices";
+import { createCodexBrowserOpenCommand } from "../src/application/codex/codexBrowserOpenCommand";
+import { buildRoomNotices } from "../src/hooks/roomNotices";
 import { useAppStore } from "../src/store/appStore";
 
 const room: ClientRoomRecord = {

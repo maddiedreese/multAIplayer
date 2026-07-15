@@ -142,34 +142,52 @@ function checkOptionalFile(path, detail) {
 }
 
 function checkProductionRelayEnv() {
-  const deletionLedgerEndpoint = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT");
-  const deletionLedgerBucket = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET");
-  const deletionLedgerRegion = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION");
-  const deletionLedgerAccessKey = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID");
-  const deletionLedgerSecretKey = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY");
-  const deletionLedgerHmacKey = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY");
-  const deletionLedgerUrlStyle = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE");
-  const deletionLedgerProtectionSeconds = envInteger(
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS",
-    7_776_000
-  );
-  const allowedOrigins = envValue("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS");
-  const requireAuth = envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true);
-  const debug = envBoolean("MULTAIPLAYER_RELAY_DEBUG", false);
-  const rateLimits = envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true);
-  const trustProxyHeaders = envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
-  const trustedProxyConfigured = envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false);
-  const storage = envValue("MULTAIPLAYER_RELAY_STORAGE") || "sqlite";
-  const dataPath = envValue("MULTAIPLAYER_RELAY_DATA_PATH");
-  const mlsValidatorPath = envValue("MULTAIPLAYER_MLS_VALIDATOR_PATH");
-  const attachmentBlobMaxBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000);
-  const attachmentBlobLiveQuotaBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES", 250_000_000);
-  const attachmentBlobUploadBytes = envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW", 100_000_000);
-  const websocketConnectionCap = envInteger("MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER", 20);
-  const websocketConnectRateLimit = envInteger("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT", 120);
-  const totalRoomCap = envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500);
-  const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
+  const config = readProductionRelayConfig();
+  checkDeletionLedger(config);
+  checkCoreRelayConfig(config);
+  checkRelayPathsAndProxy(config);
+  checkRelayAbuseLimits(config);
+}
 
+function readProductionRelayConfig() {
+  return {
+    deletionLedgerEndpoint: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT"),
+    deletionLedgerBucket: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET"),
+    deletionLedgerRegion: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION"),
+    deletionLedgerAccessKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID"),
+    deletionLedgerSecretKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY"),
+    deletionLedgerHmacKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"),
+    deletionLedgerUrlStyle: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE"),
+    deletionLedgerProtectionSeconds: envInteger("MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS", 7_776_000),
+    allowedOrigins: envValue("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS"),
+    requireAuth: envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true),
+    debug: envBoolean("MULTAIPLAYER_RELAY_DEBUG", false),
+    rateLimits: envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true),
+    trustProxyHeaders: envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false),
+    trustedProxyConfigured: envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false),
+    storage: envValue("MULTAIPLAYER_RELAY_STORAGE") || "sqlite",
+    dataPath: envValue("MULTAIPLAYER_RELAY_DATA_PATH"),
+    mlsValidatorPath: envValue("MULTAIPLAYER_MLS_VALIDATOR_PATH"),
+    attachmentBlobMaxBytes: envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000),
+    attachmentBlobLiveQuotaBytes: envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES", 250_000_000),
+    attachmentBlobUploadBytes: envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW", 100_000_000),
+    websocketConnectionCap: envInteger("MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER", 20),
+    websocketConnectRateLimit: envInteger("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT", 120),
+    totalRoomCap: envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500)
+  };
+}
+
+function checkDeletionLedger(config) {
+  const {
+    deletionLedgerEndpoint,
+    deletionLedgerBucket,
+    deletionLedgerRegion,
+    deletionLedgerAccessKey,
+    deletionLedgerSecretKey,
+    deletionLedgerHmacKey,
+    deletionLedgerUrlStyle,
+    deletionLedgerProtectionSeconds
+  } = config;
   const deletionLedgerEndpointIsHttps = (() => {
     try {
       return new URL(deletionLedgerEndpoint).protocol === "https:";
@@ -200,6 +218,11 @@ function checkProductionRelayEnv() {
         ? "S3-compatible ledger configured with a protection horizon of at least 90 days"
         : "required: complete HTTPS S3 ledger credentials, separate 32-character HMAC key, explicit URL style, and protection horizon >= 7776000 seconds"
   });
+}
+
+function checkCoreRelayConfig(config) {
+  const { allowedOrigins, requireAuth, debug, rateLimits, storage } = config;
+  const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
   checks.push({
     ok: Boolean(allowedOrigins) && allowedOriginErrors.length === 0,
     label: "production MULTAIPLAYER_RELAY_ALLOWED_ORIGINS",
@@ -234,6 +257,10 @@ function checkProductionRelayEnv() {
           ? "must be sqlite for a hosted production relay"
           : "must be sqlite"
   });
+}
+
+function checkRelayPathsAndProxy(config) {
+  const { dataPath, mlsValidatorPath, trustProxyHeaders, trustedProxyConfigured } = config;
   checks.push({
     ok: Boolean(dataPath) && !dataPath.startsWith("/tmp/"),
     label: "production MULTAIPLAYER_RELAY_DATA_PATH",
@@ -262,6 +289,17 @@ function checkProductionRelayEnv() {
         : "requires MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true after the edge strips and rewrites forwarding headers"
       : "proxy headers not trusted by default"
   });
+}
+
+function checkRelayAbuseLimits(config) {
+  const {
+    attachmentBlobMaxBytes,
+    attachmentBlobLiveQuotaBytes,
+    attachmentBlobUploadBytes,
+    websocketConnectionCap,
+    websocketConnectRateLimit,
+    totalRoomCap
+  } = config;
   checks.push({
     ok: attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000,
     label: "production MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES",

@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
-import { loadThemeMode } from "../../lib/appRuntime";
-import type { ThemeMode } from "../../components/DesktopSidebar";
+import { loadThemeMode } from "../../application/runtime/appRuntime";
+import type { ThemeMode } from "../../lib/core/uiTypes";
 
 export interface ShellSlice {
   sidebarWidth: number;

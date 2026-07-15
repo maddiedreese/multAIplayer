@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { loadOrCreateDeviceIdentity, type DeviceIdentity } from "../lib/deviceIdentity";
-import { keyPackageCount, publishKeyPackages, registerDevice } from "../lib/workspaceClient";
-import { establishDeviceSession } from "../lib/deviceSession";
+import { loadOrCreateDeviceIdentity, type DeviceIdentity } from "../lib/identity/deviceIdentity";
+import { keyPackageCount, publishKeyPackages, registerDevice } from "../application/workspace/workspaceClient";
+import { establishDeviceSession } from "../lib/identity/deviceSession";
 import { useAppStore } from "../store/appStore";
-import { generateMlsKeyPackage } from "../lib/mlsClient";
+import { generateMlsKeyPackage } from "../lib/mls/mlsClient";
 
 interface UseDeviceIdentityLifecycleOptions {
   relayHttpUrl: string;

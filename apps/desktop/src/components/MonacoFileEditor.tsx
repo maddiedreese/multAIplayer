@@ -120,36 +120,27 @@ async function installMonaco(): Promise<typeof Monaco> {
 
 export function languageForPath(path: string): string | undefined {
   const extension = path.split(".").pop()?.toLowerCase();
-  switch (extension) {
-    case "cjs":
-    case "js":
-    case "jsx":
-    case "mjs":
-      return "javascript";
-    case "cts":
-    case "mts":
-    case "ts":
-    case "tsx":
-      return "typescript";
-    case "css":
-      return "css";
-    case "html":
-    case "htm":
-      return "html";
-    case "json":
-    case "jsonc":
-      return "json";
-    case "md":
-    case "mdx":
-      return "markdown";
-    case "rs":
-      return "rust";
-    case "toml":
-      return "toml";
-    case "yaml":
-    case "yml":
-      return "yaml";
-    default:
-      return undefined;
-  }
+  return extension ? languageByExtension[extension] : undefined;
 }
+
+const languageByExtension: Readonly<Record<string, string>> = {
+  cjs: "javascript",
+  js: "javascript",
+  jsx: "javascript",
+  mjs: "javascript",
+  cts: "typescript",
+  mts: "typescript",
+  ts: "typescript",
+  tsx: "typescript",
+  css: "css",
+  html: "html",
+  htm: "html",
+  json: "json",
+  jsonc: "json",
+  md: "markdown",
+  mdx: "markdown",
+  rs: "rust",
+  toml: "toml",
+  yaml: "yaml",
+  yml: "yaml"
+};

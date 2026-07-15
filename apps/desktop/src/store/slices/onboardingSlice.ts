@@ -6,7 +6,7 @@ import {
   saveOnboardingState,
   type OnboardingEvent,
   type OnboardingState
-} from "../../lib/onboardingState";
+} from "../../lib/onboarding/onboardingState";
 import type { AppStoreState } from "../appStore";
 
 export interface OnboardingSlice {

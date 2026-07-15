@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classifyCodexFailure, codexUsageLimitMessage } from "../src/lib/codexFailure";
+import { classifyCodexFailure, codexUsageLimitMessage } from "../src/lib/codex/codexFailure";
 
 test("classifyCodexFailure detects usage limit and quota failures", () => {
   assert.equal(classifyCodexFailure(["Error: usage limit reached"]), "usage_limit");

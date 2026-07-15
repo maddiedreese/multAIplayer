@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { canRequestBrowserAccess, canHostBrowserAction } from "../src/lib/browserPolicy";
-import { canApproveCodexTurn } from "../src/lib/codexApproval";
-import { buildCodexApprovalSnapshot, buildCodexTurnInput, type CodexChatMessage } from "../src/lib/codexTurn";
-import { resolveFilePreviewTab } from "../src/lib/filePreview";
-import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "../src/lib/githubWorkflowReadiness";
-import { createHandoffSettingsPatch, hostHandoffDetail } from "../src/lib/hostHandoff";
-import { saveEncryptedHistory, loadEncryptedHistory, saveHistorySettings } from "../src/lib/localHistory";
-import { canUseRoomChat, canStageRoomChatAttachment } from "../src/lib/chatPolicy";
-import { terminalRequestForApprovedRun, canActOnRoomTerminalRequest } from "../src/lib/terminalApproval";
-import { canUseLocalWorkspace } from "../src/lib/workspaceAccess";
-import { normalizeCodexModel, planRoomCreation, planTeamCreation } from "../src/lib/workspaceCreation";
+import { canRequestBrowserAccess, canHostBrowserAction } from "../src/lib/browser/browserPolicy";
+import { canApproveCodexTurn } from "../src/lib/codex/codexApproval";
+import { buildCodexApprovalSnapshot, buildCodexTurnInput, type CodexChatMessage } from "../src/lib/codex/codexTurn";
+import { resolveFilePreviewTab } from "../src/lib/files/filePreview";
+import { checkGitHubActionsReadiness, checkGitHubWorkflowReadiness } from "../src/lib/git/githubWorkflowReadiness";
+import { createHandoffSettingsPatch, hostHandoffDetail } from "../src/lib/handoff/hostHandoff";
+import { saveEncryptedHistory, loadEncryptedHistory, saveHistorySettings } from "../src/lib/history/localHistory";
+import { canUseRoomChat, canStageRoomChatAttachment } from "../src/lib/chat/chatPolicy";
+import { terminalRequestForApprovedRun, canActOnRoomTerminalRequest } from "../src/lib/terminal/terminalApproval";
+import { canUseLocalWorkspace } from "../src/lib/access/workspaceAccess";
+import { normalizeCodexModel, planRoomCreation, planTeamCreation } from "../src/lib/workspace/workspaceCreation";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();

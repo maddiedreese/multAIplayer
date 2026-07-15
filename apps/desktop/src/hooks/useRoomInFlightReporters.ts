@@ -1,8 +1,8 @@
 import type { RefObject } from "react";
-import { isRoomHostMutationInFlight, roomHostMutationInFlightMessage } from "../lib/hostHandoff";
-import { isRoomSettingsMutationInFlight, roomSettingsMutationInFlightMessage } from "../lib/teamRoomDefaults";
-import { isRoomFileActionInFlight, roomFileActionInFlightMessage } from "../lib/workspaceAccess";
-import { isRoomTerminalActionInFlight, roomTerminalActionInFlightMessage } from "../lib/terminalApproval";
+import { isRoomHostMutationInFlight, roomHostMutationInFlightMessage } from "../lib/handoff/hostHandoff";
+import { isRoomSettingsMutationInFlight, roomSettingsMutationInFlightMessage } from "../lib/team/teamRoomDefaults";
+import { isRoomFileActionInFlight, roomFileActionInFlightMessage } from "../lib/access/workspaceAccess";
+import { isRoomTerminalActionInFlight, roomTerminalActionInFlightMessage } from "../lib/terminal/terminalApproval";
 
 type RoomBusyRef = RefObject<Record<string, boolean>>;
 type RoomMessageSetter = (roomId: string, message: string | null) => void;

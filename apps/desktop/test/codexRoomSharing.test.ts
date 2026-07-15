@@ -5,7 +5,7 @@ import {
   codexHostFailureRoomMessage,
   projectCodexRoomEvent,
   projectCodexRoomStatus
-} from "../src/lib/codexRoomSharing.ts";
+} from "../src/lib/codex/codexRoomSharing.ts";
 
 test("room event projection keeps protocol names and strips native diagnostics", () => {
   assert.equal(projectCodexRoomEvent("item/started"), "item/started");

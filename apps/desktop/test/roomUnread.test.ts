@@ -10,7 +10,7 @@ import {
   replaceRoomPreservingUnread,
   sanitizeLocalRoomReadState,
   upsertRoomPreservingUnread
-} from "../src/lib/roomUnread";
+} from "../src/lib/history/roomUnread";
 
 const room: ClientRoomRecord = {
   id: "room-a",

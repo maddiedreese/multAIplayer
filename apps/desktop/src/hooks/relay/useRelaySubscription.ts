@@ -1,12 +1,12 @@
 import { useEffect, type MutableRefObject } from "react";
 import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
-import { connectRelay, type RelayClient } from "../../lib/relayClient";
-import { trustedAvatarUrl } from "../../lib/avatarUrl";
-import { ensureRoomDefaults } from "../../lib/roomDefaults";
+import { connectRelay, type RelayClient } from "../../lib/relay/relayClient";
+import { trustedAvatarUrl } from "../../lib/core/avatarUrl";
+import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { useAppStore } from "../../store/appStore";
 import type { ChatMessage } from "../../types";
 import { useLatestRef } from "../useLatestRef";
-import { routeMlsMessage } from "./routeMlsMessage";
+import { recoverAuthenticatedHostTransfer, routeMlsMessage } from "./routeMlsMessage";
 import {
   currentMlsEpoch,
   listMlsJoinAdmissions,
@@ -14,21 +14,21 @@ import {
   isMlsRequiresRejoin,
   forgetCorruptMlsGroup,
   openMlsGroup
-} from "../../lib/mlsClient";
-import { pendingMlsOutboxRoomIds, recoverRoomAfterJoin } from "../../lib/mlsOutboxDrain";
+} from "../../lib/mls/mlsClient";
+import { pendingMlsOutboxRoomIds, recoverRoomAfterJoin } from "../../application/mls/mlsOutboxDrain";
 import {
   completeMlsRelayAdmission,
   coordinateMlsAdmissionRecoveryWithRetry,
   projectMlsAdmissionInviteRequest,
   synchronizeMlsRecoverySelection
-} from "../../lib/mlsJoinAdmission";
-import { reportExpectedFailure, reportNonFatal } from "../../lib/nonFatalReporting";
-import { getRelayHttpUrl } from "../../lib/appConfig";
-import { recoverDeviceSessionForRelayError } from "../../lib/deviceSession";
+} from "../../application/mls/mlsJoinAdmission";
+import { reportExpectedFailure, reportNonFatal } from "../../lib/core/nonFatalReporting";
+import { getRelayHttpUrl } from "../../lib/core/appConfig";
+import { recoverDeviceSessionForRelayError } from "../../lib/identity/deviceSession";
 import {
   canContinueSelectedWorkspaceAfterAdmissionRecovery,
   runRelayWorkspaceStartupBarrier
-} from "../../lib/relayWorkspaceStartup";
+} from "../../lib/relay/relayWorkspaceStartup";
 
 interface LocalUser {
   id: string;
@@ -352,6 +352,9 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
             try {
               const epoch = await currentMlsEpoch(roomId);
               if (message.message.messageType === "commit" && message.message.epochHint < epoch) {
+                if (message.message.commitEffect === "host_handoff") {
+                  await recoverAuthenticatedHostTransfer(message.message);
+                }
                 seenEnvelopeIds.current.add(message.message.id);
                 return;
               }

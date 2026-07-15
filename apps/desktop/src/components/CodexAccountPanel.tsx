@@ -1,5 +1,5 @@
 import { ExternalLink, LogIn, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
-import type { CodexAppApprovalMode } from "../lib/localBackend";
+import type { CodexAppApprovalMode } from "../lib/platform/localBackend";
 import { useCodexAccount, type CodexAccountController } from "../hooks/useCodexAccount";
 import { InfoRow } from "./common";
 
@@ -8,33 +8,35 @@ export function CodexAccountPanel() {
 }
 
 export function CodexAccountPanelView({ controller }: { controller: CodexAccountController }) {
-  const {
-    native,
-    snapshot,
-    login,
-    mcpLogin,
-    busy,
-    message,
-    approvalMode,
-    refresh,
-    beginLogin,
-    cancelLogin,
-    signOut,
-    connectMcp,
-    updateApprovalMode
-  } = controller;
+  if (!controller.native) return <CodexUnavailablePanel />;
+  return <CodexNativeAccountPanel controller={controller} />;
+}
 
-  if (!native) {
-    return (
-      <section className="drawer-section codex-account-panel">
-        <h3>Codex on this device</h3>
-        <span>Account, app, and MCP controls are available in the native desktop app.</span>
-      </section>
-    );
-  }
-
+function CodexUnavailablePanel() {
   return (
     <section className="drawer-section codex-account-panel">
+      <h3>Codex on this device</h3>
+      <span>Account, app, and MCP controls are available in the native desktop app.</span>
+    </section>
+  );
+}
+
+function CodexNativeAccountPanel({ controller }: { controller: CodexAccountController }) {
+  return (
+    <section className="drawer-section codex-account-panel">
+      <CodexAccountSummary controller={controller} />
+      <CodexLoginControls controller={controller} />
+      <CodexApprovalModeControl controller={controller} />
+      <CodexInventory controller={controller} />
+      {controller.message && <div className="workflow-message">{controller.message}</div>}
+    </section>
+  );
+}
+
+function CodexAccountSummary({ controller }: { controller: CodexAccountController }) {
+  const { snapshot, busy, refresh } = controller;
+  return (
+    <>
       <div className="panel-title">
         <div>
           <strong>Codex on this device</strong>
@@ -56,7 +58,14 @@ export function CodexAccountPanelView({ controller }: { controller: CodexAccount
       {snapshot?.capabilities.compatibilityWarning && (
         <div className="workflow-message">{snapshot.capabilities.compatibilityWarning}</div>
       )}
+    </>
+  );
+}
 
+function CodexLoginControls({ controller }: { controller: CodexAccountController }) {
+  const { snapshot, login, busy, beginLogin, cancelLogin, signOut } = controller;
+  return (
+    <>
       {!snapshot?.account ? (
         <div className="codex-account-actions">
           <button
@@ -92,29 +101,41 @@ export function CodexAccountPanelView({ controller }: { controller: CodexAccount
           </button>
         </div>
       )}
+    </>
+  );
+}
 
-      <label className="codex-approval-mode">
-        <span>
-          <ShieldCheck size={14} /> Global app tool approvals
-        </span>
-        <select
-          value={approvalMode}
-          disabled={busy || !snapshot?.capabilities.supportsApps}
-          onChange={(event) => void updateApprovalMode(event.target.value as CodexAppApprovalMode)}
-        >
-          <option value="" disabled>
-            Choose a default…
-          </option>
-          <option value="auto">Automatic</option>
-          <option value="prompt">Always prompt</option>
-          {snapshot?.capabilities.supportsWritesApproval && <option value="writes">Prompt for writes</option>}
-        </select>
-        <small>
-          This persists in the device-wide Codex config and affects other Codex clients. “Prompt for writes” trusts only
-          tools that declare themselves read-only.
-        </small>
-      </label>
+function CodexApprovalModeControl({ controller }: { controller: CodexAccountController }) {
+  const { snapshot, busy, approvalMode, updateApprovalMode } = controller;
+  return (
+    <label className="codex-approval-mode">
+      <span>
+        <ShieldCheck size={14} /> Global app tool approvals
+      </span>
+      <select
+        value={approvalMode}
+        disabled={busy || !snapshot?.capabilities.supportsApps}
+        onChange={(event) => void updateApprovalMode(event.target.value as CodexAppApprovalMode)}
+      >
+        <option value="" disabled>
+          Choose a default…
+        </option>
+        <option value="auto">Automatic</option>
+        <option value="prompt">Always prompt</option>
+        {snapshot?.capabilities.supportsWritesApproval && <option value="writes">Prompt for writes</option>}
+      </select>
+      <small>
+        This persists in the device-wide Codex config and affects other Codex clients. “Prompt for writes” trusts only
+        tools that declare themselves read-only.
+      </small>
+    </label>
+  );
+}
 
+function CodexInventory({ controller }: { controller: CodexAccountController }) {
+  const { snapshot, mcpLogin, busy, connectMcp } = controller;
+  return (
+    <>
       <div className="codex-host-list">
         <strong>Apps ({snapshot?.apps.length ?? 0})</strong>
         {snapshot?.appsError && <small>{snapshot.appsError}</small>}
@@ -154,8 +175,6 @@ export function CodexAccountPanelView({ controller }: { controller: CodexAccount
           </div>
         ))}
       </div>
-
-      {message && <div className="workflow-message">{message}</div>}
-    </section>
+    </>
   );
 }

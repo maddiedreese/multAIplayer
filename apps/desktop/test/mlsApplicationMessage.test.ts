@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseMlsAuthenticatedData } from "../src/lib/mlsClient";
+import { parseMlsAuthenticatedData } from "../src/lib/mls/mlsClient";
 
 test("MLS authenticated data binds exact routing identity and message metadata", () => {
   const value = {

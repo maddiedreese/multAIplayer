@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createInitialOnboardingState, loadOnboardingState } from "../lib/onboardingState";
+import { createInitialOnboardingState, loadOnboardingState } from "../lib/onboarding/onboardingState";
 import {
   createAppConfigSlice,
   emptyAppConfigState,

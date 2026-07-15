@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { GitHubAuthConfig, SignedInUser } from "../src/lib/authClient";
-import { minimumSupportedCodexVersion } from "../src/lib/codexCompatibility";
-import type { CodexProbe } from "../src/lib/localBackend";
+import type { GitHubAuthConfig, SignedInUser } from "../src/lib/identity/authClient";
+import { minimumSupportedCodexVersion } from "../src/lib/codex/codexCompatibility";
+import type { CodexProbe } from "../src/lib/platform/localBackend";
 import {
   projectOnboardingReadiness,
   type OnboardingReadinessInput,
   type OnboardingReadinessRow
-} from "../src/lib/onboardingReadiness";
+} from "../src/application/onboarding/onboardingReadiness";
 
 const githubConfig: GitHubAuthConfig = {
   provider: "github",

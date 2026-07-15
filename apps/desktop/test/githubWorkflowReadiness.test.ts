@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GitHubAuthConfig, SignedInUser } from "../src/lib/authClient";
+import type { GitHubAuthConfig, SignedInUser } from "../src/lib/identity/authClient";
 import {
   checkGitHubActionsReadiness,
   checkGitHubWorkflowReadiness,
   gitHubActionsRefreshInFlightMessage,
   isGitHubActionsRefreshInFlight
-} from "../src/lib/githubWorkflowReadiness";
+} from "../src/lib/git/githubWorkflowReadiness";
 
 const authConfig: GitHubAuthConfig = {
   provider: "github",

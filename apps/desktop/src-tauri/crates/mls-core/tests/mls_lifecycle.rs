@@ -110,7 +110,9 @@ fn three_client_lifecycle_enforces_authority_and_epoch_exclusion() {
         bob.export_blob_key("room-1", b"blob-1").unwrap()
     );
 
-    let handoff = alice.transfer_host("room-1", 1, "bob-mac".into()).unwrap();
+    let handoff = alice
+        .transfer_host("room-1", 1, "bob-mac".into(), "handoff-1".into())
+        .unwrap();
     let authorization = alice
         .host_transfer_authorization("room-1", &handoff.outbox_id)
         .unwrap();
@@ -687,7 +689,7 @@ fn host_transfer_must_name_the_credential_at_the_target_leaf() {
         .unwrap();
     bob.join_welcome("room-2", &add.welcome).unwrap();
     assert!(matches!(
-        alice.transfer_host("room-2", 1, "mallory-mac".into()),
+        alice.transfer_host("room-2", 1, "mallory-mac".into(), "handoff-2".into()),
         Err(EngineError::InvalidInput)
     ));
 }

@@ -6,7 +6,7 @@ import {
   getRoomNotificationEligibility,
   roomIdFromNotificationExtra,
   roomNotificationTitle
-} from "../src/lib/roomNotifications";
+} from "../src/lib/room/roomNotifications";
 import { useAppStore } from "../src/store/appStore";
 import { projectRoomSettingsPanelMaps } from "../src/store/slices/roomSettingsSlice";
 import type { ChatMessage } from "../src/types";

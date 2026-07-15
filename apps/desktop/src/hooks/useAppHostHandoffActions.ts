@@ -1,9 +1,9 @@
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { createAppRoomActions } from "../lib/appRoomActions";
+import type { createAppRoomActions } from "./appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
-import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
+import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomSettingsActor } from "./useRoomSettingsActor";
 import { useHostHandoffActions } from "./useHostHandoffActions";

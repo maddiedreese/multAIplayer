@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseInviteInput } from "../src/lib/inviteActionsHelpers";
-import { InviteJoinError } from "../src/lib/inviteJoinError";
+import { parseInviteInput } from "../src/lib/invite/inviteActionsHelpers";
+import { InviteJoinError } from "../src/lib/invite/inviteJoinError";
 
 function hasInviteCode(code: InviteJoinError["code"]) {
   return (error: unknown) => error instanceof InviteJoinError && error.code === code;

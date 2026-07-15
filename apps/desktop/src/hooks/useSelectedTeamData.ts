@@ -1,6 +1,6 @@
 import type { TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
-import type { SignedInUser } from "../lib/authClient";
-import { buildTeamMemberRows } from "../lib/rosterDisplayRows";
+import type { SignedInUser } from "../lib/identity/authClient";
+import { buildTeamMemberRows } from "../presentation/roster/rosterDisplayRows";
 
 interface UseSelectedTeamDataOptions {
   teams: TeamRecord[];

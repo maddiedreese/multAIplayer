@@ -4,7 +4,7 @@ import React, { createElement } from "react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { JSDOM } from "jsdom";
 import { RoomChatComposer } from "../src/components/RoomChatComposer";
-import { loadCodexFollowUpBehavior } from "../src/lib/codexFollowUpBehavior";
+import { loadCodexFollowUpBehavior } from "../src/lib/codex/codexFollowUpBehavior";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://127.0.0.1:5173/" });
 for (const [key, value] of Object.entries({

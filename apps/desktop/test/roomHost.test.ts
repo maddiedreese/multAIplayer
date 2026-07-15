@@ -7,7 +7,7 @@ import {
   isEnvelopeFromHandoffInitiator,
   isLocalUserActiveHostForRoom,
   roomHostEnvelopeRejectionMessage
-} from "../src/lib/roomHost";
+} from "../src/lib/access/roomHost";
 
 const activeRoom: ClientRoomRecord = {
   id: "room-alpha",

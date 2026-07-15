@@ -1,5 +1,5 @@
 import type { useAppRefs } from "./useAppRefs";
-import type { createAppRoomActions } from "../lib/appRoomActions";
+import type { createAppRoomActions } from "./appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";

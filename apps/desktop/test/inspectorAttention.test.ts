@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { countPendingRequests, inspectorAttentionCounts } from "../src/lib/inspectorAttention";
+import { countPendingRequests, inspectorAttentionCounts } from "../src/presentation/inspector/inspectorAttention";
 
 test("countPendingRequests only counts pending room requests", () => {
   assert.equal(

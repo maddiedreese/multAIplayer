@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { createRoomActions } from "../src/lib/roomActions";
+import { createRoomActions } from "../src/application/rooms/roomActions";
 import { useAppStore } from "../src/store/appStore";
 
 const room: ClientRoomRecord = {

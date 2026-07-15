@@ -9,6 +9,9 @@ import {
   startRelayWithWorkspace,
   waitForJoined
 } from "../support/relay.js";
+import { commitValidatedKeyPackages } from "../../src/http/key-package-upload-transaction.js";
+import { createRelayStore } from "../../src/state.js";
+import type { KeyPackageRecord } from "@multaiplayer/protocol";
 
 const validatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
 test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
@@ -618,6 +621,160 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
     await relay.close();
   }
 });
+
+test("live KeyPackage ceilings apply across every device on an account", async () => {
+  const relay = await startRelayWithWorkspace({
+    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath,
+    MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER: "1"
+  });
+  try {
+    const first = await device(relay.baseUrl, "github:tester", "quota-device-one");
+    const second = await device(relay.baseUrl, "github:tester", "quota-device-two");
+    const upload = (deviceId: string, auth: Awaited<ReturnType<typeof device>>, id: string, encoded: string) =>
+      fetch(`${relay.baseUrl}/devices/${deviceId}/key-packages`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: auth.cookie,
+          "x-device-session": auth.token
+        },
+        body: JSON.stringify({
+          keyPackages: [
+            {
+              id,
+              keyPackage: encoded,
+              keyPackageHash: `sha256:${createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex")}`,
+              ciphersuite: 2
+            }
+          ]
+        })
+      });
+    const responses = await Promise.all([
+      upload("quota-device-one", first, "quota-kp-one", "AA=="),
+      upload("quota-device-two", second, "quota-kp-two", "Ag==")
+    ]);
+    assert.deepEqual(responses.map((response) => response.status).sort(), [201, 429]);
+    const rejected = responses.find((response) => response.status === 429)!;
+    assert.equal(rejected.status, 429);
+    assert.equal(((await rejected.json()) as { quota: { type: string } }).quota.type, "live_key_packages_per_user");
+  } finally {
+    await relay.close();
+  }
+});
+
+test("validated KeyPackage commits serialize the per-device ceiling after validation", async () => {
+  const store = createRelayStore();
+  for (let index = 0; index < 49; index += 1) store.setKeyPackage(packageRecord(`seed-${index}`, index));
+  const firstSave = deferred<void>();
+  const first = commitValidatedKeyPackages({
+    store,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    accepted: [packageRecord("candidate-one", 50)],
+    accountLimit: 250,
+    deviceLimit: 50,
+    persist: () => firstSave.promise
+  });
+  const second = commitValidatedKeyPackages({
+    store,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    accepted: [packageRecord("candidate-two", 51)],
+    accountLimit: 250,
+    deviceLimit: 50,
+    persist: async () => {}
+  });
+  await Promise.resolve();
+  firstSave.resolve();
+  assert.equal((await first).status, "accepted");
+  assert.equal((await second).status, "device_quota");
+  assert.equal(store.keyPackagesForDevice("github:tester", "quota-device").length, 50);
+});
+
+test("validated KeyPackage commits reject a concurrent same-id collision", async () => {
+  const store = createRelayStore();
+  const firstSave = deferred<void>();
+  const firstRecord = packageRecord("shared-id", 1);
+  const secondRecord = packageRecord("shared-id", 2);
+  const first = commitValidatedKeyPackages({
+    store,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    accepted: [firstRecord],
+    accountLimit: 250,
+    deviceLimit: 50,
+    persist: () => firstSave.promise
+  });
+  const second = commitValidatedKeyPackages({
+    store,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    accepted: [secondRecord],
+    accountLimit: 250,
+    deviceLimit: 50,
+    persist: async () => {}
+  });
+  await Promise.resolve();
+  firstSave.resolve();
+  assert.equal((await first).status, "accepted");
+  assert.equal((await second).status, "conflict");
+  assert.equal(store.keyPackages.get("shared-id"), firstRecord);
+});
+
+test("failed KeyPackage persistence rolls back only its contribution before the next winner", async () => {
+  const store = createRelayStore();
+  const firstSave = deferred<void>();
+  const failedRecord = packageRecord("retry-id", 1);
+  const winningRecord = packageRecord("retry-id", 2);
+  const first = commitValidatedKeyPackages({
+    store,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    accepted: [failedRecord],
+    accountLimit: 250,
+    deviceLimit: 50,
+    persist: () => firstSave.promise
+  });
+  const second = commitValidatedKeyPackages({
+    store,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    accepted: [winningRecord],
+    accountLimit: 250,
+    deviceLimit: 50,
+    persist: async () => {}
+  });
+  await Promise.resolve();
+  firstSave.reject(new Error("deterministic persistence failure"));
+  assert.equal((await first).status, "persistence_unavailable");
+  assert.equal((await second).status, "accepted");
+  assert.equal(store.keyPackages.get("retry-id"), winningRecord);
+});
+
+function packageRecord(id: string, value: number): KeyPackageRecord {
+  const keyPackage = Buffer.from([value % 256]).toString("base64");
+  return {
+    id,
+    keyPackage,
+    keyPackageHash: `sha256:${createHash("sha256").update(Buffer.from(keyPackage, "base64")).digest("hex")}`,
+    ciphersuite: 2,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    credentialIdentity: "fixture",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 async function device(baseUrl: string, userId: string, deviceId: string) {
   const cookie = await createDebugSession(baseUrl, userId, userId.split(":").at(-1)!);

@@ -7,6 +7,22 @@ const alwaysRejectedStatuses = new Set(["NoCoverage", "RuntimeError", "Pending"]
 
 /** Enforce repository-owned mutation quality gates against a deterministic summary. */
 export function checkMutationPolicy(summary, policy, sources = {}) {
+  validateMutationInputs(summary, policy);
+  const failures = [];
+  checkWholeFileRules(summary, policy, failures);
+  const governedFiles = new Set([
+    ...Object.keys(policy.files),
+    ...policy.regions.map((region) => (region && typeof region === "object" ? region.file : undefined))
+  ]);
+  const allowedTimeouts = policy.allowedTimeouts.map(validateTimeoutRule);
+  const allowedIgnored = policy.allowedIgnored.map((rule, index) => validateIgnoredRule(rule, index));
+  checkMutantStatuses(summary.mutants, governedFiles, allowedTimeouts, allowedIgnored, failures);
+  checkStaleIgnoredRules(summary.mutants, allowedIgnored, failures);
+  checkRegionRules(summary.mutants, policy.regions, sources, failures);
+  return failures;
+}
+
+function validateMutationInputs(summary, policy) {
   requireObject(summary, "mutation summary");
   requireObject(policy, "mutation policy");
   if (!Array.isArray(summary.files) || !Array.isArray(summary.mutants)) {
@@ -22,12 +38,9 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
   if (!Array.isArray(policy.regions)) {
     throw new TypeError("mutation policy must contain a regions array");
   }
+}
 
-  const failures = [];
-  const governedFiles = new Set([
-    ...Object.keys(policy.files),
-    ...policy.regions.map((region) => (region && typeof region === "object" ? region.file : undefined))
-  ]);
+function checkWholeFileRules(summary, policy, failures) {
   const filesByPath = new Map(summary.files.map((file) => [file.path, file]));
   for (const file of summary.files) {
     if (!Object.hasOwn(policy.files, file.path)) {
@@ -65,10 +78,10 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
       failures.push(`${path}: ${survived} survived mutants exceeds maximum ${rule.maximumSurvived}`);
     }
   }
+}
 
-  const allowedTimeouts = policy.allowedTimeouts.map(validateTimeoutRule);
-  const allowedIgnored = policy.allowedIgnored.map((rule, index) => validateIgnoredRule(rule, index));
-  for (const mutant of summary.mutants) {
+function checkMutantStatuses(mutants, governedFiles, allowedTimeouts, allowedIgnored, failures) {
+  for (const mutant of mutants) {
     if (alwaysRejectedStatuses.has(mutant.status)) {
       failures.push(describeMutant(mutant, `${mutant.status} is not allowed`));
     } else if (
@@ -96,13 +109,18 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
       failures.push(describeMutant(mutant, `unknown status ${JSON.stringify(mutant.status)}`));
     }
   }
+}
+
+function checkStaleIgnoredRules(mutants, allowedIgnored, failures) {
   for (const rule of allowedIgnored) {
-    if (!summary.mutants.some((mutant) => mutant.status === "Ignored" && matchesIgnored(mutant, rule))) {
+    if (!mutants.some((mutant) => mutant.status === "Ignored" && matchesIgnored(mutant, rule))) {
       failures.push(`${rule.file}:${rule.line}:${rule.column}: stale allowedIgnored policy entry`);
     }
   }
+}
 
-  for (const [index, rule] of policy.regions.entries()) {
+function checkRegionRules(mutants, regionRules, sources, failures) {
+  for (const [index, rule] of regionRules.entries()) {
     requireObject(rule, `mutation policy region ${index}`);
     for (const field of ["file", "marker"]) {
       if (typeof rule[field] !== "string" || rule[field].length === 0) {
@@ -128,7 +146,7 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
       continue;
     }
     const region = findRegion(sources[rule.file], rule.file, rule.marker);
-    const overlapping = summary.mutants.filter(
+    const overlapping = mutants.filter(
       (mutant) => mutant.file === rule.file && mutant.endLine >= region.start && mutant.line <= region.end
     );
     const crossing = overlapping.filter((mutant) => mutant.line <= region.start || mutant.endLine >= region.end);
@@ -150,8 +168,6 @@ export function checkMutationPolicy(summary, policy, sources = {}) {
       }
     }
   }
-
-  return failures;
 }
 
 export function findRegion(source, file, marker) {

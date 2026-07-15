@@ -2,18 +2,18 @@ import { ClipboardList, ExternalLink, X } from "lucide-react";
 import { GitHubIcon } from "./GitHubIcon";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import type { DeviceIdentity } from "../lib/deviceIdentity";
-import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/authClient";
-import { saveNativeDiagnosticBundle } from "../lib/diagnostics";
+import type { DeviceIdentity } from "../lib/identity/deviceIdentity";
+import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/identity/authClient";
+import { saveNativeDiagnosticBundle } from "../lib/platform/diagnostics";
 import { InfoRow } from "./common";
 import { CodexAccountPanel } from "./CodexAccountPanel";
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/productLinks";
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/core/productLinks";
 import {
   deleteHostedAccount,
   recheckHostedAccountDeletion,
   hostedAccountDeletionConfirmation,
   type HostedAccountDeletionResult
-} from "../lib/authClient";
+} from "../lib/identity/authClient";
 
 export function ProfileDrawerPanel({
   currentUser,
@@ -26,6 +26,7 @@ export function ProfileDrawerPanel({
   deviceIdentityMessage,
   relaySessionPersistence,
   codexAccountPanel = <CodexAccountPanel />,
+  archivePanel,
   onRotateDeviceIdentity,
   onHostedAccountDeleted,
   onSignIn,
@@ -41,6 +42,7 @@ export function ProfileDrawerPanel({
   deviceIdentityMessage: string | null;
   relaySessionPersistence: string;
   codexAccountPanel?: ReactNode;
+  archivePanel?: ReactNode;
   onRotateDeviceIdentity: () => void;
   onHostedAccountDeleted: () => void;
   onSignIn: () => void;
@@ -116,31 +118,14 @@ export function ProfileDrawerPanel({
 
   return (
     <div className="drawer-content">
-      <section className="drawer-section account-section">
-        {currentUser?.avatarUrl ? (
-          <img src={currentUser.avatarUrl} alt="" />
-        ) : (
-          <div className="drawer-avatar">
-            {currentUser ? currentUser.login.slice(0, 1).toUpperCase() : <GitHubIcon size={24} />}
-          </div>
-        )}
-        <div>
-          <strong>{currentUser?.name ?? currentUser?.login ?? "Not signed in"}</strong>
-          <span>{currentUser ? `@${currentUser.login}` : "GitHub required for PRs and Actions"}</span>
-        </div>
-      </section>
-
-      <section className="drawer-section">
-        <InfoRow label="GitHub sign-in" value={authConfig?.configured === false ? "Not configured" : "Ready"} />
-        <InfoRow label="GitHub access" value={authConfig?.scopes.join(", ") || "Unavailable"} />
-        <InfoRow label="App origins" value={authConfig?.allowedOrigins.join(", ") || "Local/default"} />
-        <InfoRow label="Workspace edits" value={authConfig?.mutationsRequireAuth ? "Requires sign-in" : "Local only"} />
-        <InfoRow label="Relay sessions" value={relaySessionPersistence} />
-        <InfoRow label="Session" value={currentUser ? "Signed in" : "Signed out"} />
-        <InfoRow label="Device" value={deviceId} />
-        <InfoRow label="Device identity" value={deviceIdentity?.publicKeyFingerprint ?? "Preparing"} />
-        {currentUser && <InfoRow label="User id" value={currentUser.id} />}
-      </section>
+      <ProfileIdentity currentUser={currentUser} />
+      <ProfileEnvironment
+        currentUser={currentUser}
+        authConfig={authConfig}
+        relaySessionPersistence={relaySessionPersistence}
+        deviceId={deviceId}
+        deviceIdentity={deviceIdentity}
+      />
 
       <button className="ghost-wide" onClick={onRotateDeviceIdentity}>
         Reset device identity
@@ -155,101 +140,34 @@ export function ProfileDrawerPanel({
 
       {codexAccountPanel}
 
-      {currentUser ? (
-        <button className="ghost-wide" onClick={onSignOut}>
-          <X size={15} />
-          Sign out
-        </button>
-      ) : (
-        <button className="primary-wide" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
-          <GitHubIcon size={15} />
-          {authConfig?.configured === false
-            ? "GitHub sign-in not configured"
-            : authBusy
-              ? "Waiting for GitHub"
-              : "Sign in with GitHub"}
-        </button>
-      )}
+      {archivePanel}
 
-      {deviceFlow && (
-        <div className="device-flow drawer-flow">
-          <span>GitHub code</span>
-          <strong>{deviceFlow.user_code}</strong>
-          <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
-            Open GitHub <ExternalLink size={13} />
-          </a>
-        </div>
-      )}
-      {authError && <div className="auth-error">{authError}</div>}
+      <ProfileSignInControls
+        currentUser={currentUser}
+        authBusy={authBusy}
+        authConfigured={authConfig?.configured !== false}
+        authError={authError}
+        deviceFlow={deviceFlow}
+        onSignIn={onSignIn}
+        onSignOut={onSignOut}
+      />
 
       {currentUser && (
-        <section className="drawer-section danger-zone">
-          <strong>Delete hosted account data</strong>
-          <p>
-            This removes your current configured relay's sign-in sessions, registered devices and KeyPackages, team
-            memberships, and pending invite artifacts. It does not erase shared team or room records, MLS ciphertext and
-            routing records, encrypted attachment blobs, or accepted receipts already shared with other members.
-          </p>
-          <p>
-            You must transfer or delete teams you own and hand off rooms you host first. Local encrypted room data is
-            controlled separately on this Mac; use each room's <strong>Forget on this device</strong> control to remove
-            it.
-          </p>
-          {!deletionOpen ? (
-            <button className="ghost-wide" type="button" onClick={() => setDeletionOpen(true)}>
-              Delete hosted account data
-            </button>
-          ) : (
-            <div className="account-deletion-confirmation">
-              <label htmlFor="hosted-account-deletion-confirmation">
-                Type <strong>{hostedAccountDeletionConfirmation}</strong> to confirm
-              </label>
-              <input
-                id="hosted-account-deletion-confirmation"
-                value={deletionConfirmation}
-                onChange={(event) => setDeletionConfirmation(event.target.value)}
-                autoComplete="off"
-              />
-              <button
-                className="ghost-wide"
-                type="button"
-                disabled={deletionBusy || deletionConfirmation !== hostedAccountDeletionConfirmation}
-                onClick={() => void deleteAccount()}
-              >
-                {deletionBusy ? "Deleting…" : "Permanently delete hosted account data"}
-              </button>
-              <button
-                className="ghost-wide"
-                type="button"
-                disabled={deletionBusy}
-                onClick={() => {
-                  setDeletionOpen(false);
-                  setDeletionConfirmation("");
-                  setDeletionResult(null);
-                  setDeletionStatus(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-          {deletionResult?.status === "blocked" && (
-            <div className="workflow-message" role="status">
-              Account deletion is blocked. Transfer or delete {deletionResult.blockers.ownedTeams.length} owned team(s)
-              and hand off {deletionResult.blockers.hostedRooms.length} hosted room(s), then try again.
-            </div>
-          )}
-          {deletionResult?.status === "deleted" && (
-            <div className="workflow-message" role="status">
-              Hosted account data deleted. This app has cleared its signed-in workspace state.
-            </div>
-          )}
-          {deletionResult?.status === "pending" && (
-            <div className="workflow-message" role="status">
-              Deletion request protected and pending primary cleanup. This identity has been signed out.
-            </div>
-          )}
-        </section>
+        <HostedAccountDeletionSection
+          open={deletionOpen}
+          confirmation={deletionConfirmation}
+          busy={deletionBusy}
+          result={deletionResult}
+          onOpen={() => setDeletionOpen(true)}
+          onConfirmationChange={setDeletionConfirmation}
+          onDelete={() => void deleteAccount()}
+          onCancel={() => {
+            setDeletionOpen(false);
+            setDeletionConfirmation("");
+            setDeletionResult(null);
+            setDeletionStatus(null);
+          }}
+        />
       )}
 
       {deletionStatus && (
@@ -275,5 +193,173 @@ export function ProfileDrawerPanel({
         </p>
       </section>
     </div>
+  );
+}
+
+function ProfileIdentity({ currentUser }: { currentUser: SignedInUser | null }) {
+  return (
+    <section className="drawer-section account-section">
+      {currentUser?.avatarUrl ? (
+        <img src={currentUser.avatarUrl} alt="" />
+      ) : (
+        <div className="drawer-avatar">
+          {currentUser ? currentUser.login.slice(0, 1).toUpperCase() : <GitHubIcon size={24} />}
+        </div>
+      )}
+      <div>
+        <strong>{currentUser?.name ?? currentUser?.login ?? "Not signed in"}</strong>
+        <span>{currentUser ? `@${currentUser.login}` : "GitHub required for PRs and Actions"}</span>
+      </div>
+    </section>
+  );
+}
+
+function ProfileEnvironment({
+  currentUser,
+  authConfig,
+  relaySessionPersistence,
+  deviceId,
+  deviceIdentity
+}: {
+  currentUser: SignedInUser | null;
+  authConfig: GitHubAuthConfig | null;
+  relaySessionPersistence: string;
+  deviceId: string;
+  deviceIdentity: DeviceIdentity | null;
+}) {
+  return (
+    <section className="drawer-section">
+      <InfoRow label="GitHub sign-in" value={authConfig?.configured === false ? "Not configured" : "Ready"} />
+      <InfoRow label="GitHub access" value={authConfig?.scopes.join(", ") || "Unavailable"} />
+      <InfoRow label="App origins" value={authConfig?.allowedOrigins.join(", ") || "Local/default"} />
+      <InfoRow label="Workspace edits" value={authConfig?.mutationsRequireAuth ? "Requires sign-in" : "Local only"} />
+      <InfoRow label="Relay sessions" value={relaySessionPersistence} />
+      <InfoRow label="Session" value={currentUser ? "Signed in" : "Signed out"} />
+      <InfoRow label="Device" value={deviceId} />
+      <InfoRow label="Device identity" value={deviceIdentity?.publicKeyFingerprint ?? "Preparing"} />
+      {currentUser && <InfoRow label="User id" value={currentUser.id} />}
+    </section>
+  );
+}
+
+function ProfileSignInControls({
+  currentUser,
+  authBusy,
+  authConfigured,
+  authError,
+  deviceFlow,
+  onSignIn,
+  onSignOut
+}: {
+  currentUser: SignedInUser | null;
+  authBusy: boolean;
+  authConfigured: boolean;
+  authError: string | null;
+  deviceFlow: GitHubDeviceStart | null;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <>
+      {currentUser ? (
+        <button className="ghost-wide" onClick={onSignOut}>
+          <X size={15} /> Sign out
+        </button>
+      ) : (
+        <button className="primary-wide" onClick={onSignIn} disabled={authBusy || !authConfigured}>
+          <GitHubIcon size={15} />
+          {!authConfigured ? "GitHub sign-in not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
+        </button>
+      )}
+      {deviceFlow && (
+        <div className="device-flow drawer-flow">
+          <span>GitHub code</span>
+          <strong>{deviceFlow.user_code}</strong>
+          <a href={deviceFlow.verification_uri} target="_blank" rel="noreferrer">
+            Open GitHub <ExternalLink size={13} />
+          </a>
+        </div>
+      )}
+      {authError && <div className="auth-error">{authError}</div>}
+    </>
+  );
+}
+
+function HostedAccountDeletionSection({
+  open,
+  confirmation,
+  busy,
+  result,
+  onOpen,
+  onConfirmationChange,
+  onDelete,
+  onCancel
+}: {
+  open: boolean;
+  confirmation: string;
+  busy: boolean;
+  result: HostedAccountDeletionResult | null;
+  onOpen: () => void;
+  onConfirmationChange: (value: string) => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <section className="drawer-section danger-zone">
+      <strong>Delete hosted account data</strong>
+      <p>
+        This removes your current configured relay's sign-in sessions, registered devices and KeyPackages, team
+        memberships, and pending invite artifacts. It does not erase shared team or room records, MLS ciphertext and
+        routing records, encrypted attachment blobs, or accepted receipts already shared with other members.
+      </p>
+      <p>
+        You must transfer or delete teams you own and hand off rooms you host first. Local encrypted room data is
+        controlled separately on this Mac; use each room's <strong>Forget on this device</strong> control to remove it.
+      </p>
+      {!open ? (
+        <button className="ghost-wide" type="button" onClick={onOpen}>
+          Delete hosted account data
+        </button>
+      ) : (
+        <div className="account-deletion-confirmation">
+          <label htmlFor="hosted-account-deletion-confirmation">
+            Type <strong>{hostedAccountDeletionConfirmation}</strong> to confirm
+          </label>
+          <input
+            id="hosted-account-deletion-confirmation"
+            value={confirmation}
+            onChange={(event) => onConfirmationChange(event.target.value)}
+            autoComplete="off"
+          />
+          <button
+            className="ghost-wide"
+            type="button"
+            disabled={busy || confirmation !== hostedAccountDeletionConfirmation}
+            onClick={onDelete}
+          >
+            {busy ? "Deleting…" : "Permanently delete hosted account data"}
+          </button>
+          <button className="ghost-wide" type="button" disabled={busy} onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      )}
+      {result?.status === "blocked" && (
+        <div className="workflow-message" role="status">
+          Account deletion is blocked. Transfer or delete {result.blockers.ownedTeams.length} owned team(s) and hand off{" "}
+          {result.blockers.hostedRooms.length} hosted room(s), then try again.
+        </div>
+      )}
+      {result?.status === "deleted" && (
+        <div className="workflow-message" role="status">
+          Hosted account data deleted. This app has cleared its signed-in workspace state.
+        </div>
+      )}
+      {result?.status === "pending" && (
+        <div className="workflow-message" role="status">
+          Deletion request protected and pending primary cleanup. This identity has been signed out.
+        </div>
+      )}
+    </section>
   );
 }

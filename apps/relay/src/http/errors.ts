@@ -54,22 +54,37 @@ function isErrorBody(body: unknown): body is Record<string, unknown> & { error: 
 
 export function defaultRelayHttpErrorCode(status: number, message = ""): RelayHttpErrorCodeType {
   const normalized = message.toLowerCase();
-  if (status === 403 && normalized.includes("device-authenticated")) return "device_auth_required";
-  if (status === 404 && normalized.includes("team member")) return "team_member_not_found";
-  if (status === 404 && normalized.includes("team")) return "team_not_found";
-  if (status === 404 && normalized.includes("room")) return "room_not_found";
-  if (status === 404 && normalized.includes("invite")) return "invite_not_found";
-  if (status === 410 && normalized.includes("invite")) return "invite_expired";
-  if (status === 503 && normalized.includes("persist")) return "persistence_unavailable";
-  if (status === 400 || status === 422) return "invalid_request";
-  if (status === 401) return "authentication_required";
-  if (status === 403) return "forbidden";
-  if (status === 404) return "not_found";
-  if (status === 409) return "conflict";
-  if (status === 410) return "invite_expired";
-  if (status === 413) return "payload_too_large";
-  if (status === 429) return "rate_limited";
-  if (status === 502 || status === 504) return "upstream_unavailable";
-  if (status === 503) return "persistence_unavailable";
-  return "internal_error";
+  const contextual = contextualErrorCode(status, normalized);
+  return contextual ?? statusErrorCode(status);
+}
+
+function contextualErrorCode(status: number, message: string): RelayHttpErrorCodeType | null {
+  const mappings: ReadonlyArray<readonly [number, string, RelayHttpErrorCodeType]> = [
+    [403, "device-authenticated", "device_auth_required"],
+    [404, "team member", "team_member_not_found"],
+    [404, "team", "team_not_found"],
+    [404, "room", "room_not_found"],
+    [404, "invite", "invite_not_found"],
+    [410, "invite", "invite_expired"],
+    [503, "persist", "persistence_unavailable"]
+  ];
+  return mappings.find(([candidate, text]) => candidate === status && message.includes(text))?.[2] ?? null;
+}
+
+function statusErrorCode(status: number): RelayHttpErrorCodeType {
+  const codes: Partial<Record<number, RelayHttpErrorCodeType>> = {
+    400: "invalid_request",
+    401: "authentication_required",
+    403: "forbidden",
+    404: "not_found",
+    409: "conflict",
+    410: "invite_expired",
+    413: "payload_too_large",
+    422: "invalid_request",
+    429: "rate_limited",
+    502: "upstream_unavailable",
+    503: "persistence_unavailable",
+    504: "upstream_unavailable"
+  };
+  return codes[status] ?? "internal_error";
 }

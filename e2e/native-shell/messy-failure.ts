@@ -107,7 +107,7 @@ async function assertRecoveredNativeMembership(browser: Browser, context: Interr
     await browser.waitUntil(
       async () => {
         const result = await browser.executeAsync((targetRoomName, done) => {
-          Promise.all([import("/src/store/appStore.ts"), import("/src/lib/mlsClient.ts")])
+          Promise.all([import("/src/store/appStore.ts"), import("/src/lib/mls/mlsClient.ts")])
             .then(([{ useAppStore }, { mlsGroupState }]) => {
               const room = useAppStore
                 .getState()

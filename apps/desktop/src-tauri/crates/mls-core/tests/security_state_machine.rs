@@ -110,7 +110,7 @@ impl Model {
         let leaf = self.engines[target].self_leaf(ROOM).unwrap();
         let device = format!("device-{target}-{}", self.generations[target]);
         let handoff = self.engines[old_host]
-            .transfer_host(ROOM, leaf, device)
+            .transfer_host(ROOM, leaf, device, format!("handoff-{}", self.serial))
             .unwrap();
         self.engines[old_host]
             .publish_succeeded(ROOM, &handoff.outbox_id)
@@ -180,6 +180,7 @@ impl Model {
                         ROOM,
                         host_leaf,
                         format!("device-{}-{}", self.host, self.generations[self.host]),
+                        format!("unauthorized-{}", self.serial),
                     ),
                     Err(EngineError::NotHost)
                 ));
@@ -289,7 +290,12 @@ fn reordered_and_replayed_commits_fail_without_blocking_ordered_progress() {
         .unwrap();
     let member_leaf = member.self_leaf("ordering-room").unwrap();
     let third = host
-        .transfer_host("ordering-room", member_leaf, "device-1-0".into())
+        .transfer_host(
+            "ordering-room",
+            member_leaf,
+            "device-1-0".into(),
+            "ordering-handoff".into(),
+        )
         .unwrap();
     host.publish_succeeded("ordering-room", &third.outbox_id)
         .unwrap();

@@ -7,7 +7,7 @@ import {
   roomTerminalActionInFlightMessage,
   roomTerminalRequestMessage,
   terminalRequestForApprovedRun
-} from "../src/lib/terminalApproval";
+} from "../src/lib/terminal/terminalApproval";
 
 const request = {
   id: "terminal-request-1",

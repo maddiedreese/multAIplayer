@@ -14,11 +14,11 @@ import {
   saveOnboardingState,
   type OnboardingEvent,
   type OnboardingState
-} from "../../../apps/desktop/src/lib/onboardingState";
+} from "../../../apps/desktop/src/lib/onboarding/onboardingState";
 import type {
   OnboardingReadinessAction,
   OnboardingReadinessRow
-} from "../../../apps/desktop/src/lib/onboardingReadiness";
+} from "../../../apps/desktop/src/application/onboarding/onboardingReadiness";
 
 export const description =
   "Production onboarding, setup checklist, Help recovery, and first-turn guidance with deterministic resumable transitions.";

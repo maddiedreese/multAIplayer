@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { maxCodexThreadIdChars, normalizeCodexThreadId } from "../src/lib/codexThread";
+import { maxCodexThreadIdChars, normalizeCodexThreadId } from "../src/lib/codex/codexThread";
 
 test("normalizeCodexThreadId trims supported local Codex thread ids", () => {
   assert.equal(normalizeCodexThreadId("  thr_123-abc:def.456  "), "thr_123-abc:def.456");

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
-import { createWorkspaceRecordActions } from "../src/lib/workspaceRecordActions";
+import { createWorkspaceRecordActions } from "../src/application/workspace/workspaceRecordActions";
 import { useAppStore } from "../src/store/appStore";
 
 const room: ClientRoomRecord = {

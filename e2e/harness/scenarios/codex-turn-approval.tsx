@@ -1,17 +1,20 @@
 import React from "react";
 import { defaultCodexSandboxLevel, type RoomRecord } from "@multaiplayer/protocol";
 import { CodexApprovalCard } from "../../../apps/desktop/src/components/CodexApprovalCard";
-import { formatCodexSandboxLevel } from "../../../apps/desktop/src/lib/appFormatters";
-import { canApproveCodexTurn } from "../../../apps/desktop/src/lib/codexApproval";
-import { formatApprovalAttachments, formatApprovalMessages } from "../../../apps/desktop/src/lib/codexApprovalSummary";
-import { buildHighPrivilegeLabels } from "../../../apps/desktop/src/lib/containerPropBuilders";
+import { formatCodexSandboxLevel } from "../../../apps/desktop/src/presentation/formatting/appFormatters";
+import { canApproveCodexTurn } from "../../../apps/desktop/src/lib/codex/codexApproval";
+import {
+  formatApprovalAttachments,
+  formatApprovalMessages
+} from "../../../apps/desktop/src/presentation/codex/codexApprovalSummary";
+import { buildHighPrivilegeLabels } from "../../../apps/desktop/src/presentation/containers/containerPropBuilders";
 import {
   buildCodexApprovalSnapshot,
   buildCodexTurnInput,
   maxCodexTurnInputChars,
   messagesSinceLastCodex,
   type CodexApprovalSnapshot
-} from "../../../apps/desktop/src/lib/codexTurn";
+} from "../../../apps/desktop/src/lib/codex/codexTurn";
 import type { ChatMessage } from "../../../apps/desktop/src/types";
 import "./codex-turn-approval.css";
 

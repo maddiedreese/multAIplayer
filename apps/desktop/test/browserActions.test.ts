@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { createBrowserActions } from "../src/lib/browserActions";
+import { createBrowserActions } from "../src/application/browser/browserActions";
 import { useAppStore } from "../src/store/appStore";
 import type { BrowserAccessRequest } from "../src/types";
 

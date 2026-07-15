@@ -1,7 +1,7 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { codexUsageLimitMessage } from "../lib/codexFailure";
-import { formatMessageTime } from "../lib/appFormatters";
-import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
+import { codexUsageLimitMessage } from "../lib/codex/codexFailure";
+import { formatMessageTime } from "../lib/formatting/appFormatters";
+import { shouldApplyRoomScopedUiUpdate } from "../lib/room/roomScopedUi";
 import type { ChatMessage, HostHandoffRecord } from "../types";
 
 interface CodexUsageLimitContext {

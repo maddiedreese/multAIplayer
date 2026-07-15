@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { maxEmbeddedAttachmentBytes } from "@multaiplayer/protocol";
-import { normalizeChatAttachment, normalizeChatMessage } from "../src/lib/chatSanitizer";
+import { normalizeChatAttachment, normalizeChatMessage } from "../src/lib/chat/chatSanitizer";
 
 test("normalizeChatMessage repairs malformed attachments without dropping chat text", () => {
   const message = normalizeChatMessage({

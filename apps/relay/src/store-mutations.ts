@@ -18,13 +18,15 @@ export function createStoredRelayMutationStream(options: {
     let value: unknown;
     switch (entity) {
       case "authSessions": {
-        const session = store.authSessions.get(key);
-        value =
-          session && session.expiresAt > options.now()
-            ? options.storedAuthSessions(new Map([[key, session]]))[0]
-            : undefined;
+        value = storedAuthSessionValue(key, options);
         break;
       }
+      case "accountRestrictions":
+        value = store.accountRestrictions.get(key);
+        break;
+      case "accountQuotaRecords":
+        value = store.accountQuotaRecords.get(key);
+        break;
       case "teams":
         value = store.teams.get(key);
         break;
@@ -32,8 +34,7 @@ export function createStoredRelayMutationStream(options: {
         value = store.rooms.get(key);
         break;
       case "invites": {
-        const invite = store.invites.get(key);
-        value = invite && !options.isExpiredInvite(invite) ? invite : undefined;
+        value = liveInviteValue(store.invites.get(key), options.isExpiredInvite);
         break;
       }
       case "inviteRequests":
@@ -55,23 +56,18 @@ export function createStoredRelayMutationStream(options: {
         value = store.keyPackages.get(key);
         break;
       case "attachmentBlobs": {
-        const blob = store.attachmentBlobs.get(key);
-        value = blob && !options.isExpiredAttachmentBlob(blob) ? blob : undefined;
+        value = liveAttachmentValue(store.attachmentBlobs.get(key), options.isExpiredAttachmentBlob);
         break;
       }
       case "appliedDeletionLedgerEntries":
         value = store.appliedDeletionLedgerEntries.get(key);
         break;
       case "teamMembers": {
-        const members = store.teamMembers.get(key);
-        value = members
-          ? { teamId: key, members: Array.from(members.values()), userIds: Array.from(members.keys()) }
-          : undefined;
+        value = storedTeamMembersValue(key, store.teamMembers.get(key));
         break;
       }
       case "mlsBacklog": {
-        const messages = options.pruneMlsBacklog(store.mlsBacklog.get(key as RoomKey) ?? []);
-        value = messages.length > 0 ? { key, messages } : undefined;
+        value = storedBacklogValue(key, store.mlsBacklog.get(key as RoomKey), options.pruneMlsBacklog);
         break;
       }
     }
@@ -93,6 +89,47 @@ export function createStoredRelayMutationStream(options: {
       store.discardDurableMutations();
     }
   };
+}
+
+function storedAuthSessionValue(
+  key: string,
+  options: Parameters<typeof createStoredRelayMutationStream>[0]
+): StoredAuthSession | undefined {
+  const session = options.store.authSessions.get(key);
+  if (!session || session.expiresAt <= options.now()) return undefined;
+  return options.storedAuthSessions(new Map([[key, session]]))[0];
+}
+
+function liveInviteValue(
+  invite: InviteRecord | undefined,
+  isExpired: (invite: InviteRecord) => boolean
+): InviteRecord | undefined {
+  return invite && !isExpired(invite) ? invite : undefined;
+}
+
+function liveAttachmentValue(
+  blob: AttachmentBlobRecord | undefined,
+  isExpired: (blob: AttachmentBlobRecord) => boolean
+): AttachmentBlobRecord | undefined {
+  return blob && !isExpired(blob) ? blob : undefined;
+}
+
+function storedTeamMembersValue(
+  key: string,
+  members: RelayStore["teamMembers"] extends Map<string, infer T> ? T | undefined : never
+) {
+  return members
+    ? { teamId: key, members: Array.from(members.values()), userIds: Array.from(members.keys()) }
+    : undefined;
+}
+
+function storedBacklogValue(
+  key: string,
+  messages: MlsRelayMessage[] | undefined,
+  prune: (messages: MlsRelayMessage[]) => MlsRelayMessage[]
+) {
+  const retained = prune(messages ?? []);
+  return retained.length > 0 ? { key, messages: retained } : undefined;
 }
 
 function acceptedReceiptStorageKey(key: string): string {

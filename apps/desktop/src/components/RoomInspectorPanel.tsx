@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import type { InspectorTab } from "../lib/core/uiTypes";
 
-export type InspectorTab = "files" | "terminal" | "browser" | "room";
+export type { InspectorTab };
 
 interface RoomInspectorPanelProps {
   activeTab: InspectorTab;

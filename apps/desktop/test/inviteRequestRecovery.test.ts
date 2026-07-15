@@ -5,10 +5,10 @@ import {
   assertPendingInviteRecoveryContext,
   loadObservedResumablePendingInvites,
   pendingInviteHasMatchingAdmission
-} from "../src/lib/invite/inviteJoinActions";
-import { inviteRequesterDeviceMatches } from "../src/lib/invite/inviteRelayActions";
+} from "../src/application/invite/inviteJoinActions";
+import { inviteRequesterDeviceMatches } from "../src/application/invite/inviteRelayActions";
 import { PendingInviteWaitRegistry } from "../src/lib/invite/pendingInviteWaitRegistry";
-import type { PendingMlsInviteRequest } from "../src/lib/mlsClient";
+import type { PendingMlsInviteRequest } from "../src/lib/mls/mlsClient";
 
 const pending: PendingMlsInviteRequest = {
   inviteId: "invite-1",

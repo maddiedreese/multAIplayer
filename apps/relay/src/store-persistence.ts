@@ -24,6 +24,7 @@ export function createRelayStorePersistenceCoordinator(options: {
   let saveTimer: NodeJS.Timeout | null = null;
   const pendingSaves = new Set<Promise<void>>();
   let pendingChanges: ReturnType<RelayStoreCodec["drainStoredRelayMutations"]> = [];
+  let debouncedFullSaveQueue = Promise.resolve();
 
   function trackSave(save: Promise<void>) {
     const tracked = save.finally(() => {
@@ -154,7 +155,7 @@ export function createRelayStorePersistenceCoordinator(options: {
     return save;
   }
 
-  async function saveRelayStore() {
+  async function saveRelayStoreOnce() {
     if (options.persistence.flushMode === "immediate") {
       await savePendingChanges();
       return;
@@ -164,6 +165,13 @@ export function createRelayStorePersistenceCoordinator(options: {
     await options.persistence.save(options.storeCodec.toStoredRelayState());
     options.storeCodec.discardStoredRelayMutations();
     pendingChanges = [];
+  }
+
+  function saveRelayStore(): Promise<void> {
+    if (options.persistence.flushMode === "immediate") return saveRelayStoreOnce();
+    const save = debouncedFullSaveQueue.then(saveRelayStoreOnce, saveRelayStoreOnce);
+    debouncedFullSaveQueue = save.catch(() => undefined);
+    return save;
   }
 
   async function flushRelayStore() {

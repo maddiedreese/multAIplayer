@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { canCreateRoomInvite } from "../src/lib/invitePolicy";
+import { canCreateRoomInvite } from "../src/lib/invite/invitePolicy";
 
 const room: ClientRoomRecord = {
   id: "room-invite",

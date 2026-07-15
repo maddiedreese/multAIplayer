@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import type { RoomRecord, TeamMemberRecord, TeamRecord, TeamRole } from "@multaiplayer/protocol";
 import { loadRelayConfig } from "../config.js";
 import type { AuthSession, RelayStore } from "../state.js";
+import { acquireDurableQuotaTransaction, reserveDurableQuota, rollbackDurableQuota } from "../auth/account-quotas.js";
 
 interface RegisterTeamRoutesOptions {
   app: Express;
@@ -20,12 +21,12 @@ interface RegisterTeamRoutesOptions {
     members: Map<string, TeamMemberRecord>,
     nextOwnerUserId: string
   ) => Map<string, TeamMemberRecord>;
-  addTeamMember: (teamId: string, userId: string, role?: TeamRole) => void;
   revokeTeamInvites: (teamId: string) => void;
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
   broadcastWorkspaceUpdated: (team: TeamRecord) => void;
   broadcastRoomUpdated: (room: RoomRecord) => void;
   scheduleStoreSave: () => void;
+  saveRelayStore: () => Promise<void>;
   recordQuotaRejection?: (type: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxTeamNameChars: number;
@@ -43,12 +44,12 @@ export function registerTeamRoutes({
   canSetTeamMemberRole,
   canRemoveTeamMember,
   transferTeamOwnership,
-  addTeamMember,
   revokeTeamInvites,
   revokeTeamMemberSessions,
   broadcastWorkspaceUpdated,
   broadcastRoomUpdated,
   scheduleStoreSave,
+  saveRelayStore,
   recordQuotaRejection,
   normalizeMetadataText,
   maxTeamNameChars
@@ -201,36 +202,20 @@ export function registerTeamRoutes({
       sendRelayError(res, 403, "forbidden", "Join this team before changing its archive state.");
       return;
     }
-    if (!["archive", "restore", "delete"].includes(action)) {
+    if (!isTeamLifecycleAction(action)) {
       sendRelayError(res, 400, "invalid_request", "action must be archive, restore, or delete");
       return;
     }
-    if ((action === "archive" || action === "restore") && requesterRole !== "owner" && requesterRole !== "admin") {
-      sendRelayError(res, 403, "forbidden", "Only team owners and admins can archive or restore teams.");
-      return;
-    }
-    if (action === "delete" && requesterRole !== "owner") {
-      sendRelayError(res, 403, "forbidden", "Only the team owner can delete a team.");
-      return;
-    }
+    const authorizationError = teamLifecycleAuthorizationError(action, requesterRole);
+    if (authorizationError) return void sendRelayError(res, 403, "forbidden", authorizationError);
 
     const now = new Date().toISOString();
-    const updatedTeam: TeamRecord =
-      action === "restore"
-        ? { ...team, archivedAt: undefined }
-        : action === "archive"
-          ? { ...team, archivedAt: team.archivedAt ?? now }
-          : { ...team, archivedAt: undefined, deletedAt: now };
+    const updatedTeam = teamAfterLifecycleAction(team, action, now);
     store.setTeam(updatedTeam);
 
     const updatedRooms: RoomRecord[] = [];
     for (const room of store.allRooms().filter((item) => item.teamId === teamId && !item.deletedAt)) {
-      const updatedRoom =
-        action === "restore"
-          ? { ...room, archivedAt: undefined }
-          : action === "archive"
-            ? { ...room, archivedAt: room.archivedAt ?? now }
-            : { ...room, archivedAt: undefined, deletedAt: now };
+      const updatedRoom = roomAfterTeamLifecycleAction(room, action, now);
       store.setRoom(updatedRoom);
       updatedRooms.push(updatedRoom);
     }
@@ -242,7 +227,7 @@ export function registerTeamRoutes({
     res.json({ team: teamRecordForUser(updatedTeam, store, session?.user.id), rooms: updatedRooms });
   });
 
-  app.post("/teams", (req, res) => {
+  app.post("/teams", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
 
@@ -256,32 +241,62 @@ export function registerTeamRoutes({
       );
       return;
     }
-    if (
-      session &&
-      !consumeDailyCreationQuota({
-        cap: dailyCreationCaps.teamsPerUser,
-        counts: store.dailyTeamCreationCounts,
-        quota: "daily_user_team_creations",
-        userId: session.user.id,
-        res,
-        recordQuotaRejection
-      })
-    ) {
-      return;
+    const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+    try {
+      const reservation = session
+        ? reserveDurableQuota({
+            store,
+            quota: "daily_team_creations",
+            userId: session.user.id,
+            limit: dailyCreationCaps.teamsPerUser,
+            resetAt: nextUtcMidnight(Date.now())
+          })
+        : null;
+      if (reservation && !reservation.allowed) {
+        recordQuotaRejection?.("daily_user_team_creations");
+        res.setHeader("Retry-After", Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)));
+        return void sendRelayError(res, 429, "quota_exceeded", "Daily team creation quota exceeded.", {
+          retryAfterSeconds: Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)),
+          quota: {
+            type: "daily_user_team_creations",
+            limit: dailyCreationCaps.teamsPerUser,
+            used: reservation.used,
+            remaining: 0,
+            resetsAt: new Date(reservation.resetAt).toISOString()
+          }
+        });
+      }
+      const team: TeamRecord = {
+        id: `team_${nanoid(10)}`,
+        name,
+        members: 1
+      };
+      store.setTeam(team);
+      if (session) {
+        const members = new Map<string, TeamMemberRecord>([
+          [
+            session.user.id,
+            { teamId: team.id, userId: session.user.id, role: "owner", joinedAt: new Date().toISOString() }
+          ]
+        ]);
+        store.setTeamMembers(team.id, members);
+        try {
+          await saveRelayStore();
+        } catch {
+          store.teams.delete(team.id);
+          store.teamMembers.delete(team.id);
+          if (reservation?.allowed) rollbackDurableQuota(store, reservation);
+          return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team quota and team.");
+        }
+        broadcastWorkspaceUpdated(team);
+      } else {
+        scheduleStoreSave();
+        broadcastWorkspaceUpdated(team);
+      }
+      res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, store, session?.user.id) });
+    } finally {
+      releaseQuotaTransaction();
     }
-    const team: TeamRecord = {
-      id: `team_${nanoid(10)}`,
-      name,
-      members: 1
-    };
-    store.setTeam(team);
-    if (session) {
-      addTeamMember(team.id, session.user.id, "owner");
-    } else {
-      scheduleStoreSave();
-      broadcastWorkspaceUpdated(team);
-    }
-    res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, store, session?.user.id) });
   });
 }
 
@@ -295,6 +310,29 @@ function listTeamMembers(
   );
 }
 
+type TeamLifecycleAction = "archive" | "restore" | "delete";
+
+function isTeamLifecycleAction(value: string): value is TeamLifecycleAction {
+  return value === "archive" || value === "restore" || value === "delete";
+}
+
+function teamLifecycleAuthorizationError(action: TeamLifecycleAction, role: TeamRole | undefined): string | null {
+  if (action === "delete") return role === "owner" ? null : "Only the team owner can delete a team.";
+  return role === "owner" || role === "admin" ? null : "Only team owners and admins can archive or restore teams.";
+}
+
+function teamAfterLifecycleAction(team: TeamRecord, action: TeamLifecycleAction, now: string): TeamRecord {
+  if (action === "restore") return { ...team, archivedAt: undefined };
+  if (action === "archive") return { ...team, archivedAt: team.archivedAt ?? now };
+  return { ...team, archivedAt: undefined, deletedAt: now };
+}
+
+function roomAfterTeamLifecycleAction(room: RoomRecord, action: TeamLifecycleAction, now: string): RoomRecord {
+  if (action === "restore") return { ...room, archivedAt: undefined };
+  if (action === "archive") return { ...room, archivedAt: room.archivedAt ?? now };
+  return { ...room, archivedAt: undefined, deletedAt: now };
+}
+
 export function teamRecordForUser(
   team: TeamRecord,
   store: Pick<RelayStore, "getTeamMember">,
@@ -306,74 +344,6 @@ export function teamRecordForUser(
 
 function parseRequestedTeamRole(value: unknown): TeamRole | null {
   return value === "owner" || value === "admin" || value === "member" ? value : null;
-}
-
-interface DailyCreationQuotaRecord {
-  count: number;
-  resetAt: number;
-}
-
-function consumeDailyCreationQuota({
-  cap,
-  counts,
-  quota,
-  userId,
-  res,
-  recordQuotaRejection
-}: {
-  cap: number;
-  counts: Map<string, DailyCreationQuotaRecord>;
-  quota: "daily_user_team_creations";
-  userId: string;
-  res: Response;
-  recordQuotaRejection?: (type: string) => void;
-}): boolean {
-  const now = Date.now();
-  for (const [existingKey, existing] of counts) if (existing.resetAt <= now) counts.delete(existingKey);
-  const resetAt = nextUtcMidnight(now);
-  const key = `${quota}:${userId}`;
-  const current = counts.get(key);
-  const record = current && current.resetAt > now ? current : { count: 0, resetAt };
-  if (record.count >= cap) {
-    sendDailyCreationQuotaExceeded(res, {
-      quota,
-      limit: cap,
-      used: record.count,
-      resetAt: record.resetAt
-    });
-    recordQuotaRejection?.(quota);
-    return false;
-  }
-  counts.set(key, { count: record.count + 1, resetAt: record.resetAt });
-  return true;
-}
-
-function sendDailyCreationQuotaExceeded(
-  res: Response,
-  {
-    quota,
-    limit,
-    used,
-    resetAt
-  }: {
-    quota: "daily_user_team_creations";
-    limit: number;
-    used: number;
-    resetAt: number;
-  }
-) {
-  const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
-  res.setHeader("Retry-After", retryAfterSeconds);
-  sendRelayError(res, 429, "quota_exceeded", "Daily team creation quota exceeded.", {
-    retryAfterSeconds,
-    quota: {
-      type: quota,
-      limit,
-      used,
-      remaining: 0,
-      resetsAt: new Date(resetAt).toISOString()
-    }
-  });
 }
 
 function nextUtcMidnight(now: number): number {

@@ -6,9 +6,9 @@ import {
 } from "../appDefaults";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
-import type { createAppRoomActions } from "../lib/appRoomActions";
+import type { createAppRoomActions } from "./appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
-import type { WorkspaceRecordActions } from "../lib/workspaceRecordActions";
+import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomChatMutations } from "./useRoomChatMutations";
 import { useRelaySyncContext } from "./useRelaySyncContext";

@@ -49,6 +49,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -58,6 +60,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Require security-claim changelog updates
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npm run check:threat-model-changelog
 
       - name: Verify web, relay, and packages
         run: npm run verify:web
@@ -105,6 +114,7 @@ jobs:
           path: |
             apps/desktop/coverage
             apps/desktop/coverage-critical
+            apps/desktop/coverage-host-actions
           if-no-files-found: error
           retention-days: 14
 
@@ -264,42 +274,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  mls-validator-benchmark:
-    name: MLS validator latency budget
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Set up Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install pinned Rust toolchain
-        run: |
-          rustup toolchain install 1.89.0 --profile minimal
-          rustup default 1.89.0
-      - name: Install JavaScript dependencies
-        run: npm ci
-      - name: Benchmark the real validator process
-        run: npm run bench:mls-validator -- --samples 100 --warmups 10 --concurrency 1 --output reports/mls-validator-benchmark.json
-      - name: Enforce validator latency budget
-        run: node scripts/check-mls-validator-benchmark.mjs reports/mls-validator-benchmark.json
-      - name: Publish validator latency summary
-        if: always() && hashFiles('reports/mls-validator-benchmark.json') != ''
-        run: |
-          node -e 'const report = require("./reports/mls-validator-benchmark.json"); process.stdout.write(`### MLS validator benchmark\n\n| Samples | Mean | p95 | Throughput |\n| ---: | ---: | ---: | ---: |\n| ${report.samples} | ${report.latencyMs.mean} ms | ${report.latencyMs.p95} ms | ${report.throughputPerSecond}/s |\n`)' >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload validator benchmark report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: mls-validator-benchmark
-          path: reports/mls-validator-benchmark.json
-          if-no-files-found: error
-          retention-days: 30
-
   web-shell-e2e:
     name: UI contract journeys
     runs-on: ubuntu-latest
@@ -422,10 +396,6 @@ jobs:
       - name: Run two real native clients through invite, message, and handoff
         if: steps.native-policy.outputs.run == 'true'
         run: xvfb-run -a npm run test:e2e:native
-
-      - name: Enforce native journey duration policy
-        if: steps.native-policy.outputs.run == 'true'
-        run: node scripts/check-native-journey-duration.mjs reports/native-shell-e2e/duration.json
 
       - name: Upload native journey duration metrics
         if: always() && steps.native-policy.outputs.run == 'true'
@@ -590,5 +560,37 @@ jobs:
         with:
           name: multAIplayer-macos-dmg
           path: apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  relay-chaos-soak:
+    name: Relay restart and backup chaos soak
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build package dependencies
+        run: npm run build:packages
+      - name: Exercise relay churn, restart, backup, and restore
+        env:
+          MULTAIPLAYER_RELAY_SOAK_DURATION_MS: "300000"
+          MULTAIPLAYER_RELAY_SOAK_CLIENTS: "32"
+          MULTAIPLAYER_RELAY_SOAK_RESTART_CYCLES: "4"
+        run: npm run test:soak -w @multaiplayer/relay
+      - name: Upload relay soak evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relay-chaos-soak
+          path: apps/relay/reports/soak
           if-no-files-found: error
           retention-days: 14

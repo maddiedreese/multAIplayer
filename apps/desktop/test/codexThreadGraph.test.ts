@@ -3,8 +3,12 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CodexThreadGraphView } from "../src/components/CodexThreadGraphPanel";
-import { deriveCodexAgentTree, mergeCodexThreadGraph, normalizeCodexThreadGraph } from "../src/lib/codexThreadGraph";
-import { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } from "../src/lib/localRoomHistoryPayload";
+import {
+  deriveCodexAgentTree,
+  mergeCodexThreadGraph,
+  normalizeCodexThreadGraph
+} from "../src/lib/codex/codexThreadGraph";
+import { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } from "../src/lib/history/localRoomHistoryPayload";
 import { useAppStore } from "../src/store/appStore";
 import type { CodexActivity, CodexThreadGraph, LocalRoomHistoryPayload } from "../src/types";
 

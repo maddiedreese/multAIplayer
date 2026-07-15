@@ -1,0 +1,21 @@
+{
+  "all": true,
+  "src": ["src"],
+  "include": [
+    "src/application/codex/codexInvokeActions.ts",
+    "src/application/files/fileActions.ts",
+    "src/application/git/gitWorkflowActions.ts",
+    "src/application/terminal/terminalActions.ts",
+    "src/application/workspace/workspaceClient.ts",
+    "src/lib/codex/codexTurn.ts",
+    "src/lib/terminal/terminalApproval.ts"
+  ],
+  "temp-directory": "coverage/tmp",
+  "report-dir": "coverage-host-actions",
+  "reporter": ["text", "json-summary", "lcov"],
+  "check-coverage": true,
+  "lines": 65,
+  "statements": 65,
+  "functions": 70,
+  "branches": 65
+}

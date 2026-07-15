@@ -1,4 +1,4 @@
-import type { MlsInviteCapabilityBinding, MlsOutboxItem } from "../mlsClient";
+import type { MlsInviteCapabilityBinding, MlsOutboxItem } from "../mls/mlsClient";
 
 export interface PendingInviteApproval {
   epoch: number;
@@ -73,18 +73,7 @@ export function recoverInviteApproval(
   const welcome = matchingWelcomes[0]!;
   const metadata = welcome.metadata;
   if (metadata?.type !== "welcome") invalidRecovery("Welcome metadata is missing");
-  if (
-    welcome.roomId !== requestBinding.roomId ||
-    welcome.epoch !== requestBinding.keyEpoch + 1 ||
-    metadata.inviteId !== requestBinding.inviteId ||
-    metadata.requestId !== requestBinding.requestId ||
-    metadata.requesterUserId !== requestBinding.requesterUserId ||
-    metadata.requesterDeviceId !== requestBinding.requesterDeviceId ||
-    metadata.keyPackageId !== keyPackageId ||
-    metadata.keyPackageHash !== requestBinding.keyPackageHash ||
-    typeof metadata.responseMac !== "string" ||
-    !metadata.responseMac
-  ) {
+  if (!welcomeMatchesRequest(welcome, metadata, requestBinding, keyPackageId)) {
     invalidRecovery("Welcome metadata does not match the authenticated request");
   }
   assertResponseBinding(metadata.responseBinding, requestBinding);
@@ -105,4 +94,24 @@ export function recoverInviteApproval(
     responseBinding: metadata.responseBinding,
     responseMac: metadata.responseMac
   };
+}
+
+function welcomeMatchesRequest(
+  welcome: MlsOutboxItem,
+  metadata: Extract<NonNullable<MlsOutboxItem["metadata"]>, { type: "welcome" }>,
+  requestBinding: ExpectedInviteApproval["requestBinding"],
+  keyPackageId: string
+): boolean {
+  return (
+    welcome.roomId === requestBinding.roomId &&
+    welcome.epoch === requestBinding.keyEpoch + 1 &&
+    metadata.inviteId === requestBinding.inviteId &&
+    metadata.requestId === requestBinding.requestId &&
+    metadata.requesterUserId === requestBinding.requesterUserId &&
+    metadata.requesterDeviceId === requestBinding.requesterDeviceId &&
+    metadata.keyPackageId === keyPackageId &&
+    metadata.keyPackageHash === requestBinding.keyPackageHash &&
+    typeof metadata.responseMac === "string" &&
+    metadata.responseMac.length > 0
+  );
 }

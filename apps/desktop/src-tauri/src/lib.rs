@@ -24,6 +24,7 @@ mod mls_native;
 mod output;
 mod process;
 mod project;
+mod room_archive;
 mod shell;
 mod shell_authorization;
 mod terminal;
@@ -45,6 +46,7 @@ use invite_link::*;
 use local_preview::*;
 use mls_native::*;
 use project::*;
+use room_archive::*;
 use shell::*;
 use shell_authorization::*;
 use tauri::Manager;
@@ -115,6 +117,11 @@ pub fn run() {
             project_files,
             project_file_read,
             project_file_write,
+            room_archive_export,
+            room_archive_import,
+            room_archive_list,
+            room_archive_open,
+            room_archive_delete,
             run_shell_command,
             authorize_shell_execution,
             clear_shell_execution_grants,

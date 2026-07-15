@@ -1,8 +1,8 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import type { TrustedDeviceKey } from "../lib/deviceTrust";
-import type { LocalHostUser } from "../lib/roomHost";
+import type { TrustedDeviceKey } from "../lib/identity/deviceTrust";
+import type { LocalHostUser } from "../lib/access/roomHost";
 import type { RoomPresence } from "../types";
-import { buildRoomMemberRows } from "../lib/rosterDisplayRows";
+import { buildRoomMemberRows } from "../presentation/roster/rosterDisplayRows";
 
 interface UseRoomMemberRowsOptions {
   presenceByRoom: Record<string, Record<string, RoomPresence>>;

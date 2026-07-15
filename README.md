@@ -49,6 +49,7 @@ multAIplayer puts the collaboration surfaces around Codex beside the conversatio
 - **Share a localhost build.** The host can expose an explicit `localhost` or `127.0.0.1` port with a temporary Cloudflare Quick Tunnel and open the resulting preview in the room browser. Preview sharing requires [`cloudflared`](docs/local-preview-sharing.md) on the host Mac (`brew install cloudflare/cloudflare/cloudflared`); multAIplayer does not proxy the site through its relay. Quick Tunnel URLs are public while running, so review the build before sharing it.
 - **Codex work you can follow.** See bounded, structured activity for commands, file changes, tools, web work, images, and subagents. Steer an active turn, queue the next proposal, set a thread goal, or inspect and fork the Codex thread graph.
 - **Git and GitHub in context.** Review the current working tree, copy project and diff summaries, create a branch, commit, push, open a draft pull request, and follow GitHub Actions from the room. The **Changed files** list is the current Git working-tree status—not a list of everything merged since the last PR; [the user guide explains the exact comparison](docs/using-the-app.md#project-files-and-diffs).
+- **Encrypted room portability.** Export a room's display history to a passphrase-encrypted, interoperable age archive, then import it later as a read-only library—even while signed out or disconnected. Archives deliberately omit MLS keys, device credentials, pending approvals, host authority, and other live capabilities; see [Encrypted room archives](docs/room-archives.md).
 - **Private team continuity.** Chat, attachments, approvals, activity, and host handoff travel as MLS-encrypted room events. One active host supplies the current checkout, tools, credentials, and Codex account, and can hand that role to another verified member.
 
 ## How a room works
@@ -81,6 +82,8 @@ The official relay is live on Railway at `https://relay.multaiplayer.com` and `w
 
 The service is free, experimental, and has no uptime, recovery, or response-time guarantee. Keep normal Git and project backups. The Profile drawer can delete hosted account data after owned teams are transferred or deleted and hosted rooms are handed off; shared encrypted records, other members' copies, local room state, GitHub's OAuth grant, and backup rotation are separate deletion boundaries.
 
+The alpha relay is deliberately a single Node process with one SQLite writer and process-local WebSocket fan-out, deployed behind a trusted TLS reverse proxy/WAF. It enforces durable account quotas and operator-managed account restrictions, but does not claim horizontal failover. Larger installations should shard complete teams across independent relays rather than point multiple processes at one store; the rationale is recorded in the [single-node relay ADR](docs/decisions/single-node-relay.md).
+
 Hosted use is governed by the [Privacy Policy](https://multaiplayer.com/privacy) and [Terms of Service](https://multaiplayer.com/terms). The [self-hosting guide](docs/self-hosting.md) covers independent relay deployments, and [If this project goes unmaintained](docs/if-unmaintained.md) explains the continuity plan.
 
 ## Build the app locally
@@ -108,16 +111,16 @@ npm run verify
 
 ## Repository map
 
-| Path | Responsibility |
-| --- | --- |
-| `apps/desktop` | React desktop UI and the Tauri/Rust native boundary |
-| `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, HPKE invites, encrypted state, and history/blob exporters |
-| `apps/relay` | Authenticated HTTP/WebSocket relay, identity verification, persistence, and quotas |
-| `packages/protocol` | Shared wire records and runtime validation |
-| `packages/codex` | Codex app-server client and compatibility contract |
-| `packages/git`, `packages/github` | Host-side Git and GitHub adapters |
-| `e2e` | UI contracts and real multi-process native journeys |
-| `docs` | User guides, architecture, operations, decisions, and review material |
+| Path                                     | Responsibility                                                                     |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `apps/desktop`                           | React desktop UI and the Tauri/Rust native boundary                                |
+| `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, HPKE invites, encrypted state, and history/blob exporters           |
+| `apps/relay`                             | Authenticated HTTP/WebSocket relay, identity verification, persistence, and quotas |
+| `packages/protocol`                      | Shared wire records and runtime validation                                         |
+| `packages/codex`                         | Codex app-server client and compatibility contract                                 |
+| `packages/git`, `packages/github`        | Host-side Git and GitHub adapters                                                  |
+| `e2e`                                    | UI contracts and real multi-process native journeys                                |
+| `docs`                                   | User guides, architecture, operations, decisions, and review material              |
 
 The supported Codex app-server range is 0.133.0–0.144.0. Newer versions are marked unverified, and contract-sensitive behavior fails closed until reviewed. Read [How Codex hosting works](docs/codex-hosting.md) for the exact local-account, approval, projection, and compatibility boundaries.
 

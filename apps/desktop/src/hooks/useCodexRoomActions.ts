@@ -1,4 +1,4 @@
-import { createCodexInvokeActions } from "../lib/codexInvokeActions";
+import { createCodexInvokeActions } from "../application/codex/codexInvokeActions";
 import { useCodexTurnActions } from "./useCodexTurnActions";
 
 type CodexTurnActionsOptions = Parameters<typeof useCodexTurnActions>[0];

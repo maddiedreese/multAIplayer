@@ -8,7 +8,7 @@ const workspaceRoot = fileURLToPath(new URL("..", import.meta.url));
 const defaultSourceRoot = fileURLToPath(new URL("../apps/desktop/src-tauri/src", import.meta.url));
 const defaultRustContract = fileURLToPath(new URL("../apps/desktop/src-tauri/src/command_error.rs", import.meta.url));
 const defaultTypeScriptContract = fileURLToPath(
-  new URL("../apps/desktop/src/lib/nativeCommandError.ts", import.meta.url)
+  new URL("../apps/desktop/src/lib/platform/nativeCommandError.ts", import.meta.url)
 );
 
 /**

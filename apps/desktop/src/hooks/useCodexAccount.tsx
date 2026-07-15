@@ -12,18 +12,11 @@ import {
   type CodexAppApprovalMode,
   type CodexHostSnapshot,
   type CodexLoginStartResult
-} from "../lib/localBackend";
-import { isTauriRuntime } from "../lib/localBackend/runtime";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
-import { openTrustedAuthenticationUrl, trustedAuthenticationUrl } from "../lib/authExternalUrl";
-
-export type CodexAccountReadinessStatus = "checking" | "native_required" | "unavailable" | "sign_in_required" | "ready";
-
-export interface CodexAccountReadiness {
-  status: CodexAccountReadinessStatus;
-  ready: boolean;
-  message: string;
-}
+} from "../lib/platform/localBackend";
+import { isTauriRuntime } from "../lib/platform/localBackend/runtime";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
+import { openTrustedAuthenticationUrl, trustedAuthenticationUrl } from "../lib/identity/authExternalUrl";
+import type { CodexAccountReadiness } from "../lib/codex/codexAccountReadiness";
 
 export function projectCodexAccountReadiness({
   native,

@@ -38,6 +38,13 @@ test("account deletion removes identity-owned records while preserving shared en
   store.dailyTeamCreationCounts.set(`daily_user_team_creations:${userId}`, { count: 1, resetAt: Date.now() + 60_000 });
   store.dailyRoomCreationCounts.set(`daily_user_room_creations:${userId}`, { count: 1, resetAt: Date.now() + 60_000 });
   store.attachmentBlobUploadByteCounts.set(userId, { bytes: 10, resetAt: Date.now() + 60_000 });
+  store.accountQuotaRecords.set(`daily_team_creations:${userId}`, {
+    key: `daily_team_creations:${userId}`,
+    userId,
+    quota: "daily_team_creations",
+    used: 1,
+    resetAt: Date.now() + 60_000
+  });
   store.rateLimitStore.set("auth:session:session-leaving", { count: 1, resetAt: Date.now() + 60_000 });
   store.deviceChallenges.set("challenge-leaving", { userId, deviceId: "device-one", expiresAt: Date.now() + 60_000 });
   store.invites.set("invite-leaving", {
@@ -105,6 +112,7 @@ test("account deletion removes identity-owned records while preserving shared en
     dailyTeamCreationQuotaRecords: 1,
     dailyRoomCreationQuotaRecords: 1,
     attachmentUploadQuotaRecords: 1,
+    durableQuotaRecords: 1,
     rateLimitRecords: 1,
     deviceChallenges: 1
   });
@@ -119,6 +127,7 @@ test("account deletion removes identity-owned records while preserving shared en
   assert.equal(store.dailyTeamCreationCounts.size, 0);
   assert.equal(store.dailyRoomCreationCounts.size, 0);
   assert.equal(store.attachmentBlobUploadByteCounts.size, 0);
+  assert.equal(store.accountQuotaRecords.size, 0);
   assert.equal(store.rateLimitStore.size, 0);
   assert.equal(store.deviceChallenges.size, 0);
   assert.equal(store.invites.has("invite-leaving"), false);
@@ -153,6 +162,13 @@ test("account deletion rollback preserves the session and concurrent unrelated m
     expiresAt: Date.now() + 60_000
   });
   store.devices.set(`${userId}:device-retry`, device(userId, "device-retry"));
+  store.accountQuotaRecords.set(`daily_room_creations:${userId}`, {
+    key: `daily_room_creations:${userId}`,
+    userId,
+    quota: "daily_room_creations",
+    used: 3,
+    resetAt: Date.now() + 60_000
+  });
 
   let rejectSave: ((error: Error) => void) | undefined;
   const delayedFailure = new Promise<void>((_resolve, reject) => {
@@ -172,6 +188,7 @@ test("account deletion rollback preserves the session and concurrent unrelated m
   assert.equal(store.teamMembers.get("team-retry")?.has(userId), true);
   assert.equal(store.teams.get("team-retry")?.members, 2);
   assert.equal(store.devices.has(`${userId}:device-retry`), true);
+  assert.equal(store.accountQuotaRecords.get(`daily_room_creations:${userId}`)?.used, 3);
   assert.equal(store.authSessions.has("session-concurrent"), true);
   assert.equal(store.teams.has("team-concurrent"), true);
 
@@ -179,8 +196,10 @@ test("account deletion rollback preserves the session and concurrent unrelated m
   assert.equal(result.authSessions, 1);
   assert.equal(result.teamMemberships, 1);
   assert.equal(result.devices, 1);
+  assert.equal(result.durableQuotaRecords, 1);
   assert.equal(store.authSessions.has("session-retry"), false);
   assert.equal(store.teamMembers.get("team-retry")?.has(userId), false);
+  assert.equal(store.accountQuotaRecords.has(`daily_room_creations:${userId}`), false);
   assert.equal(store.authSessions.has("session-concurrent"), true);
   assert.equal(store.teams.has("team-concurrent"), true);
 });

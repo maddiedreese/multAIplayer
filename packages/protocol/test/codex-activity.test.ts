@@ -36,7 +36,8 @@ test("host-handoff routing metadata is complete and commit-bound", () => {
       nextHostUserId: "next-user",
       nextHostDeviceId: "next-device",
       hostTransferAuthorization: {
-        version: 1,
+        version: 2,
+        transferId: "offer-1",
         roomId: "room",
         commitMessageId: "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
         parentEpoch: 0,

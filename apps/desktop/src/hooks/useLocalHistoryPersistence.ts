@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { saveEncryptedHistory, type LocalHistorySettings } from "../lib/localHistory";
-import { pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
-import { localRoomReadStateForHistory } from "../lib/roomUnread";
-import { reportNonFatal } from "../lib/nonFatalReporting";
-import { terminalsForLocalHistory } from "../lib/terminalState";
-import type { TerminalSnapshot } from "../lib/localBackend";
+import { saveEncryptedHistory, type LocalHistorySettings } from "../lib/history/localHistory";
+import { pruneLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
+import { localRoomReadStateForHistory } from "../lib/history/roomUnread";
+import { reportNonFatal } from "../lib/core/nonFatalReporting";
+import { terminalsForLocalHistory } from "../lib/terminal/terminalState";
+import type { TerminalSnapshot } from "../lib/platform/localBackend";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type {
   BrowserAccessRequest,

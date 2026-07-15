@@ -6,8 +6,8 @@ import {
   onboardingJoinTitle,
   orderOnboardingReadinessRows,
   successfulAuthenticationReadyToAdvance
-} from "../src/lib/onboardingAssistantModel";
-import type { OnboardingReadinessRow } from "../src/lib/onboardingReadiness";
+} from "../src/application/onboarding/onboardingAssistantModel";
+import type { OnboardingReadinessRow } from "../src/application/onboarding/onboardingReadiness";
 
 function row(
   id: OnboardingReadinessRow["id"],

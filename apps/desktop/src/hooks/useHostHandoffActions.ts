@@ -6,28 +6,33 @@ import type {
   ClientRoomRecord
 } from "@multaiplayer/protocol";
 import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
-import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../lib/mlsApplicationMessage";
-import { authorizeMlsHostTransfer, markMlsPublishSucceeded, mlsGroupState, transferMlsHost } from "../lib/mlsClient";
-import { isStaleMlsPublish } from "../lib/relayClient";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
-import { clearAndRebaseStaleMlsCommit } from "../lib/mlsCommitRebase";
-import { createGitPatch, getGitRemoteOrigin } from "../lib/localBackend";
-import { updateRoomHost } from "../lib/workspaceClient";
-import { buildCodexTurnSummary } from "../lib/codexTurn";
-import { codexUsageLimitMessage } from "../lib/codexFailure";
-import { createHandoffSettingsPatch, findRoomHostHandoff, roomHostHandoffMessage } from "../lib/hostHandoff";
-import { parseGitHubRemoteUrl } from "../lib/gitWorkflowDraft";
-import { shouldApplyRoomScopedUiUpdate } from "../lib/roomScopedUi";
-import { roomLockMessage } from "../lib/appRuntime";
-import { createMlsGroupWithHistorySettings } from "../lib/localHistory";
+import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../application/mls/mlsApplicationMessage";
+import {
+  authorizeMlsHostTransfer,
+  markMlsPublishSucceeded,
+  mlsGroupState,
+  transferMlsHost
+} from "../lib/mls/mlsClient";
+import { isStaleMlsPublish } from "../lib/relay/relayClient";
+import { reportExpectedFailure, reportNonFatal } from "../lib/core/nonFatalReporting";
+import { clearAndRebaseStaleMlsCommit } from "../lib/mls/mlsCommitRebase";
+import { applyGitPatch, createGitPatch, getGitRemoteOrigin } from "../lib/platform/localBackend";
+import { updateRoomHost } from "../application/workspace/workspaceClient";
+import { buildCodexTurnSummary } from "../lib/codex/codexTurn";
+import { codexUsageLimitMessage } from "../lib/codex/codexFailure";
+import { createHandoffSettingsPatch, findRoomHostHandoff, roomHostHandoffMessage } from "../lib/handoff/hostHandoff";
+import { parseGitHubRemoteUrl } from "../lib/git/gitWorkflowDraft";
+import { shouldApplyRoomScopedUiUpdate } from "../lib/room/roomScopedUi";
+import { roomLockMessage } from "../application/runtime/appRuntime";
+import { createMlsGroupWithHistorySettings } from "../lib/history/localHistory";
 import { queueForHandoff, resolveHandoffProject } from "./hostHandoffHelpers";
 import { useAppStore } from "../store/appStore";
 import type { ChatMessage, HostHandoffRecord } from "../types";
 import type { UseHostHandoffActionsOptions } from "./hostHandoffActionTypes";
 import { useFinalizeIncomingHostHandoff } from "./useFinalizeIncomingHostHandoff";
-import { ensureRoomDefaults } from "../lib/roomDefaults";
-import { publishRoomConfigSnapshot } from "../lib/roomConfigSnapshot";
-import { publishHostHandoffAccepted } from "../lib/hostHandoffAcceptedPublisher";
+import { ensureRoomDefaults } from "../lib/room/roomDefaults";
+import { publishRoomConfigSnapshot } from "../application/mls/roomConfigSnapshot";
+import { publishHostHandoffAccepted } from "../application/handoff/hostHandoffAcceptedPublisher";
 export function useHostHandoffActions({
   hasSelectedRoom,
   selectedRoom,
@@ -62,6 +67,7 @@ export function useHostHandoffActions({
 }: UseHostHandoffActionsOptions) {
   const markHostHandoffAcceptedForRoom = useAppStore((state) => state.markHostHandoffAcceptedForRoom);
   const markLatestHostHandoffAcceptedForRoom = useAppStore((state) => state.markLatestHostHandoffAcceptedForRoom);
+  const markHostHandoffPatchAppliedForRoom = useAppStore((state) => state.markHostHandoffPatchAppliedForRoom);
   const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
   async function publishEncryptedConfig(room: ClientRoomRecord, incrementRevision: boolean) {
     const client = relayRef.current;
@@ -146,7 +152,11 @@ export function useHostHandoffActions({
     const roomId = selectedRoom.id;
     if (reportRoomHostMutationInFlight(roomId)) return;
     if (handoff.status === "accepted") {
-      setSelectedHostMessage("This host handoff has already been completed.");
+      if (handoff.gitPatch && !handoff.gitPatchTruncated && !handoff.patchAppliedLocally && isActiveHost) {
+        await applyAcceptedHostPatch(handoff);
+      } else {
+        setSelectedHostMessage("This host handoff has already been completed.");
+      }
       return;
     }
     const roomHandoff = findRoomHostHandoff(hostHandoffs, handoff.id);
@@ -167,11 +177,83 @@ export function useHostHandoffActions({
       setHostBusyForRoom(roomId, false);
     }
   }
+  async function applyAcceptedHostPatch(handoff: HostHandoffRecord) {
+    const roomId = selectedRoom.id;
+    if (reportRoomHostMutationInFlight(roomId)) return;
+    setHostBusyForRoom(roomId, true);
+    try {
+      const patch = createHandoffSettingsPatch(handoff);
+      const project = await resolveHandoffProject(handoff, patch.projectPath);
+      const result = await applyGitPatch(project.path, handoff.gitPatch!);
+      if (result.status !== 0) throw new Error(result.stderr || result.stdout || "git apply failed");
+      markHostHandoffPatchAppliedForRoom(roomId, handoff.id);
+      setCodexContinuationForRoom(
+        roomId,
+        handoff.reason === "usage_limit" ? { ...handoff, patchAppliedLocally: true } : null
+      );
+      resetFileContextForRoom(roomId);
+      setHostMessageForRoom(roomId, "Applied the reviewed host-handoff patch.");
+    } catch (error) {
+      setHostMessageForRoom(roomId, `The staged host-handoff patch was not applied: ${String(error)}`);
+    } finally {
+      setHostBusyForRoom(roomId, false);
+    }
+  }
   async function publishHostHandoff(
     room: ClientRoomRecord,
     reason: HostHandoffRecord["reason"] = "manual",
     contextMessages: ChatMessage[] = messages
   ) {
+    const handoff = await prepareHostHandoff(room, reason, contextMessages);
+    appendHostHandoff(room.id, handoff);
+    const client = relayRef.current;
+    if (!client || relayStatus === "closed" || relayStatus === "error") {
+      setHostMessageForRoom(room.id, "Host handoff package saved locally because the relay is not connected.");
+      return;
+    }
+    const payload: HostHandoffPlaintextPayload = { ...handoff };
+    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
+      {
+        id: crypto.randomUUID(),
+        teamId: room.teamId,
+        roomId: room.id,
+        senderDeviceId: deviceId,
+        senderUserId: localUser.id,
+        createdAt: new Date().toISOString(),
+        kind: "room.host"
+      },
+      payload
+    );
+    seenEnvelopeIds.current.add(envelope.id);
+    await publishMlsApplicationMessage(client, envelope);
+  }
+
+  async function prepareHostHandoff(
+    room: ClientRoomRecord,
+    reason: HostHandoffRecord["reason"],
+    contextMessages: ChatMessage[]
+  ): Promise<HostHandoffRecord> {
+    const git = await prepareHandoffGitContext(room);
+    const summary = buildCodexTurnSummary(contextMessages, room, terminals, git.browserRequests, git.status);
+    return {
+      id: crypto.randomUUID(),
+      fromHost: localUser.name,
+      fromUserId: localUser.id,
+      reason,
+      projectPath: room.projectPath,
+      ...handoffGitFields(git),
+      ...handoffCodexFields(room),
+      messagesSinceLastCodex: summary.messagesSinceLastCodex,
+      queuedCodexTurns: queueForHandoff(room.id, queuedCodexTurns),
+      attachmentNames: summary.attachments.map((attachment) => attachment.name),
+      terminals: summary.terminals,
+      continuationSummary: reason === "usage_limit" ? codexUsageLimitMessage(localUser.name) : undefined,
+      createdAt: new Date().toISOString(),
+      status: "available"
+    };
+  }
+
+  async function prepareHandoffGitContext(room: ClientRoomRecord) {
     const remoteInfo = await getGitRemoteOrigin(room.projectPath).catch(() => {
       reportExpectedFailure("Git remote was unavailable for host handoff context");
       return { originUrl: null };
@@ -188,21 +270,22 @@ export function useHostHandoffActions({
           return null;
         })
       : null;
-    const summary = buildCodexTurnSummary(contextMessages, room, terminals, roomBrowserRequests, roomGitStatus);
-    const handoff: HostHandoffRecord = {
-      id: crypto.randomUUID(),
-      fromHost: localUser.name,
-      fromUserId: localUser.id,
-      reason,
-      projectPath: room.projectPath,
-      ...(remoteInfo.originUrl ? { gitRemoteUrl: remoteInfo.originUrl } : {}),
-      ...(repoRef ? { gitRepoOwner: repoRef.owner, gitRepoName: repoRef.repo } : {}),
-      ...(roomGitStatus?.branch ? { gitBranch: roomGitStatus.branch } : {}),
-      ...(roomGitStatus?.files.length
-        ? { gitDirtyFiles: roomGitStatus.files.slice(0, 50).map((file) => file.path) }
-        : {}),
-      ...(patchResult?.patch && !patchResult.truncated ? { gitPatch: patchResult.patch } : {}),
-      ...(patchResult?.truncated ? { gitPatchTruncated: true } : {}),
+    return { remoteInfo, repoRef, status: roomGitStatus, patchResult, browserRequests: roomBrowserRequests };
+  }
+
+  function handoffGitFields(git: Awaited<ReturnType<typeof prepareHandoffGitContext>>) {
+    return {
+      ...(git.remoteInfo.originUrl ? { gitRemoteUrl: git.remoteInfo.originUrl } : {}),
+      ...(git.repoRef ? { gitRepoOwner: git.repoRef.owner, gitRepoName: git.repoRef.repo } : {}),
+      ...(git.status?.branch ? { gitBranch: git.status.branch } : {}),
+      ...(git.status?.files.length ? { gitDirtyFiles: git.status.files.slice(0, 50).map((file) => file.path) } : {}),
+      ...(git.patchResult?.patch && !git.patchResult.truncated ? { gitPatch: git.patchResult.patch } : {}),
+      ...(git.patchResult?.truncated ? { gitPatchTruncated: true } : {})
+    };
+  }
+
+  function handoffCodexFields(room: ClientRoomRecord) {
+    return {
       codexModel: room.codexModel,
       codexModelPolicy: room.codexModelPolicy,
       codexReasoningEffort: room.codexReasoningEffort,
@@ -211,64 +294,8 @@ export function useHostHandoffActions({
       codexSpeed: room.codexSpeed,
       codexServiceTierPolicy: room.codexServiceTierPolicy,
       codexSandboxLevel: (room.codexSandboxLevel ?? defaultCodexSandboxLevel) as CodexSandboxLevel,
-      approvalPolicy: room.approvalPolicy,
-      messagesSinceLastCodex: summary.messagesSinceLastCodex,
-      queuedCodexTurns: queueForHandoff(room.id, queuedCodexTurns),
-      attachmentNames: summary.attachments.map((attachment) => attachment.name),
-      terminals: summary.terminals,
-      continuationSummary: reason === "usage_limit" ? codexUsageLimitMessage(localUser.name) : undefined,
-      createdAt: new Date().toISOString(),
-      status: "available"
+      approvalPolicy: room.approvalPolicy
     };
-    appendHostHandoff(room.id, handoff);
-    const client = relayRef.current;
-    if (!client || relayStatus === "closed" || relayStatus === "error") {
-      setHostMessageForRoom(room.id, "Host handoff package saved locally because the relay is not connected.");
-      return;
-    }
-    const payload: HostHandoffPlaintextPayload = {
-      id: handoff.id,
-      fromHost: handoff.fromHost,
-      fromUserId: handoff.fromUserId,
-      reason: handoff.reason,
-      projectPath: handoff.projectPath,
-      gitRemoteUrl: handoff.gitRemoteUrl,
-      gitRepoOwner: handoff.gitRepoOwner,
-      gitRepoName: handoff.gitRepoName,
-      gitBranch: handoff.gitBranch,
-      gitDirtyFiles: handoff.gitDirtyFiles,
-      gitPatch: handoff.gitPatch,
-      gitPatchTruncated: handoff.gitPatchTruncated,
-      codexModel: handoff.codexModel,
-      codexModelPolicy: handoff.codexModelPolicy,
-      codexReasoningEffort: handoff.codexReasoningEffort,
-      codexReasoningEffortPolicy: handoff.codexReasoningEffortPolicy,
-      codexRawReasoningEnabled: handoff.codexRawReasoningEnabled,
-      codexSpeed: handoff.codexSpeed,
-      codexServiceTierPolicy: handoff.codexServiceTierPolicy,
-      codexSandboxLevel: handoff.codexSandboxLevel,
-      approvalPolicy: handoff.approvalPolicy,
-      messagesSinceLastCodex: handoff.messagesSinceLastCodex,
-      queuedCodexTurns: handoff.queuedCodexTurns,
-      attachmentNames: handoff.attachmentNames,
-      terminals: handoff.terminals,
-      continuationSummary: handoff.continuationSummary,
-      createdAt: handoff.createdAt
-    };
-    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
-      {
-        id: crypto.randomUUID(),
-        teamId: room.teamId,
-        roomId: room.id,
-        senderDeviceId: deviceId,
-        senderUserId: localUser.id,
-        createdAt: new Date().toISOString(),
-        kind: "room.host"
-      },
-      payload
-    );
-    seenEnvelopeIds.current.add(envelope.id);
-    await publishMlsApplicationMessage(client, envelope);
   }
   async function requestHostAuthority(handoff: HostHandoffRecord) {
     const patch = createHandoffSettingsPatch(handoff);
@@ -321,7 +348,7 @@ export function useHostHandoffActions({
       candidate.deviceId !== handoff.candidateDeviceId
     )
       throw new Error("Host candidate no longer matches the authenticated MLS roster leaf.");
-    const commit = await transferMlsHost(selectedRoom.id, candidate.leaf, candidate.deviceId);
+    const commit = await transferMlsHost(selectedRoom.id, candidate.leaf, candidate.deviceId, handoff.id);
     const signed = await authorizeMlsHostTransfer(selectedRoom.id, commit.outboxId);
     const message: MlsRelayMessage = {
       id: commit.outboxId,
@@ -363,18 +390,22 @@ export function useHostHandoffActions({
       throw error;
     }
     const committedEpoch = await markMlsPublishSucceeded(selectedRoom.id, commit.outboxId);
-    await publishHostHandoffAccepted({
-      room: selectedRoom,
-      handoff,
-      hostLeaf: candidate.leaf,
-      committedEpoch,
-      localUserId: localUser.id,
-      deviceId,
-      relayStatus,
-      relayRef,
-      seenEnvelopeIds
-    });
     markHostHandoffAcceptedForRoom(selectedRoom.id, handoff.id);
+    try {
+      await publishHostHandoffAccepted({
+        room: selectedRoom,
+        handoff,
+        hostLeaf: candidate.leaf,
+        committedEpoch,
+        localUserId: localUser.id,
+        deviceId,
+        relayStatus,
+        relayRef,
+        seenEnvelopeIds
+      });
+    } catch (error) {
+      reportNonFatal("publish the informational host handoff acceptance event", error);
+    }
   }
   return {
     setRoomHost,

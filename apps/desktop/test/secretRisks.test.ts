@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { detectBrowserSecretRisks, detectSecretRisks, detectTerminalCommandRisks } from "../src/lib/secretRisks";
+import {
+  detectBrowserSecretRisks,
+  detectSecretRisks,
+  detectTerminalCommandRisks
+} from "../src/lib/security/secretRisks";
 
 test("detectSecretRisks flags sensitive filenames", () => {
   assert.deepEqual(detectSecretRisks("DATABASE_URL=postgres://example", "/repo/.env.local"), [

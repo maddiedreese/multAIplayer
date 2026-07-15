@@ -7,7 +7,7 @@ import {
   isRoomFileActionInFlight,
   localWorkspaceGateMessage,
   roomFileActionInFlightMessage
-} from "../src/lib/workspaceAccess";
+} from "../src/lib/access/workspaceAccess";
 
 const room: ClientRoomRecord = {
   id: "room-workspace",

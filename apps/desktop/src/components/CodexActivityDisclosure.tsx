@@ -72,44 +72,9 @@ function CodexActivityDetail({ activity }: { activity: CodexActivity }) {
   if (!details) return null;
   switch (details.type) {
     case "reasoning":
-      return (
-        <div className="codex-reasoning-summary">
-          {details.summaries.length > 0 && (
-            <section aria-label="Reasoning summary">
-              <strong>Summary</strong>
-              {details.summaries.map((summary, index) => (
-                <p key={index}>{summary}</p>
-              ))}
-            </section>
-          )}
-          {details.rawContent?.length ? (
-            <details className="codex-raw-reasoning">
-              <summary>
-                <ChevronRight className="codex-disclosure-chevron" size={12} aria-hidden="true" />
-                <span>Raw reasoning shared with this room</span>
-              </summary>
-              <div>
-                {details.rawContent.map((content, index) => (
-                  <p key={index}>{content}</p>
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </div>
-      );
+      return <ReasoningDetail details={details} />;
     case "command":
-      return (
-        <>
-          <DetailCode label="Command" value={details.command} />
-          {details.output && <DetailCode label="Output" value={details.output} />}
-          {(details.exitCode !== undefined || details.durationMs !== undefined) && (
-            <small>
-              {details.exitCode !== undefined ? `Exit ${details.exitCode}` : "Completed"}
-              {details.durationMs !== undefined ? ` · ${formatDuration(details.durationMs)}` : ""}
-            </small>
-          )}
-        </>
-      );
+      return <CommandDetail details={details} />;
     case "file_change":
       return (
         <ul className="codex-file-changes">
@@ -122,51 +87,114 @@ function CodexActivityDetail({ activity }: { activity: CodexActivity }) {
         </ul>
       );
     case "tool":
-      return (
-        <>
-          <p>
-            <strong>
-              {details.server ? `${details.server} · ` : ""}
-              {details.name}
-            </strong>
-          </p>
-          {details.arguments && <DetailCode label="Input" value={details.arguments} />}
-          {details.result && <DetailCode label="Result" value={details.result} />}
-          {details.error && <DetailCode label="Error" value={details.error} />}
-          {details.durationMs !== undefined && <small>{formatDuration(details.durationMs)}</small>}
-        </>
-      );
+      return <ToolDetail details={details} />;
     case "web_search":
-      return (
-        <dl>
-          {details.action && <DetailRow label="Action" value={details.action.replaceAll("_", " ")} />}
-          {details.query && <DetailRow label="Query" value={details.query} />}
-          {details.url && <DetailRow label="Page" value={details.url} />}
-          {details.pattern && <DetailRow label="Find" value={details.pattern} />}
-        </dl>
-      );
+      return <WebSearchDetail details={details} />;
     case "image_generation":
       return details.prompt ? <p>{details.prompt}</p> : null;
     case "agent":
-      return (
-        <>
-          {details.prompt && <p>{details.prompt}</p>}
-          {(details.model || details.reasoningEffort) && (
-            <small>{[details.model, details.reasoningEffort].filter(Boolean).join(" · ")}</small>
-          )}
-          {details.states?.length ? (
-            <ul className="codex-agent-states">
-              {details.states.map((state) => (
-                <li key={state.threadId}>
-                  <code>{shortId(state.threadId)}</code> · {state.status}
-                  {state.message ? ` — ${state.message}` : ""}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </>
-      );
+      return <AgentDetail details={details} />;
   }
+}
+
+function ToolDetail({ details }: { details: Extract<NonNullable<CodexActivity["details"]>, { type: "tool" }> }) {
+  return (
+    <>
+      <p>
+        <strong>
+          {details.server ? `${details.server} · ` : ""}
+          {details.name}
+        </strong>
+      </p>
+      {details.arguments && <DetailCode label="Input" value={details.arguments} />}
+      {details.result && <DetailCode label="Result" value={details.result} />}
+      {details.error && <DetailCode label="Error" value={details.error} />}
+      {details.durationMs !== undefined && <small>{formatDuration(details.durationMs)}</small>}
+    </>
+  );
+}
+
+function WebSearchDetail({
+  details
+}: {
+  details: Extract<NonNullable<CodexActivity["details"]>, { type: "web_search" }>;
+}) {
+  return (
+    <dl>
+      {details.action && <DetailRow label="Action" value={details.action.replaceAll("_", " ")} />}
+      {details.query && <DetailRow label="Query" value={details.query} />}
+      {details.url && <DetailRow label="Page" value={details.url} />}
+      {details.pattern && <DetailRow label="Find" value={details.pattern} />}
+    </dl>
+  );
+}
+
+function AgentDetail({ details }: { details: Extract<NonNullable<CodexActivity["details"]>, { type: "agent" }> }) {
+  return (
+    <>
+      {details.prompt && <p>{details.prompt}</p>}
+      {(details.model || details.reasoningEffort) && (
+        <small>{[details.model, details.reasoningEffort].filter(Boolean).join(" · ")}</small>
+      )}
+      {details.states?.length ? (
+        <ul className="codex-agent-states">
+          {details.states.map((state) => (
+            <li key={state.threadId}>
+              <code>{shortId(state.threadId)}</code> · {state.status}
+              {state.message ? ` — ${state.message}` : ""}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
+function ReasoningDetail({
+  details
+}: {
+  details: Extract<NonNullable<CodexActivity["details"]>, { type: "reasoning" }>;
+}) {
+  return (
+    <div className="codex-reasoning-summary">
+      {details.summaries.length > 0 && (
+        <section aria-label="Reasoning summary">
+          <strong>Summary</strong>
+          {details.summaries.map((summary, index) => (
+            <p key={index}>{summary}</p>
+          ))}
+        </section>
+      )}
+      {details.rawContent?.length ? (
+        <details className="codex-raw-reasoning">
+          <summary>
+            <ChevronRight className="codex-disclosure-chevron" size={12} aria-hidden="true" />
+            <span>Raw reasoning shared with this room</span>
+          </summary>
+          <div>
+            {details.rawContent.map((content, index) => (
+              <p key={index}>{content}</p>
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function CommandDetail({ details }: { details: Extract<NonNullable<CodexActivity["details"]>, { type: "command" }> }) {
+  return (
+    <>
+      <DetailCode label="Command" value={details.command} />
+      {details.output && <DetailCode label="Output" value={details.output} />}
+      {(details.exitCode !== undefined || details.durationMs !== undefined) && (
+        <small>
+          {details.exitCode !== undefined ? `Exit ${details.exitCode}` : "Completed"}
+          {details.durationMs !== undefined ? ` · ${formatDuration(details.durationMs)}` : ""}
+        </small>
+      )}
+    </>
+  );
 }
 
 function DetailCode({ label, value }: { label: string; value: string }) {

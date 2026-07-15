@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { openTrustedAuthenticationUrl, trustedAuthenticationUrl } from "../src/lib/authExternalUrl";
+import { openTrustedAuthenticationUrl, trustedAuthenticationUrl } from "../src/lib/identity/authExternalUrl";
 
 test("authentication navigation accepts only the expected HTTPS provider origins", () => {
   assert.equal(

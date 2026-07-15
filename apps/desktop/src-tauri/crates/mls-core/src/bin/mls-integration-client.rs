@@ -177,9 +177,12 @@ impl Client {
                             && member.credential.device_id == next_host_device_id
                     })
                     .ok_or("next host missing from roster")?;
-                let output = self
-                    .engine
-                    .transfer_host(ROOM, next.leaf, next_host_device_id)?;
+                let output = self.engine.transfer_host(
+                    ROOM,
+                    next.leaf,
+                    next_host_device_id,
+                    "integration-handoff".into(),
+                )?;
                 Ok(json!({
                     "message": STANDARD.encode(output.message),
                     "messageId": output.outbox_id,

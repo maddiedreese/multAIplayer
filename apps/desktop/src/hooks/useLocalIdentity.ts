@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import type { SignedInUser } from "../lib/authClient";
-import { loadOrCreateDeviceId } from "../lib/appRuntime";
-import { trustedAvatarUrl } from "../lib/avatarUrl";
+import type { SignedInUser } from "../lib/identity/authClient";
+import { loadOrCreateDeviceId } from "../application/runtime/appRuntime";
+import { trustedAvatarUrl } from "../lib/core/avatarUrl";
 
 export function useLocalIdentity(currentUser: SignedInUser | null) {
   const deviceId = useMemo(() => loadOrCreateDeviceId(), []);

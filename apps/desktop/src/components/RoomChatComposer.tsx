@@ -7,7 +7,7 @@ import {
   loadCodexFollowUpBehavior,
   saveCodexFollowUpBehavior,
   type CodexFollowUpBehavior
-} from "../lib/codexFollowUpBehavior";
+} from "../lib/codex/codexFollowUpBehavior";
 
 export function RoomChatComposer({
   onboardingAnchor,

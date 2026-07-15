@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import type { TerminalSnapshot } from "../lib/localBackend";
-import type { InspectorTab } from "../components/RoomInspectorPanel";
-import { hasAcknowledgedRoomVisibilityWarning } from "../lib/roomVisibilityWarning";
+import type { TerminalSnapshot } from "../lib/platform/localBackend";
+import type { InspectorTab } from "../lib/core/uiTypes";
+import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibilityWarning";
 
 interface UseSelectedRoomContextOptions {
   rooms: ClientRoomRecord[];

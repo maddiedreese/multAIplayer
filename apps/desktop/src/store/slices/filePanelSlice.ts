@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
-import type { GitDiffResult, ProjectFileContent, ProjectFileEntry } from "../../lib/localBackend";
-import { omitRecordKey } from "../../lib/setUtils";
-import type { FilePreviewTab } from "../../lib/filePreview";
+import type { GitDiffResult, ProjectFileContent, ProjectFileEntry } from "../../lib/platform/localBackend";
+import { omitRecordKey } from "../../lib/core/setUtils";
+import type { FilePreviewTab } from "../../lib/files/filePreview";
 import type { MarkdownCopyFallback } from "../../types";
 import type { WorkspaceFileSaveRequest } from "../../types";
 import type { AppStoreState } from "../appStore";

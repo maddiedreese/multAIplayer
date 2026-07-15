@@ -5,8 +5,8 @@ import type {
   ChatReactionPlaintextPayload,
   TeamMemberRecord
 } from "@multaiplayer/protocol";
-import { messageIsBeforeCodexWatermark } from "../../lib/codexMessageWatermark";
-import { messagesSinceLastCodex } from "../../lib/codexTurn";
+import { messageIsBeforeCodexWatermark } from "../../lib/codex/codexMessageWatermark";
+import { messagesSinceLastCodex } from "../../lib/codex/codexTurn";
 import type { ChatAttachment, ChatMessage, PendingCodexApproval } from "../../types";
 import type { AppStoreState } from "../appStore";
 
@@ -225,58 +225,7 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
     });
   },
   deleteRoomMessage: (roomId, deletion) => {
-    set((state) => {
-      const roomMessages = state.messagesByRoom[roomId] ?? [];
-      const target = roomMessages.find((message) => message.id === deletion.messageId);
-      if (!target || target.deletedAt) return state;
-      if (target.authorUserId && target.authorUserId !== deletion.deletedByUserId) return state;
-      const roomRuntime = state.codexRuntimeByRoom[roomId];
-      if (!messageIsBeforeCodexWatermark(target, roomRuntime?.events ?? [])) return state;
-      const nextMessages = roomMessages.map((message) => {
-        if (message.id !== deletion.messageId) return message;
-        return {
-          ...message,
-          body: "",
-          deletedAt: deletion.deletedAt,
-          deletedBy: deletion.deletedBy,
-          deletedByUserId: deletion.deletedByUserId,
-          attachments: undefined,
-          reactions: undefined
-        };
-      });
-      const approvalIncludesMessage =
-        roomRuntime?.pendingApproval?.messages.some((message) => message.id === deletion.messageId) ?? false;
-      const queuedApprovals = roomRuntime?.queuedApprovals?.filter(
-        (turn) => turn.triggerMessageId !== deletion.messageId
-      );
-      const queueChanged = queuedApprovals && queuedApprovals.length !== (roomRuntime?.queuedApprovals ?? []).length;
-      const refreshedApproval =
-        approvalIncludesMessage && roomRuntime?.pendingApproval
-          ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
-          : null;
-      return {
-        messagesByRoom: {
-          ...state.messagesByRoom,
-          [roomId]: nextMessages
-        },
-        chatDeletesByRoom: {
-          ...state.chatDeletesByRoom,
-          [roomId]: appendUniqueAuditEvent(state.chatDeletesByRoom[roomId], deletion, (item) => item.id)
-        },
-        ...(approvalIncludesMessage || queueChanged
-          ? {
-              codexRuntimeByRoom: {
-                ...state.codexRuntimeByRoom,
-                [roomId]: updateCodexRuntimeAfterMessageDelete(
-                  roomRuntime,
-                  approvalIncludesMessage ? refreshedApproval : roomRuntime?.pendingApproval,
-                  queueChanged ? queuedApprovals : roomRuntime?.queuedApprovals
-                )
-              }
-            }
-          : {})
-      };
-    });
+    set((state) => deleteRoomMessageState(state, roomId, deletion));
   },
   applyMessageReaction: (roomId, reaction) => {
     set((state) => {
@@ -306,6 +255,62 @@ export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], Works
     });
   }
 });
+
+function deleteRoomMessageState(state: AppStoreState, roomId: string, deletion: ChatDeletePlaintextPayload) {
+  const context = deletableMessageContext(state, roomId, deletion);
+  if (!context) return state;
+  const { roomMessages, roomRuntime } = context;
+  const nextMessages = roomMessages.map((message) =>
+    message.id === deletion.messageId
+      ? {
+          ...message,
+          body: "",
+          deletedAt: deletion.deletedAt,
+          deletedBy: deletion.deletedBy,
+          deletedByUserId: deletion.deletedByUserId,
+          attachments: undefined,
+          reactions: undefined
+        }
+      : message
+  );
+  const approvalIncludesMessage =
+    roomRuntime?.pendingApproval?.messages.some((message) => message.id === deletion.messageId) ?? false;
+  const queuedApprovals = roomRuntime?.queuedApprovals?.filter((turn) => turn.triggerMessageId !== deletion.messageId);
+  const queueChanged = queuedApprovals && queuedApprovals.length !== (roomRuntime?.queuedApprovals ?? []).length;
+  const refreshedApproval =
+    approvalIncludesMessage && roomRuntime?.pendingApproval
+      ? refreshPendingApprovalMessages(roomRuntime.pendingApproval, nextMessages)
+      : null;
+  return {
+    messagesByRoom: { ...state.messagesByRoom, [roomId]: nextMessages },
+    chatDeletesByRoom: {
+      ...state.chatDeletesByRoom,
+      [roomId]: appendUniqueAuditEvent(state.chatDeletesByRoom[roomId], deletion, (item) => item.id)
+    },
+    ...(approvalIncludesMessage || queueChanged
+      ? {
+          codexRuntimeByRoom: {
+            ...state.codexRuntimeByRoom,
+            [roomId]: updateCodexRuntimeAfterMessageDelete(
+              roomRuntime,
+              approvalIncludesMessage ? refreshedApproval : roomRuntime?.pendingApproval,
+              queueChanged ? queuedApprovals : roomRuntime?.queuedApprovals
+            )
+          }
+        }
+      : {})
+  };
+}
+
+function deletableMessageContext(state: AppStoreState, roomId: string, deletion: ChatDeletePlaintextPayload) {
+  const roomMessages = state.messagesByRoom[roomId] ?? [];
+  const target = roomMessages.find((message) => message.id === deletion.messageId);
+  if (!target || target.deletedAt) return null;
+  if (target.authorUserId && target.authorUserId !== deletion.deletedByUserId) return null;
+  const roomRuntime = state.codexRuntimeByRoom[roomId];
+  if (!messageIsBeforeCodexWatermark(target, roomRuntime?.events ?? [])) return null;
+  return { roomMessages, roomRuntime };
+}
 
 function updateCodexRuntimeAfterMessageDelete(
   roomRuntime: AppStoreState["codexRuntimeByRoom"][string] | undefined,

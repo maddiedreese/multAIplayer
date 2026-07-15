@@ -11,6 +11,7 @@ export interface RegisterRoomRoutesOptions {
   isTeamMember: (teamId: string, userId: string) => boolean;
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
   scheduleStoreSave: () => void;
+  saveRelayStore: () => Promise<void>;
   broadcastRoomUpdated: (room: RoomRecord) => void;
   recordQuotaRejection?: (type: string) => void;
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };

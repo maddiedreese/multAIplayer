@@ -3,16 +3,33 @@ import {
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
   type InviteRecord as InviteRecordType,
+  type InviteJoinRequestRecord,
+  type InviteResponseRecord,
   type KeyPackageRecord as KeyPackageRecordType,
   type RoomRecord,
-  type TeamRecord,
-  isRecord
+  type TeamMemberRecord,
+  type TeamRecord
 } from "@multaiplayer/protocol";
 import type { NormalizedStoredAuthSession, StoredAuthSession } from "./auth/session.js";
-import type { AcceptedMessageReceipt, AuthSession, RelayStore, RoomKey } from "./state.js";
+import type {
+  AcceptedMessageReceipt,
+  AccountQuotaRecord,
+  AccountRestriction,
+  AppliedDeletionLedgerEntry,
+  AuthSession,
+  InviteAckReceipt,
+  RelayStore,
+  RoomKey
+} from "./state.js";
 import type { StoredRelayMutation } from "./persistence-types.js";
 import { createStoredRelayMutationStream } from "./store-mutations.js";
 import { createRelayStoreNormalizers } from "./store-codec-normalizers.js";
+import {
+  applyStoredAccountQuotaRecords,
+  normalizeAccountRestriction,
+  normalizeDeletionLedgerEntry
+} from "./store-codec-account-normalizers.js";
+import { migrateStoredRelayDocument } from "./store-codec-migrations.js";
 
 export interface StoredRelayState {
   version: 1;
@@ -22,21 +39,19 @@ export interface StoredRelayState {
   invites: InviteRecordType[];
   devices?: DeviceRecord[];
   keyPackages?: KeyPackageRecordType[];
-  inviteRequests?: unknown[];
-  inviteResponses?: unknown[];
-  inviteAckReceipts?: unknown[];
-  acceptedMessageReceipts?: unknown[];
+  inviteRequests?: InviteJoinRequestRecord[];
+  inviteResponses?: InviteResponseRecord[];
+  inviteAckReceipts?: InviteAckReceipt[];
+  acceptedMessageReceipts?: AcceptedMessageReceipt[];
   teamMembers?: Array<{
     teamId: string;
-    members?: Array<{
-      userId: string;
-      role?: string;
-      joinedAt?: string;
-    }>;
+    members?: TeamMemberRecord[];
     userIds?: string[];
   }>;
   authSessions?: StoredAuthSession[];
-  appliedDeletionLedgerEntries?: Array<{ entryId: string; appliedAt: string }>;
+  accountRestrictions?: AccountRestriction[];
+  accountQuotaRecords?: AccountQuotaRecord[];
+  appliedDeletionLedgerEntries?: AppliedDeletionLedgerEntry[];
   attachmentBlobs?: AttachmentBlobRecordType[];
   mlsBacklog: Array<{
     key: RoomKey;
@@ -111,131 +126,134 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     storedAuthSessions: options.storedAuthSessions
   });
 
+  function applyStoredRows<T>(
+    value: unknown,
+    normalize: (candidate: unknown) => T | null,
+    apply: (normalized: T) => void
+  ): void {
+    for (const candidate of storedArray(value)) {
+      const normalized = normalize(candidate);
+      if (normalized) apply(normalized);
+    }
+  }
+
+  function applyStoredState(stored: Record<string, unknown>): void {
+    const migrated = migrateStoredRelayDocument(stored);
+    if (!migrated) return;
+    applyStoredRows(migrated.teams, normalizeTeam, (team) => store.teams.set(team.id, team));
+    applyStoredRows(migrated.rooms, normalizeRoom, (room) => store.rooms.set(room.id, room));
+    applyStoredRows(migrated.invites, normalizeInvite, (invite) => {
+      if (!isExpiredInvite(invite)) store.invites.set(invite.id, invite);
+    });
+    applyStoredRows(migrated.devices, normalizeDevice, (device) => {
+      store.devices.set(deviceKey(device.userId, device.deviceId), device);
+    });
+    applyStoredRows(migrated.keyPackages, normalizeKeyPackage, (keyPackage) => {
+      if (!store.keyPackages.has(keyPackage.id)) store.setKeyPackage(keyPackage);
+    });
+    applyStoredRows(migrated.inviteRequests, normalizeRequest, (request) => {
+      if (!store.inviteRequests.has(request.requestId)) store.inviteRequests.set(request.requestId, request);
+    });
+    applyStoredRows(migrated.inviteResponses, normalizeWelcome, (response) => {
+      if (!store.inviteResponses.has(response.requestId)) store.inviteResponses.set(response.requestId, response);
+    });
+    for (const item of storedArray(migrated.teamMembers)) applyStoredTeamMembers(item);
+    applyStoredRows(migrated.inviteAckReceipts, normalizeInviteAckReceipt, (receipt) => {
+      store.inviteAckReceipts.set(receipt.requestId, receipt);
+    });
+    applyStoredRows(migrated.acceptedMessageReceipts, normalizeAcceptedMessageReceipt, (receipt) => {
+      store.acceptedMessageReceipts.set(`${receipt.roomKey}\0${receipt.messageId}`, receipt);
+    });
+    applyStoredRows(migrated.attachmentBlobs, normalizeAttachmentBlob, (blob) => {
+      if (!isExpiredAttachmentBlob(blob)) store.attachmentBlobs.set(blob.id, blob);
+    });
+    applyStoredRows(migrated.authSessions, options.normalizeStoredAuthSession, (session) => {
+      store.authSessions.set(session.sessionIdHash, session.session);
+    });
+    applyStoredRows(
+      migrated.accountRestrictions,
+      (item) => normalizeAccountRestriction(item, now(), options.maxUserIdChars),
+      (restriction) => store.accountRestrictions.set(restriction.userId, restriction)
+    );
+    applyStoredAccountQuotaRecords(store, migrated.accountQuotaRecords, now());
+    applyStoredRows(migrated.appliedDeletionLedgerEntries, normalizeDeletionLedgerEntry, (entry) => {
+      store.appliedDeletionLedgerEntries.set(entry.entryId, entry);
+    });
+    applyStoredRows(migrated.mlsBacklog, normalizeStoredBacklog, (backlog) => {
+      store.mlsBacklog.set(backlog.key, backlog.messages);
+    });
+  }
+
+  function pruneMap<T>(records: Map<string, T>, expired: (record: T) => boolean): void {
+    for (const [key, record] of records) if (expired(record)) records.delete(key);
+  }
+
+  function pruneExpiredInvites(): void {
+    for (const [id, invite] of store.invites) {
+      if (!isExpiredInvite(invite)) continue;
+      store.invites.delete(id);
+      pruneMap(store.inviteRequests, (request) => request.inviteId === id);
+      pruneMap(store.inviteResponses, (response) => response.inviteId === id);
+    }
+  }
+
+  function capOldest<T>(records: Map<string, T>, timestamp: (record: T) => number, maximum: number): void {
+    const sorted = Array.from(records.entries()).sort((left, right) => timestamp(left[1]) - timestamp(right[1]));
+    for (const [id] of sorted.slice(0, Math.max(0, sorted.length - maximum))) records.delete(id);
+  }
+
+  function acceptedReceiptPoolKey(receipt: AcceptedMessageReceipt): string {
+    return receipt.messageType === "commit"
+      ? `${receipt.roomKey}\0commit`
+      : `${receipt.roomKey}\0application\0${receipt.senderUserId}`;
+  }
+
+  function pruneAcceptedMessageReceipts(): void {
+    pruneMap(
+      store.acceptedMessageReceipts,
+      (receipt) => Date.parse(receipt.acceptedAt) < now() - 180 * 24 * 60 * 60 * 1000
+    );
+    const pools = new Map<string, Array<[string, AcceptedMessageReceipt]>>();
+    for (const entry of store.acceptedMessageReceipts) {
+      const [, receipt] = entry;
+      const key = acceptedReceiptPoolKey(receipt);
+      const pool = pools.get(key) ?? [];
+      pool.push(entry);
+      pools.set(key, pool);
+    }
+    for (const pool of pools.values()) {
+      pool.sort((left, right) => Date.parse(left[1].acceptedAt) - Date.parse(right[1].acceptedAt));
+      for (const [id] of pool.slice(0, Math.max(0, pool.length - 4096))) store.acceptedMessageReceipts.delete(id);
+    }
+  }
+
+  function pruneMlsBacklogs(): void {
+    for (const [key, messages] of store.mlsBacklog) {
+      const pruned = options.pruneMlsBacklog(messages);
+      if (pruned.length) store.mlsBacklog.set(key, pruned);
+      else store.mlsBacklog.delete(key);
+    }
+  }
+
+  function pruneExpiredState(): void {
+    pruneMap(store.authSessions, (session) => session.expiresAt <= now());
+    pruneMap(store.accountRestrictions, (restriction) =>
+      Boolean(restriction.expiresAt && Date.parse(restriction.expiresAt) <= now())
+    );
+    pruneMap(store.accountQuotaRecords, (quota) => quota.resetAt <= now());
+    pruneExpiredInvites();
+    pruneMap(store.inviteAckReceipts, (receipt) => Date.parse(receipt.expiresAt) <= now());
+    capOldest(store.inviteAckReceipts, (receipt) => Date.parse(receipt.acknowledgedAt), 4096);
+    pruneAcceptedMessageReceipts();
+    pruneMap(store.attachmentBlobs, isExpiredAttachmentBlob);
+    pruneMlsBacklogs();
+  }
+
   return {
     isExpiredInvite,
     isExpiredAttachmentBlob,
-    applyStoredRelayState(stored) {
-      for (const team of storedArray(stored.teams)) {
-        const normalized = normalizeTeam(team);
-        if (normalized) store.teams.set(normalized.id, normalized);
-      }
-      for (const room of storedArray(stored.rooms)) {
-        const normalized = normalizeRoom(room);
-        if (normalized) store.rooms.set(normalized.id, normalized);
-      }
-      for (const invite of storedArray(stored.invites)) {
-        const normalized = normalizeInvite(invite);
-        if (normalized && !isExpiredInvite(normalized)) store.invites.set(normalized.id, normalized);
-      }
-      for (const device of storedArray(stored.devices)) {
-        const normalized = normalizeDevice(device);
-        if (normalized) store.devices.set(deviceKey(normalized.userId, normalized.deviceId), normalized);
-      }
-      for (const keyPackage of storedArray(stored.keyPackages)) {
-        const normalized = normalizeKeyPackage(keyPackage);
-        if (normalized && !store.keyPackages.has(normalized.id)) store.setKeyPackage(normalized);
-      }
-      for (const request of storedArray(stored.inviteRequests)) {
-        const parsed = normalizeRequest(request);
-        if (parsed && !store.inviteRequests.has(parsed.requestId)) store.inviteRequests.set(parsed.requestId, parsed);
-      }
-      for (const response of storedArray(stored.inviteResponses)) {
-        const parsed = normalizeWelcome(response);
-        if (parsed && !store.inviteResponses.has(parsed.requestId)) store.inviteResponses.set(parsed.requestId, parsed);
-      }
-      for (const item of storedArray(stored.teamMembers)) {
-        applyStoredTeamMembers(item);
-      }
-      for (const receipt of storedArray(stored.inviteAckReceipts)) {
-        const normalized = normalizeInviteAckReceipt(receipt);
-        if (normalized) store.inviteAckReceipts.set(normalized.requestId, normalized);
-      }
-      for (const receipt of storedArray(stored.acceptedMessageReceipts)) {
-        const normalized = normalizeAcceptedMessageReceipt(receipt);
-        if (normalized) store.acceptedMessageReceipts.set(`${normalized.roomKey}\0${normalized.messageId}`, normalized);
-      }
-      for (const blob of storedArray(stored.attachmentBlobs)) {
-        const normalized = normalizeAttachmentBlob(blob);
-        if (normalized && !isExpiredAttachmentBlob(normalized)) store.attachmentBlobs.set(normalized.id, normalized);
-      }
-      for (const storedSession of storedArray(stored.authSessions)) {
-        const normalized = options.normalizeStoredAuthSession(storedSession);
-        if (normalized) store.authSessions.set(normalized.sessionIdHash, normalized.session);
-      }
-      for (const entry of storedArray(stored.appliedDeletionLedgerEntries)) {
-        if (
-          isRecord(entry) &&
-          typeof entry.entryId === "string" &&
-          entry.entryId.length <= 512 &&
-          typeof entry.appliedAt === "string" &&
-          !Number.isNaN(Date.parse(entry.appliedAt))
-        ) {
-          store.appliedDeletionLedgerEntries.set(entry.entryId, {
-            entryId: entry.entryId,
-            appliedAt: entry.appliedAt
-          });
-        }
-      }
-      for (const item of storedArray(stored.mlsBacklog)) {
-        const normalized = normalizeStoredBacklog(item);
-        if (normalized) store.mlsBacklog.set(normalized.key, normalized.messages);
-      }
-    },
-    pruneExpiredRelayState() {
-      for (const [id, session] of store.authSessions.entries()) {
-        if (session.expiresAt <= now()) store.authSessions.delete(id);
-      }
-      for (const [id, invite] of store.invites.entries()) {
-        if (isExpiredInvite(invite)) {
-          store.invites.delete(id);
-          for (const [requestId, request] of store.inviteRequests) {
-            if (request.inviteId === id) store.inviteRequests.delete(requestId);
-          }
-          for (const [requestId, response] of store.inviteResponses) {
-            if (response.inviteId === id) store.inviteResponses.delete(requestId);
-          }
-        }
-      }
-      for (const [id, receipt] of store.inviteAckReceipts) {
-        if (Date.parse(receipt.expiresAt) <= now()) store.inviteAckReceipts.delete(id);
-      }
-      const ackReceipts = Array.from(store.inviteAckReceipts.entries()).sort(
-        (left, right) => Date.parse(left[1].acknowledgedAt) - Date.parse(right[1].acknowledgedAt)
-      );
-      for (const [id] of ackReceipts.slice(0, Math.max(0, ackReceipts.length - 4096)))
-        store.inviteAckReceipts.delete(id);
-      for (const [id, receipt] of store.acceptedMessageReceipts) {
-        if (Date.parse(receipt.acceptedAt) < now() - 180 * 24 * 60 * 60 * 1000)
-          store.acceptedMessageReceipts.delete(id);
-      }
-      const receiptPools = new Map<string, Array<[string, AcceptedMessageReceipt]>>();
-      for (const entry of store.acceptedMessageReceipts) {
-        const [, receipt] = entry;
-        const pool =
-          receipt.messageType === "commit"
-            ? `${receipt.roomKey}\0commit`
-            : `${receipt.roomKey}\0application\0${receipt.senderUserId}`;
-        const receipts = receiptPools.get(pool) ?? [];
-        receipts.push(entry);
-        receiptPools.set(pool, receipts);
-      }
-      for (const receipts of receiptPools.values()) {
-        receipts.sort((left, right) => Date.parse(left[1].acceptedAt) - Date.parse(right[1].acceptedAt));
-        for (const [id] of receipts.slice(0, Math.max(0, receipts.length - 4096)))
-          store.acceptedMessageReceipts.delete(id);
-      }
-      for (const [id, blob] of store.attachmentBlobs.entries()) {
-        if (isExpiredAttachmentBlob(blob)) store.attachmentBlobs.delete(id);
-      }
-      for (const [key, messages] of store.mlsBacklog.entries()) {
-        const pruned = options.pruneMlsBacklog(messages);
-        if (pruned.length) {
-          store.mlsBacklog.set(key, pruned);
-        } else {
-          store.mlsBacklog.delete(key);
-        }
-      }
-    },
+    applyStoredRelayState: applyStoredState,
+    pruneExpiredRelayState: pruneExpiredState,
     drainStoredRelayMutations() {
       return mutationStream.drain();
     },
@@ -261,6 +279,10 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
           userIds: Array.from(members.keys())
         })),
         authSessions: options.storedAuthSessions(store.authSessions),
+        accountRestrictions: Array.from(store.accountRestrictions.values()).filter(
+          (restriction) => !restriction.expiresAt || Date.parse(restriction.expiresAt) > now()
+        ),
+        accountQuotaRecords: Array.from(store.accountQuotaRecords.values()).filter((quota) => quota.resetAt > now()),
         appliedDeletionLedgerEntries: Array.from(store.appliedDeletionLedgerEntries.values()),
         attachmentBlobs: Array.from(store.attachmentBlobs.values()).filter((blob) => !isExpiredAttachmentBlob(blob)),
         mlsBacklog: Array.from(store.mlsBacklog.entries())

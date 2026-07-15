@@ -1,5 +1,5 @@
 import { Copy, FileCode2, Search } from "lucide-react";
-import type { GitStatusSummary, ProjectFileEntry } from "../lib/localBackend";
+import type { GitStatusSummary, ProjectFileEntry } from "../lib/platform/localBackend";
 import type { WorkspaceFileOpenAction } from "./workspaceFilesPanelTypes";
 
 export interface WorkspaceFileListModel {

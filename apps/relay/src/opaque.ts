@@ -36,60 +36,71 @@ export function parseStrictDirectedInviteRequestJson(
     return null;
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    if (!sameKeys(parsed, ["version", "binding", "sealedPayload"]) || parsed.version !== 3) return null;
-    const binding = parsed.binding;
-    const sealedPayload = parsed.sealedPayload;
-    if (!binding || typeof binding !== "object" || Array.isArray(binding)) return null;
-    if (!sealedPayload || typeof sealedPayload !== "object" || Array.isArray(sealedPayload)) return null;
-    const bindingRecord = binding as Record<string, unknown>;
-    if (
-      !sameKeys(bindingRecord, [
-        "version",
-        "phase",
-        "inviteId",
-        "teamId",
-        "roomId",
-        "keyEpoch",
-        "keyPackageHash",
-        "requestId",
-        "requestNonce",
-        "requesterUserId",
-        "requesterDeviceId",
-        "hostUserId",
-        "hostDeviceId",
-        "expiresAt",
-        "status",
-        "decidedAt"
-      ]) ||
-      bindingRecord.version !== 3 ||
-      bindingRecord.phase !== "request" ||
-      !boundedText(bindingRecord.inviteId, 160) ||
-      !boundedRelayId(bindingRecord.teamId) ||
-      !boundedRelayId(bindingRecord.roomId) ||
-      !Number.isSafeInteger(bindingRecord.keyEpoch) ||
-      Number(bindingRecord.keyEpoch) < 0 ||
-      typeof bindingRecord.keyPackageHash !== "string" ||
-      !/^sha256:[0-9a-f]{64}$/.test(bindingRecord.keyPackageHash) ||
-      !boundedText(bindingRecord.requestId, 160) ||
-      typeof bindingRecord.requestNonce !== "string" ||
-      !/^[A-Za-z0-9_-]{16,160}$/.test(bindingRecord.requestNonce) ||
-      !boundedText(bindingRecord.requesterUserId, 160) ||
-      !boundedText(bindingRecord.requesterDeviceId, 160) ||
-      !boundedText(bindingRecord.hostUserId, 160) ||
-      !boundedText(bindingRecord.hostDeviceId, 160) ||
-      typeof bindingRecord.expiresAt !== "string" ||
-      Number.isNaN(Date.parse(bindingRecord.expiresAt)) ||
-      bindingRecord.status !== null ||
-      bindingRecord.decidedAt !== null ||
-      !strictHpkeSealedObject(sealedPayload as Record<string, unknown>) ||
-      JSON.stringify(parsed) !== value
-    )
-      return null;
+    if (!isStrictInviteEnvelope(parsed)) return null;
+    const bindingRecord = parsed.binding as Record<string, unknown>;
+    if (!isStrictInviteBinding(bindingRecord)) return null;
+    if (!strictHpkeSealedObject(parsed.sealedPayload as Record<string, unknown>)) return null;
+    if (JSON.stringify(parsed) !== value) return null;
     return parsed as unknown as StrictDirectedInviteRequest;
   } catch {
     return null;
   }
+}
+
+const directedInviteBindingKeys = [
+  "version",
+  "phase",
+  "inviteId",
+  "teamId",
+  "roomId",
+  "keyEpoch",
+  "keyPackageHash",
+  "requestId",
+  "requestNonce",
+  "requesterUserId",
+  "requesterDeviceId",
+  "hostUserId",
+  "hostDeviceId",
+  "expiresAt",
+  "status",
+  "decidedAt"
+];
+
+function isStrictInviteEnvelope(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (!sameKeys(record, ["version", "binding", "sealedPayload"]) || record.version !== 3) return false;
+  return isPlainRecord(record.binding) && isPlainRecord(record.sealedPayload);
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isStrictInviteBinding(binding: Record<string, unknown>): boolean {
+  if (!sameKeys(binding, directedInviteBindingKeys)) return false;
+  if (binding.version !== 3 || binding.phase !== "request") return false;
+  if (!boundedText(binding.inviteId, 160) || !boundedRelayId(binding.teamId) || !boundedRelayId(binding.roomId)) {
+    return false;
+  }
+  if (!validInviteCryptographicBinding(binding)) return false;
+  if (!validInviteParticipants(binding)) return false;
+  return binding.status === null && binding.decidedAt === null;
+}
+
+function validInviteCryptographicBinding(binding: Record<string, unknown>): boolean {
+  if (!Number.isSafeInteger(binding.keyEpoch) || Number(binding.keyEpoch) < 0) return false;
+  if (typeof binding.keyPackageHash !== "string" || !/^sha256:[0-9a-f]{64}$/.test(binding.keyPackageHash)) {
+    return false;
+  }
+  if (!boundedText(binding.requestId, 160)) return false;
+  return typeof binding.requestNonce === "string" && /^[A-Za-z0-9_-]{16,160}$/.test(binding.requestNonce);
+}
+
+function validInviteParticipants(binding: Record<string, unknown>): boolean {
+  if (!boundedText(binding.requesterUserId, 160) || !boundedText(binding.requesterDeviceId, 160)) return false;
+  if (!boundedText(binding.hostUserId, 160) || !boundedText(binding.hostDeviceId, 160)) return false;
+  return typeof binding.expiresAt === "string" && !Number.isNaN(Date.parse(binding.expiresAt));
 }
 
 export function isStrictExporterCiphertextJson(value: unknown, maxChars: number): value is string {

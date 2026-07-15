@@ -42,6 +42,14 @@ MLS erases superseded epoch secrets as its key schedule advances. multAIplayer d
 
 This creates a precise tradeoff: live MLS traffic gains forward secrecy and post-compromise recovery properties, while locally retained history does not gain forward secrecy against later compromise of that device's encrypted store and credential-store wrapping key. New members receive no pre-join history. A device that loses MLS state can rejoin, but cannot recover old backlog or local history secrets from the relay.
 
+### Passphrase-encrypted room archives
+
+Room export is deliberately outside the MLS key schedule. The native app serializes a bounded version-1 display-history body, places its SHA-256 digest inside the envelope, and encrypts the complete envelope with the exact-pinned `age` 0.11.1 passphrase API (scrypt recipient plus age authenticated streaming encryption). A wrong passphrase, modified ciphertext, unsupported version, oversized file, excessive nesting, or payload-digest mismatch fails closed. Export uses an owner-only atomic file and rejects symlink or special-file destinations.
+
+The exported body never contains MLS group snapshots, epochs, exporter or retained-history secrets, signing/HPKE/device private state, KeyPackages, Welcome messages, invite capabilities, pending admission state, host-handoff authority, pending approvals, queued Codex turns, or Codex thread/session identifiers. Imported activity passes through the same TypeScript local-history normalizers before it becomes a read-only display projection; it is never hydrated into the live room store.
+
+The device archive library stores the original passphrase-encrypted age bytes under the native app-data directory. Its owner-only sidecar contains only a random archive id, import time, encrypted byte length, and format version. Room/team names, export time, history, and content-derived hashes remain inside the age ciphertext and are revealed only after the user supplies the passphrase. The app never stores the passphrase. This is an encrypted data-exit and review format, not an MLS backup: importing cannot join a group, recover an attachment blob, acquire authority, or make a room executable. The complete operational contract is in [Encrypted room archives](room-archives.md).
+
 ## Onboarding state is not cryptographic state
 
 The resumable setup record is a local webview preference, not MLS state, a room-history payload, or a source of authority. It may retain bounded team and room identifiers plus boolean workflow markers, including a partial team id used to avoid duplicate creation. It does not retain an invite capability, KeyPackage private material, Welcome, project path, prompt, account credential, transcript, or room key.

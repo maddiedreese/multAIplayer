@@ -3,9 +3,9 @@ import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { closeRoomBrowserSurfaceEvent } from "../lib/browserSurfaceEvents";
+import { closeRoomBrowserSurfaceEvent } from "../lib/browser/browserSurfaceEvents";
 import type { BrowserTab } from "../store/slices/browserSlice";
-import { reportExpectedFailure } from "../lib/nonFatalReporting";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 
 const browserWebviewLabel = "room_browser";
 

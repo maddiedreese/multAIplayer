@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { trustedAvatarUrl } from "../src/lib/avatarUrl";
+import { trustedAvatarUrl } from "../src/lib/core/avatarUrl";
 
 test("trustedAvatarUrl allows GitHub avatar hosts", () => {
   assert.equal(

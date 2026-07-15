@@ -40,7 +40,7 @@ export default tseslint.config(
     files: typescriptFiles,
     ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: {
-      complexity: ["error", 50],
+      complexity: ["error", 20],
       "max-depth": ["error", 5]
     }
   },
@@ -61,6 +61,8 @@ export default tseslint.config(
     },
     rules: {
       "desktop/no-unreported-bare-catch": "error",
+      "desktop/layer-boundaries": "error",
+      "desktop/no-flat-lib-module": "error",
       "desktop/zustand-slice-boundaries": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"

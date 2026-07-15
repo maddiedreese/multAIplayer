@@ -102,6 +102,7 @@ fn project_file_write_saves_inside_project_and_rejects_escape() {
         cwd: cwd.clone(),
         path: "src/new-file.ts".to_string(),
         content: "export const saved = true;\n".to_string(),
+        expected_content: None,
     })
     .expect("write project file");
 
@@ -114,11 +115,51 @@ fn project_file_write_saves_inside_project_and_rejects_escape() {
         cwd,
         path: "../secret.txt".to_string(),
         content: "nope".to_string(),
+        expected_content: None,
     })
     .expect_err("path escape should fail");
     assert_eq!(error.code, command_error::CommandErrorCode::InvalidArgument);
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn project_file_write_rejects_stale_content_and_symlink_parent_escape() {
+    let root = test_temp_dir("project-file-cas");
+    let outside = test_temp_dir("project-file-cas-outside");
+    fs::write(root.join("tracked.txt"), "newer\n").expect("seed current file");
+    let stale = project_file_write(project::ProjectFileWriteRequest {
+        cwd: root.to_string_lossy().to_string(),
+        path: "tracked.txt".to_string(),
+        content: "overwrite\n".to_string(),
+        expected_content: Some("older\n".to_string()),
+    })
+    .expect_err("stale editor content must not overwrite disk");
+    assert_eq!(stale.code, command_error::CommandErrorCode::InvalidArgument);
+    assert_eq!(
+        fs::read_to_string(root.join("tracked.txt")).unwrap(),
+        "newer\n"
+    );
+
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&outside, root.join("linked"))
+            .expect("create directory symlink");
+        let escaped = project_file_write(project::ProjectFileWriteRequest {
+            cwd: root.to_string_lossy().to_string(),
+            path: "linked/secret.txt".to_string(),
+            content: "escape".to_string(),
+            expected_content: None,
+        })
+        .expect_err("symlink parent must not escape the project");
+        assert_eq!(
+            escaped.code,
+            command_error::CommandErrorCode::InvalidArgument
+        );
+        assert!(!outside.join("secret.txt").exists());
+    }
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(outside);
 }
 
 #[test]
@@ -316,6 +357,21 @@ fn command_output_is_bounded_with_truncation_marker() {
     assert!(bounded.contains("multAIplayer truncated command output"));
     assert!(bounded.starts_with("first line"));
     assert!(bounded.ends_with("last line"));
+}
+
+#[test]
+fn process_output_redacts_secrets_before_truncation() {
+    let token = format!("ghp_{}", "a".repeat(40));
+    let output = format!(
+        "{}{}{}",
+        "x".repeat(MAX_COMMAND_OUTPUT_CHARS),
+        token,
+        "y".repeat(50_000)
+    );
+    let safe = redact_and_bound_command_output(output.as_bytes());
+    assert!(safe.chars().count() <= MAX_COMMAND_OUTPUT_CHARS);
+    assert!(!safe.contains(&token));
+    assert!(safe.contains("REDACTED BY MULTAIPLAYER"));
 }
 
 #[test]

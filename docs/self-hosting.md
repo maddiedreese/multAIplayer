@@ -9,6 +9,7 @@ Supported alpha self-hosting requirements:
 - Node.js runtime for the relay;
 - GitHub OAuth app configured by the self-hoster;
 - HTTPS and WebSocket support;
+- a trusted TLS reverse proxy or edge service in front of every internet-facing relay, with the Node listener unreachable from the public internet;
 - a desktop build whose app-shell CSP includes the self-hosted relay HTTP and WebSocket origins;
 - persistent SQLite storage for hosted or internet-facing relays;
 - relay-managed encrypted attachment blob storage in SQLite for hosted or internet-facing relays, or JSON storage for local/dev self-hosting.
@@ -39,7 +40,7 @@ For a hosted or internet-facing relay, run the production relay doctor against t
 npm run doctor:production-relay
 ```
 
-This check fails if GitHub OAuth is missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. Session identifiers are hashed before persistence by the relay rather than controlled by a deployment secret. The doctor is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or an external rate limiter in multi-instance deployments.
+This check fails if GitHub OAuth is missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. Session identifiers are hashed before persistence by the relay rather than controlled by a deployment secret. The doctor is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or the mandatory trusted edge and IP-level controls for an internet-facing deployment.
 
 ## Docker Relay
 
@@ -104,6 +105,8 @@ SQLite uses WAL mode and immediate, incremental transactions against normalized 
 
 The relay still hydrates durable state into one process-local store at startup. Run one relay writer per SQLite database; general multi-instance coordination is not claimed until reads and all compare-and-swap mutations move behind a shared database service. Horizontal deployments also require shared rate limiting and attachment-storage coordination.
 
+This is a deliberate architecture, not an accidental alpha omission. Scale vertically or place whole teams on independent relays; never let two processes write the same SQLite database. See the [single-node relay decision](decisions/single-node-relay.md).
+
 For upgrade continuity, a relay started with neither storage variable set checks the former default path `.multaiplayer/relay-store.json` before initializing the default SQLite database. It imports a valid version-1 snapshot transactionally, then renames the JSON source to `relay-store.json.migrated-to-sqlite`. Restarts load only the committed SQLite state, so the import is idempotent. An unreadable or unsupported legacy snapshot aborts startup and remains in place for operator recovery; it never falls through to an empty store. Explicit storage or data-path settings are never auto-migrated. Back up the JSON file first and use the explicit migration runbook when operating outside these defaults.
 
 If the relay cannot parse the configured store, or the store version is unsupported, it moves the store aside next to the original path with a `.corrupt-...` suffix and starts from a clean in-memory state. Keep regular backups of `MULTAIPLAYER_RELAY_DATA_PATH` for production/self-hosted deployments; the quarantine file is a recovery aid, not a replacement for backups.
@@ -164,6 +167,8 @@ MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS=3600000
 
 The max-bytes setting limits both the declared attachment size and the exporter-sealed blob size accepted by the relay. The live quota limits the total unexpired sealed attachment volume per signed-in user. The upload bytes quota limits burst upload volume in the configured window. Blob payloads remain opaque; these limits are for relay storage and request-size control, not content inspection.
 
+For signed-in accounts, upload-window usage is stored in SQLite with the blob write and survives restart. A failed persistence attempt rolls back both the blob and its reservation. The live-volume ceiling is derived from unexpired stored blobs, so it also survives restart without a second counter.
+
 Opaque MLS messages are also bounded before they enter WebSocket fanout or backlog:
 
 ```bash
@@ -193,6 +198,8 @@ MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false
 
 These limits are keyed by signed-in session when available, otherwise by client IP. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Forwarded addresses are used only when both proxy variables are true. Set them only when a trusted reverse proxy removes client-supplied forwarding headers and writes its own; the production doctor rejects the unsafe one-sided configuration. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter is process-local. Before a second production replica, follow the [multi-instance rate-limiting decision](decisions/multi-instance-rate-limiting.md): keep local defense in depth, add coarse edge controls, and enforce semantic identity/resource quotas atomically in a shared store. Sticky routing alone is not a correctness boundary.
 
+For every hosted or internet-facing deployment, the reverse proxy or edge is mandatory even with one replica. It terminates TLS, strips client-supplied forwarding headers, writes one trusted client address, bounds request bodies and connection timeouts, and applies coarse source-IP/volumetric controls before traffic reaches Node. Bind the relay to a private interface or platform-private service so clients cannot bypass that edge. The production doctor checks the relay-side header configuration; it cannot prove network isolation or edge policy, so operators must test both direct-origin reachability and spoofed forwarding headers.
+
 MLS derives per-message keys and nonces from its key schedule, so protocol v2 has no cryptographic nonce budget or per-epoch envelope counter. Generic rate, size, backlog, and socket limits remain abuse controls. Commits are instead serialized by expected epoch and active-host identity.
 
 Concurrent WebSocket connection caps are also enforced per signed-in user when available, otherwise per client identity, and per room device id after join. These caps are intentionally above normal use; they exist to prevent a runaway client from holding unbounded sockets.
@@ -203,9 +210,11 @@ Team and room creation also have authenticated per-user daily caps:
 MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP=25
 MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP=100
 MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER=500
+MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER=250
+MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER=100
 ```
 
-Daily creation quota rejections return `429` with `Retry-After` and a structured `quota_exceeded` JSON body that clients can render directly. The total-room cap is checked against the signed-in user's current visible rooms and returns the same structured `quota_exceeded` shape.
+Daily team and room counters are stored in SQLite under the single-writer relay model, expire at the next UTC day, and survive restarts. Their reservation and protected write persist together; failed persistence rolls both back. Rejections return `429` with `Retry-After` and a structured `quota_exceeded` JSON body that clients can render directly. The total-room cap is checked against the signed-in user's current visible rooms. Live KeyPackage and invite ceilings are derived globally across every device and room owned by the signed-in account, respectively, from persisted unconsumed/unexpired records. They therefore survive restart without maintaining a second counter.
 
 Authenticated quotas use the GitHub session identity. If a self-hosted relay deliberately disables auth, rate limits still fall back to client IP, but authenticated per-user creation and blob-volume quotas cannot identify a durable account and are correspondingly weaker.
 
@@ -290,6 +299,8 @@ While authorization is pending, the desktop polls at GitHub's advertised interva
 GitHub access tokens stay behind the native Rust IPC boundary. Native commands repeat repository, branch, request-size, response-size, text, and GitHub URL validation before returning bounded results to the webview. The relay never receives PR bodies, repository targets, or Actions responses. Structured relay request logs record only method, route path without its query string, status, duration, and a bounded request id; they do not record request bodies or the transient verification token. GitHub remains a separate processor of the data sent to its API.
 
 The relay has no separate user-profile or billing-account table. A signed-in user can call `DELETE /auth/account` with JSON `{ "confirmation": "delete my account" }`; the desktop exposes this as a destructive Account action. Deletion is blocked with `409 account_deletion_blocked` until the user transfers or deletes every team they own and hands off every non-deleted room they host. Before primary deletion, the relay commits an authenticated pseudonymous tombstone to its external deletion ledger. It then removes all of that GitHub identity's token-free relay sessions, process-local device sessions and challenges, registered devices, unused KeyPackages, team memberships, creator-owned unused invites, pending invite admission artifacts, and identity/session quota records from primary or process-local state. The native app separately deletes its Keychain token when it clears the signed-in workspace. It removes and broadcasts room presence, closes live relay connections, and clears the browser cookie. It also removes the identity from trusted-approver lists and removes host identity metadata from already-deleted rooms. If primary persistence fails after the tombstone commits, the response is `202` pending, the identity is immediately denied authenticated access, and startup reconciliation retries deletion before the relay listens. The primary rollback preserves unrelated concurrent mutations without reopening access.
+
+Hosted operators can deny an abusive GitHub identity without deleting shared encrypted records. Account restrictions are durable in the relay store, survive restart, deny new GitHub verification and stored sessions, and evict auth/device sessions, presence, subscriptions, and live sockets when applied through the relay control. The public HTTP API has no operator endpoint. Use the stopped-relay CLI from the [operator runbook](release-operations.md#hosted-account-restriction) and retain only a bounded reason code; restriction is service denial, not retroactive erasure or removal from other devices.
 
 Deletion does not rewrite shared team or room records, MLS ciphertext and its sender/routing metadata, encrypted attachments, or accepted-message receipts. Those records remain available to collaborators and follow their ordinary configured retention because rewriting them would break shared encrypted history, downloads, replay/idempotency protection, or MLS state. Deleting relay data does not erase encrypted data already stored on a user's Macs, revoke the OAuth grant at GitHub, or selectively purge an operator's existing backups. Users remove local history with the app's per-room local controls and may revoke the OAuth grant in GitHub settings.
 

@@ -1,4 +1,4 @@
-import { createCodexBrowserOpenCommand } from "../lib/codexBrowserOpenCommand";
+import { createCodexBrowserOpenCommand } from "../application/codex/codexBrowserOpenCommand";
 import { useRelayRoomSync } from "./useRelayRoomSync";
 
 export function useRelaySyncContext({

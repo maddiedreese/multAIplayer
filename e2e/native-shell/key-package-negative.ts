@@ -12,7 +12,7 @@ interface NativeKeyPackageUpload {
 async function generateNativeKeyPackage(browser: Browser): Promise<NativeKeyPackageUpload> {
   return browser
     .executeAsync((done) => {
-      import("/src/lib/mlsClient.ts")
+      import("/src/lib/mls/mlsClient.ts")
         .then(({ generateMlsKeyPackage }) => generateMlsKeyPackage())
         .then((keyPackage) => done({ keyPackage }))
         .catch((error) => done({ error: String(error) }));
@@ -35,7 +35,7 @@ async function publishNativeKeyPackage(browser: Browser, deviceId: string, keyPa
       };
       const results = (page.__multaiplayerKeyPackageResults ??= {});
       results[key] = undefined;
-      void import("/src/lib/workspaceClient.ts")
+      void import("/src/application/workspace/workspaceClient.ts")
         .then(({ publishKeyPackages }) => publishKeyPackages(targetDeviceId, [upload]))
         .then(() => {
           results[key] = { accepted: true };

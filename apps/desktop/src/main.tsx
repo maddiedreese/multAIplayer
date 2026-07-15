@@ -1,8 +1,8 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { installGlobalDiagnostics } from "./lib/diagnostics";
-import { isTauriRuntime } from "./lib/localBackend/runtime";
+import { installGlobalDiagnostics } from "./lib/platform/diagnostics";
+import { isTauriRuntime } from "./lib/platform/localBackend/runtime";
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
 

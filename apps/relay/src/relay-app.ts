@@ -4,6 +4,7 @@ import express from "express";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { createRelayAuthSessionManager, createRelayAuthSessionPersistence } from "./auth/session.js";
+import { createAccountRestrictionManager, isAccountRestricted } from "./auth/account-restrictions.js";
 import { FileDeletionLedger, S3DeletionLedger } from "./auth/deletion-ledger.js";
 import { reconcileDeletionLedger } from "./auth/deletion-reconciliation.js";
 import {
@@ -150,7 +151,8 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     nodeEnv,
     normalizeSessionId: normalizeAuthSessionId,
     scheduleStoreSave,
-    isDeletedIdentity: (userId) => deletionLedger?.isProtected(userId) ?? false
+    isDeletedIdentity: (userId) => deletionLedger?.isProtected(userId) ?? false,
+    isRestrictedIdentity: (userId) => isAccountRestricted(relayStore, userId)
   });
   const { authSessionMaxAgeMs, getAuthSession } = authSessionManager;
   const authSessionPersistence = createRelayAuthSessionPersistence({
@@ -251,6 +253,11 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     send: relayFanout.send,
     broadcast: relayFanout.broadcast
   });
+  const accountRestrictionManager = createAccountRestrictionManager({
+    store: relayStore,
+    liveControl: relayRoomManager,
+    persist: () => relayStorePersistence.saveRelayStore()
+  });
 
   app.use(relayRequestGuards.rateLimitMiddleware);
   const requesterFromRequest = createRequesterFromRequest(getAuthSession);
@@ -268,10 +275,10 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     roomManager: relayRoomManager,
     keyPackageValidator,
     scheduleStoreSave,
-    addTeamMember,
     revokeTeamInvites: teamMutations.revokeTeamInvites,
     requesterFromRequest,
-    deletionLedger
+    deletionLedger,
+    isAccountRestricted: (userId) => isAccountRestricted(relayStore, userId)
   });
   app.use(relayJsonBodyErrorMiddleware);
   registerRelayWebSocketAdapter({
@@ -288,6 +295,8 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
   });
 
   await relayStorePersistence.loadRelayStore();
+  const restrictionStartup = accountRestrictionManager.evictRestrictedAccounts();
+  if (restrictionStartup.removedAuthSessions > 0) await relayStorePersistence.saveRelayStore();
   const deletionReconciliation = deletionLedger
     ? await reconcileDeletionLedger({
         ledger: deletionLedger,
@@ -314,6 +323,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     wss,
     config: relayConfig,
     deletionReconciliation,
+    accountRestrictions: accountRestrictionManager,
     ...runtime
   };
 }

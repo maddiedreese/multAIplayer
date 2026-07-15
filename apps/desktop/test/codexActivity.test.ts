@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CodexActivityTimelineView } from "../src/components/CodexActivityTimeline";
-import { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } from "../src/lib/localRoomHistoryPayload";
+import { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } from "../src/lib/history/localRoomHistoryPayload";
 import { useAppStore } from "../src/store/appStore";
 import type { CodexActivity } from "../src/types";
 

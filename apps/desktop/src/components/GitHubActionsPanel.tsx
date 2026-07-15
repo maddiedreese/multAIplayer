@@ -1,6 +1,6 @@
 import { ExternalLink, RefreshCw } from "lucide-react";
-import type { GitHubActionRun } from "../lib/authClient";
-import type { GitHubActionsReadiness } from "../lib/githubWorkflowReadiness";
+import type { GitHubActionRun } from "../lib/identity/authClient";
+import type { GitHubActionsReadiness } from "../lib/git/githubWorkflowReadiness";
 
 export interface ActionsSummaryDisplay {
   label: string;
