@@ -83,12 +83,38 @@ export function githubDevicePollDelayMs(intervalSeconds: number, expiresAt: numb
 }
 
 export async function logout(): Promise<void> {
-  const response = await fetch(`${getRelayHttpUrl()}/auth/logout`, {
-    method: "POST",
-    credentials: "include"
-  });
-  await readJsonResponse(response, "Failed to sign out");
-  if (isTauriRuntime()) await invokeNative<void>("github_token_delete");
+  let relayFailed = false;
+  let relayFailure: unknown;
+  try {
+    const response = await fetch(`${getRelayHttpUrl()}/auth/logout`, {
+      method: "POST",
+      credentials: "include"
+    });
+    await readJsonResponse(response, "Failed to sign out");
+  } catch (error) {
+    relayFailed = true;
+    relayFailure = error;
+  }
+
+  let credentialFailed = false;
+  let credentialFailure: unknown;
+  if (isTauriRuntime()) {
+    try {
+      await invokeNative<void>("github_token_delete");
+    } catch (error) {
+      credentialFailed = true;
+      credentialFailure = error;
+    }
+  }
+
+  if (relayFailed && credentialFailed) {
+    throw new AggregateError(
+      [relayFailure, credentialFailure],
+      "The relay session and local GitHub credential could not both be cleared."
+    );
+  }
+  if (relayFailed) throw relayFailure;
+  if (credentialFailed) throw credentialFailure;
 }
 
 export const hostedAccountDeletionConfirmation = "delete my account" as const;

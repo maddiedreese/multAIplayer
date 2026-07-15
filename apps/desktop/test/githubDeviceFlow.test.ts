@@ -4,6 +4,7 @@ import {
   deleteHostedAccount,
   HostedAccountDeletionIndeterminateError,
   githubDevicePollDelayMs,
+  logout,
   nextGitHubDevicePollIntervalSeconds,
   recheckHostedAccountDeletion,
   type GitHubDevicePollResult
@@ -31,6 +32,66 @@ test("GitHub device polling increases its interval when GitHub requests slowdown
 test("GitHub device polling never schedules beyond code expiry", () => {
   assert.equal(githubDevicePollDelayMs(5, 12_000, 10_000), 2_000);
   assert.equal(githubDevicePollDelayMs(5, 9_000, 10_000), 0);
+});
+
+test("sign-out removes the native GitHub credential even when relay logout is unavailable", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  const relayFailure = new TypeError("relay unavailable");
+  const invoked: string[] = [];
+  try {
+    globalThis.fetch = async () => {
+      throw relayFailure;
+    };
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        __TAURI_INTERNALS__: {
+          invoke: async (command: string) => {
+            invoked.push(command);
+          }
+        }
+      }
+    });
+
+    assert.equal(await logout().catch((error: unknown) => error), relayFailure);
+    assert.deepEqual(invoked, ["github_token_delete"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow === undefined) delete (globalThis as { window?: Window }).window;
+    else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+  }
+});
+
+test("sign-out reports both relay and credential-store failures", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  const relayFailure = new TypeError("relay unavailable");
+  const credentialFailure = { code: "storage_error", message: "credential store unavailable" };
+  try {
+    globalThis.fetch = async () => {
+      throw relayFailure;
+    };
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        __TAURI_INTERNALS__: {
+          invoke: async () => {
+            throw credentialFailure;
+          }
+        }
+      }
+    });
+
+    const error = await logout().catch((caught: unknown) => caught);
+    assert.ok(error instanceof AggregateError);
+    assert.equal(error.errors[0], relayFailure);
+    assert.equal((error.errors[1] as Error).message, credentialFailure.message);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow === undefined) delete (globalThis as { window?: Window }).window;
+    else Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+  }
 });
 
 test("hosted account deletion sends exact confirmation and preserves typed blockers", async () => {

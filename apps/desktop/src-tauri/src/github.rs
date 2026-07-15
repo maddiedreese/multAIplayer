@@ -222,6 +222,14 @@ fn validate_scopes(scopes: &[String]) -> Result<String, String> {
 #[tauri::command]
 pub async fn github_device_flow_start(
     state: tauri::State<'_, GitHubState>,
+) -> crate::command_error::CommandResult<DeviceFlowStart> {
+    github_device_flow_start_inner(state)
+        .await
+        .map_err(github_command_error)
+}
+
+async fn github_device_flow_start_inner(
+    state: tauri::State<'_, GitHubState>,
 ) -> Result<DeviceFlowStart, String> {
     let client_id = validate_client_id(GITHUB_CLIENT_ID)?;
     let scopes = GITHUB_SCOPES
@@ -285,6 +293,16 @@ pub async fn github_device_flow_poll(
     window: WebviewWindow,
     state: tauri::State<'_, GitHubState>,
     flow_id: String,
+) -> crate::command_error::CommandResult<DevicePollResult> {
+    github_device_flow_poll_inner(window, state, flow_id)
+        .await
+        .map_err(github_command_error)
+}
+
+async fn github_device_flow_poll_inner(
+    window: WebviewWindow,
+    state: tauri::State<'_, GitHubState>,
+    flow_id: String,
 ) -> Result<DevicePollResult, String> {
     let (client_id, device_code) = {
         let mut pending = state
@@ -343,7 +361,7 @@ pub async fn github_device_flow_poll(
     let (user, cookie) = verify_with_relay(RELAY_HTTP_ORIGIN, &token).await?;
     store_token(&token)?;
     if window.set_cookie(cookie).is_err() {
-        let _ = github_token_delete();
+        let _ = github_token_delete_inner();
         return Err("Signed in, but the relay session could not be installed.".to_owned());
     }
     state
@@ -501,7 +519,11 @@ fn load_token() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn github_token_delete() -> Result<(), String> {
+pub fn github_token_delete() -> crate::command_error::CommandResult<()> {
+    github_token_delete_inner().map_err(github_command_error)
+}
+
+fn github_token_delete_inner() -> Result<(), String> {
     match token_entry()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(_) => {
@@ -512,6 +534,14 @@ pub fn github_token_delete() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn github_create_pull_request(
+    request: PullRequestInput,
+) -> crate::command_error::CommandResult<PullRequestResult> {
+    github_create_pull_request_inner(request)
+        .await
+        .map_err(github_command_error)
+}
+
+async fn github_create_pull_request_inner(
     request: PullRequestInput,
 ) -> Result<PullRequestResult, String> {
     let request = validate_pull_request(request)?;
@@ -548,7 +578,17 @@ pub async fn github_create_pull_request(
 }
 
 #[tauri::command]
-pub async fn github_list_action_runs(request: ActionRunsInput) -> Result<ActionRunsResult, String> {
+pub async fn github_list_action_runs(
+    request: ActionRunsInput,
+) -> crate::command_error::CommandResult<ActionRunsResult> {
+    github_list_action_runs_inner(request)
+        .await
+        .map_err(github_command_error)
+}
+
+async fn github_list_action_runs_inner(
+    request: ActionRunsInput,
+) -> Result<ActionRunsResult, String> {
     let (owner, repo) = validate_repo(&request.owner, &request.repo)?;
     let branch = request
         .branch
@@ -727,6 +767,32 @@ async fn bounded_json<T: DeserializeOwned>(response: reqwest::Response) -> Resul
     serde_json::from_slice(&bytes).map_err(|_| "The upstream response was invalid.".to_owned())
 }
 
+fn github_command_error(message: String) -> crate::command_error::CommandError {
+    use crate::command_error::CommandError;
+
+    match message.as_str() {
+        "GitHub repository is invalid."
+        | "GitHub branch name is invalid."
+        | "GitHub text field is invalid."
+        | "GitHub pull request body is invalid."
+        | "GitHub request is invalid." => CommandError::invalid_argument(message),
+        "Sign in to GitHub before using this feature."
+        | "Stored GitHub credentials are invalid."
+        | "GitHub sign-in was denied."
+        | "The GitHub sign-in code expired. Start sign-in again."
+        | "GitHub returned an invalid access credential." => CommandError::unauthorized(message),
+        "GitHub sign-in state expired. Start again." => CommandError::not_found(message),
+        "The credential store is unavailable."
+        | "GitHub sign-in could not be stored securely."
+        | "GitHub credentials could not be removed from the credential store." => {
+            CommandError::storage(message)
+        }
+        // Never reflect an unexpected internal or upstream error across IPC: future
+        // callers may accidentally attach credential material to it.
+        _ => CommandError::unavailable("The GitHub operation could not be completed."),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -747,6 +813,23 @@ mod tests {
         for invalid in ["bad branch", "../main", "topic.lock", "a//b", "@"] {
             assert!(validate_branch(invalid).is_err());
         }
+    }
+
+    #[test]
+    fn command_errors_are_typed_and_do_not_reflect_unexpected_secrets() {
+        let invalid = github_command_error("GitHub repository is invalid.".to_owned());
+        assert_eq!(
+            invalid.code,
+            crate::command_error::CommandErrorCode::InvalidArgument
+        );
+
+        let secret = "ghp_DO_NOT_REFLECT_THIS_VALUE";
+        let unexpected = github_command_error(secret.to_owned());
+        assert_eq!(
+            unexpected.code,
+            crate::command_error::CommandErrorCode::Unavailable
+        );
+        assert!(!unexpected.message.contains(secret));
     }
 
     #[test]
