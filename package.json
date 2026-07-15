@@ -72,7 +72,7 @@
     "globals": "17.7.0",
     "prettier": "3.9.5",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.63.0",
+    "typescript-eslint": "8.64.0",
     "webdriverio": "9.29.1"
   },
   "overrides": {
@@ -94,13 +94,13 @@
     "@esbuild/linux-x64": "0.28.1",
     "@esbuild/win32-arm64": "0.28.1",
     "@esbuild/win32-x64": "0.28.1",
-    "@rolldown/binding-darwin-arm64": "1.1.5",
-    "@rolldown/binding-darwin-x64": "1.1.5",
-    "@rolldown/binding-linux-arm64-gnu": "1.1.5",
-    "@rolldown/binding-linux-arm64-musl": "1.1.5",
-    "@rolldown/binding-linux-x64-gnu": "1.1.5",
-    "@rolldown/binding-linux-x64-musl": "1.1.5",
-    "@rolldown/binding-win32-arm64-msvc": "1.1.5",
-    "@rolldown/binding-win32-x64-msvc": "1.1.5"
+    "@rolldown/binding-darwin-arm64": "1.2.0",
+    "@rolldown/binding-darwin-x64": "1.2.0",
+    "@rolldown/binding-linux-arm64-gnu": "1.2.0",
+    "@rolldown/binding-linux-arm64-musl": "1.2.0",
+    "@rolldown/binding-linux-x64-gnu": "1.2.0",
+    "@rolldown/binding-linux-x64-musl": "1.2.0",
+    "@rolldown/binding-win32-arm64-msvc": "1.2.0",
+    "@rolldown/binding-win32-x64-msvc": "1.2.0"
   }
 }
