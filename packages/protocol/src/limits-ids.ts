@@ -21,15 +21,12 @@ export const maxAttachmentBlobTypeChars = 160;
 export const maxMediumTextChars = 4_096;
 export const maxPublicKeyJwkChars = maxMediumTextChars;
 export const maxLongTextChars = 120_000;
-/** Base64 ceiling for the relay's at-rest auth-session nonce and authentication tag. */
-export const maxSessionCiphertextNonceChars = 4_096;
 export const maxProjectPathChars = 2_048;
 export const maxRoomProjectPathChars = maxProjectPathChars;
 export const maxUrlChars = 2_048;
 export const maxCodexModelChars = 80;
 export const maxPublicKeyFingerprintChars = 128;
 export const maxAccessTokenChars = 8_192;
-export const maxGitHubDeviceCodeChars = 256;
 export const maxCodexThreadIdChars = 512;
 export const maxCodexQueueSize = 5;
 export const maxTerminalSnapshots = 20;

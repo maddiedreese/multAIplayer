@@ -56,7 +56,7 @@ test("accepted hosted-account deletion is reported as protected and pending clea
           scopes: ["repo", "read:user"],
           mutationsRequireAuth: true,
           allowedOrigins: ["tauri://localhost"],
-          sessionPersistence: "encrypted"
+          sessionPersistence: "identity_only"
         }}
         authBusy={false}
         authError={null}

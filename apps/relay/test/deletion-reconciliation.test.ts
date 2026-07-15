@@ -39,7 +39,6 @@ test("reconciliation deletes resurrected identity data even when an applied mark
   const ledger = ledgerFor(userId);
   const [entry] = await ledger.list();
   store.authSessions.set("restored-session", {
-    accessToken: "secret",
     user: { id: userId, login: "restored" },
     expiresAt: Date.now() + 60_000
   });
@@ -100,7 +99,6 @@ test("delayed primary cleanup appends protection for 90 days from the cleanup at
     const requested = await ledger.record(userId);
     const store = createRelayStore();
     store.authSessions.set("delayed-session", {
-      accessToken: "secret",
       user: { id: userId, login: "delayed" },
       expiresAt: Date.now() + 60_000
     });
@@ -132,7 +130,6 @@ test("restart after the original horizon deletes the identity before purging and
     const original = await ledger.record(userId);
     const store = createRelayStore();
     store.authSessions.set("pending-session", {
-      accessToken: "secret",
       user: { id: userId, login: "expired-but-pending" },
       expiresAt: Date.now() + 60_000
     });

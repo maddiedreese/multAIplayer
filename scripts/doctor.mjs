@@ -38,12 +38,6 @@ if (!productionRelay) {
   }
 }
 
-checkOptionalEnv("GITHUB_CLIENT_ID", "GitHub sign-in and PR/Actions flows need a relay GitHub OAuth app.");
-checkOptionalEnv(
-  "MULTAIPLAYER_RELAY_SESSION_SECRET",
-  "Set at least 32 characters to persist encrypted GitHub sessions across relay restarts."
-);
-
 if (productionRelay) {
   checkProductionRelayEnv();
 }
@@ -147,18 +141,7 @@ function checkOptionalFile(path, detail) {
   });
 }
 
-function checkOptionalEnv(name, detail) {
-  const value = process.env[name]?.trim();
-  checks.push({
-    ok: true,
-    label: name,
-    detail: value ? "configured" : `optional: ${detail}`
-  });
-}
-
 function checkProductionRelayEnv() {
-  const githubClientId = envValue("GITHUB_CLIENT_ID");
-  const sessionSecret = envValue("MULTAIPLAYER_RELAY_SESSION_SECRET");
   const deletionLedgerEndpoint = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT");
   const deletionLedgerBucket = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET");
   const deletionLedgerRegion = envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION");
@@ -187,19 +170,6 @@ function checkProductionRelayEnv() {
   const totalRoomCap = envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500);
   const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
 
-  checks.push({
-    ok: Boolean(githubClientId),
-    label: "production GITHUB_CLIENT_ID",
-    detail: githubClientId ? "configured" : "required: production relays need GitHub OAuth configured"
-  });
-  checks.push({
-    ok: sessionSecret.length >= 32,
-    label: "production MULTAIPLAYER_RELAY_SESSION_SECRET",
-    detail:
-      sessionSecret.length >= 32
-        ? "configured with at least 32 characters"
-        : "required: use a stable high-entropy value of at least 32 characters"
-  });
   const deletionLedgerEndpointIsHttps = (() => {
     try {
       return new URL(deletionLedgerEndpoint).protocol === "https:";

@@ -36,7 +36,6 @@ export interface RelayStoreMutation {
 }
 
 export interface AuthSession {
-  accessToken: string;
   user: {
     id: string;
     login: string;

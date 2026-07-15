@@ -1,7 +1,8 @@
-import { normalizeGitHubBranchName, normalizeGitHubRepoRef, normalizePullRequestDraft } from "@multaiplayer/github";
 import { getRelayHttpUrl } from "./appConfig";
 import { readJsonResponse } from "./httpResponse";
 import { trustedAuthenticationUrl } from "./authExternalUrl";
+import { invokeNative } from "./nativeCommandError";
+import { isTauriRuntime } from "./localBackend/runtime";
 
 export interface GitHubAuthConfig {
   provider: "github";
@@ -9,11 +10,11 @@ export interface GitHubAuthConfig {
   scopes: string[];
   mutationsRequireAuth: boolean;
   allowedOrigins: string[];
-  sessionPersistence: "encrypted" | "memory_only";
+  sessionPersistence: "identity_only";
 }
 
 export interface GitHubDeviceStart {
-  device_code: string;
+  flow_id: string;
   user_code: string;
   verification_uri: string;
   expires_in: number;
@@ -54,14 +55,8 @@ export async function recheckHostedAccountDeletion(): Promise<HostedAccountDelet
 }
 
 export async function startGitHubDeviceFlow(): Promise<GitHubDeviceStart> {
-  const response = await fetch(`${getRelayHttpUrl()}/auth/github/device/start`, {
-    method: "POST",
-    credentials: "include"
-  });
-  const flow = await readJsonResponse<Omit<GitHubDeviceStart, "expiresAt">>(
-    response,
-    "Failed to start GitHub device flow"
-  );
+  if (!isTauriRuntime()) throw new Error("GitHub sign-in is available only in the native desktop app.");
+  const flow = await invokeNative<Omit<GitHubDeviceStart, "expiresAt">>("github_device_flow_start");
   const verificationUri = trustedAuthenticationUrl("github", flow.verification_uri);
   if (!verificationUri) throw new Error("GitHub returned an unsupported verification address.");
   return {
@@ -71,22 +66,11 @@ export async function startGitHubDeviceFlow(): Promise<GitHubDeviceStart> {
   };
 }
 
-export async function pollGitHubDeviceFlow(deviceCode: string): Promise<GitHubDevicePollResult> {
-  const response = await fetch(`${getRelayHttpUrl()}/auth/github/device/poll`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ device_code: deviceCode })
+export async function pollGitHubDeviceFlow(flowId: string): Promise<GitHubDevicePollResult> {
+  if (!isTauriRuntime()) throw new Error("GitHub sign-in is available only in the native desktop app.");
+  return invokeNative<GitHubDevicePollResult>("github_device_flow_poll", {
+    flowId
   });
-  if (response.status === 202) {
-    const body = (await response.json()) as { status?: string; retryAfterSeconds?: unknown };
-    if (body.status === "slow_down") {
-      return { status: "slow_down", retryAfterSeconds: Math.max(1, Number(body.retryAfterSeconds) || 5) };
-    }
-    return { status: "pending" };
-  }
-  const body = await readJsonResponse<{ user: SignedInUser }>(response, "Failed to poll GitHub device flow");
-  return { status: "complete", user: (body as { user: SignedInUser }).user };
 }
 
 export function nextGitHubDevicePollIntervalSeconds(currentInterval: number, result: GitHubDevicePollResult): number {
@@ -104,6 +88,7 @@ export async function logout(): Promise<void> {
     credentials: "include"
   });
   await readJsonResponse(response, "Failed to sign out");
+  if (isTauriRuntime()) await invokeNative<void>("github_token_delete");
 }
 
 export const hostedAccountDeletionConfirmation = "delete my account" as const;
@@ -168,8 +153,10 @@ export async function deleteHostedAccount(
       retainedSharedData: string[];
     }>(response, "Failed to delete hosted account data");
     if (response.status === 202 && body.status === "pending" && body.deleted === null) {
+      if (isTauriRuntime()) await invokeNative<void>("github_token_delete");
       return { status: "pending", retainedSharedData: body.retainedSharedData };
     }
+    if (isTauriRuntime()) await invokeNative<void>("github_token_delete");
     return {
       status: "deleted",
       deleted: body.deleted,
@@ -189,6 +176,7 @@ async function recoverHostedAccountDeletionAfterResponseLoss(cause: unknown): Pr
   try {
     const currentUser = await getCurrentUser();
     if (currentUser) throw cause;
+    if (isTauriRuntime()) await invokeNative<void>("github_token_delete");
     return { status: "indeterminate", signedOut: true };
   } catch (probeError) {
     if (probeError === cause) throw cause;
@@ -259,14 +247,8 @@ export interface GitHubActionRunsResult {
 }
 
 export async function createPullRequest(request: PullRequestRequest): Promise<PullRequestResult> {
-  const normalized = normalizePullRequestDraft(request);
-  const response = await fetch(`${getRelayHttpUrl()}/github/pulls`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(normalized)
-  });
-  return readJsonResponse<PullRequestResult>(response, "Failed to create pull request");
+  if (!isTauriRuntime()) throw new Error("Pull requests are available only in the native desktop app.");
+  return invokeNative<PullRequestResult>("github_create_pull_request", { request });
 }
 
 export async function listGitHubActionRuns(
@@ -274,11 +256,8 @@ export async function listGitHubActionRuns(
   repo: string,
   branch?: string
 ): Promise<GitHubActionRunsResult> {
-  const repoRef = normalizeGitHubRepoRef(owner, repo);
-  const params = new URLSearchParams({ owner: repoRef.owner, repo: repoRef.repo });
-  if (branch?.trim()) params.set("branch", normalizeGitHubBranchName(branch));
-  const response = await fetch(`${getRelayHttpUrl()}/github/actions/runs?${params}`, {
-    credentials: "include"
+  if (!isTauriRuntime()) throw new Error("GitHub Actions are available only in the native desktop app.");
+  return invokeNative<GitHubActionRunsResult>("github_list_action_runs", {
+    request: { owner, repo, ...(branch?.trim() ? { branch } : {}) }
   });
-  return readJsonResponse<GitHubActionRunsResult>(response, "Failed to load GitHub Actions");
 }

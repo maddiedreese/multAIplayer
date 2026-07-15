@@ -1,289 +1,129 @@
 import { test } from "node:test";
-import { assert, createDebugSession, join, mkdtemp, rm, startRelay, tmpdir, writeFile } from "../support/relay.js";
+import {
+  assert,
+  join,
+  mkdtemp,
+  readFile,
+  rm,
+  startRelay,
+  tmpdir,
+  waitForStoredState,
+  writeFile
+} from "../support/relay.js";
 
-test("relay reports configured GitHub OAuth scopes", async () => {
+test("relay advertises native OAuth configuration without a secret", async () => {
   const relay = await startRelay({
-    GITHUB_OAUTH_SCOPES: "read:user,repo workflow",
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com,tauri://localhost",
-    MULTAIPLAYER_RELAY_SESSION_SECRET: "test-session-secret-with-at-least-32-characters"
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com,tauri://localhost"
   });
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);
     assert.equal(response.status, 200);
-    const body = (await response.json()) as {
-      scopes: string[];
-      mutationsRequireAuth: boolean;
-      allowedOrigins: string[];
-      sessionPersistence: string;
-    };
-    assert.deepEqual(body.scopes, ["read:user", "repo", "workflow"]);
-    assert.equal(body.mutationsRequireAuth, true);
-    assert.deepEqual(body.allowedOrigins, ["https://multaiplayer.com", "tauri://localhost"]);
-    assert.equal(body.sessionPersistence, "encrypted");
+    const body = await response.json();
+    assert.deepEqual(body, {
+      provider: "github",
+      configured: true,
+      scopes: ["read:user", "repo"],
+      mutationsRequireAuth: true,
+      allowedOrigins: ["https://multaiplayer.com", "tauri://localhost"],
+      sessionPersistence: "identity_only",
+      accountDeletion: "external_ledger_protected"
+    });
   } finally {
     await relay.close();
   }
 });
 
-test("relay bounds GitHub device-code polling input", async () => {
-  const relay = await startRelay({ GITHUB_CLIENT_ID: "test-client-id" });
+test("relay removes device flow and GitHub proxy routes", async () => {
+  const relay = await startRelay({});
   try {
-    const missing = await fetch(`${relay.baseUrl}/auth/github/device/poll`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({})
-    });
-    assert.equal(missing.status, 400);
-
-    const oversized = await fetch(`${relay.baseUrl}/auth/github/device/poll`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ device_code: "x".repeat(257) })
-    });
-    assert.equal(oversized.status, 400);
-
-    const controlCharacter = await fetch(`${relay.baseUrl}/auth/github/device/poll`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ device_code: "device\ncode" })
-    });
-    assert.equal(controlCharacter.status, 400);
+    for (const path of [
+      "/auth/github/device/start",
+      "/auth/github/device/poll",
+      "/github/pulls",
+      "/github/actions/runs"
+    ]) {
+      const response = await fetch(`${relay.baseUrl}${path}`, { method: path.includes("actions") ? "GET" : "POST" });
+      assert.equal(response.status, 404, path);
+    }
   } finally {
     await relay.close();
   }
 });
 
-test("relay distinguishes pending and slowdown device states from terminal GitHub errors", async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-github-device-test-"));
-  const mockPath = join(tempDir, "mock-github-device-fetch.mjs");
-  await writeFile(
-    mockPath,
-    `
-const nativeFetch = globalThis.fetch;
-globalThis.fetch = async (input, init = {}) => {
-  if (String(input) === "https://github.com/login/oauth/access_token") {
-    const deviceCode = JSON.parse(String(init.body)).device_code;
-    return Response.json({ error: deviceCode });
-  }
-  return nativeFetch(input, init);
-};
-`,
-    "utf8"
-  );
-  const relay = await startRelay({
-    GITHUB_CLIENT_ID: "test-client-id",
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${mockPath}`.trim()
-  });
+test("verify rejects missing, oversized, and control-character credentials before GitHub", async () => {
+  const relay = await startRelay({});
   try {
-    const poll = (deviceCode: string) =>
-      fetch(`${relay.baseUrl}/auth/github/device/poll`, {
+    for (const access_token of [undefined, "x".repeat(8193), "token\nvalue"]) {
+      const response = await fetch(`${relay.baseUrl}/auth/github/verify`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ device_code: deviceCode })
+        body: JSON.stringify(access_token === undefined ? {} : { access_token })
       });
-
-    const pending = await poll("authorization_pending");
-    assert.equal(pending.status, 202);
-    assert.deepEqual(await pending.json(), { status: "pending" });
-
-    const slowDown = await poll("slow_down");
-    assert.equal(slowDown.status, 202);
-    assert.deepEqual(await slowDown.json(), { status: "slow_down", retryAfterSeconds: 5 });
-
-    const denied = await poll("access_denied");
-    assert.equal(denied.status, 400);
-    assert.deepEqual(await denied.json(), { error: "GitHub sign-in was denied.", code: "invalid_request" });
-
-    const expired = await poll("expired_token");
-    assert.equal(expired.status, 400);
-    assert.deepEqual(await expired.json(), {
-      error: "The GitHub sign-in code expired. Start sign-in again.",
-      code: "invalid_request"
-    });
-
-    const unknown = await poll("unexpected_error");
-    assert.equal(unknown.status, 502);
-    assert.deepEqual(await unknown.json(), {
-      error: "GitHub did not complete sign-in.",
-      code: "upstream_unavailable"
-    });
-  } finally {
-    await relay.close();
-    await rm(tempDir, { recursive: true, force: true });
-  }
-});
-
-test("relay validates GitHub PR and Actions inputs before proxying", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
-  try {
-    const cookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
-
-    const pullResponse = await fetch(`${relay.baseUrl}/github/pulls`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({
-        owner: "maddiedreese/bad",
-        repo: "multAIplayer",
-        title: "Ship it",
-        body: "",
-        head: "codex/branch",
-        base: "main",
-        draft: true
-      })
-    });
-    assert.equal(pullResponse.status, 400);
-    assert.match(await pullResponse.text(), /GitHub owner/);
-
-    const actionsResponse = await fetch(
-      `${relay.baseUrl}/github/actions/runs?owner=maddiedreese&repo=multAIplayer&branch=bad%20branch`,
-      {
-        headers: { cookie }
-      }
-    );
-    assert.equal(actionsResponse.status, 400);
-    assert.match(await actionsResponse.text(), /Unsafe GitHub branch name/);
+      assert.equal(response.status, 400);
+    }
   } finally {
     await relay.close();
   }
 });
 
-test("relay normalizes GitHub proxy responses before returning them", async () => {
-  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-github-proxy-test-"));
+test("verify binds identity, discards the token, and persists identity-only sessions", async () => {
+  const token = "ghp_RELAY_TOKEN_MUST_NEVER_PERSIST_0123456789";
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-github-verify-test-"));
   const mockPath = join(tempDir, "mock-github-fetch.mjs");
   await writeFile(
     mockPath,
     `
 const nativeFetch = globalThis.fetch;
 globalThis.fetch = async (input, init = {}) => {
-  const url = String(input);
-  if (url.includes("https://api.github.com/repos/") && url.endsWith("/pulls")) {
-    if (url.includes("/repos/maddiedreese/error/pulls")) {
-      return new Response(JSON.stringify({
-        message: "x".repeat(20000),
-        access_token: "should-never-be-relayed"
-      }), { status: 422, headers: { "content-type": "application/json" } });
-    }
-    return new Response(JSON.stringify({
-      id: 123,
-      number: 42,
-      html_url: "https://github.com/maddiedreese/multAIplayer/pull/42",
-      title: "Ship it",
-      body: "should-not-be-relayed",
-      token: "should-not-be-relayed"
-    }), { status: 201, headers: { "content-type": "application/json" } });
-  }
-  if (url.includes("https://api.github.com/repos/") && url.includes("/actions/runs")) {
-    return new Response(JSON.stringify({
-      total_count: 2,
-      workflow_runs: [
-        {
-          id: 456,
-          name: "CI",
-          display_title: "Harden proxy",
-          run_number: 7,
-          workflow_id: 8,
-          status: "completed",
-          conclusion: "success",
-          head_branch: "codex/security-relay-hardening",
-          head_sha: "abc123",
-          event: "push",
-          html_url: "https://github.com/maddiedreese/multAIplayer/actions/runs/456",
-          created_at: "2026-07-05T00:00:00Z",
-          updated_at: "2026-07-05T00:01:00Z",
-          access_token: "should-not-be-relayed"
-        },
-        {
-          id: 789,
-          name: "x".repeat(20000),
-          status: "completed",
-          conclusion: "success",
-          html_url: "https://github.com/maddiedreese/multAIplayer/actions/runs/789",
-          created_at: "2026-07-05T00:00:00Z",
-          updated_at: "2026-07-05T00:01:00Z"
-        }
-      ]
-    }), { status: 200, headers: { "content-type": "application/json" } });
+  if (String(input) === "https://api.github.com/user") {
+    if (init.headers.authorization !== "Bearer ${token}") return Response.json({}, { status: 401 });
+    return Response.json({ id: 42, login: "octocat", name: "Octo Cat", avatar_url: "https://avatars.githubusercontent.com/u/42" });
   }
   return nativeFetch(input, init);
 };
 `,
     "utf8"
   );
-
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
     NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${mockPath}`.trim()
   });
+  let restarted: Awaited<ReturnType<typeof startRelay>> | null = null;
   try {
-    const cookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
-
-    const pullResponse = await fetch(`${relay.baseUrl}/github/pulls`, {
+    const verified = await fetch(`${relay.baseUrl}/auth/github/verify`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({
-        owner: "maddiedreese",
-        repo: "multAIplayer",
-        title: "Ship it",
-        body: "",
-        head: "codex/branch",
-        base: "main",
-        draft: true
-      })
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ access_token: token })
     });
-    assert.equal(pullResponse.status, 201);
-    assert.deepEqual(await pullResponse.json(), {
-      id: 123,
-      number: 42,
-      url: "https://github.com/maddiedreese/multAIplayer/pull/42",
-      title: "Ship it"
-    });
-
-    const errorResponse = await fetch(`${relay.baseUrl}/github/pulls`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({
-        owner: "maddiedreese",
-        repo: "error",
-        title: "Ship it",
-        body: "",
-        head: "codex/branch",
-        base: "main",
-        draft: true
-      })
-    });
-    assert.equal(errorResponse.status, 422);
-    assert.deepEqual(await errorResponse.json(), { error: "GitHub request failed.", code: "upstream_unavailable" });
-
-    const actionsResponse = await fetch(
-      `${relay.baseUrl}/github/actions/runs?owner=maddiedreese&repo=multAIplayer&branch=codex%2Fbranch`,
-      {
-        headers: { cookie }
+    assert.equal(verified.status, 200);
+    assert.deepEqual(await verified.json(), {
+      user: {
+        id: "github:42",
+        login: "octocat",
+        name: "Octo Cat",
+        avatarUrl: "https://avatars.githubusercontent.com/u/42"
       }
-    );
-    assert.equal(actionsResponse.status, 200);
-    assert.deepEqual(await actionsResponse.json(), {
-      totalCount: 2,
-      runs: [
-        {
-          id: 456,
-          name: "CI",
-          displayTitle: "Harden proxy",
-          runNumber: 7,
-          workflowId: 8,
-          status: "completed",
-          conclusion: "success",
-          branch: "codex/security-relay-hardening",
-          headSha: "abc123",
-          event: "push",
-          url: "https://github.com/maddiedreese/multAIplayer/actions/runs/456",
-          createdAt: "2026-07-05T00:00:00Z",
-          updatedAt: "2026-07-05T00:01:00Z"
-        }
-      ]
     });
+    const cookie = verified.headers.get("set-cookie")?.split(";")[0];
+    assert.ok(cookie);
+    const stored = await waitForStoredState(relay.dataPath, (state) => state.authSessions?.length === 1);
+    const serialized = JSON.stringify(stored);
+    assert.equal(serialized.includes(token), false);
+    assert.equal(serialized.includes("accessToken"), false);
+    assert.equal(serialized.includes("encryptedAccessToken"), false);
+    for (const path of [relay.dataPath, `${relay.dataPath}-wal`, `${relay.dataPath}-shm`]) {
+      const bytes = await readFile(path).catch(() => Buffer.alloc(0));
+      assert.equal(bytes.includes(Buffer.from(token)), false, path);
+    }
+    await relay.close({ preserveData: true });
+    restarted = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, undefined, relay.dataPath);
+    const me = await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } });
+    assert.equal(me.status, 200);
+    assert.equal((await me.json()).user.id, "github:42");
   } finally {
-    await relay.close();
+    if (restarted) await restarted.close();
+    else await relay.close();
     await rm(tempDir, { recursive: true, force: true });
   }
 });

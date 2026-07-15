@@ -16,6 +16,7 @@ mod command_error;
 mod command_safety;
 mod diagnostics;
 mod git;
+mod github;
 mod host_sandbox;
 mod invite_link;
 mod local_preview;
@@ -39,6 +40,7 @@ use codex_steering::*;
 use codex_threads::*;
 use diagnostics::*;
 use git::*;
+use github::*;
 use invite_link::*;
 use local_preview::*;
 use mls_native::*;
@@ -62,6 +64,7 @@ pub fn run() {
         .manage(LocalPreviewState::default())
         .manage(CodexRpcState::default())
         .manage(CodexHostState::default())
+        .manage(GitHubState::default())
         .manage(MlsNativeState::default())
         .manage(NativeInviteState::default())
         .setup(|app| {
@@ -102,6 +105,12 @@ pub fn run() {
             git_create_patch,
             git_clone_repository,
             git_apply_patch,
+            github_device_flow_start,
+            github_device_flow_poll,
+            github_device_flow_cancel,
+            github_token_delete,
+            github_create_pull_request,
+            github_list_action_runs,
             git_diff_file,
             project_files,
             project_file_read,

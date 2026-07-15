@@ -7,7 +7,6 @@ import { createRelayAuthSessionManager, createRelayAuthSessionPersistence } from
 import { FileDeletionLedger, S3DeletionLedger } from "./auth/deletion-ledger.js";
 import { reconcileDeletionLedger } from "./auth/deletion-reconciliation.js";
 import {
-  maxAccessTokenChars,
   maxAttachmentBlobIdChars,
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
@@ -70,7 +69,6 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     attachmentBlobMaxBytes,
     jsonBodyLimitBytes,
     mlsMessageMaxBytes,
-    sessionPersistenceSecret,
     allowedCorsOrigins,
     mutationsRequireAuth,
     rateLimitsEnabled,
@@ -124,7 +122,6 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     relayStore;
   const relayAuthz = createRelayAuthz(relayStore);
   const { isTeamMember, canAccessRoom } = relayAuthz;
-  const maxEncryptedAccessTokenChars = Math.ceil((maxAccessTokenChars * 4) / 3) + 1024;
   const relayLimits = createRelayLimits(mlsMessageMaxBytes, {
     maxDisplayNameChars,
     maxDeviceIdChars,
@@ -158,13 +155,10 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
   const { authSessionMaxAgeMs, getAuthSession } = authSessionManager;
   const authSessionPersistence = createRelayAuthSessionPersistence({
     authSessionMaxAgeMs,
-    maxAccessTokenChars,
     maxAuthSessionIdChars,
     maxDisplayNameChars,
-    maxEncryptedAccessTokenChars,
     maxRoomProjectPathChars,
-    maxUserIdChars,
-    sessionPersistenceSecret
+    maxUserIdChars
   });
   const { storedAuthSessions, normalizeStoredAuthSession } = authSessionPersistence;
   const relayStoreCodec = createRelayStoreCodec({

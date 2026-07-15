@@ -22,12 +22,10 @@ test("account deletion removes identity-owned records while preserving shared en
   store.rooms.set("room-live", room("room-live", otherUserId, [userId]));
   store.rooms.set("room-deleted", { ...room("room-deleted", userId, [userId]), deletedAt: "2026-07-02T00:00:00.000Z" });
   store.authSessions.set("session-leaving", {
-    accessToken: "secret",
     user: { id: userId, login: "leaving" },
     expiresAt: Date.now() + 60_000
   });
   store.authSessions.set("session-remaining", {
-    accessToken: "other-secret",
     user: { id: otherUserId, login: "remaining" },
     expiresAt: Date.now() + 60_000
   });
@@ -148,7 +146,6 @@ test("account deletion rollback preserves the session and concurrent unrelated m
     ])
   );
   store.authSessions.set("session-retry", {
-    accessToken: "secret",
     user: { id: userId, login: "retry" },
     expiresAt: Date.now() + 60_000
   });
@@ -160,7 +157,6 @@ test("account deletion rollback preserves the session and concurrent unrelated m
   });
   const firstAttempt = deleteAccountOwnedRelayDataAtomically(store, userId, () => delayedFailure);
   store.authSessions.set("session-concurrent", {
-    accessToken: "other-secret",
     user: { id: "github:concurrent", login: "concurrent" },
     expiresAt: Date.now() + 60_000
   });

@@ -554,7 +554,6 @@ test("relay operational messages use the structured observability sink", () => {
   }
   assert.match(config, /logRelayEvent\("warn", "invalid_storage_backend_ignored"\)/);
   assert.match(config, /logRelayEvent\("warn", "invalid_allowed_origin_ignored"\)/);
-  assert.match(config, /logRelayEvent\("warn", "weak_session_secret_disables_persistence"/);
   assert.match(observability, /service: "multaiplayer-relay"/);
   assert.match(observability, /defaultRelayLogSink/);
 });

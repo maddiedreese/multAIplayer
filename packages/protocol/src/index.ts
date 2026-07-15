@@ -14,9 +14,7 @@ export {
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
-  maxSessionCiphertextNonceChars,
   maxGitHubActionRuns,
-  maxGitHubDeviceCodeChars,
   maxGitWorkflowResults,
   maxHostNameChars,
   maxLongTextChars,
@@ -45,8 +43,6 @@ export type {
   RelayHttpErrorCode as RelayHttpErrorCodeType,
   RelayHttpErrorResponse as RelayHttpErrorResponseType
 } from "./http-errors.js";
-
-export { SessionAccessTokenCiphertext } from "./session-crypto.js";
 
 export {
   BrowserRequestPlaintextPayload,

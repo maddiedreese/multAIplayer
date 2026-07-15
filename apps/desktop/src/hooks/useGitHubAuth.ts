@@ -11,6 +11,7 @@ import {
 } from "../lib/authClient";
 import { useAppStore } from "../store/appStore";
 import { openTrustedAuthenticationUrl } from "../lib/authExternalUrl";
+import { invokeNative } from "../lib/nativeCommandError";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",
@@ -18,7 +19,7 @@ const fallbackAuthConfig: GitHubAuthConfig = {
   scopes: ["read:user"],
   mutationsRequireAuth: false,
   allowedOrigins: [],
-  sessionPersistence: "memory_only"
+  sessionPersistence: "identity_only"
 };
 
 export function useGitHubAuth(relayHttpUrl: string) {
@@ -100,7 +101,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
         setDeviceFlow(null);
         return;
       }
-      pollGitHubDeviceFlow(deviceFlow.device_code)
+      pollGitHubDeviceFlow(deviceFlow.flow_id)
         .then((result) => {
           if (cancelled) return;
           if (result.status === "complete") {
@@ -144,11 +145,12 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [setAuthBusy, setAuthError, setDeviceFlow]);
 
   const cancelGitHubSignIn = useCallback(() => {
+    if (deviceFlow) void invokeNative<void>("github_device_flow_cancel", { flowId: deviceFlow.flow_id });
     setAuthenticationBrowserOpenFailed(false);
     setDeviceFlow(null);
     setAuthBusy(false);
     setAuthError(null);
-  }, [setAuthBusy, setAuthError, setDeviceFlow]);
+  }, [deviceFlow, setAuthBusy, setAuthError, setDeviceFlow]);
 
   const signOutGitHub = useCallback(async () => {
     await logout();

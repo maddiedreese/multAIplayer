@@ -7,7 +7,6 @@ import {
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
-  maxGitHubDeviceCodeChars,
   maxHostNameChars,
   maxMediumTextChars,
   maxPublicKeyFingerprintChars,
@@ -71,12 +70,9 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
   registerRelayRoutes({
     app: options.app,
     store,
-    githubClientId: config.githubClientId,
-    githubOAuthScopes: config.githubOAuthScopes,
     mutationsRequireAuth: config.mutationsRequireAuth,
     deviceAuthRequired: config.mutationsRequireAuth,
     allowedCorsOrigins: config.allowedCorsOrigins,
-    sessionPersistenceSecret: config.sessionPersistenceSecret,
     authSessions: store.authSessions,
     deletionLedger: options.deletionLedger,
     authSessionMaxAgeMs: auth.authSessionMaxAgeMs,
@@ -99,7 +95,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
       }
     },
     normalizeMetadataText,
-    maxGitHubDeviceCodeChars,
     maxUserIdChars,
     maxDisplayNameChars,
     maxRoomProjectPathChars,

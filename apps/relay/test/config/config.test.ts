@@ -27,17 +27,6 @@ test("relay validates PORT with the bounded integer parser", () => {
   }
 });
 
-test("relay defaults to the disclosed public and private GitHub repository scopes", () => {
-  const previous = process.env.GITHUB_OAUTH_SCOPES;
-  try {
-    delete process.env.GITHUB_OAUTH_SCOPES;
-    assert.deepEqual(loadRelayConfig().githubOAuthScopes, ["read:user", "repo"]);
-  } finally {
-    if (previous === undefined) delete process.env.GITHUB_OAUTH_SCOPES;
-    else process.env.GITHUB_OAUTH_SCOPES = previous;
-  }
-});
-
 test("relay only enables metrics with a strong bearer token", () => {
   const previous = process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN;
   try {
@@ -99,14 +88,12 @@ test("relay loads configuration from env files without overriding process env", 
   await writeFile(
     envPath,
     [
-      'GITHUB_OAUTH_SCOPES="read:user repo"',
       "MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://env-file.example/ # normalized",
       "MULTAIPLAYER_RELAY_REQUIRE_AUTH=false"
     ].join("\n"),
     "utf8"
   );
   const relay = await startRelay({
-    GITHUB_OAUTH_SCOPES: "read:user workflow",
     MULTAIPLAYER_RELAY_ENV_FILE: envPath
   });
   try {
@@ -117,7 +104,7 @@ test("relay loads configuration from env files without overriding process env", 
       mutationsRequireAuth: boolean;
       allowedOrigins: string[];
     };
-    assert.deepEqual(body.scopes, ["read:user", "workflow"]);
+    assert.deepEqual(body.scopes, ["read:user", "repo"]);
     assert.equal(body.mutationsRequireAuth, false);
     assert.deepEqual(body.allowedOrigins, ["https://env-file.example"]);
   } finally {

@@ -15,7 +15,7 @@ const githubConfig: GitHubAuthConfig = {
   scopes: ["read:user"],
   mutationsRequireAuth: false,
   allowedOrigins: [],
-  sessionPersistence: "encrypted"
+  sessionPersistence: "identity_only"
 };
 
 const githubUser: SignedInUser = { id: "user_1", login: "person" };

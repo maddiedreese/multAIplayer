@@ -132,8 +132,7 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatSessionPersistence(value: GitHubAuthConfig["sessionPersistence"] | undefined): string {
-  if (value === "encrypted") return "Encrypted at rest";
-  if (value === "memory_only") return "Memory-only";
+  if (value === "identity_only") return "Identity only — no GitHub token";
   return "Unavailable";
 }
 
