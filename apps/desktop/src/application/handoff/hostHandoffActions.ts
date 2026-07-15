@@ -122,6 +122,21 @@ export function createHostHandoffActions(
     return { snapshot, room };
   }
 
+  function freshRoomHostStateMatchesOneOf(expected: ClientRoomRecord[], action: string) {
+    const { room } = freshRoom(expected[0]!.id, action);
+    if (
+      !expected.some(
+        (candidate) =>
+          room.hostStatus === candidate.hostStatus &&
+          room.hostUserId === candidate.hostUserId &&
+          room.activeHostDeviceId === candidate.activeHostDeviceId
+      )
+    ) {
+      throw new Error(`${action} stopped because the room host changed.`);
+    }
+    return room;
+  }
+
   async function publishEncryptedConfig(room: ClientRoomRecord, incrementRevision: boolean) {
     const client = relayRef.current;
     if (!client) throw new Error("Relay is unavailable for the encrypted room configuration snapshot.");
@@ -165,8 +180,12 @@ export function createHostHandoffActions(
       if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroupWithHistorySettings(roomId);
       freshRoomHostState(selectedRoom, "Host claim");
       const room = ensureRoomDefaults(await updateRoomHost(roomId, host, hostUserId, "active", deviceId), selectedRoom);
-      freshRoomHostState(selectedRoom, "Host claim");
+      // The websocket may install the exact HTTP response before this await
+      // resumes. Accept either the reviewed pre-claim tuple or that returned
+      // tuple, but reject every third-party/intermediate authority state.
+      freshRoomHostStateMatchesOneOf([selectedRoom, room], "Host claim");
       replaceRoom(room);
+      freshRoomHostState(room, "Host claim", true);
       await publishEncryptedConfig(room, true);
       freshRoomHostState(room, "Host claim", true);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {

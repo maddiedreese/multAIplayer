@@ -427,9 +427,15 @@ test("offline handoff publication preserves the package without attempting encry
   assert.equal(nativeCommands.includes("mls_encrypt_application"), false);
 });
 
-test("host claim revalidates the room and publishes the encrypted configuration snapshot", async () => {
+test("host claim accepts the exact returned authority installed by websocket before HTTP resumes", async () => {
   const originalFetch = globalThis.fetch;
-  const activeRoom = { ...room, hostStatus: "active" as const, hostUserId: "github:candidate", acceptedMlsEpoch: 2 };
+  const activeRoom = {
+    ...room,
+    hostStatus: "active" as const,
+    hostUserId: "github:candidate",
+    activeHostDeviceId: "device-candidate",
+    acceptedMlsEpoch: 2
+  };
   const claimableRoom = { ...room, acceptedMlsEpoch: 2 };
   let currentRoom: ClientRoomRecord = claimableRoom;
   let publishes = 0;
@@ -439,7 +445,7 @@ test("host claim revalidates the room and publishes the encrypted configuration 
       ? { challenge: "challenge", expiresAt: "2099-01-01T00:00:00.000Z" }
       : url.endsWith("/session")
         ? { deviceSessionToken: "session-token", expiresAt: "2099-01-01T00:00:00.000Z" }
-        : { room: activeRoom };
+        : ((currentRoom = activeRoom), { room: activeRoom });
     return new Response(JSON.stringify(json), { status: 200, headers: { "content-type": "application/json" } });
   };
   try {
@@ -470,6 +476,70 @@ test("host claim revalidates the room and publishes the encrypted configuration 
     assert.equal(currentRoom.hostStatus, "active");
     assert.equal(nativeCommands.includes("mls_encrypt_application"), true);
     assert.equal(publishes, 1);
+  } finally {
+    localStorage.removeItem("multaiplayer:app-config");
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("host claim rejects a third-party websocket authority state before config publication", async () => {
+  const originalFetch = globalThis.fetch;
+  const claimableRoom = { ...room, acceptedMlsEpoch: 2 };
+  const returnedRoom = {
+    ...claimableRoom,
+    hostStatus: "active" as const,
+    hostUserId: "github:candidate",
+    activeHostDeviceId: "device-candidate"
+  };
+  const thirdPartyRoom = {
+    ...claimableRoom,
+    hostStatus: "active" as const,
+    hostUserId: "github:other-host",
+    activeHostDeviceId: "device-other"
+  };
+  let currentRoom: ClientRoomRecord = claimableRoom;
+  let publishes = 0;
+  let hostMessage = "";
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    const json = url.endsWith("/challenge")
+      ? { challenge: "challenge", expiresAt: "2099-01-01T00:00:00.000Z" }
+      : url.endsWith("/session")
+        ? { deviceSessionToken: "session-token", expiresAt: "2099-01-01T00:00:00.000Z" }
+        : ((currentRoom = thirdPartyRoom), { room: returnedRoom });
+    return new Response(JSON.stringify(json), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    localStorage.setItem(
+      "multaiplayer:app-config",
+      JSON.stringify({ relayHttpUrl: "http://127.0.0.1:8787", relayWsUrl: "ws://127.0.0.1:8787" })
+    );
+    await establishDeviceSession(getRelayHttpUrl(), "device-candidate");
+    const input = {
+      ...options(async () => {
+        publishes += 1;
+      }),
+      selectedRoom: claimableRoom,
+      replaceRoom: (next: ClientRoomRecord) => {
+        currentRoom = next;
+      },
+      setHostMessageForRoom: (_roomId: string, message: string | null) => {
+        hostMessage = message ?? "";
+      },
+      getHostHandoffSnapshot: () => ({
+        selectedRoomId: room.id,
+        room: currentRoom,
+        isActiveHost: currentRoom.hostUserId === "github:candidate" && currentRoom.hostStatus === "active",
+        hostHandoffs: []
+      })
+    };
+    const { result } = renderHook(() => useHostHandoffActions(input));
+
+    await act(() => result.current.setRoomHost("active"));
+
+    assert.equal(currentRoom.hostUserId, "github:other-host");
+    assert.equal(publishes, 0);
+    assert.match(hostMessage, /room host changed/);
   } finally {
     localStorage.removeItem("multaiplayer:app-config");
     globalThis.fetch = originalFetch;
