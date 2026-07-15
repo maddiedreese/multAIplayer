@@ -6,19 +6,14 @@ on:
     tags: ["v*"]
   pull_request:
     paths:
-      - "apps/desktop/src-tauri/**"
-      - "apps/desktop/src/application/handoff/**"
-      - "apps/desktop/src/application/mls/**"
-      - "apps/desktop/src/hooks/*HostHandoff*.ts"
-      - "apps/desktop/src/lib/invite/**"
-      - "apps/desktop/src/lib/mls/**"
-      - "apps/desktop/src/lib/onboarding/**"
-      - "apps/desktop/src/store/slices/codexHostHandoffSlice.ts"
-      - "apps/relay/**"
-      - "packages/protocol/**"
-      - "e2e/native-shell/**"
-      - "tools/security/security-journey-evidence.mjs"
+      - "apps/**"
+      - "packages/**"
+      - "e2e/**"
+      - "scripts/run-e2e.mjs"
+      - "tools/security/**"
       - "docs/threat-model.md"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/journeys.yml"
   schedule:
     - cron: "23 7 * * 2"
