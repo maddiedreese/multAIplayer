@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { WebSocket } from "ws";
 import { codexReasoningEffortIds, maxRoomProjectPathChars } from "@multaiplayer/protocol";
+import { createRelayPersistence } from "../../src/persistence.js";
 
 const relayPackageRoot = fileURLToPath(new URL("../..", import.meta.url));
 const mockValidatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
@@ -68,8 +69,7 @@ export async function startRelay(
   storedState?: StoredRelayStateFixture,
   existingDataPath?: string
 ): Promise<RelayHarness> {
-  const { tempDir, dataPath, initialState, storageBackend, initialStatePath } = await prepareRelayStorage(
-    extraEnv,
+  const { tempDir, dataPath, initialState, initialStatePath } = await prepareRelayStorage(
     storedState,
     existingDataPath
   );
@@ -90,10 +90,7 @@ export async function startRelay(
           ? { MULTAIPLAYER_MLS_VALIDATOR_PATH: mockValidatorPath }
           : {}),
         PORT: String(port),
-        // Most legacy persistence fixtures intentionally exercise the explicit
-        // development-only JSON backend. Production/default-backend tests opt
-        // into SQLite or omit this override directly.
-        MULTAIPLAYER_RELAY_STORAGE: storageBackend,
+        MULTAIPLAYER_RELAY_STORAGE: "sqlite",
         MULTAIPLAYER_RELAY_DATA_PATH: dataPath,
         MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH:
           extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH ?? join(tempDir, "external-deletion-ledger"),
@@ -102,9 +99,7 @@ export async function startRelay(
           "relay-test-deletion-ledger-hmac-key-at-least-32-characters",
         MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS:
           extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS ?? "7776000",
-        ...(initialState && storageBackend === "sqlite"
-          ? { MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH: initialStatePath }
-          : {})
+        ...(initialState ? { MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH: initialStatePath } : {})
       },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -132,27 +127,21 @@ export async function startRelay(
   throw lastError;
 }
 
-async function prepareRelayStorage(
-  extraEnv: NodeJS.ProcessEnv,
-  storedState?: StoredRelayStateFixture,
-  existingDataPath?: string
-) {
+async function prepareRelayStorage(storedState?: StoredRelayStateFixture, existingDataPath?: string) {
   const tempDir = existingDataPath
     ? resolve(existingDataPath, "..")
     : await mkdtemp(join(tmpdir(), "multaiplayer-relay-test-"));
-  const dataPath = existingDataPath ?? join(tempDir, "relay-store.json");
+  const dataPath = existingDataPath ?? join(tempDir, "relay-store.sqlite");
   const dataAlreadyExists = await access(dataPath).then(
     () => true,
     () => false
   );
   const initialState = storedState ?? (dataAlreadyExists ? undefined : defaultWorkspaceFixture());
-  const storageBackend = extraEnv.MULTAIPLAYER_RELAY_STORAGE ?? "json";
   const initialStatePath = join(tempDir, "initial-relay-state.json");
   if (initialState) {
-    const targetPath = storageBackend === "sqlite" ? initialStatePath : dataPath;
-    await writeFile(targetPath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
+    await writeFile(initialStatePath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
   }
-  return { tempDir, dataPath, initialState, storageBackend, initialStatePath };
+  return { tempDir, dataPath, initialState, initialStatePath };
 }
 
 function createRelayHarness(
@@ -367,11 +356,14 @@ export async function waitForStoredState(
 ): Promise<StoredRelayStateFixture> {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 30; attempt += 1) {
+    const persistence = createRelayPersistence({ dataPath });
     try {
-      const state = JSON.parse(await readFile(dataPath, "utf8")) as StoredRelayStateFixture;
+      const state = (await persistence.load()) as StoredRelayStateFixture;
       if (predicate(state)) return state;
     } catch (error) {
       lastError = error;
+    } finally {
+      persistence.close();
     }
     await delay(50);
   }

@@ -65,11 +65,11 @@ Components render state and dispatch actions, while protocol, crypto, transport,
 Run:
 
 ```bash
-npm run test:scripts
+npm run test -w @multaiplayer/protocol
 npm run test -w @multaiplayer/desktop
 ```
 
-Explain the progression from focused workspace tests to the single `npm run verify` pull-request gate. Point to `docs/engineering-practices.md#continuous-integration-policy` for which GitHub jobs block merges and which scheduled security jobs should be investigated separately.
+Explain the progression from focused workspace tests to the single `npm run verify` pull-request gate. Point to `docs/external-review-packet.md#continuous-integration-policy` for which GitHub jobs block merges and which scheduled security jobs should be investigated separately.
 
 ### 18:00 — First contribution
 
@@ -205,7 +205,7 @@ Codex approval distinguishes inline attachment content from encrypted blob refer
 
 Composer text and attachment drafts are scoped per room. If a user switches rooms, unfinished message text stays with its original room. If a large encrypted attachment blob finishes uploading after a switch, the finished attachment remains queued only for the room where the upload began.
 
-Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Runtime state and newly encrypted local history store only the normalized thread graph and active selection. An old flat thread id is accepted solely by a one-way history migration and is never written back; its removal condition is tracked in the [compatibility inventory](engineering-practices.md#compatibility-inventory).
+Room goals use Codex thread Goal mode. After a room has an approved Codex thread, `/goal <objective>` calls Codex app-server's thread goal API. Pause, resume, edit, and clear controls update the active thread's goal. Runtime state and newly encrypted local history store only the normalized thread graph and active selection. An old flat thread id is accepted solely by a one-way history migration and is never written back; its removal condition is tracked in the [compatibility inventory](external-review-packet.md#compatibility-inventory).
 
 Project file previews and encrypted attachment blob opens are also tied to the originating room. If a room switch happens while a file read or blob decrypt is in flight, the completed read is ignored rather than rendered into the newly selected room's inspector. Attachment previews are blocked while a room is locally locked after forget or relay membership revocation.
 
@@ -605,7 +605,7 @@ Responsibilities:
 - self-host configuration;
 - abuse/rate protections.
 
-The relay keeps its composition and domain boundaries explicit. `relay-app.ts` wires configuration, lifecycle, route, WebSocket, and persistence adapters; HTTP room creation/settings/host/lifecycle handlers live in separate route modules; WebSocket admission, validation, and dispatch are independent; and persistence exposes a small facade over JSON compatibility and SQLite schema/entity/MLS repositories. HTTP failures carry a stable protocol error code in addition to bounded prose. Authenticated `/metrics` output uses Prometheus counters plus fixed-bucket publish/fanout, WebSocket-send, and SQLite-write latency histograms.
+The relay keeps its composition and domain boundaries explicit. `relay-app.ts` wires configuration, lifecycle, route, WebSocket, and persistence adapters; HTTP room creation/settings/host/lifecycle handlers live in separate route modules; WebSocket admission, validation, and dispatch are independent; and persistence exposes a small facade over SQLite schema/entity/MLS repositories plus a one-time legacy JSON importer. HTTP failures carry a stable protocol error code in addition to bounded prose. Authenticated `/metrics` output uses Prometheus counters plus fixed-bucket publish/fanout, WebSocket-send, and SQLite-write latency histograms.
 
 Non-responsibilities:
 

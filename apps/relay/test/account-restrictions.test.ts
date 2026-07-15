@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -160,39 +160,35 @@ test("restricting an account durably evicts every live identity surface", async 
 
 test("offline restriction CLI survives restart, denies a stored session, and can unrestrict", async () => {
   const dir = await mkdtemp(join(tmpdir(), "multaiplayer-restriction-test-"));
-  const dataPath = join(dir, "relay.json");
+  const dataPath = join(dir, "relay.sqlite");
   const rawSessionId = "blocked-session-token";
   const expiresAt = Date.now() + 60_000;
-  await writeFile(
-    dataPath,
-    JSON.stringify({
-      version: 1,
-      savedAt: new Date().toISOString(),
-      teams: [],
-      rooms: [],
-      invites: [],
-      teamMembers: [],
-      mlsBacklog: [],
-      authSessions: [
-        {
-          sessionIdHash: createHash("sha256").update(rawSessionId).digest("hex"),
-          user: { id: "github:blocked", login: "blocked" },
-          expiresAt
-        }
-      ]
-    }),
-    "utf8"
-  );
+  const initial = createRelayPersistence({ dataPath });
+  await initial.save({
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [],
+    rooms: [],
+    invites: [],
+    teamMembers: [],
+    mlsBacklog: [],
+    authSessions: [
+      {
+        sessionIdHash: createHash("sha256").update(rawSessionId).digest("hex"),
+        user: { id: "github:blocked", login: "blocked" },
+        expiresAt
+      }
+    ]
+  });
+  initial.close();
   try {
     await runRestrictionCli("restrict", "github:blocked", "abuse", dataPath);
-    const restricted = JSON.parse(await readFile(dataPath, "utf8")) as { accountRestrictions?: unknown[] };
+    let reopened = createRelayPersistence({ dataPath });
+    const restricted = (await reopened.load()) as { accountRestrictions?: unknown[] };
     assert.equal(restricted.accountRestrictions?.length, 1);
+    reopened.close();
 
-    const relay = await startRelay(
-      { MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true", MULTAIPLAYER_RELAY_STORAGE: "json" },
-      undefined,
-      dataPath
-    );
+    const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, undefined, dataPath);
     try {
       const response = await fetch(`${relay.baseUrl}/auth/me`, {
         headers: { cookie: `multaiplayer_session=${rawSessionId}` }
@@ -202,12 +198,16 @@ test("offline restriction CLI survives restart, denies a stored session, and can
     } finally {
       await relay.close({ preserveData: true });
     }
-    const afterRestart = JSON.parse(await readFile(dataPath, "utf8")) as { authSessions?: unknown[] };
+    reopened = createRelayPersistence({ dataPath });
+    const afterRestart = (await reopened.load()) as { authSessions?: unknown[] };
     assert.deepEqual(afterRestart.authSessions, []);
+    reopened.close();
 
     await runRestrictionCli("unrestrict", "github:blocked", "operator_restriction", dataPath);
-    const unrestricted = JSON.parse(await readFile(dataPath, "utf8")) as { accountRestrictions?: unknown[] };
+    reopened = createRelayPersistence({ dataPath });
+    const unrestricted = (await reopened.load()) as { accountRestrictions?: unknown[] };
     assert.deepEqual(unrestricted.accountRestrictions, []);
+    reopened.close();
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -231,41 +231,7 @@ test("expired restrictions no longer deny an identity", () => {
   );
 });
 
-test("offline restriction CLI updates normalized SQLite state", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "multaiplayer-restriction-sqlite-test-"));
-  const dataPath = join(dir, "relay.sqlite");
-  const persistence = createRelayPersistence({ backend: "sqlite", dataPath });
-  try {
-    await persistence.save({
-      version: 1,
-      savedAt: new Date().toISOString(),
-      teams: [],
-      rooms: [],
-      invites: [],
-      mlsBacklog: []
-    });
-    persistence.close();
-    await runRestrictionCli("restrict", "github:sqlite", "abuse", dataPath, "sqlite");
-    const reopened = createRelayPersistence({ backend: "sqlite", dataPath });
-    const loaded = (await reopened.load()) as { accountRestrictions?: Array<{ userId: string }> };
-    assert.deepEqual(
-      loaded.accountRestrictions?.map((item) => item.userId),
-      ["github:sqlite"]
-    );
-    reopened.close();
-  } finally {
-    persistence.close();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-async function runRestrictionCli(
-  action: string,
-  userId: string,
-  reasonCode: string,
-  dataPath: string,
-  storage = "json"
-) {
+async function runRestrictionCli(action: string, userId: string, reasonCode: string, dataPath: string) {
   return execFileAsync(
     process.execPath,
     [
@@ -276,7 +242,6 @@ async function runRestrictionCli(
       userId,
       reasonCode,
       `--data-path=${dataPath}`,
-      `--storage=${storage}`,
       "--confirm-relay-stopped"
     ],
     { cwd: process.cwd() }

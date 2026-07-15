@@ -3,7 +3,7 @@ interface LocalUser {
   name: string;
 }
 
-export function useRoomSettingsActor(localUser: LocalUser) {
+export function createRoomSettingsActor(localUser: LocalUser) {
   return function roomSettingsActor() {
     return {
       requesterName: localUser.name,

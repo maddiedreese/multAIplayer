@@ -1,12 +1,20 @@
-# multAIplayer MLS protocol v2: external review
+# External security review and engineering guide
 
 Packet revision: 2026-07-15.
+
+This is the canonical reviewer and maintainer guide. The [threat model](threat-model.md) is the canonical statement of security claims and residual risks; this guide maps those claims to review scope, executable evidence, and engineering operations without creating a second source of truth.
+
+- [External review packet](#external-review-packet)
+- [Security journey evidence](#security-journey-evidence)
+- [Engineering practices and operations](#engineering-practices-and-operations)
+
+## External review packet
 
 Thank you for reviewing multAIplayer. Record the exact commit or tag you reviewed in every finding; this living packet deliberately does not embed a self-referential commit hash. Use the private reporting path in `SECURITY.md` for potentially exploitable issues.
 
 The official single-instance alpha relay is live on Railway at `relay.multaiplayer.com`. The single-node topology is deliberate: one process owns presence/fanout and one writer owns SQLite, behind a mandatory trusted edge; horizontal availability is not claimed. It uses GitHub Device Flow with `read:user repo`, intentionally supporting both public and private repositories the signed-in user can access. No supported public desktop build has been published yet; Developer ID signing, notarization, bundled-architecture checks, and signed universal-link dispatch remain release gates rather than claims established by the live relay.
 
-## Review scope
+### Review scope
 
 Protocol v2 replaces the custom group-key and message-protection construction with RFC 9420 MLS through `mls-rs`; multAIplayer's integration layer is unaudited. Full encrypted rooms are native-only: MLS state, signature keys, HPKE keys, exporter output, and history secrets remain in Rust/Tauri and never cross webview IPC.
 
@@ -24,7 +32,7 @@ The application still owns security-sensitive policy and integration code. The m
 10. Do both untrusted parsing chokepoints reject malformed transport documents without bypassing the exact production validation path?
 11. Does macOS command confinement match the documented boundary: writes limited to the canonical workspace, incoming Git patches bound to a canonical working directory inside the locally approved project root, bounded system/toolchain reads, and process/network access still allowed after exact native approval?
 
-## Locked protocol choices
+### Locked protocol choices
 
 - MLS implementation: `mls-rs`; multAIplayer's integration layer is unaudited.
 - Only ciphersuite `0x0002`, `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`; no negotiation or downgrade fallback.
@@ -35,7 +43,7 @@ The application still owns security-sensitive policy and integration code. The m
 - Attachment blobs remain outside MLS messages and are sealed with keys derived using exporter label `multaiplayer blob v1` and the blob id as context.
 - Protocol v2 has no legacy room-wire reader. Invite authenticator v3 rejects pre-v3 links and pending responses.
 
-## Roles, trust, and visible metadata
+### Roles, trust, and visible metadata
 
 - The active host controls membership and Commit production. A compromised host can admit members and disclose content while authoritative.
 - Member devices hold native MLS state and can decrypt epochs in which they participate.
@@ -55,7 +63,7 @@ The operator can durably restrict a GitHub identity through a stopped-relay CLI,
 
 Approved room commands and interactive terminals cross two separate native boundaries. First, the operating-system dialog binds authority to the exact room, canonical workspace, command or visibly escaped terminal input, and execution kind. Second, macOS launches the approved shell through `sandbox-exec`: filesystem writes are allowed only below the canonical workspace, while reads are allowed from the workspace and named system/toolchain paths; process creation, inherited environment, and network access remain available. This is tested filesystem confinement, not complete host isolation or a claim that approved workspace code is safe.
 
-## Message and membership flows
+### Message and membership flows
 
 Application events are validated against bounded plaintext schemas, passed to Rust, and encoded as MLS PrivateMessages. Allowlist projections, including `codex.activity`, determine what enters a room message. Reasoning summaries are projected by default. Provider-supplied raw reasoning is eligible only when the active host enables an off-by-default per-room sharing setting; provider, model, and app-server support is not guaranteed. If present, it is bounded, encrypted to the room, visible to room members, and retained under their local-history policies. Disabling the setting cannot retract records already delivered. The relay receives an opaque MLS blob plus bounded routing metadata and does not inspect the application event kind.
 
@@ -69,7 +77,7 @@ The official link is only a delivery mechanism for that same request. It neither
 
 Removal first revokes relay reads and sockets, then the host produces an MLS Remove Commit. Host handoff is an authenticated authority transfer coupled to a Commit; after it lands, both relay and clients accept Commits only from the new active-host leaf.
 
-## First-run state and safety boundary
+### First-run state and safety boundary
 
 Onboarding resume state is a versioned local webview record, not encrypted room history or membership evidence. Its decoder allowlists create/join intent, assistant surface and presentation state, completion/dismissal flags, bounded team/room ids, and boolean milestones. It deliberately excludes workspace and room names, absolute project paths, invite links/fragments/capabilities, OAuth and device-login ids/URLs/codes, raw errors, starter prompts, raw reasoning, and project or room content. Invalid, inconsistent, or unsupported records are removed and reset; a compromised webview can still modify the coarse record, so no authorization decision trusts it.
 
@@ -77,7 +85,7 @@ Readiness is intent-specific. Creating a workspace retains host readiness, inclu
 
 The safety screen presents the actual conservative initial room settings: ask before every Codex turn, workspace-write sandboxing, raw-reasoning sharing off, restricted/allowlisted browser access, and the encrypted local-history retention summary. Starter choices populate the real composer for review and do not send or approve automatically. Onboarding adds no tutorial telemetry and does not create a separate path for secrets, raw reasoning, or project content; ordinary bounded diagnostics retain their separately documented policy.
 
-## HTTPS invitation and external-auth boundary
+### HTTPS invitation and external-auth boundary
 
 The canonical invitation is:
 
@@ -91,7 +99,7 @@ The native parser independently requires HTTPS, an exact official host and `/inv
 
 External authentication also has a two-layer launch boundary. TypeScript validates provider-specific HTTPS destinations before invoking native code, and Rust repeats the policy before opening the operating system's default browser. GitHub is restricted to its device-verification endpoint; OpenAI/Codex login is restricted to the approved OpenAI and ChatGPT authentication hosts. Invalid destinations never reach the opener, and browser-launch failure presents a copy-link fallback. Native Rust owns GitHub device-code polling and Keychain token custody; the local Codex app-server owns ChatGPT login state. Neither token belongs in onboarding persistence.
 
-## Invite authenticator v3
+### Invite authenticator v3
 
 The invite URL carries an independent random 256-bit capability and the issuer persists only:
 
@@ -127,7 +135,7 @@ response_mac = HMAC-SHA-256(Kresponse,
 
 Phase-specific APIs reject the other phase before authentication. This uses independent key and input labels in addition to the encoded phase. There is no compatibility interpretation for v2 JSON/field-order-dependent authenticators; pre-v3 links and pending responses fail closed.
 
-## Persistence, rollback, and crash safety
+### Persistence, rollback, and crash safety
 
 MLS state, exact outbox records, exporter-derived history secrets, per-blob keys, pending requester records, admission receipts, and the latest validated member-only room configuration are stored in SQLCipher. Its wrapping key is held in the operating-system credential store. The room-config record contains the project path, Codex model/tuning values, revision, and emitting epoch. Rust validates it and saves it before producing the corresponding MLS application message, allowing post-Add/reconnect retry without returning to relay metadata; the relay receives only the opaque PrivateMessage. Before the requester publishes an invite request, the native boundary durably records the bearer capability, original MAC binding, KeyPackage id, and exact relay-visible sealed request. Startup IPC exposes routing metadata and that already-relay-visible request envelope, including its public binding; the bearer capability remains native-only. A restarted requester therefore republishes byte-identical request material, and native response acceptance reloads the capability and authoritative original binding internally rather than accepting either from the webview. A Rust serialization vector pins the relay-visible envelope's canonical field order, and a relay parser contract test accepts that order while rejecting reordered input. Successful relay admission clears the pending requester record before retiring the durable join-admission receipt, so a crash between those operations remains recoverable. A state mutation and every resulting outbound record commit before any Commit, Welcome, or application message is sent. Corrupt database, WAL, and SHM files are quarantined together and require an explicit clean rejoin; rejoining does not restore older history secrets. **Clear history** removes retained history but keeps the current config record; **Forget on this device** removes both.
 
@@ -137,7 +145,7 @@ The relay independently uses SQLite compare-and-swap state to accept exactly one
 
 Authenticated daily team/room creation and attachment upload-window counters are durable under the relay's single SQLite writer. The protected record and quota reservation persist together and roll back together on failure. Live attachment volume, KeyPackages across all devices, and unexpired invites across all rooms are capped per account by deriving usage from persisted records, avoiding a divergent second counter. The process-local fixed-window limiter remains defense in depth rather than a durable quota. Scheduled/manual deterministic chaos evidence adds 32-client reconnect storms, ongoing publish traffic, alternating graceful/forced restarts, a live SQLite backup, and fenced restore validation. It checks integrity, unique message ids, the accepted MLS epoch, newest retained traffic, zero leaked sockets, and bounded operational metrics while reporting p95/p99 latencies and WAL growth; it does not claim horizontal failover.
 
-## Error and diagnostics boundary
+### Error and diagnostics boundary
 
 `EngineError` keeps stable public state errors plus structured operation failures. A failure records:
 
@@ -147,7 +155,7 @@ Authenticated daily team/room creation and attachment upload-window counters are
 
 Its `Display` implementation exposes only the category and operation, never the stored cause. A rejoin-required failure retains bounded storage operation/cause detail natively. All fallible Tauri commands serialize `CommandError` as `{ code, message }`. Rust and TypeScript share the complete code vocabulary: `crypto_error`, `internal_error`, `invalid_argument`, `not_found`, `process_error`, `requires_rejoin`, `storage_error`, `unauthorized`, and `unavailable`. Native command paths now emit each category at a concrete boundary, including MLS cryptography/state, project storage and validation, OS process launch, authorization, diagnostics, invitation intake, and Codex steering. The frontend's single `invokeNative` adapter validates that shape, preserves readable legacy string failures, and maps malformed values to `internal_error`. Codes are assigned at the Rust command boundary and are never inferred from prose. A repository gate rejects any fallible `#[tauri::command]` that returns `Result` directly and verifies exact Rust/TypeScript code parity. Reviewers should check both sides: failures must not collapse internally, dependency/storage detail must not cross IPC, and copy changes must not affect recovery.
 
-## Deployment boundary worth reviewing
+### Deployment boundary worth reviewing
 
 The relay origin allowlist enforces browser CORS and browser-origin WebSocket policy. Requests or upgrades with no `Origin` header are allowed for native and server-side clients; an explicitly empty header is rejected rather than treated as omitted. An unset, empty, or all-invalid allowlist remains permissive for browser origins only in development and denies browser HTTP and WebSocket origins in production. The production doctor rejects that empty deployment configuration. The allowlist is not client authentication: device sessions, membership authorization, and TLS remain necessary.
 
@@ -161,7 +169,7 @@ The relay has no independent user-profile table: its account-like record is the 
 
 Before listening, every startup lists and authenticates every tombstone, including expired records, hashes every identity present in primary state, and reapplies matching deletion regardless of SQLite's applied-marker state. When identity rows still match, reconciliation writes a fresh protection record before committing cleanup. Only after that primary cleanup persists does it purge expired external objects and remove stale primary pseudonymous markers whose objects are confirmed gone. This ordering defends both partial/manual restores that retain a marker while resurrecting other identity rows and delayed cleanup that outlives the original protection horizon. A protected identity cannot sign in again until the newest 90-day horizon covering the 89-day maximum backup window has elapsed. Restore operations have an explicit no-listener reconciliation command and fail closed if an older snapshot resurrects ownership/host blockers. Tests cover authenticated/idempotent/tamper-detecting tombstones, path and Railway virtual-host signing shape, post-horizon resurrection and protection renewal, expiry cleanup, marker cleanup, resurrection with a surviving marker, ownership blockers, normal deletion, primary-persist failure with immediate denial, concurrent rollback isolation, and retained shared records. Local encrypted state, GitHub's OAuth grant, collaborator copies, and shared records remain separate deletion boundaries.
 
-## Dependency and source-review policy
+### Dependency and source-review policy
 
 Direct dependencies are lockfile-pinned. Independent npm and Rust advisory workflows run every Monday and on releases; repository-level Dependabot security updates are the immediate remediation path, while monthly Dependabot version batches remain routine maintenance. Deprecated-package install warnings such as development-only `glob`/`inflight` transitives are not treated as vulnerability findings or hidden with overrides; actionable lockfile findings remain governed by `npm audit`, Dependabot, and the relay-image Trivy scan. CI audits both the application/release Cargo lockfile and the independent MLS fuzz-target lockfile with RustSec and `cargo-deny`. The structured `.github/rust-advisory-policy.json` ledger records owner, review date, exact RustSec ids and packages, dependency path, platform scope, reachability, and disposition; maintainers review it alongside `deny.toml` when an advisory is added or changed.
 
@@ -169,11 +177,11 @@ The current ledger keeps the `glib 0.18.5` `VariantStrIter` soundness advisory v
 
 The former roughly 900-line native GitHub, Codex, MLS-command, MLS-engine, and MLS-storage files are split into cohesive domain modules. Production TypeScript/JavaScript uses the default ESLint complexity ceiling of 20. Neither measure is correctness evidence; the repository deliberately avoids a physical-line ratchet.
 
-The maintained [compatibility inventory](engineering-practices.md#compatibility-inventory) separates reject-only old-input diagnostics from compatibility readers and records an explicit removal condition for every retained runtime class. This revision removes the unused browser auto-approval helper and the duplicate Codex runtime thread id. Encrypted history accepts that former flat thread id only through a one-way normalization to `codexThreadGraph`; runtime and persistence never write the mirror back. Codex's volatile supported range remains sourced from `contracts/codex-app-server/support-policy.json`, and the package contract test checks that the policy remains bounded by the checked-in transport fixtures.
+The maintained [compatibility inventory](#compatibility-inventory) separates reject-only old-input diagnostics from compatibility readers and records an explicit removal condition for every retained runtime class. This revision removes the unused browser auto-approval helper and the duplicate Codex runtime thread id. Encrypted history accepts that former flat thread id only through a one-way normalization to `codexThreadGraph`; runtime and persistence never write the mirror back. Codex's volatile supported range remains sourced from `contracts/codex-app-server/support-policy.json`, and the package contract test checks that the policy remains bounded by the checked-in transport fixtures.
 
 Weekly/manual CI keeps one mutation target: relay authorization. It runs beside seeded relay parser fuzzing and the restart/backup chaos soak, while native untrusted-input fuzzing remains a separate scheduled lane. The narrower mutation scope favors the highest-value authorization signal without making four expensive mutation suites routine CI ceremony.
 
-## Untrusted parser boundaries and validator process model
+### Untrusted parser boundaries and validator process model
 
 The Rust validator CLI reads at most 384 KiB and calls the same exported `validate_key_package_document(&[u8])` function as its cargo-fuzz target. That function parses strict JSON with unknown fields denied, enforces the bounded base64 upload, reaches the real RFC 9420 `MlsMessage::from_bytes` and KeyPackage validation path, pins the ciphersuite, and binds the embedded credential to the authenticated uploader. A second cargo-fuzz target feeds arbitrary app-server method/value input through the exact production Codex activity projector in a lightweight workspace crate. Scheduled/manual runs restore and grow both lockfile-keyed corpora; relay fast-check fuzzing separately covers the strict HPKE-directed invite-request parser with canonical, reordered, truncated, extra-key, and bit-flipped cases.
 
@@ -181,17 +189,17 @@ The relay's seeded fast-check target calls `parseRelayClientMessage`, the real W
 
 KeyPackage validation intentionally remains one child process per upload. KeyPackage upload is low-frequency admission traffic, so current evidence does not justify a long-lived framed validator process. Functional tests cover the bounded child-process contract and fail-closed timeout, output, and validation behavior; the project does not treat shared-runner microbenchmarks as a release invariant.
 
-The relay uses SQLite as the only hosted backend. Its JSON snapshot backend is retained only for local development/test compatibility, and SQLite's importer handles legacy snapshot migration.
+The relay uses SQLite as its only runtime persistence backend. A one-time importer migrates an existing legacy JSON snapshot, marks it as migrated, and leaves all subsequent reads and writes on SQLite.
 
 Incoming handoff patches remain staged until explicit review. A receiver reuses its already-approved room project only when that path's parsed GitHub remote matches the handoff repository; otherwise, it must explicitly select a matching clone or a clone destination. The sender-provided project path is never treated as local filesystem authority. Native `git_apply_patch` canonicalizes the approved project root and requested working directory, rejects outside and symlink escapes, and runs Git against the validated canonical directory. Focused Rust tests cover nested roots, outside roots, and symlink aliases.
 
-## Honest non-goals
+### Honest non-goals
 
 The protocol does not claim endpoint-compromise protection, retroactive deletion, anonymous metadata, availability against a malicious relay, browser MLS security, history forward secrecy for retained local history, or independent professional audit. Live MLS traffic receives RFC 9420 forward-secrecy and post-compromise mechanisms subject to the single active-host authority policy.
 
 Automated AASA, entitlement, parser, and handler tests do not claim that macOS Launch Services dispatches the live universal link into a signed installed application. Cold-start and warm-app routing, association-cache behavior, and the alternate-host post-install retry remain manual signed-release evidence. Automated authentication tests validate presentation, URL policy, and native opener boundaries; they do not complete live GitHub or OpenAI authorization.
 
-## Verification evidence
+### Verification evidence
 
 - Native tests cover suite pinning, Welcome targeting, v3 capability encoding and domain separation, HPKE context binding, removal, handoff, history across epochs, staging-guard cleanup, categorized failures, and transactional recovery. A generated model runs shrinkable random add/remove/handoff/rejoin sequences and checks after every transition that all non-hosts fail every host-only Commit constructor and removed or retired engines cannot decrypt the current epoch.
 - Adversarial native cases reject every truncated prefix of a valid Commit, reject out-of-order and replayed Commits, and then prove that rejected input did not poison correctly ordered progress. The selected P-256/HKDF-SHA-256/AES-128-GCM HPKE suite is checked against the published RFC 9180 Appendix A.3 encapsulation and ciphertext bytes and opened through the public wrapper.
@@ -201,6 +209,7 @@ Automated AASA, entitlement, parser, and handler tests do not claim that macOS L
 - A dependency-free bounded host-handoff exploration enumerates offer creation, concurrent candidate requests, transfer Commit, outgoing-process crash, optional accepted-event loss, reconnect recovery, incoming-patch approval, and old-host action interleavings. Candidate-requested, transfer-committed, and patch-applied records run through the production store's pure reducer, while candidate selection and Commit correlation exercise their production helpers directly. The authority/crash/delivery scheduler remains an abstract finite model; this is state-machine evidence for the authority protocol, not a TLA+/stateright proof, React/relay wiring execution, or timing proof for an unbounded network.
 - The Linux native-shell job controls two isolated real Tauri applications through WebKitWebDriver. Both clean profiles present focused Welcome. The host selects create, verifies relay/GitHub readiness, advances past the unavailable third-party ChatGPT prerequisite through an explicit in-app test transition, submits the production workspace/room form with a directly entered project path, accepts safe defaults, and enters the real room. The guest selects join, proves local Codex is nonblocking, continues, and submits the official HTTPS invitation through the production onboarding form. Its UI-driven flow then follows the production Tauri commands, native MLS/HPKE, credential-store, real validator, relay, SQLite, and WebSocket paths for a real protected request transitioning into blocking device-verification guidance, host denial with the guest MLS group still absent, expired-capability rejection before KeyPackage publication, crash/restart admission recovery, message exchange, host handoff, relay authority update, and successor traffic. The verification assertion checks that the active host must approve the device. In the recovery case, the requesting Tauri process is killed after its native SQLCipher transaction has persisted the exact request but before host approval. It restarts with the same profile, Secret Service store, user, and device, reloads only relay-visible replay material and routing metadata into the webview, and republishes the byte-identical sealed request while the bearer capability remains native-only. While it is offline, the host approves. A loopback proxy observes the real Welcome request after Commit acknowledgement, restarts the real relay over the same SQLite store, verifies the accepted epoch survived, and releases the original request; it does not synthesize relay, MLS, or persistence behavior. Relay device sessions are intentionally process-local, so the host must sign a fresh challenge after restart; concurrent HTTP and WebSocket recovery is coalesced, and only explicit missing-session errors trigger a single retry. The approval retry validates the persisted Welcome, response capability, KeyPackage binding, epoch, and optional still-pending Commit before reuse, so recovery cannot create a second membership Commit or accept unrelated durable state. The replacement relay then stores the Welcome, and the restarted guest must recover it, restore the exact device-bound native roster, and decrypt the next message. This is Commit/epoch and device-authentication recovery across relay restart followed by Welcome durability across guest restart; the Welcome was not stored before the relay restart. Diagnostic assertions inside the guest shell call the production MLS/workspace client modules directly to distinguish an absent native group and to send a one-bit-tampered native KeyPackage through relay schema/hash checks to the executable validator; those two assertions are real native/relay integration evidence, not React interaction claims. Its intentional substitutions are relay debug authentication in place of GitHub OAuth, the ChatGPT-readiness transition, and direct path entry in place of the platform folder picker. The expiry case uses a second test control, available only when debug endpoints are explicitly enabled and the request is loopback: it backdates the real stored invite, after which the ordinary production lookup, pruning, UI error, unchanged KeyPackage count, and absent native group are asserted. The fixture identities are authenticated by the debug substitute, but the guest is not pre-enrolled in the newly created onboarding team; successful invite admission adds the exact GitHub identity and device through the production path. CI retains a structured per-stage duration artifact for normally completed invocations and publishes the timing table in the job summary; a missing artifact on cancellation or hard timeout is itself visible. Shared-runner duration and the current stage sequence are operational evidence, not checked-in source contracts.
 - Direct `tauri-driver` 2.0.6 automation remains limited to Linux WebKitWebDriver and Windows EdgeDriver; its direct macOS backend is still unimplemented. The macOS package job now separately builds a test-only application with the pinned WebdriverIO Tauri service's embedded driver, launches the packaged application in a real WKWebView, finds and clicks the visible Profile control, observes the Account surface, and invokes the production `app_version` Tauri command through the real JavaScript-to-native IPC bridge. The driver plugins are exact-pinned and feature- and environment-gated, and the release workflow does not register them. This is boot, visible-control, and real IPC-handshake evidence on macOS, not a full input-level two-client journey.
+- A scheduled/manual macOS job starts two independent native `mls-core` clients against the real relay, validator, and SQLite path. It covers platform-native process composition, application decryption, host handoff, former-host rejection, and successor traffic on a macOS runner. It still stops below two Tauri windows, live Keychain-backed admission, and input-level onboarding, so those remain release-review boundaries.
 - Linux WebKitGTK and macOS WKWebView are different ports of the WebKit engine family, so the Linux journey's frontend layout and UI-contract evidence transfers more directly to macOS than evidence from a Chromium fallback would. Four platform boundaries do not transfer: the IPC bridge implementation (`WKScriptMessageHandler` on macOS versus the GTK port's mechanism), credential storage (macOS Keychain versus Secret Service), window and process lifecycle, and behavioral effects of code signing and entitlements on spawned validator and relay processes. The macOS native-core/relay composition, native checks, smoke, and packaging provide separately scoped evidence for process spawning, the child stdio protocol, validator invocation, relay networking, and bundle assembly; they do not turn the Linux two-shell journey into a macOS two-shell claim.
 - The relay parser target runs 100,000 seeded structure-aware and raw-transport cases through the real connection parser in weekly/manual CI; the implementation run completed all four properties without a finding.
 - Isolated Playwright UI-contract scenarios render production invite, onboarding, chat, handoff, room-header, model-settings, and Codex-approval components. They cover invite approval and denial; two-party handoff and exclusive control transfer; active-host-only Codex execution; bounded approval previews; shared human/Codex code rendering; a validated generated raster attachment; expandable reasoning, raw-reasoning, edit, tool, and subagent activity; and the off-by-default raw-reasoning room-sharing control and warning. The six-case onboarding scenario covers equal keyboard-accessible create/join entry, persisted Explore/checklist state and Help recovery/reset, direct readiness repair, partial-create retry and the safe-default screen, blocking join verification without optimistic unlock, and starter-prompt draft insertion without sending. The invite codec/parser and Codex context builders are real; each page discloses that relay delivery, authentication, native Codex/account/folder operations, native MLS, persistence, image blob upload, and native Codex execution are simulated where applicable. These are UI-composition tests, not native projector, authorization, storage, or cryptographic evidence.
@@ -215,11 +224,11 @@ These tests are implementation evidence, not a cryptographic proof or audit.
 
 The process journey requires Cargo to build its validator and native MLS fixture. A local machine without Cargo receives the explicit successful skip `skipped: Rust toolchain required` instead of a subprocess `ENOENT`; the CI job installs pinned Rust first and rejects its JUnit evidence unless both named Rust-backed journeys executed with no skipped testcase.
 
-The `Real two-client native MLS journey` required-check name is stable. It always executes on `main`, scheduled/manual CI, and `v*` release tags. Pull requests report **Not applicable** only when every changed path is narrowly classified Markdown documentation; UI, assets, workflow/configuration, dependencies, onboarding, invitations, MLS, relay authorization/persistence, protocol/crypto packages, native code, and the journey itself remain in scope. Missing or unclassified change evidence runs conservatively. Stage-timestamped logs, bounded failure screenshots/process logs, and the duration artifact make intermittent behavior a diagnosable product-race candidate rather than a reason for blind reruns.
+The product-journey workflow runs the Linux two-shell journey on `main`, scheduled/manual CI, and `v*` release tags. Pull requests enter the workflow only when its plain Actions path filters match native Rust/Tauri, MLS, relay, protocol, invitation, onboarding, or journey changes. Stage-timestamped logs, bounded failure screenshots/process logs, and the duration artifact make intermittent behavior a diagnosable product-race candidate rather than a reason for blind reruns.
 
 Desktop TypeScript has a visible coverage job with retained full-surface LCOV/JSON reports. The complete `apps/desktop/src` surface is held to rounded minimums of 50% lines/statements, 60% functions, and 75% branches rather than an exact per-file snapshot of today's implementation. A smaller invite/MLS-adjacent gate independently covers invite URL/policy/approval, native intake, onboarding admission, MLS join admission, and pending-invite recovery at 95% lines/statements, 90% functions, and 80% branches. A host-action gate separately covers the file, terminal, Codex-turn, Git workflow, and workspace-client action modules at 65% lines/statements/branches and 70% functions, with adversarial cases for project confinement, symlink and stale-write rejection, authority races, terminal authorization/redaction, hostile identifiers, and failure cleanup. These are regression floors and scoped evidence, not a claim that every React surface is deeply tested.
 
-## Review map
+### Review map
 
 | Topic                                  | Location                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -238,8 +247,8 @@ Desktop TypeScript has a visible coverage job with retained full-surface LCOV/JS
 | Invite and handoff UI contracts        | `e2e/invite-join.spec.ts`, `e2e/host-handoff.spec.ts`, `e2e/harness/scenarios/`                                                                                                                                                                                                                                                                                                                                                                  |
 | Bounded host-handoff state exploration | `apps/desktop/src/lib/handoff/hostHandoffMachine.ts`, `apps/desktop/test/hostHandoffModel.test.ts`, `docs/decisions/host-handoff.md`                                                                                                                                                                                                                                                                                                             |
 | Stateful native-core/relay composition | `apps/relay/test/live-native-relay-journey.test.ts`, `apps/desktop/src-tauri/crates/mls-core/src/bin/mls-integration-client.rs`                                                                                                                                                                                                                                                                                                                  |
-| Two-shell production-path journey      | `e2e/native-shell/journey.ts`, `e2e/native-shell/invite-scenarios.ts`, `e2e/native-shell/messy-failure.ts`, `e2e/native-shell/restart-proxy.ts`, `e2e/native-shell/restart-proxy.test.ts`, `e2e/native-shell/key-package-negative.ts`, `scripts/native-journey-metrics.mjs`, `.github/workflows/ci.yml`                                                                                                                                          |
-| macOS WKWebView boot and IPC smoke     | `e2e/native-macos/macos-smoke.e2e.mjs`, `e2e/native-macos/wdio.conf.mjs`, `apps/desktop/src-tauri/tauri.native-e2e.conf.json`, `.github/workflows/ci.yml`                                                                                                                                                                                                                                                                                        |
+| Two-shell production-path journey      | `e2e/native-shell/journey.ts`, `e2e/native-shell/invite-scenarios.ts`, `e2e/native-shell/messy-failure.ts`, `e2e/native-shell/restart-proxy.ts`, `e2e/native-shell/restart-proxy.test.ts`, `e2e/native-shell/key-package-negative.ts`, `scripts/native-journey-metrics.mjs`, `.github/workflows/journeys.yml`                                                                                                                                    |
+| macOS WKWebView boot and IPC smoke     | `e2e/native-macos/macos-smoke.e2e.mjs`, `e2e/native-macos/wdio.conf.mjs`, `apps/desktop/src-tauri/tauri.native-e2e.conf.json`, `.github/workflows/journeys.yml`                                                                                                                                                                                                                                                                                  |
 | Codex approval UI contract             | `e2e/codex-turn-approval.spec.ts`, `e2e/harness/scenarios/codex-turn-approval.tsx`                                                                                                                                                                                                                                                                                                                                                               |
 | Codex chat and reasoning UI contracts  | `e2e/codex-chat-parity.spec.ts`, `e2e/raw-reasoning-setting.spec.ts`, `e2e/harness/scenarios/codex-chat-parity.tsx`, `e2e/harness/scenarios/raw-reasoning-setting.tsx`                                                                                                                                                                                                                                                                           |
 | First-run state and join boundary      | `apps/desktop/src/lib/onboarding/onboardingState.ts`, `apps/desktop/src/application/onboarding/onboardingReadiness.ts`, `apps/desktop/src/lib/onboarding/onboardingInviteJoin.ts`, `apps/desktop/src/application/history/firstWorkspaceCreation.ts`                                                                                                                                                                                              |
@@ -255,7 +264,456 @@ Desktop TypeScript has a visible coverage job with retained full-surface LCOV/JS
 | Hosted account deletion boundary       | `apps/relay/src/auth/account-deletion.ts`, `apps/relay/src/auth/deletion-ledger.ts`, `apps/relay/src/auth/deletion-reconciliation.ts`, `apps/relay/src/auth/github.ts`, `apps/relay/src/reconcile-deletions.ts`, `apps/relay/test/account-deletion.test.ts`, `apps/relay/test/deletion-ledger.test.ts`, `apps/relay/test/deletion-reconciliation.test.ts`, `apps/relay/test/auth/session.test.ts`, `apps/desktop/src/lib/identity/authClient.ts` |
 | Hosted account restriction boundary    | `apps/relay/src/auth/account-restrictions.ts`, `apps/relay/src/manage-account-restriction.ts`, `apps/relay/test/account-restrictions.test.ts`, `docs/decisions/single-node-relay.md`                                                                                                                                                                                                                                                             |
 | Encrypted room data exit               | `apps/desktop/src-tauri/src/room_archive.rs`, `apps/desktop/src/application/history/roomArchive.ts`, `apps/desktop/test/roomArchive.test.ts`, `docs/room-archives.md`                                                                                                                                                                                                                                                                            |
-| Advisory ledger and CI audit           | `.github/rust-advisory-policy.json`, `deny.toml`, `.github/workflows/rust-audit.yml`                                                                                                                                                                                                                                                                                                                                                             |
-| Threat claims and changelog            | `docs/threat-model.md`, `docs/threat-model.md#history`                                                                                                                                                                                                                                                                                                                                                                                         |
+| Advisory ledger and CI audit           | `.github/rust-advisory-policy.json`, `deny.toml`, `.github/workflows/supply-chain.yml`                                                                                                                                                                                                                                                                                                                                                           |
+| Threat claims and changelog            | `docs/threat-model.md`, `docs/threat-model.md#history`                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Findings, partial reviews, and questions are welcome. State the exact reviewed commit or tag and preferred attribution.
+
+## Security journey evidence
+
+This section describes what the automated journeys execute. Interpret security properties and residual risks through the canonical [threat model](threat-model.md), and use the [verification evidence](#verification-evidence) above for the reviewer-oriented index.
+
+The repository keeps four evidence levels separate:
+
+1. Chromium UI-contract specs render production components but visibly simulate relay, MLS, persistence, and native execution.
+2. A stateful process test connects two independent live `mls-core` clients to a real relay and validator.
+3. A Linux native-shell job drives two isolated real Tauri processes through the production desktop, Tauri command, MLS, relay, validator, SQLite, and credential-store paths.
+4. A macOS package-lane smoke launches a test-only packaged app in a real WKWebView, clicks a visible control, observes the resulting Account surface, and invokes the real `app_version` Tauri command across the JavaScript/native bridge.
+
+The native-shell journey's only mocked external boundary is GitHub identity establishment: it calls the relay's test-only debug-auth endpoint instead of GitHub OAuth. Both GitHub users are already members of the fixture team. The test covers admission of the guest device into the MLS group through the real KeyPackage, HPKE request, host approval, Add Commit, and Welcome flow; it does not cover GitHub OAuth or inviting a GitHub user to a team.
+
+### Deterministic relay confidentiality journey
+
+The `security-journey` CI job runs the relay as a real child process and exercises the protocol-v2 delivery boundary with native-generated MLS fixtures. It covers device registration, KeyPackage publication and consumption, active-host Commit ordering, opaque MLS backlog delivery, removal, handoff, and plaintext scans of relay persistence artifacts. The native artifacts are generated before relay delivery, so this test is not evidence that two desktop processes react correctly to live relay events.
+
+The same gate scans every serialized wire artifact for the stable canary strings in `apps/desktop/test/fixtures/injection-red-team-v1.json`. Add a new versioned fixture when the corpus meaning changes; append cases without changing the version when only coverage expands.
+
+The journey verifies that non-host and stale-epoch Commits fail closed and that relay SQLite, WAL, and SHM files do not contain application plaintext, private KeyPackage material, Welcome secrets, or exporter-derived values. CI publishes the JUnit result as the `security-journey-results` artifact.
+
+The migration regression set extends that scan with synthetic GitHub-token, project-path, and Codex-model sentinels. Relay auth tests exercise verify-then-discard success, token-shape rejection, upstream failure, token-free session serialization, and legacy token-field stripping. Native Rust tests exercise pinned client/scopes/origin, redirect refusal, Keychain abstraction, bounded GitHub request/response normalization, and absence of credentials from command results and diagnostics. Room-config tests exercise native schema/epoch bounds, active-host sender checks, highest epoch/revision convergence, post-Add and recovery re-emission, config-pending joiners, handoff, removed-member exclusion, legacy HTTP rejection, and active SQLite/WAL/SHM purge. Provider calls and a real macOS Keychain grant are still external/manual boundaries; dummy credentials and injected HTTP/keyring adapters are used in automation.
+
+Run it locally with:
+
+```sh
+npm run test:security-journey
+```
+
+The process journey needs Cargo because it builds the validator and generates its MLS fixture from the native core. When Cargo is not installed, the test exits successfully with the explicit result `skipped: Rust toolchain required`; this local convenience does not weaken CI, where the job installs pinned Rust 1.88.0 and rejects the JUnit report unless both named Rust-backed journeys executed with no skipped testcase. `MULTAIPLAYER_CARGO_BIN` may select a non-default Cargo executable.
+
+### Stateful native-core and relay journey
+
+`apps/relay/test/live-native-relay-journey.test.ts` starts two separate, long-lived `mls-integration-client` processes. Each owns a distinct real `MlsEngine` and device signer. The test uploads the guest's real KeyPackage through the actual validator, publishes MLS bytes through a real relay and SQLite store, and passes the relay-delivered bytes—not a side-channel copy—into the receiving engine. It checks application decryption, signed host handoff, rejection of a former host's next Commit attempt, and post-handoff successor traffic.
+
+This fixture intentionally exposes only direct `mls-core` operations. Its state is ephemeral, and it does not call Tauri commands, use Keychain-backed admission receipts, or exercise the desktop UI. It is sequencing and process-composition evidence, not production invite-command or durable-state evidence. It runs in both the ordinary relay suite and the focused `security-journey` gate.
+
+### Two real Tauri shells
+
+`e2e/native-shell/journey.ts` launches two Tauri application binaries with isolated Linux homes, XDG directories, and Secret Service stores. WebKitWebDriver controls the actual host and guest windows. Both clean profiles must show focused Welcome. The host follows create through the production workspace/room form and safe-default screen; the guest follows join, proves Codex readiness is nonblocking, and submits the official HTTPS invitation through the production onboarding form. Through production UI and Tauri commands, the guest's first real protected admission request must transition into blocking Join/device-verification guidance that explains active-host approval; a host denial leaves the guest without MLS group state; an expired capability is rejected before a request reaches the host; and a fresh requesting app is killed with `SIGKILL` after the native SQLCipher transaction persists its exact request but before host approval. On restart, the same profile and Secret Service store recover the request, expose only relay-visible replay material and routing metadata to the webview, and keep the bearer capability inside Rust. The host creates the membership Commit while the guest is offline. A loopback harness gate observes the subsequent Welcome request only after the relay has accepted that Commit, stops the real relay, starts a new process over the same SQLite store, verifies the accepted epoch survived, and only then releases Welcome delivery. Because relay device sessions are deliberately process-local, the desktop re-proves its device identity after the replacement relay rejects the stale session. The retry reuses and validates the durable approval outbox instead of generating a second Commit. The replacement relay stores the Welcome, after which the restarted guest republishes the byte-identical request if necessary, accepts the response through the authoritative native-stored binding, restores the exact device-bound roster, and proves usable epoch keys by decrypting the next message. This proves Commit/epoch and authenticated-client recovery across relay restart followed by Welcome durability across guest restart; it does not claim that the Welcome was stored before the relay restart. The journey then transfers authority, checks the relay's active host, and sends successor traffic. A diagnostic step calls the production MLS and workspace client modules inside the native guest shell to prove the real validator rejects a tampered native KeyPackage and to distinguish an absent native group from a merely locked UI.
+
+The job uses real relay processes, SQLite persistence, WebSocket transport, `mls-keypackage-validator`, native MLS/HPKE processing, and application credential storage. The restart proxy only preserves the client-visible loopback address and deterministically gates one request; it does not synthesize a relay response, Commit, Welcome, reconnect, or persisted state. Relay debug authentication is the one intentional mock. After a socket opens, the desktop treats the authenticated workspace-subscription acknowledgement as a startup barrier: it attempts every relevant durable recovery first, requires recovery of the selected room (or selected team when no room is selected), and then resumes that authorized selection. An unrelated failed receipt remains scoped to its own room and does not freeze another valid workspace. This prevents a pre-admission team rejection from cancelling the acknowledged admission join while preserving the relay's membership checks. The expiry scenario also uses an explicitly enabled, loopback-only debug time-control to backdate the real relay invite; the production invite lookup and pruning paths perform the rejection, and the test verifies no KeyPackage was durably published. The two fixture identities begin as members of a separate seeded diagnostic team, but the guest is not pre-enrolled in the workspace created through onboarding; successful invite admission adds that exact GitHub identity and device through the production path. Direct `tauri-driver` 2.0.6 is used here because it supports Linux WebKitWebDriver (and Windows EdgeDriver) but still does not implement a direct macOS backend.
+
+The macOS package lane uses a separate embedded-driver integration from the pinned WebdriverIO Tauri service. Its feature- and environment-gated test build launches the packaged application in a real WKWebView, clicks the visible Profile control, observes the Account surface, and calls the production `app_version` command through real Tauri IPC. CI then rebuilds the production frontend without the driver before assembling artifacts; the driver versions are exact-pinned and the release workflow does not register the test driver. This is a boot, visible-control, and handler-level IPC smoke, not a full macOS two-client journey.
+
+A separate scheduled/manual macOS job starts two independent native `mls-core` clients against the real relay, validator, and SQLite path, then checks application decryption, host handoff, former-host rejection, and successor traffic. It closes the platform-runner process-composition gap but does not claim two Tauri windows, Keychain-backed invitation receipts, or input-level macOS onboarding.
+
+WebKitGTK and WKWebView are different ports in the WebKit engine family, so the Linux journey's frontend layout and UI-contract evidence transfers more directly than Chromium evidence would. The following do not transfer and remain explicit macOS review boundaries: the IPC implementation (`WKScriptMessageHandler` versus the GTK port's mechanism), Keychain versus Secret Service, window and process lifecycle, and code-signing or entitlement effects on spawned validator and relay processes. The macOS native-core/relay composition and packaging steps provide distinct evidence for process spawning, the child stdio protocol, validator invocation, relay networking, and bundle assembly. Together with the smoke they narrow, but do not erase, the macOS journey gap.
+
+Every native-shell invocation that reaches normal process teardown writes `reports/native-shell-e2e/duration.json` with monotonic total and per-stage durations, including ordinary assertion failures. CI retains that artifact for 30 days, renders the timing table in the job summary, and emits a post-run warning above the six-minute journey budget. A cancellation or hard runner timeout can prevent teardown; the artifact upload then fails visibly instead of silently claiming timing evidence. These measurements are operational evidence rather than a checked-in stage-shape or microbenchmark gate; the journey's 30-minute timeout remains the fail-safe for a hung run.
+
+The native-shell journey executes on `main`, scheduled/manual CI, and every `v*` tag. Pull requests enter the product-journey workflow only when its native, MLS, relay, protocol, invitation, onboarding, or journey path filters match. Treat a repeat-sensitive failure as a product race until the stage log, duration report, screenshots, and process logs identify another cause; contributors should not be asked to rerun without diagnosis.
+
+Run it in a matching Linux environment with:
+
+```sh
+xvfb-run -a npm run test:e2e:native
+```
+
+### Desktop browser journeys
+
+Playwright verifies the production browser build is only a static native-app notice, then runs an isolated, test-only UI-contract harness. The harness renders production React components and pure invite/Codex helpers, but it does not emulate Tauri or restore the retired browser cryptography. Every scenario lists its simulated boundaries in the page. Focused specs cover three user-facing authorization boundaries:
+
+- `e2e/invite-join.spec.ts` keeps the guest composer locked through request creation and denial, and unlocks it only after explicit host approval;
+- `e2e/host-handoff.spec.ts` keeps host and model controls with the outgoing host through offer and candidate request, then transfers them only after that host approves; and
+- `e2e/codex-turn-approval.spec.ts` checks bounded context previews, member lockout, host approval and denial, input bounds, and execution-state transitions.
+
+These browser cases are UI-contract evidence, not MLS, relay-confidentiality, native-authorization, or Codex app-server evidence. The stateful process and two-shell journeys above provide their separately stated native/relay evidence; the deterministic process journey retains relay persistence scanning and removed-member exclusion. Run the complete browser suite with `npm run test:e2e`, or a single focused case such as `npm run test:e2e -- e2e/host-handoff.spec.ts`.
+
+### First-run onboarding evidence
+
+Focused desktop tests exercise onboarding as three separate boundaries: the versioned local progress state, pure readiness/error projection, and adapters into existing workspace creation and invite admission. The state tests verify the persisted allowlist, migrations, scoped milestone invariants, corrupt/unsupported-record reset, and storage failures. Creation tests verify the exact conservative room settings and that a successful team creation becomes a retry checkpoint rather than a duplicated team. Invite tests verify fragment scrubbing before native/network work, delegation to the production capability-bound join action, fixed error categories, and a blocking approval-pending result with no unlock authority. Component tests render the production assistant, checklist, and first-turn guide and cover native keyboard controls, heading focus, readiness ordering, direct recovery actions, explicit safety continuation, prompt population without sending, and pending device-verification lockout.
+
+Readiness is intent-specific. Creating retains host readiness, including a compatible local Codex installation and ChatGPT authorization. Joining blocks only on relay and GitHub readiness; Codex, ChatGPT authorization, and a project folder can be added later if that device becomes the active host. A pure progression model advances from readiness only when a provider authorization started on that screen transitions to ready and no blocking row remains. Initial bootstrap, background probes, warnings, and invite receipt cannot trigger it, and progression stops at the create/join form rather than accepting an invite or mutating workspace membership. Focused tests also distinguish GitHub Device Flow from local Codex browser/device login, keep their codes, URLs, login ids, and raw failures out of resumable onboarding state, and verify that authentication cancellation or browser-launch failure produces bounded recovery UI rather than an authorization shortcut.
+
+The dedicated six-case Playwright contract in `e2e/onboarding.spec.ts` renders those production components and verifies equal create/join keyboard entry, persisted Explore/checklist state and Help recovery/reset, direct readiness repairs, duplicate-safe room retry and safe-default disclosure, join verification without optimistic unlock, and starter-prompt draft insertion without sending. Its visible boundary banner identifies relay bootstrap/mutations, GitHub and ChatGPT authentication, native Codex/account/folder operations, MLS verification/host approval, encrypted persistence, and Codex execution as simulated. The six cases passed in the implementation run.
+
+This is unit and Chromium UI-contract evidence, not by itself a complete end-to-end native onboarding journey. The Linux two-shell job now begins from focused clean-profile Welcome surfaces, selects both intents, checks intent-specific readiness, submits the production workspace/room form and safe defaults, submits the official HTTPS invitation through the production join form, and observes real blocking device verification before host denial and the remaining MLS journey. Its GitHub identities still come from the loopback-only debug authentication fixture; the host's third-party ChatGPT prerequisite is advanced through an explicit in-app test transition, and the project path is typed rather than selected through the platform folder picker. The packaged macOS smoke still chooses Explore and does not complete create or join. The native evidence therefore covers the Linux WebKitGTK onboarding forms and their real relay, native MLS, validator, Secret Service, SQLite, and WebSocket handlers, but not live GitHub/OpenAI authorization, input-level folder selection, or equivalent macOS onboarding.
+
+The onboarding record contains only versioned presentation/progress fields, bounded team/room ids, and boolean milestones. It excludes names, paths, invite capabilities, login ids/URLs/codes, raw errors, prompts, reasoning, and project content. The assistant adds no tutorial telemetry. Its safety summary reflects the real defaults—ask every turn, workspace-write, raw-reasoning sharing off, restricted browser access, and encrypted local-history retention—and its starter prompts neither send nor approve automatically.
+
+### Universal-link and authentication evidence
+
+The official invitation is an HTTPS universal link whose complete invitation material is confined to the fragment. Native Rust tests exercise exact-host and exact-path allowlisting, rejection of credentials, ports, queries, duplicate or unknown fragment fields, malformed or oversized values, multi-URL batches, and one-shot consumption. Desktop tests cover subscription-before-drain ordering and coalesced cold/warm intake. The website separately tests immediate pre-hydration fragment scrubbing, strict validation, memory-only alternate-host retry, static AASA shape, and a no-custom-scheme fallback. Package and release scripts verify associated-domain configuration and live AASA content.
+
+That is parser, handler, static-site, and package-configuration evidence. It does not prove that macOS Launch Services dispatches a signed link into an installed application, nor that both cold-start and warm-app activation behave correctly under the live association cache. Those cases remain manual release checks on a signed build. The in-app native intake retains at most one pending link in process memory and exposes only a payload-free availability event; process exit, consumption, rejection, or supersession removes it.
+
+Authentication URLs are checked twice: TypeScript permits only the provider's exact HTTPS destinations, and the Rust command independently repeats the provider-specific host, path, credential, port, query, and fragment policy before using the operating system's default browser. Tests cover rejection and the copy-link fallback. They do not exercise live GitHub or OpenAI account authorization. The Linux native journey uses its documented loopback-only relay debug authentication substitute, so it remains MLS/device-admission evidence rather than OAuth evidence.
+
+Codex reasoning projection has a separate privacy boundary. Summaries remain the default. Provider-supplied raw reasoning can be included only when the active host enables the off-by-default per-room sharing setting, and the provider, model, or app-server may supply none. Accepted raw reasoning is bounded and follows the same RFC 9420 MLS-encrypted room delivery via `mls-rs`, member visibility, 160-record activity cap, and encrypted local-history retention as other Codex disclosures; multAIplayer's integration layer is unaudited. The setting is prospective: turning it off does not retract content already delivered to member devices. Native projection tests cover suppression by default and inclusion only when sharing is enabled; this is policy/projection evidence, not a claim that every provider exposes raw reasoning.
+
+### Host execution limits
+
+Native Codex turns use a validated 10–900 second timeout and bounded input. Codex JSON-RPC requests also have request deadlines. Terminal sessions are intentionally interactive rather than wall-clock limited, but retain at most 1,000 redacted output lines and bound an unterminated redaction buffer to 8 KiB; every initial command and later input requires a short-lived native authorization token. Local preview tunnels have a 20-second startup deadline, retain bounded startup logs, and terminate their child process when stopped or dropped. CI jobs and desktop test subprocesses have independent hard timeouts.
+
+## Engineering practices and operations
+
+multAIplayer is developed with AI acceleration. Fuzzing, mutation testing, cross-language contract tests, and end-to-end security journeys are compensating controls for that velocity. They make important claims falsifiable and reviewable; they do not replace maintainer judgment or an independent security audit.
+
+### Agent-assisted maintainer workflow
+
+MultAIplayer is maintained through an agent-assisted, policy-driven workflow. The maintainer does not treat generated code as trusted merely because it compiles or because an agent reports success. Product intent is translated into explicit repository policy, independent gates, and reviewable evidence.
+
+#### From prompt to policy
+
+1. **Specify the outcome and threat boundary.** A work request names the user-visible behavior, protected assets, attacker capabilities, and non-negotiable invariants. Security claims are phrased as properties that can fail, not aspirations.
+2. **Inspect before changing.** The agent reads repository guidance, the current implementation, prior ADRs, tests, CI, dependency state, and the working tree. Existing maintainer work is preserved.
+3. **Decompose by independent evidence.** Parallel work is used only for bounded streams. One integration owner reconciles shared files and is responsible for the final result.
+4. **Implement the smallest coherent boundary.** Production changes include tests, failure behavior, limits, and documentation in the same pull request. Secrets, shell authority, cryptographic state, and publishing credentials stay outside model-controlled/webview boundaries.
+5. **Turn claims into gates.** Important invariants become deterministic unit/property tests, mutation policies, cross-implementation vectors, scripted journeys, static analysis, or artifact verification. Generated reports are retained when reviewers need more than pass/fail.
+6. **Review the diff as hostile input.** The maintainer checks authorization placement, fallback behavior, parser ambiguity, unbounded resources, workflow permissions, dependency scripts, binary additions, and documentation drift.
+7. **Verify in layers.** Fast focused checks run first, followed by repository-wide format, lint, type, test, build, Rust, security, and packaging checks. A failure is fixed or explicitly documented; gates are not weakened to obtain green status.
+8. **Publish through a pull request.** Only scoped files are staged. The PR states why, impact, root cause where relevant, and exact validation. Required checks and review conversations must resolve before merge.
+9. **Record durable decisions.** Architecture or security choices become ADRs. Operational limits, advisories, supported platforms, and incident expectations go in maintained documents with review dates.
+
+#### Maintainer review questions
+
+- Can untrusted room, attachment, webpage, repository, tool, or model output reach native authority without a fresh native decision?
+- Is identity, room, workspace, epoch, exact bytes, expiry, and one-time use bound at the enforcement point?
+- Does normalization preserve security markers and reject ambiguous encodings?
+- Are network, process, PTY, preview, and model-output paths bounded by time and size?
+- Is encrypted state authenticated with canonical context, and is interoperability checked outside the implementation language?
+- Does CI use locked inputs, commit-pinned actions, least privilege, and trusted artifact handoffs?
+- Would a skeptical reviewer be able to reproduce the evidence from a clean checkout?
+
+#### Evidence hierarchy
+
+Passing examples are the baseline. Property tests explore input classes; mutation tests show whether assertions distinguish security-relevant code changes; deterministic journeys prove lifecycle behavior across components; independent implementations prove wire agreement; external analyzers and supply-chain attestations add signals not authored by the same agent that wrote the feature. None of these substitutes for professional security review.
+
+#### Exceptions and follow-up
+
+An exception must name its dependency or code path, affected platform, exposure, compensating control, rationale, owner, and review date. It must not be hidden by suppressing a scanner solely to improve a score. Deferred work is tracked in docs or issues with a concrete trigger for reconsideration.
+
+### Rust panic policy
+
+The Tauri backend treats data, filesystem, process, lock, and protocol failures as recoverable. Every fallible production Tauri command returns `CommandResult<T>` with the serialized `{ code, message }` contract; internal helpers may retain narrower domain errors or `Result<_, String>` until the command boundary assigns a stable code. `npm run check:tauri-command-errors` scans the complete command inventory, rejects a direct `Result<_, _>` return before it can silently bypass that contract, and verifies that the Rust serde enum exactly matches the TypeScript code union. Commands must not use `unwrap()` or `expect()` to handle runtime input or mutable external state. Frontend recovery branches on validated codes through `invokeNative`, never on message prose.
+
+An audit on 2026-07-12 found no runtime-input `unwrap()` or `expect()` calls. A session-cache ownership assertion in `codex.rs` was converted to a non-panicking conditional, and the outer Tauri bootstrap now reports its fatal error and exits unsuccessfully without unwinding. The seven constant redaction expressions are compiled once into fallible `LazyLock` values. If any expression cannot compile, the applicable redactor replaces the entire value with a failure marker; it never returns potentially sensitive input and never panics.
+
+The crate denies Clippy's `unwrap_used` and `expect_used` lints in every non-test build, with no exception list. This compiler-aware guard excludes `#[cfg(test)]` code without relying on a textual source scanner. Any future fallible expression, including one sourced from configuration or input, must propagate an error or fail closed without reflecting the unredacted value.
+
+Occurrences in modules guarded by `#[cfg(test)]`, `lib_tests.rs`, and dedicated `tests.rs` files are test assertions, not shipped paths. Test fixtures may continue using `unwrap()` and `expect()` when a failure should abort the test with local context.
+
+Review production additions by asking whether the failed condition can depend on input, external processes, the filesystem, synchronization, persisted state, or protocol peers. If it can, propagate or handle the failure. Reserve a process-level panic for an unrecoverable bootstrap failure or a repository-owned compile-time-style invariant whose fallback would weaken security.
+
+### Continuous-integration policy
+
+GitHub branch protection is the enforcement source; keep required checks aligned with this table.
+
+| Workflow family  | Runs                                                          | Failure means                                                                                                     | PR blocking                                                                     |
+| ---------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| CI               | pull requests, `main`, manual, and `v*` tags                  | lint, formatting, types, focused tests, builds, the relay-auth coverage floor, or native checks failed            | Yes for configured fast checks                                                  |
+| Product journeys | affected pull requests, `main`, weekly, manual, and `v*` tags | an applicable UI, security, Linux native-shell, macOS two-client, fuzz, mutation, soak, or package journey failed | Only configured PR jobs; scheduled mutation-policy drift is advisory            |
+| Supply chain     | schedule, release, and manual                                 | an advisory, CodeQL, license, container, SBOM, or provenance signal needs triage                                  | No for ordinary PRs; release-triggered failures block or can withdraw a release |
+| Release          | `main` preparation plus version tags/manual publication       | versioning, preflight, reproducibility, signing, packaging, or publication failed                                 | Not an ordinary PR check; blocks release                                        |
+
+The `Prepare release` workflow runs on `main`, opens or updates the Release Please pull request, and signs a deterministic lock-metadata synchronization commit when required. It works with the built-in Actions token; because GitHub suppresses recursive pull-request workflows for that token, a maintainer must close and reopen the generated pull request to trigger its required CI checks. An optional `RELEASE_PLEASE_TOKEN` with Contents and Pull requests read/write permissions removes that step. When the built-in token creates a version tag, the workflow explicitly dispatches the signed `Release` workflow because tag events created by that token do not implicitly start another workflow.
+
+End-to-end evidence has four explicit tiers. `web-shell-e2e` runs Chromium UI contracts whose visible boundary banner identifies simulated relay, MLS, persistence, and native execution. The ordinary relay suite adds two independently stateful `mls-core` processes to a real validator, relay, SQLite store, and WebSocket path, but does not claim Tauri-command or durable credential-store coverage. `native-shell-e2e` runs two isolated real Linux Tauri applications through production admission, requester-process termination, a relay/SQLite recovery boundary between Commit acceptance and Welcome delivery, messaging, signed host handoff, and successor messaging with the real validator and relay. A loopback gate makes the restart boundary deterministic without fabricating responses or persisted state. After reconnect, the desktop attempts relevant durable admissions before resuming the selected boundary and blocks that continuation only while the selected room (or roomless selected team) remains unresolved; focused tests pin that ordering and isolation, and the real journey exercises it against relay and requester-process restart timing. That job mocks only GitHub authentication through the relay's test-only debug endpoint; its two identities are already team members, so it covers device MLS admission rather than GitHub OAuth or team invitation. Its JSON timing artifact and job-summary table provide operational history; CI does not encode today's stage sequence or shared-runner duration as a source contract.
+
+The product-journey workflow always runs on `main`, scheduled/manual invocations, and `v*` release tags. On pull requests, ordinary GitHub Actions `paths` filters run it only for native Rust/Tauri, MLS, relay, protocol, invitation, onboarding, or journey changes. The workflow has no custom JavaScript path classifier or policy allowlist. Branch protection must require only checks that are guaranteed for the applicable event. Do not paper over intermittent failures with blind reruns: treat them as product races until the named stage, timing report, screenshots, and logs establish another cause.
+
+Desktop TypeScript coverage is a separate visible CI job. It reports the complete `apps/desktop/src` surface, retains LCOV and JSON summaries, and enforces rounded full-surface minimums of 50% lines/statements, 60% functions, and 75% branches. A stricter scoped floor covers invite-link parsing/policy/approval, native invite intake, onboarding invite admission, MLS join admission, and pending-invite recovery: 95% lines/statements, 90% functions, and 80% branches. A second focused gate holds the host-side file, terminal, Codex-turn, Git workflow, and workspace-client action surface to 65% lines/statements/branches and 70% functions. Its adversarial tests emphasize project confinement, stale and symlink rejection, room/host authority races, terminal authorization and redaction, hostile identifiers, and Git/PR failure paths. These rounded floors prevent material regressions without coupling review to exact per-file fractions; they remain scoped evidence rather than a claim of uniformly deep React coverage. Lowering a floor requires an explicit reviewed policy change.
+
+Direct `tauri-driver` 2.0.6 remains limited to Linux WebKitWebDriver and Windows EdgeDriver. The `macos-desktop` job instead uses the pinned WebdriverIO Tauri service's embedded driver in a test-only build to launch the packaged application in a real WKWebView, operate a visible Profile control, observe the Account surface, and complete a real `app_version` Tauri IPC call. It then rebuilds the production frontend without the test driver, reruns the native-core/relay/validator composition, and packages ad-hoc-signed inspection artifacts. The ad-hoc identity uses no Apple account or Developer ID certificate and allows CI to verify packaged entitlements; it does not make those artifacts trusted for distribution. WebKitGTK and WKWebView are ports of the same engine family, so frontend UI-contract evidence transfers more directly than Chromium evidence would; the IPC implementation, Keychain-versus-Secret-Service behavior, window/process lifecycle, and code-signing or entitlement effects do not transfer. The macOS composition and package lane separately cover process spawning, child stdio, validator invocation, relay networking, and bundle assembly. The smoke is boot, visible-control, and handler-level IPC evidence, not a macOS equivalent of the full Linux two-shell journey. The [end-to-end coverage matrix](../e2e/README.md) maps the boundaries and gates.
+
+First-run onboarding enters CI through both the ordinary desktop unit/component suite and a six-case Chromium UI contract in `web-shell-e2e`. The desktop runner includes `.test.tsx` component suites. Exact-pinned axe-core WCAG 2.0/2.1/2.2 A/AA assertions gate the main chat, onboarding, and invite harness states. The focused tests cover persisted-state allowlisting and migration, readiness/error projection, create retry semantics, delegation to production invite admission with no optimistic unlock, and assistant/checklist/first-turn contracts. Playwright additionally covers equal keyboard-accessible create/join entry, persisted Explore/checklist state and Help recovery/reset, direct readiness repair, partial-create retry and safe-default disclosure, blocking join verification, and starter-prompt insertion without sending. Its visible boundary banner labels relay/authentication/native/MLS/persistence/Codex behavior as simulated, so it does not add a fifth evidence tier or prove onboarding end to end. The Linux two-shell journey now starts from focused clean-profile Welcome surfaces, selects create and join, checks intent-specific relay/GitHub/Codex readiness, submits the production workspace/room form, accepts safe defaults, submits the official HTTPS invitation through the production onboarding form, and observes real blocking device-verification guidance before host denial. The host's third-party ChatGPT readiness is deliberately advanced through an in-app test transition, GitHub uses the relay's loopback debug substitute, and the project path is entered directly rather than chosen through a platform folder picker. The macOS packaged smoke still chooses Explore and does not complete create or join. The native claims therefore remain bounded to the production handlers and real relay/MLS/storage paths actually exercised, not live provider authorization, macOS onboarding, or input-level folder selection.
+
+Scheduled/manual CI restores and saves the native fuzz corpus across runs, then gives both the MLS KeyPackage/document parser and the Codex app-server activity projection 120 sanitizer seconds. Validator correctness, bounded execution, timeout, malformed-input, and fail-closed behavior are tested directly; the project does not maintain a shared-runner microbenchmark gate before production usage data exists.
+
+The scheduled/manual `Relay restart and backup chaos soak` is deliberately outside ordinary pull requests. Its fixed profile runs for five minutes with 32 concurrent reconnecting clients while MLS messages continue to publish, takes a live SQLite backup, and alternates graceful and forced process restarts. Only after the source stops does it start an isolated relay from the fenced backup. It fails on SQLite integrity errors, duplicate message ids, an unexpected MLS epoch, missing newest retained traffic, unbounded metrics output, operational errors, or leaked sockets. The retained JSON reports publish and reconnect p95/p99 latency, peak active sockets, WAL growth, metrics size, restart count, and source/restore record counts. The short default command is a local smoke; neither profile is a throughput benchmark or a multi-node availability claim.
+
+Invitation delivery and authentication add narrower automated gates. Rust and desktop tests cover the strict HTTPS invitation parser, one-shot in-memory native intake, cold/warm event ordering, intent-specific readiness, GitHub Device Flow presentation, local Codex login presentation, and provider-specific trusted-URL validation. JavaScript validation runs before requesting a browser launch and Rust validates again before the native opener invokes the system browser. Package checks require the macOS associated-domain entitlement; the release workflow also validates the live AASA documents before signing and rechecks the packaged entitlement afterward. These checks do not emulate Launch Services or prove a signed universal link reaches a cold or warm WKWebView, so that dispatch remains a manual signed-release gate. The Linux native journey's relay debug authentication remains an explicit substitution for GitHub OAuth and does not test either provider's live login.
+
+The sole mutation job targets relay authorization and runs only on the weekly schedule or manual dispatch, never as an ordinary pull-request gate. It always publishes the Stryker report and score summary; during the first weekly run of each month, the mutation-policy comparison runs as an advisory drift review. Surviving or timed-out mutants require triage, but neither the score nor policy allowlist blocks an unrelated change. Relay parser fuzzing and the restart/backup chaos soak share that scheduled depth lane, while native parser fuzzing remains separate. Scheduled failures should create or update a maintenance issue and do not retroactively invalidate unrelated merges.
+
+The relay security-journey tests may skip locally when Cargo is absent. CI installs pinned Rust and then inspects the JUnit evidence: both named Rust-backed journeys must be present and no skipped testcase may exist. This prevents a green but permanently skipped matrix cell.
+
+The ordinary lint gate holds production TypeScript/JavaScript functions to the default ESLint complexity ceiling of 20. Large Rust boundaries are split by domain and reviewed through formatting, clippy, tests, dependency policy, and the structured Rust advisory ledger rather than a per-file line ratchet. The advisory workflow scans both the application/release lockfile and the separate MLS fuzz-target lockfile. Workflow tokens otherwise default to read-only: issue creation, CodeQL upload, release preparation, and artifact publication retain only their explicitly required job or single-job workflow permissions.
+
+### Dependency security
+
+The repository checks JavaScript and native dependency advisories independently. `npm audit --audit-level=high` evaluates the committed npm lockfile, including development dependencies used to build and package the app. It runs every Monday and on releases so newly published high or critical advisories fail CI even when the lockfile has not changed. Rust dependencies are checked against RustSec on the same cadence. The native audit scans both the release/application `Cargo.lock` and the independent MLS fuzz-target lockfile; `cargo-deny` enforces advisory and source policy against both manifests.
+
+The desktop release target is macOS. Linux is a development and CI compatibility target, not a supported alpha release target. Cargo's target-independent lockfile nevertheless records the Linux GTK/WebKit dependency graph. In the current Tauri 2.11 line, `glib 0.18.5` is pulled through `gtk 0.18.2` by Tauri, Wry, WebKitGTK, and their menu/runtime crates; it is not a direct dependency and cannot be upgraded independently. Recheck that path with `cargo tree --locked --target all --manifest-path apps/desktop/src-tauri/Cargo.toml -i glib@0.18.5` whenever Tauri/Wry are updated and at least monthly while an advisory remains open. Do not suppress a GTK-family advisory merely because Linux is not shipped: record its RustSec id, full dependency path, platform exposure, rationale, owner, and next review date in the tracking issue, and continue the scheduled Rust audit.
+
+The versioned [`deny.toml`](../deny.toml) contains the narrowly named cargo-deny exceptions. The structured [Rust advisory policy](../.github/rust-advisory-policy.json) is their review ledger: it records the owner, exact packages and RustSec ids, dependency paths, platform exposure, reachability assessment, disposition, and next review date. Repository hygiene requires the ledger to cover exactly every cargo-deny exception, separately track the visible glib warning, contain the required assessment fields, and have a review date that has not expired. Its GTK3 entries (`RUSTSEC-2024-0411` through `RUSTSEC-2024-0420`) are confined to the Linux Tauri/Wry/WebKit graph. `cargo audit` separately reports the glib unsoundness (`RUSTSEC-2024-0429`); neither multAIplayer nor its downloaded transitive dependencies call the affected `VariantStrIter` API. The proc-macro and `rust-unic` entries (`RUSTSEC-2024-0370`, `RUSTSEC-2025-0075`, `RUSTSEC-2025-0080`, `RUSTSEC-2025-0081`, `RUSTSEC-2025-0098`, and `RUSTSEC-2025-0100`) are unmaintained transitive build/URL-pattern crates with no safe application-selectable replacement. These are explicit, reviewable exceptions—not a lower advisory severity—and expire for maintainer review on 2026-08-01 or sooner when Tauri/Wry changes. `cargo audit` runs first so the complete advisory signal remains visible in every CI log.
+
+During the public alpha, direct npm and Cargo dependencies are exact-pinned to the versions in their committed lockfiles. Monthly Dependabot version-update batches cover routine compatible and major review work; they are not the vulnerability-response control. Repository-level Dependabot security updates must remain enabled so an eligible vulnerable dependency can receive an immediate security PR, while the independent Monday npm/Rust advisory jobs detect lockfile findings whether or not Dependabot can generate an update. GitHub Actions updates are also batched. A major batch is an owner decision, not routine maintenance: inspect upstream migration notes and transitive changes, update affected compatibility documentation and fixtures, and run the complete CI/release-relevant gate before merging. This is not a second-person approval requirement—the project has one maintainer—but major batches must remain visibly distinct from compatible updates. Security fixes may be split out and expedited when waiting for a major batch would leave a reachable vulnerability.
+
+High and critical npm findings are blocking. Prefer upgrading, replacing, or removing the affected dependency. If no remediation exists and the vulnerable code is demonstrably unreachable, open a public tracking issue that records the advisory, affected dependency path, reachability analysis, compensating controls, owner, and an expiry no more than 30 days away. Any temporary CI exception must reference that issue, name only the specific advisory, and be removed at expiry; lowering the repository-wide audit level is not an acceptable exception.
+
+The relay container is scanned without `ignore-unfixed`. Temporary Trivy exceptions live in the versioned `.trivyignore.yaml`, name each advisory, state why the affected base-image code is not reachable from the non-root Node relay, and expire within 30 days. The current entries cover Debian utilities and Node-bundled Undici in the latest verified `node:24-bookworm-slim` digest; they must be removed when a patched Node 24/Debian digest is available and may not be replaced with a blanket severity or unfixed-advisory suppression.
+
+Coverage is measured for every shared TypeScript package, the relay authorization boundary, and the complete desktop TypeScript surface, with LCOV and JSON summaries retained as CI artifacts. Coverage is a report, not a 100% ratchet or a test that snapshots today's percentages. The only security tripwire retained here is a 90% line/function/branch/statement floor for the relay authorization path. Rust MLS behavior is covered by its native lifecycle, persistence, HPKE, and crash-safety tests. Review material drops in the reports, but do not add implementation-only tests merely to preserve an exact score.
+
+The native Codex JSON-RPC classifier is exercised generatively in the ordinary locked Rust suite. The pure bounded activity projector also lives behind the lightweight `codex-activity-projection` workspace crate so cargo-fuzz can feed arbitrary app-server method/value pairs through the exact production implementation without compiling Tauri/GTK into the sanitizer target. Its committed command-completion seed starts beyond the outer JSON shape; accepted output is serialized and unknown fields or secret sentinels must not be reflected.
+
+The relay boundary has deterministic seeded parser fuzz targets in the weekly/manual relay security-depth workflow. Fast-check calls the real WebSocket parser and the exact strict HPKE-directed invite-request parser with raw UTF-8, recursive JSON, structure-aware canonical records, and truncated, reordered, extra-key, or bit-flipped variants. Canonical messages must survive unchanged; malformed inputs may be rejected but must not crash. Checked-in corpora fix representative accepted and rejected frames. The store codec separately normalizes arbitrary record-shaped decoded documents and verifies idempotence. Replay a failure with `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_PATH`, tune the run count with `MULTAIPLAYER_RELAY_FUZZ_ITERATIONS`, and preserve minimized failures as fixed regression cases.
+
+The native fuzz package has two targets: the exact bounded raw JSON/credential/RFC 9420 KeyPackage path used by `mls-keypackage-validator`, and the production Codex app-server activity projector described above. Scheduled/manual CI restores the lockfile-keyed corpus, runs each target for 120 seconds, saves the grown corpus under a unique immutable cache key, and uploads crash artifacts. Only trusted scheduled/manual runs write that cache. Periodically minimize valuable growth with `cargo +nightly fuzz cmin <target>` and commit durable seeds. Run either target locally from `apps/desktop/src-tauri/crates/mls-core` with `cargo +nightly fuzz run <target>`. OSS-Fuzz enrollment is maintainer-owned and triggered before the first non-alpha release in the compatibility inventory.
+
+The relay keeps KeyPackage validation in a separate process for each low-frequency upload. Functional, timeout, malformed-input, and fail-closed tests guard that boundary. The project deliberately does not maintain a validator microbenchmark gate before real usage data exists; if upload latency becomes material, production measurements should drive whether a stateful framed process is justified.
+
+Large native boundaries keep their public composition modules stable while placing focused implementation seams beside them: Codex version/manifest compatibility lives in `codex_account/compatibility.rs`, diagnostic validation and redaction in `diagnostics/redaction.rs`, and each large boundary's tests in its adjacent `tests.rs`. This keeps process/lifecycle orchestration separate from pure policy code and makes security-relevant changes easier to review without changing Tauri command APIs.
+
+Large Rust security boundaries are split into cohesive submodules for protocol, persistence, and native-integration review. The repository deliberately avoids a per-file line ratchet: physical length is not a semantic invariant, and a threshold pinned to today's files invites threshold-only maintenance. Formatting, clippy, focused tests, dependency policy, and human review guard these modules instead.
+
+The root Stryker override forces its development-only `typed-rest-client` dependency to resolve `qs` 6.15.3, patched for GHSA-q8mj-m7cp-5q26. Upstream currently pins vulnerable `qs` 6.15.1 exactly, so npm may label the deliberately overridden edge as outside that stale constraint even though the lockfile and installed code contain the compatible patched release. Express resolves through the same patched `qs` line. Keep the override until `typed-rest-client` accepts 6.15.2 or newer; verify the resolved lockfile, `npm audit`, and the relay authorization mutation suite before removing or changing it.
+
+The scheduled latest-Codex job installs the current published Codex CLI, generates its app-server schema, and compares its contract with the supported 0.144.0 baseline. It also starts the real app-server with a bounded timeout, completes the JSON-RPC initialization handshake, and exercises `model/list`. Removed request ids, methods, capabilities, authentication modes, approval modes, or thread-item types, as well as runtime handshake or response-shape failures, fail the job. A failure opens one marker-deduplicated issue with the observed version and run output. The workflow has read-only repository access except for issue creation; passing this forward-compatibility check does not automatically expand the supported version range.
+
+### Compatibility inventory
+
+Last audited: 2026-07-14
+
+This inventory covers runtime code labelled `legacy`, `deprecated`, or `compat`. General statements about platform or Codex-version compatibility and historical ADRs are not compatibility shims. A compatibility path needs an explicit retained contract and a removal condition; a reject-only parser is distinguished from a reader that accepts old data.
+
+| Boundary                               | Current decision                                                                                                                                                                       | Removal condition                                                                                                                                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Encrypted history flat `codexThreadId` | Read once in `localRoomHistoryPayload.ts`, normalize to `codexThreadGraph`, and never write the flat mirror again. Runtime state is graph-only.                                        | Remove the one-way reader at the next announced encrypted-history reset or stable-format break after all supported alpha builds have emitted graph-only history.                                     |
+| Browser auto-approval helper           | Removed. The unused legacy helper could still return `true`, despite the current product requiring an explicit browser approval.                                                       | Complete in this audit.                                                                                                                                                                              |
+| Pre-v3 invite URL shapes               | `inviteUrl.ts` recognizes the bounded old shape only so onboarding can reject it with a useful error. It never joins or derives secrets from it.                                       | Replace with the generic invalid-invite error after the public-alpha invite transition window closes; no security reader must be reintroduced.                                                       |
+| Pre-v2 debug chat records              | `isLegacyDebugChatMessage` drops old diagnostic records during history normalization and relay receipt.                                                                                | Remove with the same encrypted-history reset as the flat thread-id reader.                                                                                                                           |
+| Pre-activity encrypted history         | A history payload without `codexActivities` normalizes to an empty timeline; no activity or raw upstream object is fabricated.                                                         | Make the field required and remove the fallback at the same encrypted-history reset as the other history readers.                                                                                    |
+| Missing Codex catalog-policy fields    | Room, relay-store, and handoff normalizers interpret an absent policy as `pinned`, preserving the selection an old record actually made.                                               | Remove when the room/store wire schema requires all three policy fields and the hosted relay no longer accepts records created before that schema version.                                           |
+| Former member-approval policy values   | The protocol still decodes `members_can_approve` and `trusted_members_only`, but the authorization boundary treats them as display-only and only the active host can approve.          | Delete the enum values and labels in the next breaking room-wire version after persisted records are normalized to `host_only` or `members_can_request`.                                             |
+| Browser-origin room metadata           | `browserAllowedOrigins` remains a decoded room setting and room-event display value, but it cannot restore the removed browser auto-approval behavior.                                 | Remove the setting and event discriminant in the next breaking room-wire version if restricted browser context no longer uses the origin list for Codex risk/context projection.                     |
+| Older Codex approval request methods   | `execCommandApproval` and `applyPatchApproval` remain in native validation/projection and the dialog because they occur in the declared supported app-server fixtures.                 | Remove each method when `minimumSupportedVersion` advances past the last checked-in fixture that exposes it; the schema-contract test is the gate.                                                   |
+| Relay JSON-to-SQLite import            | A former default JSON store is imported transactionally once, marked, and renamed; SQLite is the only runtime backend.                                                                 | Remove the importer after an announced release has required SQLite for one full migration window and operator documentation no longer promises automatic import.                                     |
+| Relay HTTP error adapter               | `http/errors.ts` adapts handlers that have not yet moved to the typed error contract.                                                                                                  | Remove when every relay HTTP handler returns the typed error shape directly and route tests cover every error code.                                                                                  |
+| Display-name authorization fallbacks   | A few room/host records retain names for presentation while stable user ids remain authoritative.                                                                                      | Remove authorization fallback fields in the next breaking room-wire version once every producer and persisted relay record requires stable user ids. Display names may remain presentation metadata. |
+| Xterm module export adapter            | `TerminalPanel.tsx` accepts the package's named/default export layouts; this is dependency-module interop, not stored-product compatibility.                                           | Remove after the exact-pinned xterm package exposes one verified export shape on every supported bundler/runtime target.                                                                             |
+| Codex version range                    | Generated fixtures and `support-policy.json` define the supported app-server range. User-facing docs are asserted against that manifest by `codex-schema-contract.test.mjs`.           | Advance deliberately with new fixtures and review; do not remove the compatibility boundary while app-server is upstream and versioned independently.                                                |
+| OSS-Fuzz enrollment                    | Deferred while the project remains alpha; scheduled sanitizer runs retain corpus continuity for the native KeyPackage and Codex projection targets in the meantime. Owner: maintainer. | Prepare and submit the OSS-Fuzz integration before the first non-alpha release, with reproducible builds, seed corpora, and disclosure routing reviewed.                                             |
+
+#### Compiler migrations
+
+`noUncheckedIndexedAccess` is enabled repository-wide. The initial migration fixed every indexed lookup surfaced by TypeScript and the workspace check is the enforcement gate.
+
+`exactOptionalPropertyTypes` remains staged rather than silently enabled. The maintainer owns the migration, triggered before protocol/store schema v2 or the first stable release, whichever comes first. The prerequisite inventory must define omitted, explicit `null`, and `undefined` semantics across HTTP JSON, WebSocket records, encrypted history, JSON/SQLite persistence projections, and Tauri IPC. Completion means enabling the flag in the base configuration and every applicable override with serialization compatibility tests green; this paragraph is removed when that gate lands. Until then, `strict` plus `noUncheckedIndexedAccess` provides the highest-leverage record-map protection without an ambiguous wire change.
+
+#### Relay normalizer consolidation assessment
+
+`store-codec-normalizers.ts` already uses protocol Zod schemas at leaf wire boundaries. Its remaining manual code performs ordered cross-record checks, expiry and pruning, canonical base64/SPKI/HPKE validation, relational compatibility defaults, and store-wide consistency decisions. Moving those behaviors into stateful transforms or `superRefine` closures would obscure which fallback protects which compatibility boundary and is unlikely to shrink the implementation. A wholesale Zod rewrite is therefore deferred. Reconsider only a small pure leaf extraction when it demonstrably reduces lines and improves readability while the existing property/idempotence tests remain unchanged; owner: maintainer.
+
+### Release and relay operations
+
+This is the living maintainer runbook for release readiness, public alpha publication, official relay deployment, and hosted-to-self-hosted migration. Keep operational changes here instead of creating another launch checklist. User deployment details remain in [self-hosting.md](self-hosting.md); security claims remain in [threat-model.md](threat-model.md).
+
+#### Release readiness
+
+Before opening a release candidate PR, tagging, or publishing artifacts, run:
+
+```bash
+npm run release:preflight
+```
+
+This covers the TypeScript and Rust verification suites, package/application builds, license checks, environment/toolchain checks, and a fixture SQLite backup/restore drill. The exact blocking and scheduled jobs are documented in [Continuous-integration policy](#continuous-integration-policy).
+
+Release Please maintains [the project changelog](../CHANGELOG.md), workspace versions, release pull request, version tag, and GitHub Release from Conventional Commit subjects. Its `extra-files` configuration updates exact internal npm pins together with the Tauri Cargo version; the Codex app-server client reads its own package version directly. The workflow then deterministically regenerates npm lock metadata, synchronizes the native Cargo lock package version, and signs that follow-up commit. Repository contracts cover the JSON targets, while `npm run check:release-versions` uses Cargo metadata with the locked dependency graph to verify the native package and lockfile semantically. Review the resulting diff on every generated release pull request. With the built-in Actions token, GitHub suppresses recursive pull-request workflows, so a maintainer must close and reopen the generated pull request to create the required CI event. An optional fine-grained `RELEASE_PLEASE_TOKEN` with repository Contents and Pull requests read/write access removes that step. When the built-in token creates the tag, the preparation workflow explicitly dispatches the signed-artifact workflow. Merging the generated pull request attaches the notarized app, checksums, SBOM, and attestations to the generated release. Do not maintain point-in-time release-note drafts in `docs/`.
+
+Before a wider alpha, manually verify on two Apple silicon Macs running macOS 11 or later and two GitHub accounts:
+
+- first-run create and join readiness, GitHub Device Flow in the system browser, local Codex/ChatGPT browser or device login, cancellation, and copy-link recovery when the browser cannot open;
+- a signed, installed build receiving the official HTTPS invitation as both a cold start and a warm-app activation, including the explicit alternate-host retry after installation; confirm that neither app nor website logs, storage, analytics, or network requests contain the fragment;
+- KeyPackage publication, capability invite approval, Welcome join, encrypted chat, attachments, MLS removal, epoch advancement, and removed-device exclusion;
+- project selection, file/diff inspection, Codex approval, terminal and browser approval;
+- Git branch, commit, push, draft PR, and Actions status;
+- active-host handoff, including a simulated Codex usage limit;
+- a relay restart with durable encrypted sessions; and
+- the limitations in [alpha-limitations.md](alpha-limitations.md) against the release notes; and
+- the bundled Rust KeyPackage validator path and fail-closed production startup.
+
+Do not present the alpha as externally audited, production-ready, enterprise compliant, or capable of retroactive erasure or synchronized identity recovery.
+
+#### Maintainer-owned launch decisions
+
+Decide and record the official website, relay HTTP origin, relay WebSocket URL, GitHub OAuth owner/scopes, hosting provider, release cadence, support expectation, disclosure contact, and Apple signing identity. Do not ship a desktop build until these operator-owned values are configured. Use this shape when recording the final values:
+
+```text
+Website: https://multaiplayer.com
+Relay provider: Railway
+Relay API: https://relay.multaiplayer.com
+Relay rooms: wss://relay.multaiplayer.com/rooms
+GitHub scopes: read:user repo
+Desktop support: Apple silicon, macOS 11 or later
+```
+
+The official alpha deliberately supports both public and private repositories. Disclose that GitHub's broad `repo` scope covers repositories the signed-in user can access. Codex/OpenAI credentials never belong in the relay: Codex uses the active host's local app-server.
+
+The desktop release build should set `VITE_RELAY_HTTP_URL` and `VITE_RELAY_URL` to the final hosted endpoints, and its CSP must allow exactly those origins. Publish `https://<official-site>/releases/latest.json` for each release; set `security: true` for security fixes.
+
+The official invitation transport is an HTTPS universal link, not a custom URL scheme. Before signing, publish no-redirect Apple App Site Association files on both `multaiplayer.com` and `open.multaiplayer.com` for exactly `/invite` and `/invite/`, with the release Team ID and bundle id `com.multaiplayer.desktop`. The canonical link is `https://open.multaiplayer.com/invite#invite=<id>&multaiplayerJoin=<capability>&approval=request`; all invite material stays in the fragment. The apex host is the explicit retry target after installation. `npm run verify:aasa` checks the live association files, and the package checks verify that the associated-domain entitlement is present. Those checks establish configuration shape, not operating-system dispatch: the cold-start and warm-app cases above remain signed-release manual checks.
+
+#### Official relay deployment
+
+The official free-alpha relay is deployed on Railway at `https://relay.multaiplayer.com` (`wss://relay.multaiplayer.com/rooms`). It is not release-ready until this runbook's persistence, secrets, TLS/WSS, monitoring, OAuth, and backup/restore gates pass. Railway builds `apps/relay/Dockerfile` from `main`; `railway.json` disables Serverless sleeping and pins the deployment health check, restart policy, drain timing, and the single San Francisco replica. Keeping the relay warm removes wake-up latency but bills its continuous actual CPU and memory use; the Railway project-level hard spending limit remains the cost backstop. The service uses Railway-managed secrets and a 5 GB persistent volume mounted at `/data`, with SQLite at `/data/relay-store.sqlite`. Railway is an infrastructure processor, not an additional identity provider or plaintext room-content service. The official relay is a stronger operational commitment than a local self-hosted instance: retain rollback support, health checks, backups, and logs with redaction controls. It deliberately runs one writer and one process; scale vertically or shard whole teams across independent relays under the [single-node relay decision](decisions/single-node-relay.md). A second replica is blocked on shared persistence/attachment coordination and both the implementation and required adversarial acceptance suite in the accepted [edge plus atomic shared-store rate-limiting contract](decisions/multi-instance-rate-limiting.md).
+
+Railway's public edge must be the only public path to the service. It terminates TLS/WSS and supplies the trusted client IP; the service must not expose a bypass domain or public origin that accepts direct traffic. Configure coarse IP request/connection controls at the platform edge, strip incoming forwarding headers, and test that a client-supplied `X-Forwarded-For` cannot select its limiter identity. The in-process limiter remains enabled as defense in depth.
+
+Start from `.env.example` and set production values in the same environment that launches the relay. The critical shape is:
+
+```bash
+NODE_ENV=production
+PORT=8080
+RAILWAY_RUN_UID=0
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT=https://t3.storageapi.dev
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION=auto
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE=virtual-host
+MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_PREFIX=relay-deletions/v1
+MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY=...
+MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS=7776000
+MULTAIPLAYER_RELAY_STORAGE=sqlite
+MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
+MULTAIPLAYER_MLS_VALIDATOR_PATH=/app/bin/mls-keypackage-validator
+MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://multaiplayer.com,https://open.multaiplayer.com
+MULTAIPLAYER_RELAY_REQUIRE_AUTH=true
+MULTAIPLAYER_RELAY_DEBUG=false
+MULTAIPLAYER_RELAY_STRUCTURED_LOGS=true
+MULTAIPLAYER_RELAY_RATE_LIMITS=true
+MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true
+MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true
+```
+
+The relay stores token-free identity sessions; it has no OAuth-token encryption secret to generate or rotate. Configure all size, retention, upload, rate, connection, and room quotas from `.env.example`; do not copy a stale second list into this guide.
+
+Pin `PORT=8080` and target both the generated and custom Railway domains at port `8080`; otherwise a stale domain target can pass Railway's internal health check while returning `502` publicly. Railway volumes are mounted as `root`, so Railway's documented `RAILWAY_RUN_UID=0` override is required for the relay to write SQLite data under `/data`. This grants root only inside the isolated service container; it does not grant host or Railway control-plane access. Reassess the override if Railway adds managed non-root volume ownership or the image gains a verified privilege-dropping entrypoint.
+
+Run in the deployed environment:
+
+```bash
+NODE_ENV=production node scripts/doctor.mjs --production-relay
+```
+
+The doctor must pass before the endpoint is advertised. Also verify:
+
+- `/healthz` reports process health and `/readyz` becomes not-ready during shutdown;
+- WebSocket upgrades reach `/rooms` and enforce the exact browser origin;
+- a staged drain rejects new HTTP/WS work, closes sockets with `1012`, and flushes storage;
+- `/metrics` contains bounded counters and publish, WebSocket-send, and SQLite-write latency histograms rather than room content;
+- SQLite is mounted persistently outside `/tmp` and a staged backup restores successfully;
+- the Railway Bucket deletion ledger is outside the SQLite volume/backup set, startup reconciliation succeeds, and a staged pre-deletion backup cannot resurrect the deleted identity;
+- rate and quota failures are observable without plaintext payloads; and
+- relay storage and traffic contain no plaintext transcripts, attachments, repo files, terminal output, Codex/OpenAI credentials, or plaintext GitHub tokens.
+
+Trust proxy headers only when a documented reverse proxy strips client-supplied forwarding headers and writes its own. Railway documents `X-Real-IP` as the client address supplied by its public edge, so the official Railway deployment sets both proxy variables true. Other deployments must keep both false unless their proxy provides an equivalent guarantee.
+
+##### Backup restore and deletion replay
+
+Never restore directly into the public service. Create an isolated Railway service/environment with no public domain, attach the restored SQLite copy, and inject the same deletion-ledger bucket plus HMAC key. Run `npm run build -w @multaiplayer/relay` and then `npm run deletions:reconcile -w @multaiplayer/relay`. The command must exit zero before any domain or traffic is attached. It authenticates every active tombstone, compares all primary-state identities regardless of local applied markers, reapplies deletion, and commits the resulting state. A blocker means the restored snapshot predates required ownership transfer or host handoff; keep it isolated and use a safe snapshot or resolve ownership before retrying. Record the Railway snapshot id, SQLite integrity result, tombstone/pending/deleted/pruned counts, and operator. Start normally and verify readiness only after that evidence is retained.
+
+The production snapshot maximum is 7,689,600 seconds (89 days); every tombstone uses a 7,776,000-second (90-day) protection horizon to provide scheduling/clock margin. A delayed reconciliation appends a fresh tombstone before primary cleanup, extending coverage from the time data is actually removed rather than relying on the original request date. Startup deletes each external tombstone and its matching primary applied marker only after that object's `protectUntil`. Until the newest object expires, the deleted GitHub identity cannot sign back in. Do not reduce the horizon below the longest backup retention or rotate/lose the HMAC key while protected backups exist.
+
+##### Relay rollback
+
+Keep the previous artifact and a pre-deploy SQLite backup. A rollback that restores SQLite must follow the isolated deletion-replay procedure above before traffic resumes; restoring SQLite alone is prohibited because it can resurrect deleted identity data. If authentication, storage, or WebSocket routing fails, remove the official relay from public copy and direct users to self-hosting. If plaintext leakage is suspected, stop the relay, preserve evidence privately, and follow `SECURITY.md` instead of opening a public issue.
+
+#### Hosted account restriction
+
+Account restriction is an operator denial control, not deletion or moderation of encrypted history. It prevents a GitHub identity from creating a new relay session, invalidates restored session cookies at startup, and leaves shared teams, rooms, MLS ciphertext, encrypted attachments, and device-local copies unchanged. Use a short non-sensitive reason code; do not put reports, names, or support notes in the relay database.
+
+The CLI is deliberately offline because the relay has one authoritative writer. Stop and fence the relay, back up SQLite, build the relay, then run:
+
+```bash
+npm run build -w @multaiplayer/relay
+npm run restrictions:manage -w @multaiplayer/relay -- \
+  restrict github:123456 abuse \
+  --data-path=/data/relay-store.sqlite \
+  --confirm-relay-stopped
+```
+
+An optional `--expires-at=2026-08-01T00:00:00.000Z` makes the restriction temporary. Expired restrictions fail open to normal authentication and are omitted when state is normalized. To remove a restriction:
+
+```bash
+npm run restrictions:manage -w @multaiplayer/relay -- \
+  unrestrict github:123456 \
+  --data-path=/data/relay-store.sqlite \
+  --confirm-relay-stopped
+```
+
+Restart one relay writer, verify `/readyz`, and confirm the affected identity receives `account_restricted` from GitHub verification while another test identity can still authenticate. The in-process restriction control performs immediate socket, presence, auth-session, device-session, and challenge eviction when an embedded operator invokes it; no public or loopback HTTP administration route exists.
+
+#### Signing, provenance, and publication
+
+Release tags should be signed with `git tag -s` and verified with `git tag -v`. The release workflow requires these GitHub secrets:
+
+```text
+APPLE_CERTIFICATE
+APPLE_CERTIFICATE_PASSWORD
+APPLE_SIGNING_IDENTITY
+APPLE_ID
+APPLE_PASSWORD
+APPLE_TEAM_ID
+KEYCHAIN_PASSWORD
+```
+
+It builds only `aarch64-apple-darwin`, verifies that the executable is arm64-only and declares `LSMinimumSystemVersion` 11.0, then verifies Developer ID signing and stapled notarization, runs Gatekeeper checks, writes checksums, emits an SPDX SBOM, records build-provenance attestations, and keyless-signs the checksum manifest and SBOM with Sigstore. Missing signing secrets fail the release; do not publish ad hoc or unsigned local builds as public artifacts.
+
+The release lane validates the live AASA documents before the Developer ID build and verifies the packaged associated-domain entitlement afterward. Keep `APPLE_TEAM_ID` synchronized across signing, the AASA application identifier, and the ten-character Team ID validation. The ordinary macOS CI package uses Tauri's ad-hoc (`-`) identity, which requires no Apple account or personal certificate and proves that the entitlement was assembled into the code signature. Only a Developer ID-signed, installed application whose Team ID matches the live domains can prove macOS universal-link routing.
+
+Use [reproducible-builds.md](reproducible-builds.md) to compare the unsigned application payload. Signed/notarized archives are not claimed to be bit-for-bit reproducible.
+
+Before announcement, verify the update manifest, release notes, artifact digests, signature/notarization status, SBOM/provenance attachments, hosted relay, and two-person dogfood result. Ordinary bug reports should use the bounded redacted diagnostics export; never request invite fragments, credentials, transcripts, terminal output, browser content, or private source by default.
+
+#### Hosted relay exit policy
+
+Give at least 30 days' public notice before a planned official hosted relay shutdown. During the notice window, keep sign-in, relay connectivity, and these instructions available unless an emergency security, legal, provider, or private-data incident makes that unsafe. Emergency notice may be shorter only for those reasons and should preserve the minimum safe migration path.
+
+The relay is not the source of truth for project folders, Git history, MLS private state, or device-local encrypted history. Migration recreates relay-side teams, rooms, memberships, sessions, invites, backlog, and blobs.
+
+#### Hosted-to-self-hosted migration
+
+Choose a quiet window and keep every original device intact. Before cutover:
+
+1. Deploy the destination using [self-hosting.md](self-hosting.md), persistent storage, HTTPS/WSS, and a passing production doctor.
+2. Build a desktop whose CSP allows the destination HTTPS and WSS origins.
+3. Back up the destination relay and verify `/healthz`, `/readyz`, `/rooms`, restart persistence, and content-free logs.
+
+On the coordinating device, change the Settings relay HTTP and WebSocket URLs, sign in again, and recreate the team and rooms. Generate fresh capability-authenticated invites; never copy old invite links or fragments into public logs, issues, or chat.
+
+For every member/device:
+
+1. Keep the old room locally until the replacement works.
+2. Switch relay URLs and sign in to the new origin.
+3. Join with a fresh private invite.
+4. Send and receive an encrypted test message and attachment.
+5. Confirm retained local history remains readable.
+
+With two members, verify the active host, Codex approval, session persistence, member removal, and future-traffic exclusion. After all members join, issue an MLS Update Commit and verify every eligible device advances while removed or stale devices do not.
+
+If a device cannot read retained history, stop before clearing rooms or reinstalling: the relay cannot reconstruct MLS state or exporter-derived history secrets. Until encrypted export/import ships, preserved devices are the continuity mechanism.
+
+##### Migration rollback
+
+Before final cutover, members can switch Settings back to the hosted origins and continue in the original rooms. Messages sent only through the destination are not copied back automatically. Keep the hosted rooms quiet during observation, then publish the cutover time and retain the old service for the promised notice window.
+
+#### Maintenance rules
+
+- No new blocking check without deleting or demoting an existing blocking check.
+- Update this guide when a release workflow, production doctor check, relay default, or migration behavior changes.
+- Keep exact environment defaults in `.env.example` and [self-hosting.md](self-hosting.md), not duplicated here.
+- Keep CI, dependency/security automation, compatibility decisions, and release operations together in this guide; keep security boundaries in [threat-model.md](threat-model.md).
+- Run `npm run verify` before release handoff.
+- Before a non-alpha claim, require independent cryptography review, production-scale persistence/rate limiting, recurring multi-device adversarial journeys, and documented release-key custody.

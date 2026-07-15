@@ -1,10 +1,17 @@
 use serde::Serialize;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager, Runtime, Url};
+#[cfg(any(target_os = "macos", test))]
+use tauri::Url;
+#[cfg(target_os = "macos")]
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
+#[cfg(target_os = "macos")]
 const INVITE_AVAILABLE_EVENT: &str = "native-invite://available";
+#[cfg(any(target_os = "macos", test))]
 const MAX_INVITE_URL_CHARS: usize = 12_288;
+#[cfg(any(target_os = "macos", test))]
 const MAX_INVITE_ID_CHARS: usize = 160;
+#[cfg(any(target_os = "macos", test))]
 const ALLOWED_HOSTS: [&str; 2] = ["multaiplayer.com", "open.multaiplayer.com"];
 
 #[derive(Clone, Serialize)]
@@ -22,6 +29,7 @@ pub struct NativeInviteState {
 }
 
 impl NativeInviteState {
+    #[cfg(any(target_os = "macos", test))]
     fn replace(&self, invite: NativeInvitePayload) -> Result<(), ()> {
         self.pending.lock().map_err(|_| ())?.replace(invite);
         Ok(())
@@ -45,6 +53,7 @@ pub fn take_pending_native_invite(
 
 /// Accept an OS-delivered link without ever emitting or logging its bearer
 /// fragment. A batch is rejected as ambiguous; macOS normally supplies one URL.
+#[cfg(target_os = "macos")]
 pub fn handle_opened_invite_urls<R: Runtime>(app: &AppHandle<R>, urls: &[Url]) {
     let [url] = urls else {
         return;
@@ -67,6 +76,7 @@ pub fn handle_opened_invite_urls<R: Runtime>(app: &AppHandle<R>, urls: &[Url]) {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn parse_invite_url(url: &Url) -> Result<NativeInvitePayload, InviteUrlError> {
     if url.as_str().len() > MAX_INVITE_URL_CHARS {
         return Err(InviteUrlError::Invalid);
@@ -118,6 +128,7 @@ fn parse_invite_url(url: &Url) -> Result<NativeInvitePayload, InviteUrlError> {
     })
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn bounded_base64url(value: &str, max: usize) -> bool {
     !value.is_empty()
         && value.len() <= max
@@ -127,6 +138,7 @@ fn bounded_base64url(value: &str, max: usize) -> bool {
 }
 
 #[derive(Debug)]
+#[cfg(any(target_os = "macos", test))]
 enum InviteUrlError {
     Invalid,
 }

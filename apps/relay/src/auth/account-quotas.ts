@@ -6,7 +6,7 @@ const durableQuotaTransactionTails = new WeakMap<object, Promise<void>>();
 
 /**
  * Serializes reserve -> domain mutation -> persistence -> rollback as one
- * in-memory transaction. JSON persistence writes a whole-state snapshot, so
+ * in-memory transaction. Persistence may serialize state asynchronously, so
  * letting the next reservation begin after only the save promise settles can
  * capture state before the failed request has rolled back.
  */

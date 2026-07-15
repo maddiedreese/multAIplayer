@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Database, startRelay, startRelayWithWorkspace } from "../support/relay.js";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRelayPersistence } from "../../src/persistence.js";
 import { RelayPersistenceMigrationError, SqliteRelayPersistence } from "../../src/sqlite-persistence.js";
@@ -74,8 +74,8 @@ test("SQLite startup purges legacy host-local room config from rows, pages, and 
 test("SQLite accepts only one concurrent Commit for an epoch", async () => {
   const dir = await mkdtemp(join(tmpdir(), "relay-cas-")),
     path = join(dir, "relay.sqlite");
-  const first = createRelayPersistence({ backend: "sqlite", dataPath: path }),
-    second = createRelayPersistence({ backend: "sqlite", dataPath: path });
+  const first = createRelayPersistence({ dataPath: path }),
+    second = createRelayPersistence({ dataPath: path });
   const room = { id: "room", teamId: "team", acceptedMlsEpoch: 0 };
   const state = {
     version: 1,
@@ -120,7 +120,7 @@ test("SQLite accepts only one concurrent Commit for an epoch", async () => {
 test("KeyPackage approval and pending request state survive restart", async () => {
   const dir = await mkdtemp(join(tmpdir(), "relay-kp-restart-")),
     path = join(dir, "relay.sqlite");
-  const persistence = createRelayPersistence({ backend: "sqlite", dataPath: path });
+  const persistence = createRelayPersistence({ dataPath: path });
   const state = {
     version: 1,
     savedAt: new Date().toISOString(),
@@ -156,7 +156,7 @@ test("KeyPackage approval and pending request state survive restart", async () =
   try {
     await persistence.save(state);
     persistence.close();
-    const reopened = createRelayPersistence({ backend: "sqlite", dataPath: path });
+    const reopened = createRelayPersistence({ dataPath: path });
     const loaded = (await reopened.load()) as typeof state;
     assert.equal(loaded.inviteRequests.length, 1);
     assert.equal(loaded.invites[0]?.keyPackageHash, state.invites[0]!.keyPackageHash);
@@ -230,7 +230,6 @@ test("a post-import backup rename failure preserves committed SQLite state and r
     persistence.close();
 
     const restarted = createRelayPersistence({
-      backend: "sqlite",
       dataPath: sqlitePath,
       legacyJsonImportPath: legacyPath
     });
@@ -254,7 +253,6 @@ test("invalid legacy JSON aborts migration without moving or replacing the sourc
   const sqlitePath = join(dir, "relay-store.sqlite");
   await writeFile(legacyPath, "{not-json", "utf8");
   const persistence = createRelayPersistence({
-    backend: "sqlite",
     dataPath: sqlitePath,
     legacyJsonImportPath: legacyPath
   });
@@ -277,7 +275,6 @@ test("unsupported legacy JSON versions abort migration and preserve the source",
   const sqlitePath = join(dir, "relay-store.sqlite");
   await writeFile(legacyPath, JSON.stringify({ version: 999, teams: [] }), "utf8");
   const persistence = createRelayPersistence({
-    backend: "sqlite",
     dataPath: sqlitePath,
     legacyJsonImportPath: legacyPath
   });
@@ -294,28 +291,10 @@ test("unsupported legacy JSON versions abort migration and preserve the source",
   }
 });
 
-test("unreadable JSON stores are quarantined before the relay starts clean", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "relay-json-quarantine-"));
-  const dataPath = join(dir, "relay-store.json");
-  await writeFile(dataPath, "{not-json", "utf8");
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_STORAGE: "json" }, undefined, dataPath);
-  try {
-    const workspace = await fetch(`${relay.baseUrl}/teams`);
-    assert.equal(workspace.status, 200);
-    assert.deepEqual(await workspace.json(), { teams: [], rooms: [] });
-    assert.ok(
-      (await readdir(dirname(dataPath))).some((name) => name.startsWith("relay-store.json.corrupt-unreadable-"))
-    );
-  } finally {
-    await relay.close();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 test("incremental SQLite writes never update or delete unrelated entity rows", async () => {
   const dir = await mkdtemp(join(tmpdir(), "relay-incremental-"));
   const path = join(dir, "relay.sqlite");
-  const persistence = createRelayPersistence({ backend: "sqlite", dataPath: path });
+  const persistence = createRelayPersistence({ dataPath: path });
   const originalTeam = { id: "team", name: "Original", members: 1 };
   try {
     await persistence.save({

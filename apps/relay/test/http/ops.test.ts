@@ -5,12 +5,11 @@ import {
   createDebugSession,
   emptyWorkspaceFixture,
   onceOpen,
-  readFile,
   startRelay,
   waitForClose,
   waitForJoined,
   waitForNotReady,
-  type StoredRelayStateFixture
+  waitForStoredState
 } from "../support/relay.js";
 
 test("relay exposes content-free operational metrics", async () => {
@@ -96,7 +95,14 @@ test("relay drains readiness, sockets, and pending store writes on graceful shut
     assert.equal(close.reason, "Relay shutting down");
     await shutdownPromise;
 
-    const stored = JSON.parse(await readFile(relay.dataPath, "utf8")) as StoredRelayStateFixture;
+    const stored = await waitForStoredState(
+      relay.dataPath,
+      (state) =>
+        Array.isArray(state.teams) &&
+        state.teams.some(
+          (team) => typeof team === "object" && team !== null && "name" in team && team.name === "Shutdown flush team"
+        )
+    );
     assert.ok(
       Array.isArray(stored.teams) &&
         stored.teams.some(

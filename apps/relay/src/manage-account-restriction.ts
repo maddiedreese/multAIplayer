@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
 import { isRecord } from "@multaiplayer/protocol";
-import { createRelayPersistence, type RelayStorageBackend } from "./persistence.js";
+import { createRelayPersistence } from "./persistence.js";
 import type { AccountRestriction } from "./state.js";
 import { validateAccountRestriction } from "./auth/account-restrictions.js";
 
 const parsed = parseArguments(process.argv.slice(2));
-const persistence = createRelayPersistence({ backend: parsed.storage, dataPath: parsed.dataPath });
+const persistence = createRelayPersistence({ dataPath: parsed.dataPath });
 
 try {
   const loaded = await persistence.load();
@@ -46,7 +46,6 @@ function parseArguments(args: string[]): {
   userId: string;
   reasonCode: string;
   expiresAt?: string;
-  storage: RelayStorageBackend;
   dataPath: string;
 } {
   if (!args.includes("--confirm-relay-stopped")) {
@@ -55,8 +54,6 @@ function parseArguments(args: string[]): {
   const [action, userId, reason = "operator_restriction"] = args.filter((arg) => !arg.startsWith("--"));
   if (action !== "restrict" && action !== "unrestrict") usage("action must be restrict or unrestrict");
   if (!userId) usage("user id is required");
-  const storageValue = option(args, "storage") ?? "sqlite";
-  if (storageValue !== "sqlite" && storageValue !== "json") usage("storage must be sqlite or json");
   const dataPathValue = option(args, "data-path") ?? process.env.MULTAIPLAYER_RELAY_DATA_PATH;
   if (!dataPathValue) usage("--data-path or MULTAIPLAYER_RELAY_DATA_PATH is required");
   const expiresAt = option(args, "expires-at");
@@ -65,7 +62,6 @@ function parseArguments(args: string[]): {
     userId,
     reasonCode: reason,
     ...(expiresAt ? { expiresAt } : {}),
-    storage: storageValue,
     dataPath: resolve(dataPathValue)
   };
 }
@@ -76,6 +72,6 @@ function option(args: string[], name: string) {
 
 function usage(message: string): never {
   throw new Error(
-    `${message}. Usage: restrictions:manage -- restrict <user-id> [reason_code] --data-path=<path> --confirm-relay-stopped [--storage=sqlite|json] [--expires-at=<ISO>]`
+    `${message}. Usage: restrictions:manage -- restrict <user-id> [reason_code] --data-path=<path> --confirm-relay-stopped [--expires-at=<ISO>]`
   );
 }

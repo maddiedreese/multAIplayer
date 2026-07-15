@@ -2,7 +2,6 @@ import React, { type ReactNode } from "react";
 import type { CodexApprovalSummaryDisplay } from "./CodexApprovalCard";
 import { RoomChatContent } from "./RoomChatContent";
 import { RoomChatComposer } from "./RoomChatComposer";
-import { useRoomGoalTicker } from "../hooks/useRoomGoalTicker";
 import type { CodexActivity, RoomGoal } from "../types";
 
 export interface RoomChatAttachmentDisplay {
@@ -165,7 +164,11 @@ export function RoomChatPanel({
   onSendMessage: () => void;
   guidedFirstTurn?: ReactNode;
 }) {
-  useRoomGoalTicker(roomGoal, onTickGoalElapsed);
+  React.useEffect(() => {
+    if (roomGoal?.status !== "active") return undefined;
+    const interval = window.setInterval(onTickGoalElapsed, 1000);
+    return () => window.clearInterval(interval);
+  }, [onTickGoalElapsed, roomGoal?.id, roomGoal?.status]);
 
   return (
     <>

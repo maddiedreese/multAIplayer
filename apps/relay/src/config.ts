@@ -1,13 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { logRelayEvent } from "./observability.js";
 import { resolve } from "node:path";
-import type { RelayStorageBackend } from "./persistence.js";
 
 export interface RelayConfig {
   nodeEnv: string;
   port: number;
   dataPath: string;
-  storageBackend: RelayStorageBackend;
   legacyJsonImportPath: string | null;
   mlsBacklogLimit: number;
   mlsBacklogRetentionDays: number;
@@ -76,7 +74,7 @@ export function loadRelayConfig(): RelayConfig {
   loadRelayEnvFiles();
 
   const nodeEnv = process.env.NODE_ENV ?? "development";
-  const storageBackend = parseStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE);
+  validateStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE);
   const storageWasExplicit = process.env.MULTAIPLAYER_RELAY_STORAGE !== undefined;
   const dataPathWasExplicit = process.env.MULTAIPLAYER_RELAY_DATA_PATH !== undefined;
   const defaultLegacyJsonPath = resolve(".multaiplayer/relay-store.json");
@@ -99,19 +97,12 @@ export function loadRelayConfig(): RelayConfig {
   return {
     nodeEnv,
     port: parseIntegerEnv(process.env.PORT, 4321, 1, 65_535),
-    dataPath: resolve(
-      process.env.MULTAIPLAYER_RELAY_DATA_PATH ??
-        `.multaiplayer/relay-store.${storageBackend === "sqlite" ? "sqlite" : "json"}`
-    ),
-    storageBackend,
-    legacyJsonImportPath:
-      storageBackend !== "sqlite"
-        ? null
-        : process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH
-          ? resolve(process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH)
-          : !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
-            ? defaultLegacyJsonPath
-            : null,
+    dataPath: resolve(process.env.MULTAIPLAYER_RELAY_DATA_PATH ?? ".multaiplayer/relay-store.sqlite"),
+    legacyJsonImportPath: process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH
+      ? resolve(process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH)
+      : !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
+        ? defaultLegacyJsonPath
+        : null,
     mlsBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
     mlsBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
@@ -233,12 +224,11 @@ function deletionLedgerSettings() {
   };
 }
 
-function parseStorageBackend(value: string | undefined): RelayStorageBackend {
+function validateStorageBackend(value: string | undefined): void {
   const normalized = value?.trim().toLowerCase();
-  if (!normalized || normalized === "sqlite") return "sqlite";
-  if (normalized === "json") return "json";
-  logRelayEvent("warn", "invalid_storage_backend_ignored");
-  return "sqlite";
+  if (!normalized || normalized === "sqlite") return;
+  logRelayEvent("error", "unsupported_storage_backend");
+  throw new Error("MULTAIPLAYER_RELAY_STORAGE must be sqlite; the JSON runtime backend has been removed.");
 }
 
 function loadRelayEnvFiles() {

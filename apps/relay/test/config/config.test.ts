@@ -57,23 +57,20 @@ test("relay falls back safely for invalid shutdown drain values", () => {
   }
 });
 
-test("relay defaults to SQLite and requires an explicit JSON compatibility choice", () => {
+test("relay supports only SQLite persistence", () => {
   const previousStorage = process.env.MULTAIPLAYER_RELAY_STORAGE;
   const previousDataPath = process.env.MULTAIPLAYER_RELAY_DATA_PATH;
   try {
     delete process.env.MULTAIPLAYER_RELAY_STORAGE;
     delete process.env.MULTAIPLAYER_RELAY_DATA_PATH;
     const defaultConfig = loadRelayConfig();
-    assert.equal(defaultConfig.storageBackend, "sqlite");
     assert.match(defaultConfig.dataPath, /relay-store\.sqlite$/);
 
     process.env.MULTAIPLAYER_RELAY_STORAGE = "json";
-    const jsonConfig = loadRelayConfig();
-    assert.equal(jsonConfig.storageBackend, "json");
-    assert.match(jsonConfig.dataPath, /relay-store\.json$/);
+    assert.throws(() => loadRelayConfig(), /JSON runtime backend has been removed/);
 
     process.env.MULTAIPLAYER_RELAY_STORAGE = "invalid";
-    assert.equal(loadRelayConfig().storageBackend, "sqlite");
+    assert.throws(() => loadRelayConfig(), /must be sqlite/);
   } finally {
     if (previousStorage === undefined) delete process.env.MULTAIPLAYER_RELAY_STORAGE;
     else process.env.MULTAIPLAYER_RELAY_STORAGE = previousStorage;

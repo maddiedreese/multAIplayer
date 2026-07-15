@@ -46,10 +46,8 @@ Use this index to find the React lifecycle or composition point for a desktop be
 - `useRoomInteractionContext.ts` assembles room interaction capabilities.
 - `useRoomMemberRows.ts` derives room member rows for display.
 - `useRoomRuntimeContext.ts` assembles room tool actions and background behavior.
-- `useRoomSettingsActor.ts` identifies the local settings actor.
 - `useRoomToolActions.ts` composes account, git, and other room tool actions.
 - `useSelectedRoomContext.ts` derives the selected room context.
-- `useSelectedRoomReadReceipt.ts` marks the selected room as read.
 - `useSelectedRoomRuntime.ts` derives selected-room runtime and privilege state.
 - `useSelectedRoomValues.ts` selects the values rendered for the active room.
 
