@@ -16,7 +16,9 @@ function scenarioModulePath(name: string): string {
 }
 
 function Harness() {
-  const scenarioName = new URLSearchParams(window.location.search).get("scenario") ?? "";
+  const search = new URLSearchParams(window.location.search);
+  const scenarioName = search.get("scenario") ?? "";
+  const presentation = search.get("presentation") === "readme";
   const loader = scenarioModules[scenarioModulePath(scenarioName)];
   const [scenario, setScenario] = React.useState<UiContractScenarioModule | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -38,12 +40,14 @@ function Harness() {
 
   const Scenario = scenario.default;
   return (
-    <main className="e2e-harness-shell">
-      <aside className="e2e-harness-boundary" aria-label="E2E coverage boundary">
-        <strong>UI-contract E2E harness</strong>
-        <span>{scenario.description}</span>
-        <span>Simulated boundaries: {scenario.mockedBoundaries.join(", ") || "none"}</span>
-      </aside>
+    <main className={`e2e-harness-shell ${presentation ? "readme-presentation" : ""}`}>
+      {!presentation && (
+        <aside className="e2e-harness-boundary" aria-label="E2E coverage boundary">
+          <strong>UI-contract E2E harness</strong>
+          <span>{scenario.description}</span>
+          <span>Simulated boundaries: {scenario.mockedBoundaries.join(", ") || "none"}</span>
+        </aside>
+      )}
       <Scenario />
     </main>
   );

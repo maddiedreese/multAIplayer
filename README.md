@@ -1,84 +1,118 @@
-# multAIplayer
+<p align="center">
+  <img src="apps/desktop/src/assets/multaiplayer-icon.png" width="104" alt="multAIplayer app icon">
+</p>
 
-multAIplayer helps teams build with Codex together.
+<h1 align="center">multAIplayer</h1>
 
-People chat normally in private project rooms. When the group needs help, someone invokes Codex. The active host approves the turn, and their local Codex works from the recent chat, attachments, selected project folder, browser state, and terminals. Codex can make code changes, commit, push, and open a PR while the room watches progress together.
+<p align="center"><strong>Build with Codex. Together.</strong></p>
 
-Treat room membership as controlled access to the active host's machine: admitted members can ask Codex to act on the host's project, terminal, browser, Git, and GitHub context, subject to the host's approval settings.
+<p align="center">
+  A native macOS workspace where trusted teammates share an encrypted project room,<br>
+  propose work, and follow one active host's local Codex session in real time.
+</p>
 
-Short version: build with Codex together. Private by default. Open source.
+<p align="center">
+  <a href="https://multaiplayer.com">Website</a> ·
+  <a href="docs/using-the-app.md">Using the app</a> ·
+  <a href="docs/faq.md">FAQ</a> ·
+  <a href="docs/threat-model.md">Security model</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-Native room traffic uses RFC 9420 MLS through a Rust-owned cryptographic boundary. Invite links contain no group secret but do contain a private single-use bearer capability: the active host validates an HPKE-sealed request bound to the joiner's exact KeyPackage before creating an MLS Add and Welcome. Member removal uses MLS Remove without claiming to erase content already delivered. The product is native-only; browser builds show an install notice and never initialize a workspace, relay connection, identity, or MLS state.
+> [!IMPORTANT]
+> multAIplayer is a free, open-source alpha for Apple silicon Macs running macOS 11 or later. No supported public build has been published yet. The website will enable its download only after a Developer ID-signed and notarized release passes the release gates.
 
-Official invitations use an HTTPS universal link at `https://open.multaiplayer.com/invite#…`. All invitation fields, including the relay invite id, stay in the URL fragment; the landing request therefore carries no invite material to either website host. On macOS, a correctly signed release whose associated-domain entitlement matches the live AASA file can receive the link directly. Until the supported signed release replaces the placeholder download, the landing page must not present that placeholder as trusted; afterward it can offer the signed DMG and an explicit retry through `multaiplayer.com`. There is no custom URL scheme. Treat the complete link as a private bearer secret even though host approval and MLS admission are still required.
+## See the app
 
-Start with [docs/using-the-app.md](docs/using-the-app.md) for the desktop features, [docs/product-architecture.md](docs/product-architecture.md) for the product model, [docs/cryptography.md](docs/cryptography.md) for key architecture and the MLS decision, [docs/codex-hosting.md](docs/codex-hosting.md) for how host-side Codex works, [docs/local-preview-sharing.md](docs/local-preview-sharing.md) for localhost preview tunnels, [docs/threat-model.md](docs/threat-model.md) and its [public changelog](docs/threat-model-changelog.md) for privacy boundaries, [docs/self-hosting.md](docs/self-hosting.md) for relay deployment, and [docs/if-unmaintained.md](docs/if-unmaintained.md) for the project exit path. Contributors and maintainers can use [CHANGELOG.md](CHANGELOG.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md), [docs/architecture-walkthrough.md](docs/architecture-walkthrough.md), [docs/ci-policy.md](docs/ci-policy.md), [docs/release-operations.md](docs/release-operations.md), [docs/reproducible-builds.md](docs/reproducible-builds.md), and [docs/alpha-limitations.md](docs/alpha-limitations.md).
+<p align="center">
+  <img src="docs/assets/screens/onboarding.png" width="49%" alt="multAIplayer welcome screen with create and join choices">
+  <img src="docs/assets/screens/safe-defaults.png" width="49%" alt="multAIplayer safe defaults review screen">
+</p>
 
-External cryptographic and protocol reviewers should begin with the curated [external review packet](docs/external-review-packet.md).
+<p align="center">
+  <img src="docs/assets/screens/codex-room.png" width="72%" alt="A multAIplayer room showing a teammate message and expandable Codex activity">
+</p>
 
-The hosted service is governed by the [Privacy Policy](https://multaiplayer.com/privacy) and [Terms of Service](https://multaiplayer.com/terms).
+These images are deterministic captures of the current production components and styles with representative local data—not concept art. Regenerate them with `npm run docs:screenshots` after a visible UI change.
 
-## Maintenance reality
+## What it does
 
-multAIplayer is currently a single-maintainer project. There is no guaranteed response time, succession team, or promise that the hosted relay will operate indefinitely. Do not make the hosted service the only copy of project data or room history. Keep normal Git/project backups and read [If this project goes unmaintained](docs/if-unmaintained.md) before depending on the alpha for important work.
+Each room connects a team conversation to one selected project folder and one active host:
 
-## Desktop Surfaces
+1. A teammate writes normally or proposes a Codex turn.
+2. The active host reviews what will be shared and what local authority the turn requests.
+3. The host's own Codex app-server works in the selected project using the host's local account and credentials.
+4. The room receives encrypted chat, approvals, structured Codex progress, diffs, Git activity, and results.
+5. Host authority can be handed to another verified member through an explicit MLS-backed transfer.
 
-The desktop app uses Monaco Editor for workspace file editing, xterm.js for the terminal emulator, a Rust PTY layer through `portable-pty` for host shell sessions, and Tauri/Wry WebViews for multi-tab in-room web browsing. These are embedded as open source dependencies with attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The desktop also provides project files and diffs, PTY terminals, Git and GitHub workflows, multi-tab in-room browsing, encrypted attachments, local-preview sharing, Codex thread forks, and normalized subagent activity. See [Using the app](docs/using-the-app.md) for the complete surface tour.
 
-Codex hosting uses the active host's local app-server. The supported compatibility range is 0.133.0–0.144.0, with generated-schema fixtures for 0.133.0, 0.143.0, and 0.144.0; newer versions are labelled unverified and contract-sensitive features fail closed. See [docs/codex-hosting.md](docs/codex-hosting.md) for catalog selection, bidirectional approvals, metadata-only activity, host-local account/MCP controls, and thread forks.
+## The trust boundary
 
-## Download
+Room membership is controlled access to the active host's machine. Admitted members can see shared project context and request actions involving the host's project, terminal, browser, Git, GitHub, and Codex session. The host remains responsible for reviewing approvals.
 
-Public alpha downloads support Apple silicon Macs running macOS 11 or later and are published through [GitHub Releases](https://github.com/maddiedreese/multAIplayer/releases). Windows, Linux, and Intel Macs are not supported.
+- Room traffic uses RFC 9420 MLS through a Rust-owned native boundary.
+- The relay stores routing and membership metadata, public device material, opaque MLS records, encrypted blobs, invites, and encrypted OAuth sessions. It is designed not to receive plaintext chat, attachment contents, project files, terminal output, or Codex/OpenAI credentials.
+- The relay's GitHub proxy necessarily handles repository and pull-request fields for operations the user requests. The official OAuth grant is `read:user repo`, covering both public and private repositories the user can access.
+- Invite links contain a private, single-use bearer capability in the URL fragment. Share the complete link only through a private channel; never paste it into an issue, log, diagnostic, or support request.
+- MLS integration, host-authority policy, invite HPKE flow, and encrypted storage have extensive automated evidence but no independent professional audit. Encryption is the intended and tested boundary, not an independently verified guarantee.
 
-The supported public alpha must be Developer ID signed and notarized; the existing scaffold download is not a supported release. Treat every build as security-sensitive alpha software and prefer test/self-hosted rooms before using private projects.
+Read the [threat model](docs/threat-model.md), [cryptography architecture](docs/cryptography.md), [alpha limitations](docs/alpha-limitations.md), and [security policy](SECURITY.md) before using private projects.
 
-Universal-link delivery additionally depends on the signed app's Apple Team ID, associated-domain entitlement, and the live no-redirect AASA files on both `open.multaiplayer.com` and `multaiplayer.com`. Release automation validates their shape and the packaged entitlement, but a manual signed-release cold-launch and already-running-app check remains required.
+## Hosted alpha service
 
-Protocol v2 uses RFC 9420 MLS through `mls-rs`; the application integration, host-authority policy, HPKE invite flow, and storage boundary have not received an independent professional audit. End-to-end encryption is the intended, tested design boundary, not an independently verified guarantee.
+The official free-alpha relay is live on Railway at `https://relay.multaiplayer.com` and `wss://relay.multaiplayer.com/rooms`. It uses GitHub Device Flow for identity, encrypted persistent sessions, and authenticated workspace access. There is no separate multAIplayer password or billing account.
 
-## Run Locally
+The service is free, experimental, and has no uptime, recovery, or response-time guarantee. Keep normal Git and project backups. The Profile drawer can delete hosted account data after owned teams are transferred or deleted and hosted rooms are handed off; shared encrypted records, other members' copies, local room state, GitHub's OAuth grant, and backup rotation are separate deletion boundaries.
+
+Hosted use is governed by the [Privacy Policy](https://multaiplayer.com/privacy) and [Terms of Service](https://multaiplayer.com/terms). The [self-hosting guide](docs/self-hosting.md) covers independent relay deployments, and [If this project goes unmaintained](docs/if-unmaintained.md) explains the continuity plan.
+
+## Run it locally
+
+Prerequisites are Node.js 22, npm, Rust/Cargo, Xcode command-line tools, and Codex. On macOS:
 
 ```sh
-npm install
+npm ci
+cp .env.example .env
 npm run doctor
-npm run dev
-```
-
-Node.js 22 or newer is required; `nvm use` selects the same Node major used in CI. `npm run doctor` checks the local Node/npm/Rust/Cargo setup and macOS packaging prerequisites where applicable. `npm run dev` starts the local relay and desktop web shell; see [the self-hosting guide](docs/self-hosting.md) for the local endpoints and relay configuration.
-
-To run the native Tauri app with the relay:
-
-```sh
 npm run tauri:dev
 ```
 
-Copy `.env.example` to `.env` and set `GITHUB_CLIENT_ID` to enable GitHub sign-in. The relay loads the repo root `.env`, a relay-local `apps/relay/.env`, or an explicit `MULTAIPLAYER_RELAY_ENV_FILE`; shell-exported variables take precedence. Set `MULTAIPLAYER_RELAY_SESSION_SECRET` to a stable high-entropy value if the relay should keep encrypted GitHub sessions across restarts. The default `GITHUB_OAUTH_SCOPES=read:user repo` supports GitHub workflows for both public and private repositories. The `repo` scope grants broad access to repositories the signed-in user can access; self-hosters that need public repositories only may narrow it to `read:user public_repo`.
+Set `GITHUB_CLIENT_ID` in `.env` to use GitHub sign-in. A stable `MULTAIPLAYER_RELAY_SESSION_SECRET` keeps encrypted OAuth sessions readable across relay restarts. The root development command starts the local relay and frontend used by Tauri; a normal browser intentionally receives only the native-app notice and never initializes a workspace, identity, relay connection, diagnostics, or MLS state.
 
-GitHub OAuth is required for signed-in workspace access. For `NODE_ENV=production`, the relay requires authentication by default even if GitHub OAuth is not configured. Self-hosters who intentionally want an unauthenticated private LAN relay must set `MULTAIPLAYER_RELAY_REQUIRE_AUTH=false` explicitly.
-
-Self-hosted desktop builds can expose relay endpoint editing by setting `VITE_ALLOW_RELAY_CONFIGURATION=true`. Their app-shell CSP must include the chosen HTTP and WebSocket relay origins. Official packaged builds pin their hosted endpoints and do not expose relay editing or localhost relay access.
-
-For an internet-facing relay, configure exact allowed origins, durable encrypted session storage, auth-required mode, persistent relay storage, and rate limits, then run:
+Useful verification commands:
 
 ```sh
-npm run doctor:production-relay
-```
-
-The official free-alpha relay will be hosted on Railway after its DNS, persistent storage, secrets, TLS/WSS routing, monitoring, and backup/restore checks pass; it is not currently live. The relay also ships with a Dockerfile at `apps/relay/Dockerfile`; see [docs/self-hosting.md](docs/self-hosting.md) for the build/run command and production env checklist. Teams leaving the hosted relay can follow the migration section in [docs/release-operations.md](docs/release-operations.md); the hosted relay policy is at least 30 days' notice before any planned shutdown, with migration kept available during that window whenever safely possible.
-
-Production deploys should wire `/readyz` to platform readiness: shutdown makes it not-ready, rejects new HTTP/WS work, closes existing room WebSockets with `1012`, and flushes the relay store before exit.
-
-## CI
-
-Core GitHub Actions run on pushes and pull requests; mutation and heavyweight security/reproducibility checks run on schedules, releases, or manual dispatch as documented in [the CI policy](docs/ci-policy.md):
-
-```sh
+npm run check
+npm test
 npm run verify
-npm run tauri:build -w @multaiplayer/desktop
 ```
 
-`npm run verify` type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the relay/desktop web artifacts. The macOS CI job runs on the pinned `macos-15` runner, builds a Tauri app with Tauri's ad-hoc (`-`) identity, verifies that the packaged associated-domain entitlement is present, and uploads both the `.app` bundle and `.dmg` as workflow artifacts for inspection only. Ad-hoc signing uses no Apple account or Developer ID certificate and cannot prove Apple universal-link dispatch. Apple silicon is the only configured desktop release architecture: Windows, Linux, and Intel Mac packages are not supported or published during the alpha.
+`npm run verify` runs the TypeScript, UI, relay, package, Rust, and native verification layers. More expensive mutation, fuzzing, supply-chain, and reproducibility jobs run on their documented CI schedules. See [the CI policy](docs/ci-policy.md) for exact evidence boundaries.
 
-Tagged versions matching `v*` run the release workflow. It verifies the repo on the pinned `macos-15` runner, checks both live AASA documents against the release Team ID, requires Apple Developer ID signing/notarization secrets, builds the signed and notarized macOS app, validates its associated-domain entitlement plus the stapled app and DMG tickets, packages the `.app` bundle and `.dmg`, writes `SHA256SUMS.txt`, and creates a GitHub Release. Tags containing `alpha`, `beta`, or `rc` are published as prereleases.
+## Repository map
+
+| Path | Responsibility |
+| --- | --- |
+| `apps/desktop` | React desktop UI and the Tauri/Rust native boundary |
+| `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, HPKE invites, encrypted state, and history/blob exporters |
+| `apps/relay` | Authenticated HTTP/WebSocket relay, persistence, quotas, and GitHub proxy |
+| `packages/protocol` | Shared wire records and runtime validation |
+| `packages/codex` | Codex app-server client and compatibility contract |
+| `packages/git`, `packages/github` | Host-side Git and GitHub adapters |
+| `e2e` | UI contracts and real multi-process native journeys |
+| `docs` | User guides, architecture, operations, decisions, and review material |
+
+The supported Codex app-server range is 0.133.0–0.144.0. Newer versions are marked unverified, and contract-sensitive behavior fails closed until reviewed. Read [How Codex hosting works](docs/codex-hosting.md) for the exact local-account, approval, projection, and compatibility boundaries.
+
+## Contributing and review
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), the [architecture walkthrough](docs/architecture-walkthrough.md), and the small issues in [`.github/good-first-issues`](.github/good-first-issues). Commits require a Developer Certificate of Origin sign-off.
+
+Protocol and cryptography reviewers can use the [external review packet](docs/external-review-packet.md), which maps the security claims to implementation and test evidence. Report exploitable findings privately through the process in [SECURITY.md](SECURITY.md).
+
+## Release integrity
+
+Supported public artifacts are Apple-silicon-only, Developer ID signed, notarized, and published by the tagged release workflow. The workflow verifies the macOS 11 deployment target, bundled Mach-O architectures, live universal-link associations, entitlements, code signatures, stapled tickets, Gatekeeper acceptance, checksums, SBOM, provenance, and Sigstore signatures before publication. Local and ordinary CI packages are development evidence, not supported downloads.
+
+Apache-2.0 licensed. Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

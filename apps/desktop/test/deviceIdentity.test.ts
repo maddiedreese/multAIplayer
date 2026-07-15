@@ -45,11 +45,11 @@ test.beforeEach(() => {
   localStorage.clear();
 });
 
-test("web preview cannot create or load a device identity", async () => {
+test("browser runtime cannot create or load a device identity", async () => {
   await assert.rejects(loadOrCreateDeviceIdentity(), /only in the native desktop app/);
   assert.equal(localStorage.getItem("multaiplayer:device-identity:v1"), null);
 });
 
-test("web preview cannot reset a native device identity", async () => {
+test("browser runtime cannot reset a native device identity", async () => {
   await assert.rejects(resetDeviceIdentity(), /only in the native desktop app/);
 });

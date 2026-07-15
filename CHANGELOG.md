@@ -7,7 +7,7 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 ### Added
 
 - Native RFC 9420 MLS rooms with pinned `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`, active-host commits, KeyPackage invite approval, retained exporter-derived history secrets, and encrypted chat and attachments.
-- Room-scoped Codex hosting with explicit turn approval, bounded queues, goal controls, project/file/diff tools, terminals, browser previews, GitHub workflows, and host handoff.
+- Room-scoped Codex hosting with explicit turn approval, bounded queues, goal controls, project/file/diff tools, terminals, an in-room browser, GitHub workflows, and host handoff.
 - SQLite relay persistence, production readiness checks, rate and quota controls, signed/notarized macOS release enforcement, checksums, SBOMs, and provenance attestations.
 - Bounded, re-redacted native diagnostics export and an in-app release update banner.
 - Resumable first-run create/join setup with device readiness checks, conservative defaults, partial room-creation recovery, a persistent setup checklist, Help-based reopen/restart controls, and an in-room guided first Codex turn.
@@ -27,7 +27,7 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 - This protocol-v2 alpha does not migrate pre-v2 rooms, ciphertext, cryptographic state, or invite links.
 - Native MLS state loss requires rejoining and cannot recover earlier backlog or retained history.
 - Rate limiting is process-local, and multi-instance relay operation requires shared storage and edge/shared rate limiting.
-- The browser build is a seeded UI preview; encrypted rooms require the native macOS app.
+- Browser builds expose only a native-app notice; all workspace, identity, relay, diagnostics, and MLS behavior requires the native app.
 
 ## [0.1.0-alpha.0] - 2026-07-04
 

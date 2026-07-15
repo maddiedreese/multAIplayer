@@ -8,7 +8,7 @@ This is the durable script for a 20-minute contributor walkthrough. A maintainer
 2. Record at 1080p with the editor text at a readable size. Do not open `.env`, logs, local databases, private repositories, or signed-in browser content.
 3. Follow the chapters below and show the named files. Keep the terminal visible only for the listed safe commands.
 4. Turn on captions, export an MP4, and publish it somewhere maintainers can replace without changing repository history.
-5. Add the recording URL and date to the placeholder below. Re-record when the architecture or contributor commands materially change; small file moves only require updating this script.
+5. If a recording is published, add its URL and date below. Re-record when the architecture or contributor commands materially change; small file moves only require updating this script.
 
 Recording: _not published yet_. The script is complete and can be followed without a video.
 

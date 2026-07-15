@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 test("requires the native Apple silicon app without initializing a workspace", async ({ page }) => {
   await expect(page.getByTestId("native-app-required")).toBeVisible();
   await expect(page.getByRole("heading", { name: /Apple silicon Macs/ })).toBeVisible();
-  await expect(page.getByText(/There is no browser preview or browser workspace/)).toBeVisible();
+  await expect(page.getByText(/This browser page does not contain a workspace/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
     "href",
     "https://multaiplayer.com/privacy"

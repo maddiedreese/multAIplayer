@@ -5,8 +5,8 @@ test("chat renders both roles' code, generated images, and expandable Codex work
   attachPageDiagnostics(page);
   await page.goto(uiContractScenarioUrl("codex-chat-parity"));
 
-  await expect(page.getByText("const roomId = 'encrypted-room';")).toBeVisible();
-  await expect(page.getByText("let shared = true;")).toBeVisible();
+  await expect(page.getByText("const releaseReady = checks.every(Boolean);")).toBeVisible();
+  await expect(page.getByText("let notarized = receipt.is_some();")).toBeVisible();
   await expect(page.getByRole("img", { name: "Codex-generated preview" })).toBeVisible();
   const followUpBehavior = page.getByRole("combobox", { name: "Codex follow-up behavior" });
   await expect(followUpBehavior).toHaveValue("steer");

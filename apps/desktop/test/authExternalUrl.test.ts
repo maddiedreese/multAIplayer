@@ -33,7 +33,7 @@ test("authentication navigation rejects lookalikes, credentials, insecure URLs, 
   assert.equal(trustedAuthenticationUrl("openai", "https://auth.openai.com.evil.test/oauth"), null);
 });
 
-test("web preview opens only a validated authentication URL in an external browsing context", async () => {
+test("browser runtime opens only a validated authentication URL in an external browsing context", async () => {
   const originalWindow = globalThis.window;
   const opened: string[] = [];
   Object.defineProperty(globalThis, "window", {

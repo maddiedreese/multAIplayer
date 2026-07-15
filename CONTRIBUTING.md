@@ -27,7 +27,7 @@ npm run dev
 
 The first-contribution target is `npm run verify:web`; it does not require native macOS packaging. Start with the [architecture walkthrough](docs/architecture-walkthrough.md), then choose one of the live `good first issue` tickets linked from `.github/good-first-issues/`. Each ticket names its starting files, acceptance criteria, and focused checks. Comment before starting to avoid duplicated work.
 
-Use `npm run tauri:dev` instead of `npm run dev` when you need the native Tauri app. The web shell can run in local seeded-room mode without GitHub OAuth; copy `.env.example` to `.env` only when you need OAuth or self-hosted relay settings.
+Use `npm run tauri:dev` when you need the native Tauri app. A normal browser shows only the native-app notice and cannot initialize workspace, identity, relay, project, diagnostic, or MLS behavior. Copy `.env.example` to `.env` and configure `GITHUB_CLIENT_ID` when testing GitHub authentication or authenticated relay workflows.
 
 The supported alpha desktop release target is macOS. Tauri produces only `.app` and `.dmg` bundles, matching CI and the release workflow; Windows and Linux bundles are not currently tested or published.
 
@@ -50,7 +50,7 @@ Open a PR with a cohesive, outcome-specific commit. Before submitting, check the
 
 The relay loads the repo root `.env`, a relay-local `apps/relay/.env`, or an explicit `MULTAIPLAYER_RELAY_ENV_FILE`; shell-exported variables take precedence.
 
-Run the relay or desktop web shell separately with `npm run dev:relay` or `npm run dev:desktop`. Run both with `npm run dev`, and run the native application with `npm run tauri:dev`.
+Run the relay or Vite frontend separately with `npm run dev:relay` or `npm run dev:desktop`. Run both development servers with `npm run dev`, and launch the usable native application with `npm run tauri:dev`. The browser-served frontend intentionally remains a native-app notice.
 
 ### Code map
 
