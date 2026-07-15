@@ -2,18 +2,14 @@
 
 Thanks for helping with multAIplayer. This project is a macOS-first open-source alpha for private group chat with a local Codex host, an end-to-end encrypted relay, GitHub workflows, terminals, file viewing, and browser approvals.
 
-Participation is governed by [the Code of Conduct](CODE_OF_CONDUCT.md) and [project governance](GOVERNANCE.md).
-
-## Contribution attestation (DCO)
-
-Every commit must include a `Signed-off-by` trailer certifying the [Developer Certificate of Origin 1.1](https://developercertificate.org/). Add it with `git commit -s`. By signing off, you certify that you wrote the contribution or otherwise have the right to submit it under this project's license. This lightweight DCO is used instead of a CLA; contributors retain copyright and need no separate legal agreement.
+Participation is governed by [the Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Security-boundary changes
 
 Keep changes to the Rust MLS core, `packages/protocol`, and `apps/desktop/src-tauri` small, explicit, and independently testable. Pull requests should identify AI-authored security-boundary changes and report the focused property, fuzz, mutation, or native checks that apply. This project currently has one maintainer, so it does not require a separate human or code-owner approval that the sole maintainer could never supply; required CI and branch protection remain the merge gate.
 
-Dependency advisory handling and coverage gates are documented in [Dependency security](docs/dependency-security.md). Workflow purpose and merge impact are in [CI policy](docs/ci-policy.md). Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/accessibility-and-localization.md).
-Native failure-handling rules and fail-closed redaction initialization are documented in [Rust panic policy](docs/rust-panic-policy.md).
+Dependency advisory handling and coverage gates are documented in [Dependency security](docs/engineering-practices.md#dependency-security). Workflow purpose and merge impact are in [CI policy](docs/engineering-practices.md#continuous-integration-policy). Accessibility expectations and the honest localization status are in [Accessibility and localization](docs/using-the-app.md#accessibility-and-localization).
+Native failure-handling rules and fail-closed redaction initialization are documented in [Rust panic policy](docs/engineering-practices.md#rust-panic-policy).
 
 ## Fast path
 
@@ -21,24 +17,21 @@ For the shortest reproducible on-ramp, open the repository in a Dev Container. I
 
 ```sh
 npm install
-npm run doctor
+node scripts/doctor.mjs
 npm run dev
 ```
 
-The first-contribution target is `npm run verify:web`; it does not require native macOS packaging. Start with the [architecture walkthrough](docs/architecture-walkthrough.md), then choose one of the live `good first issue` tickets linked from `.github/good-first-issues/`. Each ticket names its starting files, acceptance criteria, and focused checks. Comment before starting to avoid duplicated work.
+Start with the [architecture walkthrough](docs/product-architecture.md#architecture-walkthrough), then choose an open issue with a clear scope and acceptance criteria. Comment before starting to avoid duplicated work.
 
 Use `npm run tauri:dev` when you need the native Tauri app. A normal browser shows only the native-app notice and cannot initialize workspace, identity, relay, project, diagnostic, or MLS behavior. GitHub authentication uses the public client id and exact relay origin compiled into native Rust; no client secret is required. Use the documented native compile-time overrides only when testing a deliberate self-hosted OAuth/relay pairing.
 
 The supported alpha desktop release target is macOS. Tauri produces only `.app` and `.dmg` bundles, matching CI and the release workflow; Windows and Linux bundles are not currently tested or published.
 
-Make a focused change, use the [fast development loop](#fast-development-loop) for the area you touched, then run the quick repository tier while iterating and the full gate before handoff:
+Make a focused change, use the [fast development loop](#fast-development-loop) for the area you touched, then run the full gate before handoff:
 
 ```sh
-npm run verify:quick
 npm run verify
 ```
-
-`verify:quick` omits Rust, native packaging, browser journeys, the relay's long process suite, fuzzing, and mutation work. It still lints, checks formatting and workspace types, runs repository policy tests, enforces shared-package coverage, exercises the desktop suite, reports desktop coverage, and enforces the invite/MLS-adjacent TypeScript coverage floors. Pair it with the affected workspace command in the table below—for example, relay changes still need `npm run test -w @multaiplayer/relay`.
 
 An optional staged-file hook runs Prettier and ESLint before a commit. Enable it per clone with `npm run hooks:install`; contributors who prefer another hook manager can leave it disabled. CI remains authoritative.
 
@@ -76,13 +69,13 @@ Run the smallest relevant loop while iterating, then run `npm run verify` before
 | Desktop React UI, hooks, stores, or adapters                                                          | `npm run check -w @multaiplayer/desktop` and `npm run test:smoke -w @multaiplayer/desktop`; run `npm run test -w @multaiplayer/desktop` before handoff                                                                                         |
 | Browser E2E journeys or the UI-contract harness                                                       | `npm run test:e2e -- e2e/<journey>.spec.ts`; run `npm run test:e2e` before handoff. Keep simulated relay/native boundaries visible and keep the harness outside the production desktop graph.                                                  |
 | Two-client native invite, MLS, or handoff composition                                                 | Run the focused relay process test while iterating, then `xvfb-run -a npm run test:e2e:native` in a Linux environment with the WebKit, Secret Service, and `tauri-driver` dependencies pinned by CI.                                           |
-| One shared package                                                                                    | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `codex`, `git`, or `github` as needed; protocol type-guard changes require `npm run test:mutation -w @multaiplayer/protocol` |
-| Native Tauri/Rust code                                                                                | `npm run fmt:rust:check` and `npm run test:native`; invite authenticator changes also need the focused `cargo-mutants` command documented in `docs/dependency-security.md`                                                                     |
+| One shared package                                                                                    | `npm run check -w @multaiplayer/protocol` and `npm run test -w @multaiplayer/protocol`, replacing `protocol` with `codex`, `git`, or `github` as needed                                                                                           |
+| Native Tauri/Rust code                                                                                | `npm run fmt:rust:check` and `npm run test:native`                                                                                                                                                                                              |
 | Native packaging, Tauri config, browser windows, Keychain, terminals, or Codex app-server integration | Native checks above, then `npm run tauri:build -w @multaiplayer/desktop`                                                                                                                                                                       |
-| Cross-cutting TypeScript or workspace configuration                                                   | `npm run verify:web`                                                                                                                                                                                                                           |
+| Cross-cutting TypeScript or workspace configuration                                                   | `npm run lint`, `npm run format:check`, and the affected workspace checks                                                                                                                                                                      |
 | Repository scripts                                                                                    | `npm run test:scripts`                                                                                                                                                                                                                         |
 
-Use `npm run format` to apply the repository's Prettier baseline. `npm run verify:quick` is the short TypeScript/UI policy loop and must be paired with the affected-workspace row above. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
+Use `npm run format` to apply the repository's Prettier baseline. `npm run verify` lints and checks formatting for TypeScript and JavaScript, type-checks, tests, checks Rust formatting, runs native Tauri/Rust tests, and builds the workspaces.
 
 The relay fuzz suite feeds seedable arbitrary bytes, recursive JSON values, and mutated valid MLS routing records/messages through the protocol schemas. It runs 100,000 cases by default; reproduce or tune a run with `MULTAIPLAYER_RELAY_FUZZ_SEED` and `MULTAIPLAYER_RELAY_FUZZ_ITERATIONS`.
 

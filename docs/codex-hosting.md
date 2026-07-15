@@ -61,7 +61,7 @@ The relay does see operational metadata needed to route the room:
 - plaintext attachment routing and descriptive metadata such as filename, MIME type, declared size, room id, epoch, and expiry; attachment contents remain exporter-encrypted;
 - GitHub OAuth session identity metadata when sign-in is enabled.
 
-GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are sent to room members only as MLS-encrypted snapshots.
+GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are sent to room members only as RFC 9420 MLS-encrypted snapshots via `mls-rs`; multAIplayer's integration layer is unaudited.
 
 ## Host Handoff
 

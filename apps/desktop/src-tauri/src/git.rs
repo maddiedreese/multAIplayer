@@ -11,7 +11,7 @@ use crate::validation::{
     ensure_git_patch, ensure_git_remote_url, ensure_safe_branch_name, normalize_commit_message,
     repo_name_from_remote_url, safe_project_path, MAX_GIT_PATCH_CHARS,
 };
-use crate::workspace::{canonical_project_root, ensure_existing_dir};
+use crate::workspace::{canonical_project_root, ensure_existing_dir, ensure_within_project_root};
 
 use crate::shell::CommandResult;
 
@@ -77,6 +77,7 @@ pub(crate) struct GitCloneRequest {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GitApplyPatchRequest {
     pub(crate) cwd: String,
+    pub(crate) project_root: String,
     pub(crate) patch: String,
 }
 
@@ -272,10 +273,12 @@ pub(crate) fn git_clone_repository(
 pub(crate) fn git_apply_patch(
     request: GitApplyPatchRequest,
 ) -> crate::command_error::CommandResult<GitApplyPatchResult> {
-    ensure_existing_dir(&request.cwd)?;
+    let cwd = ensure_within_project_root(&request.project_root, &request.cwd)?;
     ensure_git_patch(&request.patch)?;
     let mut child = Command::new("git")
-        .args(["-C", &request.cwd, "apply", "--whitespace=nowarn", "-"])
+        .arg("-C")
+        .arg(&cwd)
+        .args(["apply", "--whitespace=nowarn", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -291,7 +294,7 @@ pub(crate) fn git_apply_patch(
         .map_err(|error| format!("Failed to read git apply output: {error}"))?;
     Ok(GitApplyPatchResult {
         command: "git apply --whitespace=nowarn -".to_string(),
-        cwd: request.cwd,
+        cwd: cwd.to_string_lossy().to_string(),
         status: output.status.code(),
         stdout: redact_and_bound_command_output(&output.stdout),
         stderr: redact_and_bound_command_output(&output.stderr),

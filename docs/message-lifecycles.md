@@ -39,7 +39,7 @@ The relay cannot decrypt the MLS message and does not parse its application even
 1. The active host selects a local project path and Codex model/tuning settings. Room create/settings HTTP requests omit these fields, and the relay rejects legacy clients that try to send them.
 2. The desktop constructs a complete `room.config` snapshot. Rust enforces its exact schema, path/model bounds, closed policy values, positive revision, and current emitting epoch.
 3. Before producing the outbound PrivateMessage, Rust saves the validated snapshot in the local SQLCipher MLS application store. The SQLCipher wrapping key is held in the operating-system credential store. This record supports retry after a webview loss, reconnect, or process restart without reading configuration from the relay.
-4. The host publishes the MLS-encrypted snapshot after a config change, after each Add, and after host handoff. The relay receives only normal MLS ciphertext and routing metadata.
+4. After a config change, each Add, and host handoff, the host publishes the RFC 9420 MLS-encrypted snapshot via `mls-rs`; multAIplayer's integration layer is unaudited. The relay receives only normal MLS ciphertext and routing metadata.
 5. A member accepts only a snapshot authenticated as coming from the active host and newer by epoch/revision. A new member with no pre-join backlog shows configuration as pending until the post-Add snapshot arrives.
 6. **Clear history** deletes retained history but leaves the latest configuration record available to the active room. **Forget on this device** deletes both local history and that durable config record.
 

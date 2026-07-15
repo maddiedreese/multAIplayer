@@ -30,7 +30,7 @@ body:
     id: production_doctor
     attributes:
       label: Production doctor result
-      description: Paste the redacted output of `NODE_ENV=production npm run doctor:production-relay` if relevant. Remove complete invite links/fragments.
+      description: Paste the redacted output of `NODE_ENV=production node scripts/doctor.mjs --production-relay` if relevant. Remove complete invite links/fragments.
       render: shell
   - type: textarea
     id: config

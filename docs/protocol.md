@@ -1,12 +1,12 @@
 # Protocol
 
-multAIplayer protocol v2 uses RFC 9420 MLS for native encrypted rooms. The relay routes opaque MLS messages and public/bounded metadata; it never receives room plaintext, MLS private state, exporter output, or history secrets.
+multAIplayer protocol v2 uses RFC 9420 MLS via `mls-rs` for native encrypted rooms; multAIplayer's integration layer is unaudited. The relay routes opaque MLS messages and public/bounded metadata; it never receives room plaintext, MLS private state, exporter output, or history secrets.
 
 Protocol v2 is a clean break. Pre-v2 rooms and invite links are invalid and there is no legacy envelope or room-key migration path.
 
 ## Locked MLS profile
 
-- Implementation: `mls-rs` in the Rust/Tauri boundary.
+- Implementation: `mls-rs` in the Rust/Tauri boundary; multAIplayer's integration layer is unaudited.
 - Ciphersuite: only `0x0002`, `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`.
 - Credential: MLS BasicCredential binding GitHub user id and device id.
 - Fingerprint: full SHA-256 digest of the MLS signature public key.

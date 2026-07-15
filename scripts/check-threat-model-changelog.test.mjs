@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { changedPaths, isSecurityClaimPath, threatModelChangelogViolation } from "./check-threat-model-changelog.mjs";
+import {
+  changedPaths,
+  hasDatedHistoryAddition,
+  isSecurityClaimPath,
+  threatModelChangelogViolation
+} from "./check-threat-model-changelog.mjs";
 
 test("classifies security boundary and claim paths without inspecting source text", () => {
   assert.equal(isSecurityClaimPath("apps/relay/src/auth/session.ts"), true);
@@ -26,9 +31,20 @@ test("classifies security boundary and claim paths without inspecting source tex
 test("requires the public changelog when a protected path changes", () => {
   assert.match(
     threatModelChangelogViolation(["README.md", "apps/relay/src/ws/fanout.ts"]),
-    /docs\/threat-model-changelog\.md/
+    /docs\/threat-model\.md#history/
   );
-  assert.equal(threatModelChangelogViolation(["apps/relay/src/ws/fanout.ts", "docs/threat-model-changelog.md"]), null);
+  assert.match(
+    threatModelChangelogViolation(["apps/relay/src/ws/fanout.ts", "docs/threat-model.md"], "+typo only\n"),
+    /add a dated entry/
+  );
+  assert.equal(
+    threatModelChangelogViolation(
+      ["apps/relay/src/ws/fanout.ts", "docs/threat-model.md"],
+      "@@ -1,0 +2 @@\n+### 2026-07-14\n"
+    ),
+    null
+  );
+  assert.equal(hasDatedHistoryAddition("+### 2026-07-14\n"), true);
 });
 
 test("does not tax ordinary product and non-claim documentation changes", () => {

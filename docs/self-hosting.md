@@ -2,7 +2,7 @@
 
 The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
-Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](release-operations.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, build the desktop with its self-host relay origins allowed and relay editing enabled, change each desktop app's Settings drawer to those URLs, recreate team/room membership with fresh KeyPackage invites, and preserve each device's native MLS state and encrypted local history for continuity.
+Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](engineering-practices.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, build the desktop with its self-host relay origins allowed and relay editing enabled, change each desktop app's Settings drawer to those URLs, recreate team/room membership with fresh KeyPackage invites, and preserve each device's native MLS state and encrypted local history for continuity.
 
 Supported alpha self-hosting requirements:
 
@@ -37,7 +37,7 @@ Shell-exported values take precedence over `.env` file values. The parser suppor
 For a hosted or internet-facing relay, run the production relay doctor against the same shell environment used to start the relay:
 
 ```bash
-npm run doctor:production-relay
+node scripts/doctor.mjs --production-relay
 ```
 
 This check fails if GitHub OAuth is missing, credentialed browser origins are unset or not exact HTTP(S) origins, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. Session identifiers are hashed before persistence by the relay rather than controlled by a deployment secret. The doctor is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or the mandatory trusted edge and IP-level controls for an internet-facing deployment.
@@ -54,7 +54,7 @@ Build it from the repository root:
 docker build -f apps/relay/Dockerfile -t multaiplayer-relay:alpha .
 ```
 
-Run it with a persistent `/data` mount and the same environment that passes `npm run doctor:production-relay`:
+Run it with a persistent `/data` mount and the same environment that passes `node scripts/doctor.mjs --production-relay`:
 
 ```bash
 docker run --rm -p 4321:4321 \
@@ -76,7 +76,7 @@ cargo build --locked --release -p mls-core --bin mls-keypackage-validator
 export MULTAIPLAYER_MLS_VALIDATOR_PATH="$PWD/target/release/mls-keypackage-validator"
 ```
 
-Production startup and `doctor:production-relay` reject a missing validator path; the relay never substitutes a TypeScript MLS parser.
+Production startup and `node scripts/doctor.mjs --production-relay` reject a missing validator path; the relay never substitutes a TypeScript MLS parser.
 
 ## Relay Storage
 
@@ -300,7 +300,7 @@ GitHub access tokens stay behind the native Rust IPC boundary. Native commands r
 
 The relay has no separate user-profile or billing-account table. A signed-in user can call `DELETE /auth/account` with JSON `{ "confirmation": "delete my account" }`; the desktop exposes this as a destructive Account action. Deletion is blocked with `409 account_deletion_blocked` until the user transfers or deletes every team they own and hands off every non-deleted room they host. Before primary deletion, the relay commits an authenticated pseudonymous tombstone to its external deletion ledger. It then removes all of that GitHub identity's token-free relay sessions, process-local device sessions and challenges, registered devices, unused KeyPackages, team memberships, creator-owned unused invites, pending invite admission artifacts, and identity/session quota records from primary or process-local state. The native app separately deletes its Keychain token when it clears the signed-in workspace. It removes and broadcasts room presence, closes live relay connections, and clears the browser cookie. It also removes the identity from trusted-approver lists and removes host identity metadata from already-deleted rooms. If primary persistence fails after the tombstone commits, the response is `202` pending, the identity is immediately denied authenticated access, and startup reconciliation retries deletion before the relay listens. The primary rollback preserves unrelated concurrent mutations without reopening access.
 
-Hosted operators can deny an abusive GitHub identity without deleting shared encrypted records. Account restrictions are durable in the relay store, survive restart, deny new GitHub verification and stored sessions, and evict auth/device sessions, presence, subscriptions, and live sockets when applied through the relay control. The public HTTP API has no operator endpoint. Use the stopped-relay CLI from the [operator runbook](release-operations.md#hosted-account-restriction) and retain only a bounded reason code; restriction is service denial, not retroactive erasure or removal from other devices.
+Hosted operators can deny an abusive GitHub identity without deleting shared encrypted records. Account restrictions are durable in the relay store, survive restart, deny new GitHub verification and stored sessions, and evict auth/device sessions, presence, subscriptions, and live sockets when applied through the relay control. The public HTTP API has no operator endpoint. Use the stopped-relay CLI from the [operator runbook](engineering-practices.md#hosted-account-restriction) and retain only a bounded reason code; restriction is service denial, not retroactive erasure or removal from other devices.
 
 Deletion does not rewrite shared team or room records, MLS ciphertext and its sender/routing metadata, encrypted attachments, or accepted-message receipts. Those records remain available to collaborators and follow their ordinary configured retention because rewriting them would break shared encrypted history, downloads, replay/idempotency protection, or MLS state. Deleting relay data does not erase encrypted data already stored on a user's Macs, revoke the OAuth grant at GitHub, or selectively purge an operator's existing backups. Users remove local history with the app's per-room local controls and may revoke the OAuth grant in GitHub settings.
 
@@ -328,9 +328,9 @@ The alpha relay stores durable token-free signed-in sessions in its configured s
 
 The relay does not hold plaintext room history, MLS private state, or exporter-derived history secrets. Migrating from the hosted relay to a self-hosted relay is therefore a membership and routing cutover, not a server-side transcript export.
 
-Use the [release operations migration procedure](release-operations.md#hosted-to-self-hosted-migration) for the full procedure and verification checklist. Plan to:
+Use the [release operations migration procedure](engineering-practices.md#hosted-to-self-hosted-migration) for the full procedure and verification checklist. Plan to:
 
-- stand up the self-hosted relay and pass `NODE_ENV=production npm run doctor:production-relay`;
+- stand up the self-hosted relay and pass `NODE_ENV=production node scripts/doctor.mjs --production-relay`;
 - use a desktop build whose app-shell CSP allows the self-hosted HTTP and WebSocket relay origins;
 - switch each desktop app's `HTTP API URL` and `WebSocket rooms URL` in Settings;
 - sign in to GitHub again for the new relay origin when auth is required;

@@ -47,6 +47,17 @@ const tauriInternals = {
       };
     }
     if (command === "mls_publish_succeeded") return 2;
+    if (command === "plugin:dialog|open") return "/tmp";
+    if (command === "git_clone_repository") {
+      return {
+        path: "/tmp/locally-cloned-project",
+        command: "git clone https://github.com/example/project.git /tmp/locally-cloned-project",
+        status: 0,
+        stdout: "",
+        stderr: ""
+      };
+    }
+    if (command === "git_remote_origin") return { originUrl: "https://github.com/example/project.git" };
     throw new Error(`Unexpected native command: ${command}`);
   }
 };
@@ -78,6 +89,10 @@ const offer: HostHandoffRecord = {
   fromUserId: "github:host",
   reason: "manual",
   projectPath: room.projectPath,
+  gitRemoteUrl: "https://github.com/example/project.git",
+  gitRepoOwner: "example",
+  gitRepoName: "project",
+  gitBranch: "main",
   codexModel: room.codexModel,
   approvalPolicy: room.approvalPolicy,
   approvalDelegationPolicy: room.approvalDelegationPolicy,
@@ -122,7 +137,7 @@ function options(publish: () => Promise<void>, seen = new Set<string>()): UseHos
     roomSettingsActor: () => ({ requesterName: "Candidate", requesterUserId: "github:candidate" }),
     replaceRoom: noop,
     setHostBusyForRoom: noop,
-    setHostMessageForRoom: noop,
+    setHostMessageForRoom: useAppStore.getState().setHostMessageForRoom,
     setSelectedHostMessage: noop,
     setSettingsMessageForRoom: noop,
     setProjectPathDraftForRoom: noop,
@@ -145,7 +160,11 @@ test("candidate records its authenticated host request only after relay acknowle
   await act(() => result.current.acceptHostHandoff(offer));
 
   const stored = useAppStore.getState().codexRuntimeByRoom[room.id]?.hostHandoffs?.[0];
-  assert.equal(stored?.status, "requested");
+  assert.equal(
+    stored?.status,
+    "requested",
+    useAppStore.getState().roomSettingsByRoom[room.id]?.hostMessage ?? "host request did not complete"
+  );
   assert.equal(stored?.candidateUserId, "github:candidate");
   assert.equal(stored?.candidateDeviceId, "device-candidate");
   assert.equal(stored?.candidateLeaf, 1);

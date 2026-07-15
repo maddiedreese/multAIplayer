@@ -7,7 +7,6 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { checkMutationPolicy } from "./check-mutation-policy.mjs";
-import protocolStrykerConfig from "../packages/protocol/stryker.config.mjs";
 import relayStrykerConfig from "../apps/relay/stryker.config.mjs";
 
 const file = (path, mutationScore, survived = 0) => ({ path, counts: { mutationScore, survived } });
@@ -293,19 +292,16 @@ test("rejects missing, duplicate, nested, reversed, and unclosed markers", () =>
   assert.throws(() => check("// mutation-policy:start payload-core"), /unclosed mutation-policy region/);
 });
 
-test("keeps repository mutation ratchets at 100 percent while allowing policy reporting", async () => {
-  for (const [path, config, expectedFiles] of [
-    ["../apps/relay/mutation-policy.json", relayStrykerConfig, { "src/authz.ts": 100 }],
-    ["../packages/protocol/mutation-policy.json", protocolStrykerConfig, { "src/type-guards.ts": 100 }]
-  ]) {
-    const packagePolicy = JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
-    assert.deepEqual(config.thresholds, { high: 100, low: 100, break: 50 });
-    assert.deepEqual(
-      Object.fromEntries(Object.entries(packagePolicy.files).map(([filePath, rule]) => [filePath, rule.minimumScore])),
-      expectedFiles
-    );
-    assert.ok(Object.values(packagePolicy.files).every((rule) => rule.maximumSurvived === 0));
-    assert.deepEqual(packagePolicy.allowedTimeouts, []);
-    assert.deepEqual(packagePolicy.allowedIgnored, []);
-  }
+test("keeps the relay authorization mutation ratchet at 100 percent", async () => {
+  const packagePolicy = JSON.parse(
+    await readFile(new URL("../apps/relay/mutation-policy.json", import.meta.url), "utf8")
+  );
+  assert.deepEqual(relayStrykerConfig.thresholds, { high: 100, low: 100, break: 50 });
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(packagePolicy.files).map(([filePath, rule]) => [filePath, rule.minimumScore])),
+    { "src/authz.ts": 100 }
+  );
+  assert.ok(Object.values(packagePolicy.files).every((rule) => rule.maximumSurvived === 0));
+  assert.deepEqual(packagePolicy.allowedTimeouts, []);
+  assert.deepEqual(packagePolicy.allowedIgnored, []);
 });

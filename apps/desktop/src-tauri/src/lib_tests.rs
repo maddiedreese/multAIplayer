@@ -1,7 +1,7 @@
 use super::*;
 use crate::output::*;
 use crate::validation::*;
-use crate::workspace::ensure_existing_dir;
+use crate::workspace::{ensure_existing_dir, ensure_within_project_root};
 use std::fs::{self, create_dir_all, write};
 use std::path::PathBuf;
 use std::process::Command;
@@ -42,6 +42,36 @@ fn project_path_validation_rejects_unsafe_working_directories() {
     assert!(ensure_existing_dir(&format!("/tmp/{}", "x".repeat(MAX_PROJECT_PATH_CHARS))).is_err());
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn approved_project_root_rejects_outside_and_symlinked_working_directories() {
+    let root = test_temp_dir("approved-project-root");
+    let nested = root.join("nested");
+    let outside = test_temp_dir("approved-project-outside");
+    create_dir_all(&nested).expect("create nested directory");
+
+    assert_eq!(
+        ensure_within_project_root(&root.to_string_lossy(), &nested.to_string_lossy())
+            .expect("nested working directory"),
+        fs::canonicalize(&nested).expect("canonical nested directory")
+    );
+    assert!(
+        ensure_within_project_root(&root.to_string_lossy(), &outside.to_string_lossy()).is_err()
+    );
+
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&outside, root.join("outside-link")).expect("create symlink");
+        assert!(ensure_within_project_root(
+            &root.to_string_lossy(),
+            &root.join("outside-link").to_string_lossy()
+        )
+        .is_err());
+    }
+
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(outside);
 }
 
 #[test]
@@ -332,6 +362,7 @@ fn host_handoff_patch_round_trips_tracked_changes() {
     assert!(!patch.truncated);
     let applied = git_apply_patch(GitApplyPatchRequest {
         cwd: target.to_string_lossy().to_string(),
+        project_root: target.to_string_lossy().to_string(),
         patch: patch.patch,
     })
     .expect("apply patch");
