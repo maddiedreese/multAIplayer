@@ -78,7 +78,7 @@ async function captureFeature(page, filename) {
   if (dimensions.scrollHeight !== dimensions.clientHeight || dimensions.scrollWidth !== dimensions.clientWidth) {
     throw new Error(`README feature ${filename} overflows its capture surface: ${JSON.stringify(dimensions)}`);
   }
-  await feature.screenshot({ path: `${output}/${filename}` });
+  await feature.screenshot({ path: `${output}/${filename}`, omitBackground: true });
 }
 
 async function settlePage(page) {

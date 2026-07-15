@@ -1,7 +1,7 @@
 import { sendRelayError } from "../http/errors.js";
 import type { CookieOptions, Express } from "express";
 import { nanoid } from "nanoid";
-import type { AuthSession } from "../state.js";
+import type { AuthSession, NewAuthSession } from "../state.js";
 import { fetchUpstream } from "../http/upstream.js";
 import {
   accountDeletionConfirmation,
@@ -15,7 +15,8 @@ export interface RegisterGitHubAuthRoutesOptions {
   app: Express;
   mutationsRequireAuth: boolean;
   allowedCorsOrigins: string[];
-  authSessions: Map<string, AuthSession>;
+  setAuthSession: (sessionId: string, session: NewAuthSession) => void;
+  deleteAuthSession: (sessionId: unknown) => boolean;
   store: RelayStore;
   deletionLedger: DeletionLedger | null;
   authSessionMaxAgeMs: number;
@@ -36,7 +37,8 @@ export function registerGitHubAuthRoutes({
   app,
   mutationsRequireAuth,
   allowedCorsOrigins,
-  authSessions,
+  setAuthSession,
+  deleteAuthSession,
   store,
   deletionLedger,
   authSessionMaxAgeMs,
@@ -124,7 +126,7 @@ export function registerGitHubAuthRoutes({
     }
 
     const sessionId = nanoid(32);
-    const session: AuthSession = {
+    const session: NewAuthSession = {
       user: {
         id: normalizedUserId,
         login,
@@ -133,7 +135,7 @@ export function registerGitHubAuthRoutes({
       },
       expiresAt: Date.now() + authSessionMaxAgeMs
     };
-    authSessions.set(sessionId, session);
+    setAuthSession(sessionId, session);
     scheduleStoreSave();
     res.cookie("multaiplayer_session", sessionId, authCookieOptions(authSessionMaxAgeMs));
     res.json({ user: session.user });
@@ -151,7 +153,7 @@ export function registerGitHubAuthRoutes({
   app.post("/auth/logout", (req, res) => {
     const sessionId = req.cookies?.multaiplayer_session;
     if (sessionId) {
-      authSessions.delete(sessionId);
+      deleteAuthSession(sessionId);
       scheduleStoreSave();
     }
     res.clearCookie("multaiplayer_session", authCookieOptions());

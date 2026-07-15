@@ -5,12 +5,14 @@ export function MonacoFileEditor({
   path,
   value,
   disabled,
-  onChange
+  onChange,
+  loadMonaco = installMonaco
 }: {
   path: string;
   value: string;
   disabled: boolean;
   onChange: (value: string) => void;
+  loadMonaco?: () => Promise<typeof Monaco>;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -31,7 +33,7 @@ export function MonacoFileEditor({
     let cancelled = false;
     let disposable: Monaco.IDisposable | null = null;
 
-    void installMonaco().then((monaco) => {
+    void loadMonaco().then((monaco) => {
       if (cancelled || !containerRef.current) return;
       const uri = monaco.Uri.parse(`file:///${path.replace(/^\/+/, "")}`);
       const model = monaco.editor.createModel(valueRef.current, languageForPath(path), uri);
@@ -65,7 +67,7 @@ export function MonacoFileEditor({
       editorRef.current = null;
       modelRef.current = null;
     };
-  }, [path]);
+  }, [loadMonaco, path]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -116,7 +118,7 @@ async function installMonaco(): Promise<typeof Monaco> {
   return monaco;
 }
 
-function languageForPath(path: string): string | undefined {
+export function languageForPath(path: string): string | undefined {
   const extension = path.split(".").pop()?.toLowerCase();
   switch (extension) {
     case "cjs":

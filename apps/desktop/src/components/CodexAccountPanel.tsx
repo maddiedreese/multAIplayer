@@ -1,9 +1,13 @@
 import { ExternalLink, LogIn, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
 import type { CodexAppApprovalMode } from "../lib/localBackend";
-import { useCodexAccount } from "../hooks/useCodexAccount";
+import { useCodexAccount, type CodexAccountController } from "../hooks/useCodexAccount";
 import { InfoRow } from "./common";
 
 export function CodexAccountPanel() {
+  return <CodexAccountPanelView controller={useCodexAccount()} />;
+}
+
+export function CodexAccountPanelView({ controller }: { controller: CodexAccountController }) {
   const {
     native,
     snapshot,
@@ -18,7 +22,7 @@ export function CodexAccountPanel() {
     signOut,
     connectMcp,
     updateApprovalMode
-  } = useCodexAccount();
+  } = controller;
 
   if (!native) {
     return (

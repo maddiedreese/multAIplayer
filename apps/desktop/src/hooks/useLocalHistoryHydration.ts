@@ -8,6 +8,7 @@ import {
   type LocalHistorySettings
 } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
+import { reportNonFatal } from "../lib/nonFatalReporting";
 import type { ChatMessage, LocalRoomHistoryPayload, LocalRoomReadState } from "../types";
 
 interface LatestRef<T> {
@@ -59,8 +60,8 @@ export function useLocalHistoryHydration({
         hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
         hydrateRoomReadState(selectedRoomId, payload.readState);
       })
-      .catch(() => {
-        if (!cancelled) console.warn("Failed to load encrypted local history");
+      .catch((error) => {
+        if (!cancelled) reportNonFatal("load encrypted local history", error);
       })
       .finally(() => {
         if (!cancelled) historyLoadedRoomIds.current.add(selectedRoomId);

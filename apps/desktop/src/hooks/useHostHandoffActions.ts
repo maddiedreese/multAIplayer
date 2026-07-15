@@ -45,9 +45,8 @@ export function useHostHandoffActions({
   seenEnvelopeIds,
   messages,
   terminals,
-  browserRequestsByRoom,
+  browserRequests,
   gitStatus,
-  gitStatusByRoom,
   reportRoomHostMutationInFlight,
   roomSettingsActor,
   replaceRoom,
@@ -178,20 +177,18 @@ export function useHostHandoffActions({
       return { originUrl: null };
     });
     const repoRef = remoteInfo.originUrl ? parseGitHubRemoteUrl(remoteInfo.originUrl) : null;
-    const roomGitStatus = room.id === selectedRoom.id ? gitStatus : (gitStatusByRoom[room.id] ?? null);
+    const store = useAppStore.getState();
+    const roomGitStatus =
+      room.id === selectedRoom.id ? gitStatus : (store.gitWorkflowRuntimeByRoom[room.id]?.workflow?.status ?? null);
+    const roomBrowserRequests =
+      room.id === selectedRoom.id ? browserRequests : (store.browserByRoom[room.id]?.requests ?? []);
     const patchResult = roomGitStatus?.files.length
       ? await createGitPatch(room.projectPath).catch(() => {
           reportExpectedFailure("Git patch was unavailable for host handoff context");
           return null;
         })
       : null;
-    const summary = buildCodexTurnSummary(
-      contextMessages,
-      room,
-      terminals,
-      browserRequestsByRoom[room.id] ?? [],
-      roomGitStatus
-    );
+    const summary = buildCodexTurnSummary(contextMessages, room, terminals, roomBrowserRequests, roomGitStatus);
     const handoff: HostHandoffRecord = {
       id: crypto.randomUUID(),
       fromHost: localUser.name,

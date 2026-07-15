@@ -36,6 +36,8 @@ export interface RelayStoreMutation {
 }
 
 export interface AuthSession {
+  /** In-memory copy used to verify digest-keyed lookups independently. Never serialized as a bearer token. */
+  sessionIdHash: string;
   user: {
     id: string;
     login: string;
@@ -44,6 +46,9 @@ export interface AuthSession {
   };
   expiresAt: number;
 }
+
+/** Session identity supplied by an authentication route before the bearer token is hashed. */
+export type NewAuthSession = Omit<AuthSession, "sessionIdHash">;
 
 export interface ClientSession {
   socket: WebSocket;

@@ -3,31 +3,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { openRelayDatabase } from "../apps/relay/src/sqlite-schema.ts";
 
 const args = new Set(process.argv.slice(2));
 const fixtureMode = args.has("--fixture");
 const dataPathArg = process.argv.find((arg) => arg.startsWith("--data-path="));
 const dataPath = dataPathArg?.slice("--data-path=".length) ?? process.env.MULTAIPLAYER_RELAY_DATA_PATH;
-const requiredRelayTables = [
-  "relay_snapshots",
-  "relay_meta",
-  "relay_teams",
-  "relay_rooms",
-  "relay_invites",
-  "relay_devices",
-  "relay_key_packages",
-  "relay_invite_requests",
-  "relay_invite_responses",
-  "relay_invite_ack_receipts",
-  "relay_accepted_message_receipts",
-  "relay_team_members",
-  "relay_auth_sessions",
-  "relay_attachment_blobs",
-  "relay_applied_deletion_ledger_entries",
-  "relay_mls_messages",
-  "relay_room_epochs"
-];
-
 let tempDir = null;
 let sourcePath = dataPath;
 
@@ -52,12 +33,13 @@ try {
   );
   const source = new Database(sourcePath, { readonly: true });
   assertIntegrity(source, "source");
+  const sourceRelayTables = relayTableNames(source);
   await source.backup(backupPath);
   source.close();
 
   const restored = new Database(backupPath, { readonly: true });
   assertIntegrity(restored, "backup");
-  assertRelayTables(restored);
+  assertRelayTables(restored, sourceRelayTables);
   restored.close();
 
   console.log(`SQLite backup/restore drill passed: ${sourcePath} -> ${backupPath}`);
@@ -66,34 +48,7 @@ try {
 }
 
 function createFixtureRelayStore(path) {
-  const db = new Database(path);
-  db.pragma("journal_mode = WAL");
-  db.exec(`
-    create table relay_snapshots (id text primary key, state_json text not null, saved_at text not null);
-    create table relay_meta (key text primary key, value text not null);
-    create table relay_teams (id text primary key, data_json text not null);
-    create table relay_rooms (id text primary key, data_json text not null);
-    create table relay_invites (id text primary key, data_json text not null);
-    create table relay_devices (key text primary key, data_json text not null);
-    create table relay_key_packages (id text primary key, data_json text not null);
-    create table relay_invite_requests (id text primary key, data_json text not null);
-    create table relay_invite_responses (id text primary key, data_json text not null);
-    create table relay_invite_ack_receipts (id text primary key, data_json text not null);
-    create table relay_accepted_message_receipts (id text primary key, data_json text not null);
-    create table relay_team_members (team_id text primary key, data_json text not null);
-    create table relay_auth_sessions (session_id text primary key, data_json text not null);
-    create table relay_attachment_blobs (id text primary key, data_json text not null);
-    create table relay_applied_deletion_ledger_entries (id text primary key, data_json text not null);
-    create table relay_mls_messages (
-      room_key text not null,
-      message_id text not null,
-      sort_order integer not null,
-      created_at text not null,
-      data_json text not null,
-      primary key (room_key, message_id)
-    );
-    create table relay_room_epochs (room_key text primary key, accepted_epoch integer not null);
-  `);
+  const db = openRelayDatabase(path);
   db.prepare("insert into relay_meta (key, value) values (?, ?)").run("version", "1");
   db.prepare("insert into relay_meta (key, value) values (?, ?)").run("savedAt", "2026-07-08T00:00:00.000Z");
   db.prepare("insert into relay_teams (id, data_json) values (?, ?)").run(
@@ -126,8 +81,21 @@ function assertIntegrity(db, label) {
   if (result !== "ok") throw new Error(`${label} integrity_check failed: ${String(result)}`);
 }
 
-function assertRelayTables(db) {
-  const tables = new Set(db.prepare("select name from sqlite_master where type = 'table'").pluck().all());
+function relayTableNames(db) {
+  return db
+    .prepare("select name from sqlite_master where type = 'table' and name like 'relay_%' order by name")
+    .pluck()
+    .all();
+}
+
+function assertRelayTables(db, requiredRelayTables) {
+  const restoredRelayTables = relayTableNames(db);
+  if (JSON.stringify(restoredRelayTables) !== JSON.stringify(requiredRelayTables)) {
+    throw new Error(
+      `backup relay schema differs from source: ${JSON.stringify({ source: requiredRelayTables, backup: restoredRelayTables })}`
+    );
+  }
+  const tables = new Set(restoredRelayTables);
   for (const table of requiredRelayTables) {
     if (!tables.has(table)) throw new Error(`backup is missing relay table ${table}`);
   }

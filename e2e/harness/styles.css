@@ -17,19 +17,22 @@ body {
   display: grid;
   align-content: center;
   padding: 32px;
-  background: #0f0f0f;
+  background: transparent;
+}
+
+html[data-theme="dark"][data-presentation="readme"],
+html[data-theme="dark"][data-presentation="readme"] body,
+html[data-theme="dark"][data-presentation="readme"] #root {
+  background: transparent;
 }
 
 .readme-feature {
   box-sizing: content-box;
   width: min(720px, calc(100vw - 120px));
   margin: 0 auto;
-  padding: 28px;
+  padding: 0;
   overflow: visible;
-  border: 1px solid #454139;
-  border-radius: 14px;
-  background: radial-gradient(circle at 14% 7%, rgba(185, 154, 72, 0.14), transparent 38%), #151410;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+  background: transparent;
 }
 
 .readme-feature[data-scenario="codex-chat-parity"] {

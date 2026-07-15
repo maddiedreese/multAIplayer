@@ -136,37 +136,14 @@ export const createRoomLifecycleSlice: StateCreator<AppStoreState, [], [], RoomL
   },
   clearRoomScopedStateForRoom: (roomId) => {
     set((state) => ({
-      messagesByRoom: { ...state.messagesByRoom, [roomId]: [] },
-      chatEditsByRoom: { ...state.chatEditsByRoom, [roomId]: [] },
-      chatDeletesByRoom: { ...state.chatDeletesByRoom, [roomId]: [] },
-      terminalRuntimeByRoom: {
-        ...state.terminalRuntimeByRoom,
-        [roomId]: { requests: [] }
-      },
-      browserByRoom: {
-        ...state.browserByRoom,
-        [roomId]: {
-          requests: []
-        }
-      },
+      messagesByRoom: omitRecordKey(state.messagesByRoom, roomId),
+      chatEditsByRoom: omitRecordKey(state.chatEditsByRoom, roomId),
+      chatDeletesByRoom: omitRecordKey(state.chatDeletesByRoom, roomId),
+      terminalRuntimeByRoom: omitRecordKey(state.terminalRuntimeByRoom, roomId),
+      browserByRoom: omitRecordKey(state.browserByRoom, roomId),
       inviteByRoom: omitRecordKey(state.inviteByRoom, roomId),
-      codexRuntimeByRoom: {
-        ...state.codexRuntimeByRoom,
-        [roomId]: {
-          events: [],
-          activities: [],
-          hostHandoffs: [],
-          queuedApprovals: []
-        }
-      },
-      gitWorkflowRuntimeByRoom: {
-        ...state.gitWorkflowRuntimeByRoom,
-        [roomId]: {
-          ...state.gitWorkflowRuntimeByRoom[roomId],
-          workflow: { events: [] },
-          actions: { events: [] }
-        }
-      },
+      codexRuntimeByRoom: omitRecordKey(state.codexRuntimeByRoom, roomId),
+      gitWorkflowRuntimeByRoom: omitRecordKey(state.gitWorkflowRuntimeByRoom, roomId),
       roomSettingsByRoom: omitRecordKey(state.roomSettingsByRoom, roomId),
       roomChatByRoom: omitRecordKey(state.roomChatByRoom, roomId),
       sensitiveAttachmentReviewKey: state.sensitiveAttachmentReviewKey?.startsWith(`${roomId}:`)

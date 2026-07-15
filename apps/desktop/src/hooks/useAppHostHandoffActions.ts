@@ -51,7 +51,6 @@ export function useAppHostHandoffActions({
   const relayStatus = useAppStore((state) => state.relayStatus);
   const terminals = useAppStore((state) => state.terminals);
   const browserRequests = useAppStore((state) => state.browserByRoom[selectedRoom.id]?.requests);
-  const roomGitStatus = useAppStore((state) => state.gitWorkflowRuntimeByRoom[selectedRoom.id]?.workflow?.status);
 
   return useHostHandoffActions({
     hasSelectedRoom,
@@ -70,9 +69,8 @@ export function useAppHostHandoffActions({
     seenEnvelopeIds: appRefs.seenEnvelopeIds,
     messages,
     terminals,
-    browserRequestsByRoom: browserRequests ? { [selectedRoom.id]: browserRequests } : {},
+    browserRequests: browserRequests ?? [],
     gitStatus,
-    gitStatusByRoom: roomGitStatus ? { [selectedRoom.id]: roomGitStatus } : {},
     reportRoomHostMutationInFlight: roomInteraction.reportRoomHostMutationInFlight,
     roomSettingsActor,
     replaceRoom: workspaceRecords.replaceRoom,

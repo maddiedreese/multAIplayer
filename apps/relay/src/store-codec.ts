@@ -160,7 +160,7 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
       }
       for (const storedSession of storedArray(stored.authSessions)) {
         const normalized = options.normalizeStoredAuthSession(storedSession);
-        if (normalized) store.authSessions.set(normalized.sessionId, normalized.session);
+        if (normalized) store.authSessions.set(normalized.sessionIdHash, normalized.session);
       }
       for (const entry of storedArray(stored.appliedDeletionLedgerEntries)) {
         if (

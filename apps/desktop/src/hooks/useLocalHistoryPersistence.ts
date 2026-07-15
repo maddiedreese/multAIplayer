@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { saveEncryptedHistory, type LocalHistorySettings } from "../lib/localHistory";
 import { pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import { localRoomReadStateForHistory } from "../lib/roomUnread";
+import { reportNonFatal } from "../lib/nonFatalReporting";
 import { terminalsForLocalHistory } from "../lib/terminalState";
 import type { TerminalSnapshot } from "../lib/localBackend";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -121,8 +122,8 @@ export function useLocalHistoryPersistence({
       },
       historySettings.retentionDays
     );
-    saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch(() => {
-      console.warn("Failed to save encrypted local history");
+    saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch((error) => {
+      reportNonFatal("save encrypted local history", error);
     });
   }, [
     browserRequests,

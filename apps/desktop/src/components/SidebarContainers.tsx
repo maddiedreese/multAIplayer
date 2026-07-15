@@ -18,7 +18,7 @@ import { useSidebarNavigation } from "../hooks/useSidebarNavigation";
 import { approvalPolicyLabels } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
-import { projectBrowserPanelMaps } from "../store/slices/browserSlice";
+import { projectBrowserRequestsByRoom } from "../store/slices/browserSlice";
 import { projectCodexRuntimeMaps } from "../store/slices/codexHostHandoffSlice";
 import { projectHistorySearchMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import { projectTerminalRuntimeRequestsByRoom } from "../store/slices/terminalSlice";
@@ -129,10 +129,7 @@ export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }
     () => projectTerminalRuntimeRequestsByRoom(terminalRuntimeByRoom),
     [terminalRuntimeByRoom]
   );
-  const browserRequestsByRoom = useMemo(
-    () => projectBrowserPanelMaps(browserByRoom).browserRequestsByRoom,
-    [browserByRoom]
-  );
+  const browserRequestsByRoom = useMemo(() => projectBrowserRequestsByRoom(browserByRoom), [browserByRoom]);
   const display = useSidebarNavigation({
     sidebarQuery,
     rooms: visibleRooms,

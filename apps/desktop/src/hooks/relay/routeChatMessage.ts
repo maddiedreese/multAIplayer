@@ -10,6 +10,7 @@ import { isLegacyDebugChatMessage } from "../../lib/localRoomHistoryPayload";
 import { sendRoomMessageNotification } from "../../lib/roomNotifications";
 import type { AppStoreState } from "../../store/appStore";
 import type { ChatMessage } from "../../types";
+import { reportNonFatal } from "../../lib/nonFatalReporting";
 import type { MlsMessageRouteContext, MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
 
 export async function routeChatMessage(
@@ -56,7 +57,7 @@ export async function routeChatMessage(
       forgottenRoomIds: access.forgottenRoomIds,
       revokedRoomIds: access.revokedRoomIds,
       revokedTeamIds: access.revokedTeamIds
-    }).catch(() => console.warn("Failed to send room notification"));
+    }).catch((error) => reportNonFatal("send room notification", error));
     if (room) context.handleCodexBrowserOpenCommand(message, room);
     return true;
   }

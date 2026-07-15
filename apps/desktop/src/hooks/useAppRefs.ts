@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { RelayClient } from "../lib/relayClient";
-import { projectBrowserPanelMaps } from "../store/slices/browserSlice";
+import { projectBrowserRequestsByRoom } from "../store/slices/browserSlice";
 import { projectGitHubWorkflowPanelMaps } from "../store/slices/gitWorkflowSlice";
 import { projectInvitePanelMaps } from "../store/slices/inviteSlice";
 import { projectLocalPreviewPanelMaps } from "../store/slices/localPreviewSlice";
@@ -33,7 +33,7 @@ export function useAppRefs() {
   const terminalBusyRef = useRef(projectTerminalRuntimeBusyByRoom(initial.terminalRuntimeByRoom));
   const localPreviewBusyRef = useRef(projectLocalPreviewPanelMaps(initial.localPreviewByRoom).localPreviewBusyByRoom);
   const fileBusyRef = useRef(fileBusyByRoom(initial));
-  const browserRequestsRef = useRef(projectBrowserPanelMaps(initial.browserByRoom).browserRequestsByRoom);
+  const browserRequestsRef = useRef(projectBrowserRequestsByRoom(initial.browserByRoom));
 
   useEffect(() => {
     const syncRefs = (state: AppStoreState) => {
@@ -51,7 +51,7 @@ export function useAppRefs() {
       terminalBusyRef.current = projectTerminalRuntimeBusyByRoom(state.terminalRuntimeByRoom);
       localPreviewBusyRef.current = projectLocalPreviewPanelMaps(state.localPreviewByRoom).localPreviewBusyByRoom;
       fileBusyRef.current = fileBusyByRoom(state);
-      browserRequestsRef.current = projectBrowserPanelMaps(state.browserByRoom).browserRequestsByRoom;
+      browserRequestsRef.current = projectBrowserRequestsByRoom(state.browserByRoom);
     };
     // Initialization runs in a parent layout effect before this passive effect.
     syncRefs(useAppStore.getState());

@@ -1,6 +1,7 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { MutableRefObject } from "react";
 import type { ChatMessage } from "../types";
+import { reportNonFatal } from "./nonFatalReporting";
 
 const maxNotificationBodyChars = 180;
 
@@ -145,8 +146,8 @@ export function registerRoomNotificationClickFocus({
         listener = registeredListener;
       })
     )
-    .catch(() => {
-      console.warn("Failed to register room notification click handler");
+    .catch((error) => {
+      reportNonFatal("register room notification click handler", error);
     });
 
   return () => {

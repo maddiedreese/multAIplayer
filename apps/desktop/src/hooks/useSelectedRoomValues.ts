@@ -98,32 +98,10 @@ export function useSelectedRoomValues({
     pendingAttachments,
     roomGoal: codexRuntime.goal ?? null,
     pendingAttachmentBytes: embeddedAttachmentBytes(pendingAttachments),
-    browserRequests: browser.requests ?? [],
-    browserUrl: browser.url ?? defaultBrowserUrl,
-    browserReason: browser.reason ?? defaultBrowserReason,
-    activeBrowserUrl: browser.activeUrl ?? null,
-    browserTabs: browser.tabs ?? [],
-    activeBrowserTabId: browser.activeTabId ?? null,
-    gitStatus: gitWorkflow.status ?? null,
-    gitWorkflowDraft: resolveGitWorkflowDraft({ [roomId]: gitWorkflow.draft ?? {} }, roomId),
-    gitWorkflowBusy: gitWorkflow.busy ?? false,
-    gitWorkflowMessage: gitWorkflow.message ?? null,
-    actionRuns: githubActions.runs ?? [],
-    actionsBusy: githubActions.busy ?? false,
-    actionsLastChecked: githubActions.lastChecked ?? null,
-    actionsMessage: githubActions.message ?? null,
-    terminalLines: terminalRuntime.lines ?? [],
-    terminalBusy: terminalRuntime.busy ?? false,
-    selectedTerminalId: terminalRuntime.selectedTerminalId ?? null,
-    terminalError: terminalRuntime.ui?.error ?? null,
-    fileQuery: filePanel.query ?? "",
-    projectFiles: filePanel.projectFiles ?? [],
-    selectedFile: filePanel.selectedFile ?? null,
-    selectedDiff,
-    filePreviewTab: resolveFilePreviewTab(filePanel.previewTab ?? "file", Boolean(selectedDiff?.diff.trim())),
-    fileBusy: filePanel.busy ?? false,
-    fileMessage: filePanel.message ?? null,
-    fileSaveRequests: filePanel.saveRequests ?? [],
+    ...selectBrowserValues(browser, defaultBrowserUrl, defaultBrowserReason),
+    ...selectGitValues(gitWorkflow, githubActions, roomId),
+    ...selectTerminalValues(terminalRuntime),
+    ...selectFilePanelValues(filePanel, selectedDiff),
     inviteLink: invite.link ?? "",
     inviteApprovalGate: invite.approvalGate ?? true,
     inviteMessage: invite.message ?? null,
@@ -134,5 +112,58 @@ export function useSelectedRoomValues({
     teamHistoryMessage,
     visibleHistoryMessage: historyMessage ?? teamHistoryMessage,
     markdownCopyFallback
+  };
+}
+
+function selectBrowserValues(browser: BrowserByRoom[string], defaultUrl: string, defaultReason: string) {
+  return {
+    browserRequests: browser.requests ?? [],
+    browserUrl: browser.url ?? defaultUrl,
+    browserReason: browser.reason ?? defaultReason,
+    activeBrowserUrl: browser.activeUrl ?? null,
+    browserTabs: browser.tabs ?? [],
+    activeBrowserTabId: browser.activeTabId ?? null
+  };
+}
+
+function selectGitValues(
+  gitWorkflow: NonNullable<GitWorkflowRuntimeByRoom[string]["workflow"]>,
+  githubActions: NonNullable<GitWorkflowRuntimeByRoom[string]["actions"]>,
+  roomId: string
+) {
+  return {
+    gitStatus: gitWorkflow.status ?? null,
+    gitWorkflowDraft: resolveGitWorkflowDraft({ [roomId]: gitWorkflow.draft ?? {} }, roomId),
+    gitWorkflowBusy: gitWorkflow.busy ?? false,
+    gitWorkflowMessage: gitWorkflow.message ?? null,
+    actionRuns: githubActions.runs ?? [],
+    actionsBusy: githubActions.busy ?? false,
+    actionsLastChecked: githubActions.lastChecked ?? null,
+    actionsMessage: githubActions.message ?? null
+  };
+}
+
+function selectTerminalValues(terminalRuntime: TerminalRuntimeByRoom[string]) {
+  return {
+    terminalLines: terminalRuntime.lines ?? [],
+    terminalBusy: terminalRuntime.busy ?? false,
+    selectedTerminalId: terminalRuntime.selectedTerminalId ?? null,
+    terminalError: terminalRuntime.ui?.error ?? null
+  };
+}
+
+function selectFilePanelValues(
+  filePanel: FilePanelByRoom[string],
+  selectedDiff: FilePanelByRoom[string]["selectedDiff"] | null
+) {
+  return {
+    fileQuery: filePanel.query ?? "",
+    projectFiles: filePanel.projectFiles ?? [],
+    selectedFile: filePanel.selectedFile ?? null,
+    selectedDiff,
+    filePreviewTab: resolveFilePreviewTab(filePanel.previewTab ?? "file", Boolean(selectedDiff?.diff.trim())),
+    fileBusy: filePanel.busy ?? false,
+    fileMessage: filePanel.message ?? null,
+    fileSaveRequests: filePanel.saveRequests ?? []
   };
 }

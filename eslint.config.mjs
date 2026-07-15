@@ -37,6 +37,14 @@ export default tseslint.config(
     }
   },
   {
+    files: typescriptFiles,
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: {
+      complexity: ["error", 50],
+      "max-depth": ["error", 5]
+    }
+  },
+  {
     files: ["apps/desktop/**/*.{ts,tsx}"],
     languageOptions: {
       globals: {
@@ -56,71 +64,6 @@ export default tseslint.config(
       "desktop/zustand-slice-boundaries": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"
-    }
-  },
-  {
-    files: ["apps/desktop/src/hooks/**/*.{ts,tsx}", "apps/desktop/src/lib/**/*.{ts,tsx}"],
-    ignores: ["apps/desktop/src/**/*.test.{ts,tsx}", "apps/desktop/src/**/*.spec.{ts,tsx}"],
-    rules: {
-      "max-lines": ["error", { max: 575, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/desktop/src/hooks/useRoomInspectorComposition.tsx"],
-    rules: {
-      "max-lines": ["error", { max: 350, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/relay/src/http/rooms.ts"],
-    rules: {
-      "max-lines": ["error", { max: 50, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/relay/src/http/room-*-route.ts"],
-    rules: {
-      "max-lines": ["error", { max: 225, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/desktop/src/hooks/useCodexTurnActions.ts"],
-    rules: {
-      "max-lines": ["error", { max: 380, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/desktop/src/hooks/useHostHandoffActions.ts"],
-    rules: {
-      "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/desktop/src/hooks/relay/routeMlsMessage.ts"],
-    rules: {
-      "max-lines": ["error", { max: 100, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: [
-      "apps/desktop/src/hooks/relay/routeActivityMessage.ts",
-      "apps/desktop/src/hooks/relay/routeChatMessage.ts",
-      "apps/desktop/src/hooks/relay/routeRoomMessage.ts"
-    ],
-    rules: {
-      "max-lines": ["error", { max: 200, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/desktop/src/lib/roomSettingsActions.ts"],
-    rules: {
-      "max-lines": ["error", { max: 50, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    files: ["apps/desktop/src/lib/roomSettingsActionsImpl.ts"],
-    rules: {
-      "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }]
     }
   },
   {

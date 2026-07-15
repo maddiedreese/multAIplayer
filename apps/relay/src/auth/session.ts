@@ -1,10 +1,11 @@
 import { sendRelayError } from "../http/errors.js";
 import type { CookieOptions, Response } from "express";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { parseCookie } from "cookie";
 import { isRecord } from "@multaiplayer/protocol";
 import { normalizeMetadataText, normalizeRelayId } from "../limits.js";
-import type { AuthSession } from "../state.js";
+import type { AuthSession, NewAuthSession } from "../state.js";
 
 interface RelayAuthSessionManagerOptions {
   authSessions: Map<string, AuthSession>;
@@ -19,19 +20,21 @@ export interface RelayAuthSessionManager {
   readonly authSessionMaxAgeMs: number;
   authCookieOptions(maxAge?: number): CookieOptions;
   getAuthSession(sessionId: unknown): AuthSession | null;
+  setAuthSession(sessionId: string, session: NewAuthSession): void;
+  deleteAuthSession(sessionId: unknown): boolean;
   getAuthSessionFromRequest(request: IncomingMessage): AuthSession | undefined;
   allowRead(session: AuthSession | null, res: Response): boolean;
   allowMutation(session: AuthSession | null, res: Response): boolean;
 }
 
 export interface StoredAuthSession {
-  sessionId: string;
+  sessionIdHash: string;
   user: AuthSession["user"];
   expiresAt: number;
 }
 
 export interface NormalizedStoredAuthSession {
-  sessionId: string;
+  sessionIdHash: string;
   session: AuthSession;
 }
 
@@ -71,19 +74,35 @@ export function createRelayAuthSessionManager({
   function getAuthSession(sessionId: unknown): AuthSession | null {
     const normalizedSessionId = normalizeSessionId(sessionId);
     if (!normalizedSessionId) return null;
-    const session = authSessions.get(normalizedSessionId);
+    const sessionIdHash = hashAuthSessionId(normalizedSessionId);
+    const session = authSessions.get(sessionIdHash);
     if (!session) return null;
+    if (!isAuthSessionIdHash(session.sessionIdHash) || !sessionIdHashesEqual(session.sessionIdHash, sessionIdHash)) {
+      authSessions.delete(sessionIdHash);
+      scheduleStoreSave();
+      return null;
+    }
     if (isDeletedIdentity(session.user.id)) {
-      authSessions.delete(normalizedSessionId);
+      authSessions.delete(sessionIdHash);
       scheduleStoreSave();
       return null;
     }
     if (session.expiresAt <= Date.now()) {
-      authSessions.delete(normalizedSessionId);
+      authSessions.delete(sessionIdHash);
       scheduleStoreSave();
       return null;
     }
     return session;
+  }
+
+  function setAuthSession(sessionId: string, session: NewAuthSession): void {
+    const sessionIdHash = hashAuthSessionId(sessionId);
+    authSessions.set(sessionIdHash, { ...session, sessionIdHash });
+  }
+
+  function deleteAuthSession(sessionId: unknown): boolean {
+    const normalizedSessionId = normalizeSessionId(sessionId);
+    return normalizedSessionId ? authSessions.delete(hashAuthSessionId(normalizedSessionId)) : false;
   }
 
   function getAuthSessionFromRequest(request: IncomingMessage): AuthSession | undefined {
@@ -107,6 +126,8 @@ export function createRelayAuthSessionManager({
     authSessionMaxAgeMs,
     authCookieOptions,
     getAuthSession,
+    setAuthSession,
+    deleteAuthSession,
     getAuthSessionFromRequest,
     allowRead,
     allowMutation
@@ -119,6 +140,16 @@ export function parseCookieHeader(header: string | undefined): Map<string, strin
   );
 }
 
+export function hashAuthSessionId(sessionId: string): string {
+  return createHash("sha256").update(sessionId, "utf8").digest("hex");
+}
+
+function sessionIdHashesEqual(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left, "hex");
+  const rightBytes = Buffer.from(right, "hex");
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
+}
+
 export function createRelayAuthSessionPersistence({
   authSessionMaxAgeMs,
   maxAuthSessionIdChars,
@@ -129,10 +160,17 @@ export function createRelayAuthSessionPersistence({
   return {
     storedAuthSessions(authSessions) {
       const sessions: StoredAuthSession[] = [];
-      for (const [sessionId, session] of authSessions.entries()) {
+      for (const [sessionIdHash, session] of authSessions.entries()) {
         if (session.expiresAt <= Date.now()) continue;
+        if (
+          !isAuthSessionIdHash(sessionIdHash) ||
+          !isAuthSessionIdHash(session.sessionIdHash) ||
+          !sessionIdHashesEqual(session.sessionIdHash, sessionIdHash)
+        ) {
+          continue;
+        }
         sessions.push({
-          sessionId,
+          sessionIdHash,
           user: session.user,
           expiresAt: session.expiresAt
         });
@@ -141,7 +179,7 @@ export function createRelayAuthSessionPersistence({
     },
     normalizeStoredAuthSession(stored) {
       if (!isRecord(stored)) return null;
-      const sessionId = normalizeRelayId(stored.sessionId, maxAuthSessionIdChars);
+      const sessionIdHash = normalizeStoredSessionIdHash(stored, maxAuthSessionIdChars);
       const user = isRecord(stored.user) ? stored.user : null;
       const userId = normalizeMetadataText(user?.id, maxUserIdChars);
       const login = normalizeMetadataText(user?.login, maxDisplayNameChars);
@@ -149,7 +187,7 @@ export function createRelayAuthSessionPersistence({
       const avatarUrl =
         user?.avatarUrl === undefined ? undefined : normalizeMetadataText(user.avatarUrl, maxRoomProjectPathChars);
       if (
-        !sessionId ||
+        !sessionIdHash ||
         typeof stored.expiresAt !== "number" ||
         !Number.isSafeInteger(stored.expiresAt) ||
         stored.expiresAt <= Date.now() ||
@@ -163,8 +201,9 @@ export function createRelayAuthSessionPersistence({
       }
 
       return {
-        sessionId,
+        sessionIdHash,
         session: {
+          sessionIdHash,
           user: {
             id: userId,
             login,
@@ -176,4 +215,16 @@ export function createRelayAuthSessionPersistence({
       };
     }
   };
+}
+
+function normalizeStoredSessionIdHash(stored: Record<string, unknown>, maxAuthSessionIdChars: number): string | null {
+  if (typeof stored.sessionIdHash === "string" && isAuthSessionIdHash(stored.sessionIdHash)) {
+    return stored.sessionIdHash;
+  }
+  const legacySessionId = normalizeRelayId(stored.sessionId, maxAuthSessionIdChars);
+  return legacySessionId ? hashAuthSessionId(legacySessionId) : null;
+}
+
+function isAuthSessionIdHash(value: string): boolean {
+  return /^[a-f0-9]{64}$/.test(value);
 }

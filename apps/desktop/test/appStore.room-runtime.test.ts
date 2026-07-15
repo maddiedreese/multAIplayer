@@ -610,16 +610,15 @@ test("desktop store clears local room-scoped state", () => {
   store.clearRoomScopedStateForRoom("room-a");
 
   const state = useAppStore.getState();
-  assert.deepEqual(state.messagesByRoom["room-a"], []);
-  assert.deepEqual(state.chatEditsByRoom["room-a"], []);
-  assert.deepEqual(state.chatDeletesByRoom["room-a"], []);
-  assert.deepEqual(state.terminalRuntimeByRoom["room-a"]?.requests, []);
-  assert.deepEqual(state.browserByRoom["room-a"], { requests: [] });
+  assert.equal(state.messagesByRoom["room-a"], undefined);
+  assert.equal(state.chatEditsByRoom["room-a"], undefined);
+  assert.equal(state.chatDeletesByRoom["room-a"], undefined);
+  assert.equal(state.terminalRuntimeByRoom["room-a"], undefined);
+  assert.equal(state.browserByRoom["room-a"], undefined);
   assert.equal(state.inviteByRoom["room-a"], undefined);
-  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.events, []);
-  assert.deepEqual(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"], { events: [] });
-  assert.deepEqual(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.events, []);
-  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.hostHandoffs, []);
+  assert.equal(state.codexRuntimeByRoom["room-a"], undefined);
+  assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"], undefined);
+  assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"], undefined);
   assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph, undefined);
   assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.runs, undefined);
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.busy, undefined);

@@ -1,5 +1,5 @@
 import type { CookieOptions, Express } from "express";
-import type { AuthSession, RelayStore } from "../state.js";
+import type { AuthSession, NewAuthSession, RelayStore } from "../state.js";
 import { registerGitHubAuthRoutes } from "../auth/github.js";
 import type { DeletionLedger } from "../auth/deletion-ledger.js";
 
@@ -7,7 +7,8 @@ interface RegisterGitHubRoutesOptions {
   app: Express;
   mutationsRequireAuth: boolean;
   allowedCorsOrigins: string[];
-  authSessions: Map<string, AuthSession>;
+  setAuthSession: (sessionId: string, session: NewAuthSession) => void;
+  deleteAuthSession: (sessionId: unknown) => boolean;
   store: RelayStore;
   deletionLedger: DeletionLedger | null;
   authSessionMaxAgeMs: number;

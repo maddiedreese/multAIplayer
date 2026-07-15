@@ -113,6 +113,10 @@ The Project panel attaches the active host's local folder to the room. Room memb
 
 The file editor can open files, show diffs for changed files, expand into a larger view, attach the selected file to chat, and save edits back to disk. Active hosts can save directly. Other room members can edit and request a save; the active host must approve before the change touches disk. File previews and diffs are bounded; truncated files cannot be saved from the editor.
 
+The **Changed files** section is a host-local snapshot of the active project's Git working tree. It is populated from `git status --porcelain=v1`, so it includes tracked staged and unstaged changes plus untracked files relative to the current checkout and index. The app refreshes that snapshot when it attaches or switches the selected room/project and after its terminal or Git workflow actions; it is not a continuous filesystem watcher, so an external edit can remain stale until another refresh trigger. It is **not** a comparison with the last merged pull request, the merge base, or the remote default branch. A file that was committed locally no longer appears even if that commit has not been merged, while an older uncommitted change continues to appear. To review every commit since a merged PR, use an explicit Git range or the GitHub pull request view.
+
+The per-file diff preview currently shows the unstaged working-tree diff, with a generated new-file diff for untracked files. A staged-only file is still present in **Changed files**, but can have no diff text in that preview. The small `+`/`-` values in the list are status indicators for added, untracked, or deleted files rather than full line totals; review the opened diff for actual content.
+
 `Markdown` copies a project/file summary. `Summary` copies a changed-file summary. If clipboard access is blocked, the generated Markdown appears in an in-app fallback panel.
 
 ## Terminals
@@ -175,4 +179,4 @@ Team defaults control settings for newly created rooms, including local history 
 
 ## Updates
 
-The app checks the public release manifest and shows an in-app update banner when a newer version is available. Security updates get a stronger label. The alpha does not auto-update; users install signed builds manually from GitHub Releases.
+The app checks `https://multaiplayer.com/releases/latest.json` when the app shell mounts and shows an in-app banner when the manifest contains a newer version. A manifest with `security: true` is labelled **Security update available**. The banner opens the manifest's HTTPS download URL; the alpha does not download, install, or restart automatically. When a supported public build is available, it will be signed and notarized, published through GitHub Releases, and installed manually by the user. No supported public build has been published yet.

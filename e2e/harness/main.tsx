@@ -19,7 +19,10 @@ function Harness() {
   const search = new URLSearchParams(window.location.search);
   const scenarioName = search.get("scenario") ?? "";
   const presentation = search.get("presentation") === "readme";
-  if (presentation) document.documentElement.dataset.theme = "dark";
+  if (presentation) {
+    document.documentElement.dataset.theme = "dark";
+    document.documentElement.dataset.presentation = "readme";
+  }
   const loader = scenarioModules[scenarioModulePath(scenarioName)];
   const [scenario, setScenario] = React.useState<UiContractScenarioModule | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
