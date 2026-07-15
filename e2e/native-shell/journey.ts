@@ -244,7 +244,35 @@ async function sendAndReceive(sender: Browser, receiver: Browser, text: string) 
 async function handoff(host: Browser, guest: Browser) {
   await (await visible(host, "button=Handoff")).click();
   const available = await visible(guest, ".handoff-row.available", 60_000);
-  await (await available.$("button=Request handoff")).click();
+  const requestButton = await available.$("button=Request handoff");
+  const folderApproval = runtime.run(
+    "bash",
+    [
+      "-euo",
+      "pipefail",
+      "-c",
+      `initial_windows="$(xdotool search --onlyvisible --name '.*' 2>/dev/null || true)"
+for _ in $(seq 1 100); do
+  current_windows="$(xdotool search --onlyvisible --name '.*' 2>/dev/null || true)"
+  for current_window in $current_windows; do
+    if ! printf '%s\n' "$initial_windows" | grep -qx "$current_window"; then
+      xdotool key --window "$current_window" --clearmodifiers ctrl+l
+      sleep 0.2
+      xdotool type --window "$current_window" --clearmodifiers --delay 1 -- "$HANDOFF_PROJECT_ROOT"
+      xdotool key --window "$current_window" --clearmodifiers Return
+      sleep 0.5
+      xdotool key --window "$current_window" --clearmodifiers Return
+      exit 0
+    fi
+  done
+  sleep 0.1
+done
+echo "native handoff folder chooser did not become active" >&2
+exit 1`
+    ],
+    { env: { HANDOFF_PROJECT_ROOT: root }, timeoutMs: 20_000 }
+  );
+  await Promise.all([requestButton.click(), folderApproval]);
   await visible(guest, ".handoff-row.requested", 60_000);
   const requested = await visible(host, ".handoff-row.requested", 60_000);
   await (await requested.$("button=Approve candidate")).click();
