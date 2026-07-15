@@ -7,8 +7,8 @@ use mls_core::{
     generate_hpke_key_pair, issue_capability, mac_binding, mac_response_binding, open, seal,
     validate_credential, validate_key_package_upload, verify_request_binding,
     verify_response_binding, BasicAppCredential, CapabilityBinding, DeviceAuthSigner,
-    EncryptedStore, ExporterCiphertext, HpkeKeyPair, JoinAdmissionMetadata, KeyPackageUpload,
-    MlsEngine, PendingInviteRequest, SealedPayload, WelcomeRetryMetadata,
+    EncryptedStore, EngineError, ExporterCiphertext, HpkeKeyPair, JoinAdmissionMetadata,
+    KeyPackageUpload, MlsEngine, PendingInviteRequest, SealedPayload, WelcomeRetryMetadata,
 };
 use sha2::{Digest, Sha256};
 use std::{collections::HashSet, sync::Mutex};
@@ -401,7 +401,17 @@ pub(crate) fn mls_encrypt_application(
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<OutboundApplicationResponse> {
     let payload = decode(&request.payload)?;
+    let config_epoch = if request.authenticated_data.kind == "room.config" {
+        Some(validate_room_config_payload(&payload)?)
+    } else {
+        None
+    };
     Ok(with_engine(&state, |engine| {
+        if config_epoch
+            .is_some_and(|expected| engine.current_epoch(&request.room_id).ok() != Some(expected))
+        {
+            return Err(EngineError::InvalidInput);
+        }
         engine.encrypt_application(
             &request.room_id,
             &request.message_id,
@@ -418,6 +428,46 @@ pub(crate) fn mls_encrypt_application(
                 .map_err(|_| "MLS authenticated data encoding failed".to_string())?,
         })
     })
+}
+
+fn validate_room_config_payload(payload: &[u8]) -> Result<u64, String> {
+    let config: RoomConfigPayload = serde_json::from_slice(payload)
+        .map_err(|_| "Encrypted room configuration is invalid".to_string())?;
+    let bounded_text = |value: &str, max: usize| {
+        !value.is_empty() && value.len() <= max && !value.chars().any(char::is_control)
+    };
+    let policy = |value: &str| matches!(value, "auto" | "pinned");
+    let model_chars = config
+        .codex_model
+        .chars()
+        .all(|value| value.is_ascii_alphanumeric() || matches!(value, '.' | '_' | ':' | '/' | '-'));
+    if config.event_type != "room.config"
+        || config.config_revision == 0
+        || !bounded_text(&config.project_path, 2_048)
+        || !bounded_text(&config.codex_model, 80)
+        || !config
+            .codex_model
+            .chars()
+            .next()
+            .is_some_and(|value| value.is_ascii_alphanumeric())
+        || !model_chars
+        || !policy(&config.codex_model_policy)
+        || !matches!(
+            config.codex_reasoning_effort.as_str(),
+            "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
+        )
+        || !policy(&config.codex_reasoning_effort_policy)
+        || !matches!(config.codex_speed.as_str(), "standard" | "fast")
+        || !policy(&config.codex_service_tier_policy)
+        || !matches!(
+            config.codex_sandbox_level.as_str(),
+            "read_only" | "workspace_write" | "workspace_write_network" | "danger_full_access"
+        )
+    {
+        return Err("Encrypted room configuration is invalid".to_string());
+    }
+    let _ = config.codex_raw_reasoning_enabled;
+    Ok(config.emitting_epoch)
 }
 
 #[tauri::command]

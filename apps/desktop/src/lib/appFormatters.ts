@@ -6,7 +6,7 @@ import {
   maxEmbeddedAttachmentBytes,
   maxEmbeddedAttachmentBytesPerMessage,
   maxMessageAttachments,
-  type RoomRecord,
+  type ClientRoomRecord,
   type TeamRecord
 } from "@multaiplayer/protocol";
 import type { GitHubAuthConfig, SignedInUser } from "./authClient";
@@ -144,7 +144,7 @@ export function attachmentTypeFromName(name: string): string {
   return "file";
 }
 
-export function formatHostStatus(room: RoomRecord): string {
+export function formatHostStatus(room: ClientRoomRecord): string {
   if (room.hostStatus === "active") return `Hosted by ${room.host}`;
   if (room.hostStatus === "handoff") return `Handoff from ${room.host}`;
   return "No active host";
@@ -162,7 +162,7 @@ export function shortFingerprint(fingerprint: string): string {
   return `sha256:${groups.slice(0, 8).join(":")}:…:${groups.slice(-2).join(":")}`;
 }
 
-export function isRoomHostMember(member: RoomPresence, room: RoomRecord): boolean {
+export function isRoomHostMember(member: RoomPresence, room: ClientRoomRecord): boolean {
   if (room.hostStatus !== "active") return false;
   if (room.hostUserId) return member.userId === room.hostUserId;
   return member.displayName === room.host;

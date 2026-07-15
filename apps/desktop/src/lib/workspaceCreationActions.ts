@@ -1,4 +1,4 @@
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { chooseProjectFolder, defaultProjectPath } from "./localBackend";
 import { loadTeamHistorySettings, seedNewRoomHistorySettings } from "./localHistory";
 import {
@@ -22,7 +22,7 @@ interface WorkspaceCreationActionsOptions {
   setNewRoomName: (name: string) => void;
   setNewRoomProjectPath: (path: string) => void;
   upsertTeam: (team: TeamRecord) => void;
-  upsertRoom: (room: RoomRecord) => void;
+  upsertRoom: (room: ClientRoomRecord) => void;
   roomSettingsActor: () => { requesterName: string; requesterUserId: string };
 }
 

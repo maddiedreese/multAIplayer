@@ -22,6 +22,8 @@ const validatorPath = fileURLToPath(
 );
 const marker = "MLS-PLAINTEXT-MUST-NEVER-REACH-RELAY";
 const githubTokenMarker = "ghp_GITHUB_TOKEN_MUST_NEVER_REACH_RELAY_STORAGE_OR_ROOM_WIRE";
+const projectPathMarker = "/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY";
+const codexModelMarker = "sentinel-model-MUST-NEVER-REACH-RELAY";
 const rustToolchain = probeRustToolchain(process.env.MULTAIPLAYER_CARGO_BIN ?? "cargo");
 
 interface NativeFixture {
@@ -182,7 +184,8 @@ function workspace(fixture: NativeFixture): StoredRelayStateFixture {
         id: "room-desktop",
         teamId: "team-core",
         name: "Desktop app",
-        projectPath: "/tmp/multaiplayer",
+        projectPath: projectPathMarker,
+        codexModel: codexModelMarker,
         host: "Maddie",
         hostUserId: fixture.host.userId,
         activeHostDeviceId: fixture.host.deviceId,
@@ -304,6 +307,8 @@ async function scanRelay(relay: { dataPath: string }, wire: string[], forbidden:
     Buffer.from(marker),
     Buffer.from("MLS-REMOVED-MEMBER-MUST-NOT-DECRYPT"),
     Buffer.from(githubTokenMarker),
+    Buffer.from(projectPathMarker),
+    Buffer.from(codexModelMarker),
     ...forbidden
   ];
   const needles = [...binaryMarkers, ...binaryMarkers.map((value) => Buffer.from(value.toString("base64")))];
@@ -327,6 +332,10 @@ async function runSecurityJourney() {
   assert.equal(generated.stderr.includes(marker), false);
   assert.equal(generated.stdout.includes(githubTokenMarker), false);
   assert.equal(generated.stderr.includes(githubTokenMarker), false);
+  assert.equal(generated.stdout.includes(projectPathMarker), false);
+  assert.equal(generated.stderr.includes(projectPathMarker), false);
+  assert.equal(generated.stdout.includes(codexModelMarker), false);
+  assert.equal(generated.stderr.includes(codexModelMarker), false);
   const fixture = generated.fixture;
   const forbidden = fixture.forbiddenValues.map((value) => Buffer.from(value, "base64"));
   assert.ok(forbidden.every((value) => value.length > 0));

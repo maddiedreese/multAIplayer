@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   defaultCodexModel,
   defaultCodexReasoningEffort,
@@ -19,7 +19,7 @@ import type { TerminalRuntimeByRoom } from "../store/slices/terminalSlice";
 import type { ChatAttachment, ChatMessage, MarkdownCopyFallback } from "../types";
 
 interface UseSelectedRoomValuesOptions {
-  selectedRoom: RoomRecord;
+  selectedRoom: ClientRoomRecord;
   selectedRoomId: string;
   selectedTeam: string;
   selectedMessageIds: string[];

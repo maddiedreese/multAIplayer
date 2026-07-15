@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { applyGitPatch, shutdownCodexRoom } from "../lib/localBackend";
 import { createHandoffSettingsPatch } from "../lib/hostHandoff";
 import { updateRoomSettings } from "../lib/workspaceClient";
@@ -8,18 +8,19 @@ import type { HostHandoffRecord } from "../types";
 import { buildAcceptedHandoffMessage, resolveHandoffProject } from "./hostHandoffHelpers";
 
 interface Options {
-  room: RoomRecord;
+  room: ClientRoomRecord;
   handoffs: HostHandoffRecord[];
   localUserId: string;
   deviceId: string;
   roomSettingsActor: () => { requesterName: string; requesterUserId: string };
-  replaceRoom: (room: RoomRecord) => void;
+  replaceRoom: (room: ClientRoomRecord) => void;
   setHostMessage: (roomId: string, message: string) => void;
   setSettingsMessage: (roomId: string, message: string) => void;
   setProjectPathDraft: (roomId: string, path: string) => void;
   setCustomCodexModel: (roomId: string, model: string) => void;
   resetFileContext: (roomId: string) => void;
   resetCodexApproval: (roomId: string) => void;
+  publishConfig: (room: ClientRoomRecord) => Promise<void>;
 }
 
 export function useFinalizeIncomingHostHandoff(options: Options): void {
@@ -71,6 +72,7 @@ async function finalize(
   });
   void shutdownCodexRoom(options.room.id);
   options.replaceRoom(updated);
+  await options.publishConfig(updated);
   setContinuation(options.room.id, handoff.reason === "usage_limit" ? handoff : null);
   options.resetFileContext(options.room.id);
   options.resetCodexApproval(options.room.id);

@@ -1,4 +1,4 @@
-import type { RoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { SignedInUser } from "./authClient";
 import type { TrustedDeviceKey } from "./deviceTrust";
 import { isDeviceKeyTrusted } from "./deviceTrust";
@@ -52,7 +52,7 @@ export function buildRoomMemberRows({
   trustedDeviceKeys
 }: {
   presence: Record<string, RoomPresence>;
-  room: RoomRecord;
+  room: ClientRoomRecord;
   localUser: { id: string; name: string; avatarUrl?: string };
   localDeviceId: string;
   localPublicKeyFingerprint?: string;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { beforeEach } from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { RelayPublishRejectedError } from "../src/lib/relayClient";
 
 let outboxItems: unknown[] = [];
@@ -30,7 +30,8 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
   }
 });
 
-const { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds } = await import("../src/lib/mlsOutboxDrain");
+const { drainMlsOutboxForRoom, pendingMlsOutboxRoomIds, recoverRoomAfterJoin } =
+  await import("../src/lib/mlsOutboxDrain");
 
 beforeEach(() => {
   retired.length = 0;
@@ -67,7 +68,7 @@ test("startup drain retires an exact application that exceeded the retained epoc
       metadata: { type: "application", authenticatedData: [...new TextEncoder().encode(authenticatedData)] }
     }
   ];
-  const room = { id: "room-a", teamId: "team-a" } as RoomRecord;
+  const room = { id: "room-a", teamId: "team-a" } as ClientRoomRecord;
   await drainMlsOutboxForRoom(
     {
       publish: () => undefined,
@@ -81,4 +82,51 @@ test("startup drain retires an exact application that exceeded the retained epoc
     { userId: "github:user-a", deviceId: "device-a", deviceSessionToken: "session-a" }
   );
   assert.deepEqual(retired, [{ roomId: "room-a", messageId: "expired-app" }]);
+});
+
+test("host reconnect re-emits config after draining durable Add-era outbox work", async () => {
+  const order: string[] = [];
+  const client = {} as Parameters<typeof recoverRoomAfterJoin>[0];
+  const room = {
+    id: "room-a",
+    teamId: "team-a",
+    projectPath: "/private/project",
+    hostStatus: "active",
+    hostUserId: "github:host",
+    activeHostDeviceId: "device-host"
+  } as ClientRoomRecord;
+  const identity = { userId: "github:host", deviceId: "device-host", deviceSessionToken: "session" };
+  await recoverRoomAfterJoin(client, room, identity, new Set(), {
+    drain: async () => void order.push("drain"),
+    publishConfig: async ({ room: published }) => {
+      order.push(`config:${published.projectPath}`);
+      return published;
+    }
+  });
+  assert.deepEqual(order, ["drain", "config:/private/project"]);
+});
+
+test("failed config re-emission remains retryable on the next reconnect", async () => {
+  const client = {} as Parameters<typeof recoverRoomAfterJoin>[0];
+  const room = {
+    id: "room-a",
+    teamId: "team-a",
+    projectPath: "/private/project",
+    hostStatus: "active",
+    hostUserId: "github:host",
+    activeHostDeviceId: "device-host"
+  } as ClientRoomRecord;
+  const identity = { userId: "github:host", deviceId: "device-host", deviceSessionToken: "session" };
+  let attempts = 0;
+  const dependencies = {
+    drain: async () => undefined,
+    publishConfig: async ({ room: published }: { room: ClientRoomRecord }) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("offline");
+      return published;
+    }
+  };
+  await assert.rejects(recoverRoomAfterJoin(client, room, identity, new Set(), dependencies), /offline/);
+  await recoverRoomAfterJoin(client, room, identity, new Set(), dependencies);
+  assert.equal(attempts, 2);
 });

@@ -1,9 +1,9 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { TerminalSnapshot } from "./localBackend";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 
 export function canControlRoomTerminal(
-  room: RoomRecord,
+  room: ClientRoomRecord,
   user: LocalHostUser,
   terminal: Pick<TerminalSnapshot, "roomId"> | null | undefined,
   locked = false
@@ -12,7 +12,7 @@ export function canControlRoomTerminal(
 }
 
 export function roomTerminalControlMessage(
-  room: RoomRecord,
+  room: ClientRoomRecord,
   terminal: Pick<TerminalSnapshot, "roomId"> | null | undefined,
   locked = false
 ): string {

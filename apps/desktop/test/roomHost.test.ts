@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   findEnvelopeRoom,
   isEnvelopeFromActiveRoomHost,
@@ -9,7 +9,7 @@ import {
   roomHostEnvelopeRejectionMessage
 } from "../src/lib/roomHost";
 
-const activeRoom: RoomRecord = {
+const activeRoom: ClientRoomRecord = {
   id: "room-alpha",
   teamId: "team-alpha",
   name: "Alpha",

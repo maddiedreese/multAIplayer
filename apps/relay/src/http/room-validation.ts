@@ -1,6 +1,6 @@
 import { sendRelayError } from "./errors.js";
 import type { Response } from "express";
-import { codexSandboxLevelOptions, type CodexCatalogSelectionPolicy, type RoomRecord } from "@multaiplayer/protocol";
+import { type CodexCatalogSelectionPolicy } from "@multaiplayer/protocol";
 import type { RelayStore } from "../state.js";
 
 export function normalizeCatalogSelectionPolicy(
@@ -9,14 +9,6 @@ export function normalizeCatalogSelectionPolicy(
 ): CodexCatalogSelectionPolicy | undefined | null {
   if (value === undefined) return fallback;
   return value === "auto" || value === "pinned" ? value : null;
-}
-
-export function normalizeCodexSandboxLevel(value: unknown): RoomRecord["codexSandboxLevel"] | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return codexSandboxLevelOptions.some((option) => option.id === trimmed)
-    ? (trimmed as RoomRecord["codexSandboxLevel"])
-    : null;
 }
 
 export function normalizeTrustedApproverUserIds(value: unknown, maxUserIdChars: number): string[] | null {

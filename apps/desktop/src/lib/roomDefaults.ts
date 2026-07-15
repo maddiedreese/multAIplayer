@@ -8,21 +8,33 @@ import {
   defaultCodexSandboxLevel,
   defaultCodexSpeed,
   legacyCodexCatalogSelectionPolicy,
+  type ClientRoomRecord,
+  type RoomConfig,
   type RoomRecord
 } from "@multaiplayer/protocol";
 import { normalizeBrowserAllowedOrigins } from "./browserPolicy";
 
-export function ensureRoomDefaults(room: RoomRecord): RoomRecord {
+export function ensureRoomDefaults(
+  room: RoomRecord & Partial<RoomConfig>,
+  previous?: ClientRoomRecord
+): ClientRoomRecord {
+  const hasMlsConfig = typeof room.projectPath === "string" && room.projectPath.length > 0;
+  const config = hasMlsConfig ? room : previous;
   return {
+    ...(previous ?? {}),
     ...room,
-    codexModel: room.codexModel || defaultCodexModel,
-    codexModelPolicy: room.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy,
-    codexReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
-    codexReasoningEffortPolicy: room.codexReasoningEffortPolicy ?? legacyCodexCatalogSelectionPolicy,
-    codexRawReasoningEnabled: room.codexRawReasoningEnabled ?? defaultCodexRawReasoningEnabled,
-    codexSpeed: room.codexSpeed ?? defaultCodexSpeed,
-    codexServiceTierPolicy: room.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy,
-    codexSandboxLevel: room.codexSandboxLevel ?? defaultCodexSandboxLevel,
+    projectPath: config?.projectPath ?? "",
+    codexModel: config?.codexModel || defaultCodexModel,
+    codexModelPolicy: config?.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexReasoningEffort: config?.codexReasoningEffort ?? defaultCodexReasoningEffort,
+    codexReasoningEffortPolicy: config?.codexReasoningEffortPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexRawReasoningEnabled: config?.codexRawReasoningEnabled ?? defaultCodexRawReasoningEnabled,
+    codexSpeed: config?.codexSpeed ?? defaultCodexSpeed,
+    codexServiceTierPolicy: config?.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexSandboxLevel: config?.codexSandboxLevel ?? defaultCodexSandboxLevel,
+    configRevision: config?.configRevision ?? 0,
+    configEpoch: config?.configEpoch ?? 0,
+    configPending: hasMlsConfig ? (room.configPending ?? false) : (previous?.configPending ?? true),
     approvalDelegationPolicy: room.approvalDelegationPolicy ?? defaultApprovalDelegationPolicy,
     trustedApproverUserIds: Array.isArray(room.trustedApproverUserIds) ? room.trustedApproverUserIds : [],
     browserAllowedOrigins:

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  RoomRecord,
+  ClientRoomRecord,
   RoomSettingsPlaintextPayload,
   codexReasoningEffortIds,
   codexReasoningEffortOptions,
@@ -12,7 +12,7 @@ import {
 } from "../src/index.js";
 
 test("room protocol derives its reasoning enum from the shared options", () => {
-  const room = RoomRecord.parse({
+  const room = ClientRoomRecord.parse({
     id: "room-catalog",
     teamId: "team-core",
     name: "Catalog",
@@ -33,7 +33,10 @@ test("room protocol derives its reasoning enum from the shared options", () => {
     codexSandboxLevel: "workspace_write",
     browserAllowedOrigins: [],
     browserProfilePersistent: true,
-    unread: 0
+    unread: 0,
+    configRevision: 1,
+    configEpoch: 1,
+    configPending: false
   });
 
   assert.equal(room.codexReasoningEffort, "max");

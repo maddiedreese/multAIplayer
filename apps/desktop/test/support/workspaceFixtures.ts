@@ -5,7 +5,7 @@ import {
   defaultCodexReasoningEffort,
   defaultCodexSpeed,
   defaultRoomMode,
-  type RoomRecord,
+  type ClientRoomRecord,
   type TeamRecord
 } from "@multaiplayer/protocol";
 import type { ChatMessage } from "../../src/types";
@@ -26,7 +26,7 @@ const roomDefaults = {
   unread: 0
 };
 
-export const seededRooms: RoomRecord[] = [
+export const seededRooms: ClientRoomRecord[] = [
   {
     ...roomDefaults,
     id: "room-desktop",

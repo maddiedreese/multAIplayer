@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { readLocalPreviewTunnelStatus } from "../lib/localBackend";
 import type { LocalPreviewRecord } from "../types";
 
@@ -10,8 +10,8 @@ interface LatestRef<T> {
 interface UseLocalPreviewPollingOptions {
   localPreviewsByRoom: Record<string, LocalPreviewRecord[]>;
   localUserId: string;
-  roomsRef: LatestRef<RoomRecord[]>;
-  publishLocalPreviewEvent: (payload: LocalPreviewRecord, room: RoomRecord) => Promise<void>;
+  roomsRef: LatestRef<ClientRoomRecord[]>;
+  publishLocalPreviewEvent: (payload: LocalPreviewRecord, room: ClientRoomRecord) => Promise<void>;
 }
 
 export function useLocalPreviewPolling({

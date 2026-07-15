@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { createAccountActions } from "../src/lib/accountActions";
 import { createChatActions } from "../src/lib/chatActions";
 import { createCodexInvokeActions } from "../src/lib/codexInvokeActions";
@@ -54,7 +54,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
   }
 });
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-actions",
   teamId: "team-actions",
   name: "Actions",
@@ -307,7 +307,7 @@ test("workspace creation actions restore the new room through the current store"
     newRoomName: room.name,
     newRoomProjectPath: room.projectPath
   });
-  const upsertedRooms: RoomRecord[] = [];
+  const upsertedRooms: ClientRoomRecord[] = [];
   try {
     const actions = createWorkspaceCreationActions({
       setWorkspaceStatusError: () => undefined,
@@ -568,7 +568,7 @@ test("room settings actions publish the host-controlled raw reasoning sharing de
 
     await actions.setCodexRawReasoningEnabled(true);
 
-    assert.equal(requestBody?.codexRawReasoningEnabled, true);
+    assert.equal(requestBody?.codexRawReasoningEnabled, undefined);
     assert.equal(requestBody?.requesterUserId, "github:maddie");
     assert.deepEqual(events, [{ setting: "codexRawReasoningEnabled", previousValue: "false", nextValue: "true" }]);
     assert.match(

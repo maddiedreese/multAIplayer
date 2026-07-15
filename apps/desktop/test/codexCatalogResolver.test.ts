@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   catalogModelOptions,
   catalogReasoningOptionsForModel,
@@ -9,7 +9,7 @@ import {
 } from "../src/lib/codexCatalogResolver";
 import type { CodexProbe } from "../src/lib/localBackend";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-catalog",
   teamId: "team-core",
   name: "Catalog",

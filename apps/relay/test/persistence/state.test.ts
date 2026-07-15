@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Database, startRelay, startRelayWithWorkspace } from "../support/relay.js";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRelayPersistence } from "../../src/persistence.js";
@@ -30,6 +30,44 @@ test("SQLite initializes normalized MLS and KeyPackage tables", async () => {
     db.close();
   } finally {
     await relay.close();
+  }
+});
+
+test("SQLite startup purges legacy host-local room config from rows, pages, and WAL", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "relay-room-config-purge-"));
+  const path = join(dir, "relay.sqlite");
+  const marker = "/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY";
+  const legacy = new SqliteRelayPersistence(path);
+  const publicRoom = { id: "room", teamId: "team", name: "Room", host: "Host", hostStatus: "offline" };
+  await legacy.save({
+    version: 1,
+    savedAt: new Date().toISOString(),
+    teams: [],
+    rooms: [{ ...publicRoom, projectPath: marker, codexModel: "sentinel-model" }],
+    invites: [],
+    mlsBacklog: []
+  });
+  legacy.close();
+  const reopened = new SqliteRelayPersistence(path);
+  try {
+    await reopened.load();
+    await reopened.finalizeLoad(() => ({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [],
+      rooms: [publicRoom],
+      invites: [],
+      mlsBacklog: []
+    }));
+    reopened.close();
+    for (const candidate of [path, `${path}-wal`, `${path}-shm`]) {
+      const bytes = await readFile(candidate).catch(() => Buffer.alloc(0));
+      assert.equal(bytes.includes(Buffer.from(marker)), false, candidate);
+      assert.equal(bytes.includes(Buffer.from("sentinel-model")), false, candidate);
+    }
+  } finally {
+    reopened.close();
+    await rm(dir, { recursive: true, force: true });
   }
 });
 

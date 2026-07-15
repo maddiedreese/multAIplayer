@@ -1,4 +1,4 @@
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { shouldResetCodexApprovalForRoomUpdate } from "./codexApproval";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "./relayAccess";
@@ -7,8 +7,8 @@ import { currentLocalIdentity } from "./selectedWorkspace";
 
 interface CreateWorkspaceRecordActionsOptions {
   upsertTeamRecord: (team: TeamRecord) => void;
-  upsertRoomRecord: (room: RoomRecord) => void;
-  replaceRoomRecord: (room: RoomRecord) => void;
+  upsertRoomRecord: (room: ClientRoomRecord) => void;
+  replaceRoomRecord: (room: ClientRoomRecord) => void;
   resetCodexApprovalForRoom: (roomId: string) => void;
   revokeWorkspaceAccess: (teamId: string, roomId: string) => void;
   setInviteLinkForRoom: (roomId: string, link: string) => void;
@@ -38,7 +38,7 @@ export function createWorkspaceRecordActions({
     }
   }
 
-  function upsertRoom(room: RoomRecord) {
+  function upsertRoom(room: ClientRoomRecord) {
     const nextRoom = ensureRoomDefaults(room);
     const previousRoom = useAppStore.getState().rooms.find((existing) => existing.id === nextRoom.id);
     if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
@@ -47,7 +47,7 @@ export function createWorkspaceRecordActions({
     upsertRoomRecord(nextRoom);
   }
 
-  function replaceRoom(room: RoomRecord) {
+  function replaceRoom(room: ClientRoomRecord) {
     const nextRoom = ensureRoomDefaults(room);
     const previousRoom = useAppStore.getState().rooms.find((existing) => existing.id === nextRoom.id);
     if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {

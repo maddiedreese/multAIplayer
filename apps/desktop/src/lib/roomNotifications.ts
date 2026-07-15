@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { MutableRefObject } from "react";
 import type { ChatMessage } from "../types";
 
@@ -8,7 +8,7 @@ type PluginListener = { unregister: () => void };
 
 export interface RoomNotificationInput {
   relayOpen: boolean;
-  room: RoomRecord | undefined;
+  room: ClientRoomRecord | undefined;
   message: ChatMessage;
   selectedRoomId: string;
   localDeviceId: string;
@@ -49,7 +49,7 @@ export function buildRoomNotificationPreview(message: ChatMessage): string {
   return "Sent a message.";
 }
 
-export function roomNotificationTitle(room: RoomRecord, message: ChatMessage): string {
+export function roomNotificationTitle(room: ClientRoomRecord, message: ChatMessage): string {
   const author = compactPreviewText(message.author);
   return author ? `${author} in ${room.name}` : room.name;
 }
@@ -117,7 +117,7 @@ export function registerRoomNotificationClickFocus({
   roomsRef,
   selectWorkspaceRoom
 }: {
-  roomsRef: MutableRefObject<RoomRecord[]>;
+  roomsRef: MutableRefObject<ClientRoomRecord[]>;
   selectWorkspaceRoom: (teamId: string, roomId: string) => void;
 }) {
   if (!isTauriRuntime()) return () => undefined;

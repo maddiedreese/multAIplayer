@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "../src/lib/chatPolicy";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-chat",
   teamId: "team-alpha",
   name: "Chat",

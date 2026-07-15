@@ -1,4 +1,4 @@
-import { defaultCodexModel, type CodexEventPlaintextPayload, type RoomRecord } from "@multaiplayer/protocol";
+import { defaultCodexModel, type CodexEventPlaintextPayload, type ClientRoomRecord } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { buildCodexApprovalSnapshot, hasActionableCodexTurnContext } from "./codexTurn";
 import { canUseRoomChat, roomChatGateMessage } from "./chatPolicy";
@@ -14,8 +14,8 @@ import type { ChatMessage, PendingCodexApproval, QueuedCodexTurn, RoomGoal } fro
 
 export interface CodexInvokeActionsOptions {
   selectedRoomIdRef: { current: string };
-  publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
-  handleCodexBrowserOpenCommand: (message: ChatMessage, room: RoomRecord) => boolean;
+  publishChatMessage: (message: ChatMessage, room?: ClientRoomRecord) => Promise<void>;
+  handleCodexBrowserOpenCommand: (message: ChatMessage, room: ClientRoomRecord) => boolean;
   publishCodexQueueEvent: (
     event: {
       turnId: string;
@@ -25,11 +25,11 @@ export interface CodexInvokeActionsOptions {
       queuePosition?: number;
       queueSize: number;
     },
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
   publishCodexEvent: (
     event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
 }
 

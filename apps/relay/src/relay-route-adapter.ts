@@ -3,7 +3,6 @@ import {
   maxAccessTokenChars,
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
-  maxCodexModelChars,
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
@@ -30,15 +29,13 @@ import {
   isRoomMode,
   maxCiphertextCharactersForBlob,
   normalizeBrowserAllowedOrigins,
-  normalizeCodexReasoningEffort,
-  normalizeCodexSpeed,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   parseIntegerValue
 } from "./limits.js";
 import type { KeyPackageValidator } from "./mls/key-package-validator.js";
 import type { createRelayMetrics } from "./observability.js";
-import { displayNameForUser, isRoomHost, normalizeCodexModel, normalizeRoomProjectPath } from "./relay-domain.js";
+import { displayNameForUser, isRoomHost } from "./relay-domain.js";
 import type { RelayStore } from "./state.js";
 import type { RelayStoreCodec } from "./store-codec.js";
 import type { RelayStorePersistenceCoordinator } from "./store-persistence.js";
@@ -154,12 +151,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     isApprovalPolicy,
     isApprovalDelegationPolicy,
     isRoomMode,
-    normalizeRoomProjectPath,
-    normalizeCodexModel,
-    normalizeCodexReasoningEffort,
-    normalizeCodexSpeed,
     normalizeBrowserAllowedOrigins,
-    maxCodexModelChars,
     maxHostNameChars,
     maxRoomNameChars
   });

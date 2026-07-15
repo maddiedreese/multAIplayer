@@ -1,10 +1,10 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { clearPendingMlsCommit, currentMlsEpoch } from "./mlsClient";
 import type { RelayClient } from "./relayClient";
 
 export async function clearAndRebaseStaleMlsCommit(
   client: RelayClient,
-  room: RoomRecord,
+  room: ClientRoomRecord,
   identity: { userId: string; deviceId: string; deviceSessionToken: string },
   messageId: string,
   parentEpoch: number

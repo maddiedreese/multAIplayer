@@ -458,6 +458,22 @@ export const RoomSettingsPlaintextPayload = z.object({
   changedAt: z.string().datetime()
 });
 
+/** Complete host-authorized room configuration, transported only inside an MLS PrivateMessage. */
+export const RoomConfigPlaintextPayload = z.object({
+  eventType: z.literal("room.config"),
+  configRevision: z.number().int().positive(),
+  emittingEpoch: z.number().int().nonnegative(),
+  projectPath: z.string().min(1).max(maxProjectPathChars),
+  codexModel: z.string().min(1).max(maxCodexModelChars),
+  codexModelPolicy: z.enum(["auto", "pinned"]),
+  codexReasoningEffort: z.enum(codexReasoningEffortIds),
+  codexReasoningEffortPolicy: z.enum(["auto", "pinned"]),
+  codexRawReasoningEnabled: z.boolean(),
+  codexSpeed: z.enum(["standard", "fast"]),
+  codexServiceTierPolicy: z.enum(["auto", "pinned"]),
+  codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"])
+});
+
 export type ChatPlaintextPayload = z.infer<typeof ChatPlaintextPayload>;
 export type ChatEditPlaintextPayload = z.infer<typeof ChatEditPlaintextPayload>;
 export type ChatDeletePlaintextPayload = z.infer<typeof ChatDeletePlaintextPayload>;
@@ -479,3 +495,4 @@ export type HostHandoffPlaintextPayload = z.infer<typeof HostHandoffPlaintextPay
 export type HostHandoffRequestPlaintextPayload = z.infer<typeof HostHandoffRequestPlaintextPayload>;
 export type HostHandoffAcceptedPlaintextPayload = z.infer<typeof HostHandoffAcceptedPlaintextPayload>;
 export type RoomSettingsPlaintextPayload = z.infer<typeof RoomSettingsPlaintextPayload>;
+export type RoomConfigPlaintextPayload = z.infer<typeof RoomConfigPlaintextPayload>;

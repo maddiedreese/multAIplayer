@@ -1,9 +1,7 @@
 import { test } from "node:test";
 import {
   assert,
-  codexReasoningEffortIds,
   createDebugSession,
-  maxRoomProjectPathChars,
   patchHostStatus,
   patchRoomSettings,
   postJsonStatus,
@@ -11,7 +9,7 @@ import {
   type DailyCreationQuotaErrorBody
 } from "../support/relay.js";
 
-test("relay accepts room defaults when creating a room", async () => {
+test("relay accepts public room metadata and rejects host-local configuration", async () => {
   const relay = await startRelay();
   try {
     const response = await fetch(`${relay.baseUrl}/rooms`, {
@@ -20,10 +18,7 @@ test("relay accepts room defaults when creating a room", async () => {
       body: JSON.stringify({
         teamId: "team-core",
         name: "Approval room",
-        projectPath: "/tmp/multaiplayer",
         approvalPolicy: "ask_every_turn",
-        codexModel: "gpt-5.4-thinking",
-        codexReasoningEffort: "none",
         browserAllowedOrigins: ["https://github.com", "https://example.com"],
         browserProfilePersistent: false
       })
@@ -32,17 +27,13 @@ test("relay accepts room defaults when creating a room", async () => {
     const body = (await response.json()) as {
       room: {
         approvalPolicy: string;
-        codexModel: string;
-        codexReasoningEffort: string;
-        codexRawReasoningEnabled: boolean;
         browserAllowedOrigins: string[];
         browserProfilePersistent: boolean;
       };
     };
     assert.equal(body.room.approvalPolicy, "ask_every_turn");
-    assert.equal(body.room.codexModel, "gpt-5.4-thinking");
-    assert.equal(body.room.codexReasoningEffort, "none");
-    assert.equal(body.room.codexRawReasoningEnabled, false);
+    assert.equal("projectPath" in body.room, false);
+    assert.equal("codexModel" in body.room, false);
     assert.deepEqual(body.room.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
     assert.equal(body.room.browserProfilePersistent, false);
 
@@ -50,7 +41,6 @@ test("relay accepts room defaults when creating a room", async () => {
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
         name: "Bad policy room",
-        projectPath: "/tmp/multaiplayer",
         approvalPolicy: "surprise"
       }),
       400
@@ -58,8 +48,7 @@ test("relay accepts room defaults when creating a room", async () => {
     assert.equal(
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
-        name: "Bad raw reasoning setting",
-        projectPath: "/tmp/multaiplayer",
+        name: "Leaking raw reasoning setting",
         codexRawReasoningEnabled: "yes"
       }),
       400
@@ -68,7 +57,6 @@ test("relay accepts room defaults when creating a room", async () => {
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
         name: "Bad browser room",
-        projectPath: "/tmp/multaiplayer",
         browserAllowedOrigins: ["ftp://example.com"]
       }),
       400
@@ -77,7 +65,6 @@ test("relay accepts room defaults when creating a room", async () => {
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
         name: "Bad browser persistence room",
-        projectPath: "/tmp/multaiplayer",
         browserProfilePersistent: "sometimes"
       }),
       400
@@ -85,9 +72,8 @@ test("relay accepts room defaults when creating a room", async () => {
     assert.equal(
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
-        name: "Bad model room",
-        projectPath: "/tmp/multaiplayer",
-        codexModel: "not a model id"
+        name: "Leaking model room",
+        codexModel: "gpt-5.4"
       }),
       400
     );
@@ -96,34 +82,33 @@ test("relay accepts room defaults when creating a room", async () => {
   }
 });
 
-test("relay reasoning-effort errors list every current protocol option", async () => {
+test("relay rejects every legacy encrypted-config field on create and update", async () => {
   const relay = await startRelay();
-  const expectedError = `codexReasoningEffort must be one of ${codexReasoningEffortIds.join(", ")}`;
   try {
-    const createResponse = await fetch(`${relay.baseUrl}/rooms`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        teamId: "team-core",
-        name: "Invalid effort room",
-        projectPath: "/tmp/multaiplayer",
-        codexReasoningEffort: "ultra"
-      })
-    });
-    assert.equal(createResponse.status, 400);
-    assert.deepEqual(await createResponse.json(), { error: expectedError, code: "invalid_request" });
-
-    const updateResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/settings`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        requesterName: "Maddie",
-        requesterUserId: "github:maddiedreese",
-        codexReasoningEffort: "ultra"
-      })
-    });
-    assert.equal(updateResponse.status, 400);
-    assert.deepEqual(await updateResponse.json(), { error: expectedError, code: "invalid_request" });
+    for (const [field, value] of Object.entries({
+      projectPath: "/private/repo",
+      codexModel: "gpt-5.4",
+      codexModelPolicy: "pinned",
+      codexReasoningEffort: "high",
+      codexReasoningEffortPolicy: "pinned",
+      codexRawReasoningEnabled: true,
+      codexSpeed: "fast",
+      codexServiceTierPolicy: "pinned",
+      codexSandboxLevel: "workspace_write"
+    })) {
+      const createResponse = await fetch(`${relay.baseUrl}/rooms`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ teamId: "team-core", name: "Legacy config", [field]: value })
+      });
+      assert.equal(createResponse.status, 400, field);
+      const updateResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/settings`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ requesterName: "Maddie", requesterUserId: "github:maddiedreese", [field]: value })
+      });
+      assert.equal(updateResponse.status, 400, field);
+    }
   } finally {
     await relay.close();
   }
@@ -180,8 +165,7 @@ test("relay enforces authenticated user daily team and room creation quotas", as
       headers: { "content-type": "application/json", cookie: maddieCookie },
       body: JSON.stringify({
         teamId: "team-core",
-        name: "Quota room one",
-        projectPath: "/tmp/multaiplayer"
+        name: "Quota room one"
       })
     });
     assert.equal(firstRoom.status, 201);
@@ -191,8 +175,7 @@ test("relay enforces authenticated user daily team and room creation quotas", as
       headers: { "content-type": "application/json", cookie: maddieCookie },
       body: JSON.stringify({
         teamId: "team-core",
-        name: "Quota room two",
-        projectPath: "/tmp/multaiplayer"
+        name: "Quota room two"
       })
     });
     assert.equal(limitedRoom.status, 429);
@@ -239,8 +222,7 @@ test("relay enforces authenticated total room ceiling", async () => {
       headers: { "content-type": "application/json", cookie: maddieCookie },
       body: JSON.stringify({
         teamId: "team-core",
-        name: "Too many rooms",
-        projectPath: "/tmp/multaiplayer"
+        name: "Too many rooms"
       })
     });
     assert.equal(limited.status, 429);
@@ -272,14 +254,14 @@ test("relay enforces authenticated total room ceiling", async () => {
   }
 });
 
-test("relay lets only the active host change room settings", async () => {
+test("relay lets only the active host change public room settings", async () => {
   const relay = await startRelay();
   try {
     assert.equal(
       await patchRoomSettings(relay.baseUrl, {
         requesterName: "Peer",
         requesterUserId: "github:peer",
-        codexModel: "gpt-5.4-thinking"
+        name: "Peer rename"
       }),
       403
     );
@@ -287,7 +269,7 @@ test("relay lets only the active host change room settings", async () => {
       await patchRoomSettings(relay.baseUrl, {
         requesterName: "Maddie",
         requesterUserId: "github:maddiedreese",
-        codexModel: "gpt-5.4-thinking"
+        name: "Host rename"
       }),
       200
     );
@@ -295,7 +277,7 @@ test("relay lets only the active host change room settings", async () => {
       await patchRoomSettings(relay.baseUrl, {
         requesterName: "Peer",
         requesterUserId: "github:peer",
-        codexRawReasoningEnabled: true
+        browserProfilePersistent: true
       }),
       403
     );
@@ -305,20 +287,20 @@ test("relay lets only the active host change room settings", async () => {
       body: JSON.stringify({
         requesterName: "Maddie",
         requesterUserId: "github:maddiedreese",
-        codexRawReasoningEnabled: true
+        browserProfilePersistent: true
       })
     });
     assert.equal(rawReasoningResponse.status, 200);
     const rawReasoningBody = (await rawReasoningResponse.json()) as {
-      room: { codexRawReasoningEnabled?: boolean };
+      room: { browserProfilePersistent?: boolean };
     };
-    assert.equal(rawReasoningBody.room.codexRawReasoningEnabled, true);
+    assert.equal(rawReasoningBody.room.browserProfilePersistent, true);
   } finally {
     await relay.close();
   }
 });
 
-test("relay bounds room project paths and Codex model metadata", async () => {
+test("relay never accepts room project paths or Codex model metadata", async () => {
   const relay = await startRelay();
   try {
     assert.equal(
@@ -333,7 +315,7 @@ test("relay bounds room project paths and Codex model metadata", async () => {
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
         name: "Long path",
-        projectPath: `/${"a".repeat(maxRoomProjectPathChars + 1)}`
+        projectPath: "/tmp/another-project"
       }),
       400
     );
@@ -341,7 +323,7 @@ test("relay bounds room project paths and Codex model metadata", async () => {
       await patchRoomSettings(relay.baseUrl, {
         requesterName: "Maddie",
         requesterUserId: "github:maddiedreese",
-        codexModel: "bad model with spaces"
+        codexModel: "gpt-5.4"
       }),
       400
     );
@@ -352,7 +334,7 @@ test("relay bounds room project paths and Codex model metadata", async () => {
         projectPath: "/Users/maddie/dev/multAIplayer",
         codexModel: "provider/custom-model:v1"
       }),
-      200
+      400
     );
   } finally {
     await relay.close();
@@ -376,8 +358,7 @@ test("relay bounds user-visible metadata strings", async () => {
     assert.equal(
       await postJsonStatus(relay.baseUrl, "/rooms", {
         teamId: "team-core",
-        name: "x".repeat(161),
-        projectPath: "/tmp/multaiplayer"
+        name: "x".repeat(161)
       }),
       400
     );

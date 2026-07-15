@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { ThemeMode } from "../components/DesktopSidebar";
 import { membershipRemovedRoomMessage } from "./relayAccess";
 
@@ -18,7 +18,7 @@ export function loadThemeMode(): ThemeMode {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function roomLockMessage(room: RoomRecord, revoked: boolean): string {
+export function roomLockMessage(room: ClientRoomRecord, revoked: boolean): string {
   if (room.archivedAt) return "This room is archived. Restore it before sending messages or running host-side actions.";
   if (revoked) return membershipRemovedRoomMessage(room.name);
   return "This room was forgotten on this device. Rejoin from an invite or get host approval to unlock messages again.";

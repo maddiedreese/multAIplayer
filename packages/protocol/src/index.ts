@@ -63,6 +63,7 @@ export {
   LocalPreviewPlaintextPayload,
   RequestStatusPlaintextPayload,
   RoomSettingsPlaintextPayload,
+  RoomConfigPlaintextPayload,
   TerminalRequestPlaintextPayload,
   TerminalResultPlaintextPayload,
   WorkspaceFileSaveRequestPlaintextPayload,
@@ -110,6 +111,8 @@ export {
   InviteResponseRecord,
   RoomModeSchema,
   RoomRecord,
+  RoomConfig,
+  ClientRoomRecord,
   TeamMemberRecord,
   TeamRecord,
   TeamRole

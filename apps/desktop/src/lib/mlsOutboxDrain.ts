@@ -1,4 +1,4 @@
-import type { MlsRelayMessage, RoomRecord } from "@multaiplayer/protocol";
+import type { MlsRelayMessage, ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   authorizeMlsHostTransfer,
   listMlsOutbox,
@@ -10,6 +10,7 @@ import { publishDirectedInviteResponse } from "./workspaceClient";
 import { isExpiredMlsApplication, isStaleMlsPublish, type RelayClient } from "./relayClient";
 import { clearAndRebaseStaleMlsCommit } from "./mlsCommitRebase";
 import { useAppStore } from "../store/appStore";
+import { publishRoomConfigSnapshot } from "./roomConfigSnapshot";
 
 interface LocalIdentity {
   userId: string;
@@ -17,9 +18,37 @@ interface LocalIdentity {
   deviceSessionToken: string;
 }
 
+export async function recoverRoomAfterJoin(
+  client: RelayClient,
+  room: ClientRoomRecord,
+  identity: LocalIdentity,
+  seenEnvelopeIds: Set<string>,
+  dependencies: {
+    drain?: typeof drainMlsOutboxForRoom;
+    publishConfig?: typeof publishRoomConfigSnapshot;
+  } = {}
+): Promise<void> {
+  await (dependencies.drain ?? drainMlsOutboxForRoom)(client, room, identity);
+  if (
+    room.hostStatus !== "active" ||
+    room.hostUserId !== identity.userId ||
+    room.activeHostDeviceId !== identity.deviceId ||
+    !room.projectPath
+  )
+    return;
+  await (dependencies.publishConfig ?? publishRoomConfigSnapshot)({
+    client,
+    room,
+    senderUserId: identity.userId,
+    senderDeviceId: identity.deviceId,
+    seenEnvelopeIds,
+    incrementRevision: true
+  });
+}
+
 export async function drainMlsOutboxForRoom(
   client: RelayClient,
-  room: RoomRecord,
+  room: ClientRoomRecord,
   identity: LocalIdentity
 ): Promise<void> {
   const items = (await listMlsOutbox())

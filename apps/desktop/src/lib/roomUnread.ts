@@ -1,22 +1,22 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { ChatMessage, LocalRoomReadState } from "../types";
 
-export function markRoomRead(rooms: RoomRecord[], roomId: string): RoomRecord[] {
+export function markRoomRead(rooms: ClientRoomRecord[], roomId: string): ClientRoomRecord[] {
   return rooms.map((room) => (room.id === roomId && room.unread !== 0 ? { ...room, unread: 0 } : room));
 }
 
 export function markRoomUnreadForIncomingChat(
-  rooms: RoomRecord[],
+  rooms: ClientRoomRecord[],
   roomId: string,
   activeRoomId: string,
   senderDeviceId: string,
   localDeviceId: string
-): RoomRecord[] {
+): ClientRoomRecord[] {
   if (roomId === activeRoomId || senderDeviceId === localDeviceId) return rooms;
   return rooms.map((room) => (room.id === roomId ? { ...room, unread: room.unread + 1 } : room));
 }
 
-export function upsertRoomPreservingUnread(rooms: RoomRecord[], room: RoomRecord): RoomRecord[] {
+export function upsertRoomPreservingUnread(rooms: ClientRoomRecord[], room: ClientRoomRecord): ClientRoomRecord[] {
   const existing = rooms.find((item) => item.id === room.id);
   if (existing) {
     return rooms.map((item) => (item.id === room.id ? { ...room, unread: existing.unread } : item));
@@ -24,28 +24,28 @@ export function upsertRoomPreservingUnread(rooms: RoomRecord[], room: RoomRecord
   return [...rooms, room];
 }
 
-export function replaceRoomPreservingUnread(rooms: RoomRecord[], room: RoomRecord): RoomRecord[] {
+export function replaceRoomPreservingUnread(rooms: ClientRoomRecord[], room: ClientRoomRecord): ClientRoomRecord[] {
   const existing = rooms.find((item) => item.id === room.id);
   if (!existing) return rooms;
   return rooms.map((item) => (item.id === room.id ? { ...room, unread: existing.unread } : item));
 }
 
 export function applyLocalRoomReadState(
-  rooms: RoomRecord[],
+  rooms: ClientRoomRecord[],
   roomId: string,
   readState?: LocalRoomReadState
-): RoomRecord[] {
+): ClientRoomRecord[] {
   if (!readState) return rooms;
   const unread = sanitizeUnread(readState.unread);
   return rooms.map((room) => (room.id === roomId && room.unread !== unread ? { ...room, unread } : room));
 }
 
 export function hideUnreadForLockedRooms(
-  rooms: RoomRecord[],
+  rooms: ClientRoomRecord[],
   forgottenRoomIds: ReadonlySet<string>,
   revokedRoomIds: ReadonlySet<string>,
   revokedTeamIds: ReadonlySet<string>
-): RoomRecord[] {
+): ClientRoomRecord[] {
   return rooms.map((room) =>
     (forgottenRoomIds.has(room.id) || revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId)) &&
     room.unread !== 0
@@ -54,7 +54,10 @@ export function hideUnreadForLockedRooms(
   );
 }
 
-export function localRoomReadStateForHistory(room: RoomRecord, messages: readonly ChatMessage[]): LocalRoomReadState {
+export function localRoomReadStateForHistory(
+  room: ClientRoomRecord,
+  messages: readonly ChatMessage[]
+): LocalRoomReadState {
   const lastReadMessageId = room.unread === 0 ? messages.at(-1)?.id : undefined;
   return {
     unread: sanitizeUnread(room.unread),

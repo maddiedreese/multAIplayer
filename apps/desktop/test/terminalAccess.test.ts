@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { canControlRoomTerminal, roomTerminalControlMessage } from "../src/lib/terminalAccess";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-terminal",
   teamId: "team-alpha",
   name: "Terminal",

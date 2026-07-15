@@ -2,6 +2,7 @@ import {
   HostHandoffAcceptedPlaintextPayload,
   HostHandoffPlaintextPayload,
   HostHandoffRequestPlaintextPayload,
+  RoomConfigPlaintextPayload,
   RoomSettingsPlaintextPayload
 } from "@multaiplayer/protocol";
 import {
@@ -14,6 +15,7 @@ import { buildRoomSettingsSystemMessage } from "../../lib/roomSettingsMessages";
 import { approvalDelegationPolicyLabels, approvalPolicyLabels, roomModeLabels } from "../../appDefaults";
 import type { AppStoreState } from "../../store/appStore";
 import type { MlsMessageRouteContext, MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
+import { applyRoomConfig } from "../../lib/roomConfigSnapshot";
 
 export async function routeRoomMessage(
   envelope: RoutedMlsMessage,
@@ -23,6 +25,15 @@ export async function routeRoomMessage(
   decrypt: () => Promise<unknown>
 ): Promise<boolean> {
   const roomId = envelope.roomId;
+  if (envelope.kind === "room.config") {
+    const parsed = RoomConfigPlaintextPayload.safeParse(await decrypt());
+    if (!parsed.success) return true;
+    const room = findEnvelopeRoom(context.roomsRef.current, roomId);
+    if (!room || !isEnvelopeFromActiveRoomHost(room, envelope)) return true;
+    const updated = applyRoomConfig(room, parsed.data, envelope.epochHint);
+    if (updated !== room) store.replaceRoomRecord(updated);
+    return true;
+  }
   if (envelope.kind === "room.host.request") {
     const parsed = HostHandoffRequestPlaintextPayload.safeParse(await decrypt());
     if (!parsed.success) return true;

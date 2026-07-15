@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   clearEncryptedHistory,
   forgetRoomLocalData,
@@ -29,7 +29,7 @@ interface CreateLocalHistoryActionsOptions {
     setMessage?: (roomId: string, message: string | null) => void
   ) => boolean;
   replaceHistorySettings: (next: LocalHistorySettings) => void;
-  replaceRoom: (room: RoomRecord) => void;
+  replaceRoom: (room: ClientRoomRecord) => void;
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
 

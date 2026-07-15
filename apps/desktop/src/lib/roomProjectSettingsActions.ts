@@ -1,4 +1,4 @@
-import type { RoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { roomLockMessage } from "./appRuntime";
 import { chooseProjectFolder, shutdownCodexRoom } from "./localBackend";
@@ -11,9 +11,9 @@ import { maxRoomProjectPathChars, normalizeProjectPath } from "./workspaceCreati
 interface ProjectActionsOptions {
   selectedRoomId: () => string;
   reportInFlight: (roomId: string) => boolean;
-  replaceRoom: (room: RoomRecord) => void;
+  replaceRoom: (room: ClientRoomRecord) => void;
   publishEvent: (
-    room: RoomRecord,
+    room: ClientRoomRecord,
     event: Omit<RoomSettingsPlaintextPayload, "eventType" | "changedBy" | "changedByUserId">
   ) => Promise<void>;
   context: RoomSettingsMutationContext;

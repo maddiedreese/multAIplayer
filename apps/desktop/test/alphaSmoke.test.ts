@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { canRequestBrowserAccess, canHostBrowserAction } from "../src/lib/browserPolicy";
 import { canApproveCodexTurn } from "../src/lib/codexApproval";
 import { buildCodexApprovalSnapshot, buildCodexTurnInput, type CodexChatMessage } from "../src/lib/codexTurn";
@@ -90,7 +90,7 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
   });
 
   const host = { id: "github:1", name: "Maddie" };
-  const room: RoomRecord = {
+  const room: ClientRoomRecord = {
     id: "room-desktop",
     teamId: roomPlan.teamId,
     name: roomPlan.name,

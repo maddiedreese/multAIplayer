@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { RelayClient } from "../relayClient";
 
 export interface UseInviteActionsOptions {
@@ -9,7 +9,7 @@ export interface UseInviteActionsOptions {
   historyLoadedRoomIds: MutableRefObject<Set<string>>;
   reportMembershipCommitInFlight: (roomId: string) => boolean;
   upsertTeam: (team: TeamRecord) => void;
-  upsertRoom: (room: RoomRecord) => void;
+  upsertRoom: (room: ClientRoomRecord) => void;
   clearInviteSecretInput: () => void;
   selectWorkspaceRoom: (teamId: string, roomId: string) => void;
 }

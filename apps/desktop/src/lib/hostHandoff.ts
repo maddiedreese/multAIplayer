@@ -5,7 +5,7 @@ import {
   legacyCodexCatalogSelectionPolicy,
   type ApprovalPolicy,
   type HostHandoffPlaintextPayload,
-  type RoomRecord
+  type ClientRoomRecord
 } from "@multaiplayer/protocol";
 import {
   normalizeCodexModel,
@@ -18,13 +18,13 @@ import {
 export interface HandoffSettingsPatch {
   projectPath: string;
   codexModel: string;
-  codexModelPolicy: RoomRecord["codexModelPolicy"];
-  codexReasoningEffort: RoomRecord["codexReasoningEffort"];
-  codexReasoningEffortPolicy: RoomRecord["codexReasoningEffortPolicy"];
+  codexModelPolicy: ClientRoomRecord["codexModelPolicy"];
+  codexReasoningEffort: ClientRoomRecord["codexReasoningEffort"];
+  codexReasoningEffortPolicy: ClientRoomRecord["codexReasoningEffortPolicy"];
   codexRawReasoningEnabled: boolean;
-  codexSpeed: RoomRecord["codexSpeed"];
-  codexServiceTierPolicy: RoomRecord["codexServiceTierPolicy"];
-  codexSandboxLevel: RoomRecord["codexSandboxLevel"];
+  codexSpeed: ClientRoomRecord["codexSpeed"];
+  codexServiceTierPolicy: ClientRoomRecord["codexServiceTierPolicy"];
+  codexSandboxLevel: ClientRoomRecord["codexSandboxLevel"];
   approvalPolicy: ApprovalPolicy;
 }
 
@@ -74,7 +74,7 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
       projectPath,
       codexModel,
       ...catalogSettings,
-      codexSandboxLevel: codexSandboxLevel as RoomRecord["codexSandboxLevel"],
+      codexSandboxLevel: codexSandboxLevel as ClientRoomRecord["codexSandboxLevel"],
       approvalPolicy: "ask_every_turn"
     };
   }
@@ -85,7 +85,7 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
     projectPath,
     codexModel,
     ...catalogSettings,
-    codexSandboxLevel: codexSandboxLevel as RoomRecord["codexSandboxLevel"],
+    codexSandboxLevel: codexSandboxLevel as ClientRoomRecord["codexSandboxLevel"],
     approvalPolicy: handoff.approvalPolicy as ApprovalPolicy
   };
 }

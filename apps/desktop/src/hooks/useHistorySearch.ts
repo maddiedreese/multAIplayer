@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { loadEncryptedHistory, loadHistorySettings } from "../lib/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/localRoomHistoryPayload";
 import { useAppStore } from "../store/appStore";
@@ -8,7 +8,7 @@ import type { ChatMessage, LocalRoomHistoryPayload } from "../types";
 
 interface UseHistorySearchOptions {
   searchActive: boolean;
-  rooms: RoomRecord[];
+  rooms: ClientRoomRecord[];
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;

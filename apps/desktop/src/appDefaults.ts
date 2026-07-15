@@ -2,19 +2,22 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
+  defaultCodexModelPolicy,
   defaultCodexReasoningEffort,
+  defaultCodexReasoningEffortPolicy,
   defaultCodexRawReasoningEnabled,
   defaultCodexSandboxLevel,
   defaultCodexSpeed,
+  defaultCodexServiceTierPolicy,
   defaultRoomMode,
   type ApprovalDelegationPolicy,
   type ApprovalPolicy,
   type RoomMode,
-  type RoomRecord
+  type ClientRoomRecord
 } from "@multaiplayer/protocol";
 import type { BrowserStatus } from "./types";
 
-export const emptyRoom: RoomRecord = {
+export const emptyRoom: ClientRoomRecord = {
   id: "__empty-room",
   teamId: "__empty-team",
   name: "No room selected",
@@ -26,12 +29,18 @@ export const emptyRoom: RoomRecord = {
   trustedApproverUserIds: [],
   mode: defaultRoomMode,
   codexModel: defaultCodexModel,
+  codexModelPolicy: defaultCodexModelPolicy,
   codexReasoningEffort: defaultCodexReasoningEffort,
+  codexReasoningEffortPolicy: defaultCodexReasoningEffortPolicy,
   codexRawReasoningEnabled: defaultCodexRawReasoningEnabled,
   codexSpeed: defaultCodexSpeed,
+  codexServiceTierPolicy: defaultCodexServiceTierPolicy,
   codexSandboxLevel: defaultCodexSandboxLevel,
   browserAllowedOrigins: defaultBrowserAllowedOrigins,
   browserProfilePersistent: defaultBrowserProfilePersistent,
+  configRevision: 0,
+  configEpoch: 0,
+  configPending: true,
   unread: 0
 };
 

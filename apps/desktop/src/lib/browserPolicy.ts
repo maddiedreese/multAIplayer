@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "./roomHost";
 import { reportExpectedFailure } from "./nonFatalReporting";
 
@@ -33,19 +33,19 @@ export function isBrowserUrlAllowed(url: string, allowedOrigins: string[]): bool
   }
 }
 
-export function shouldAutoApproveBrowserRequest(url: string, room: RoomRecord, activeHost: boolean): boolean {
+export function shouldAutoApproveBrowserRequest(url: string, room: ClientRoomRecord, activeHost: boolean): boolean {
   void url;
   void room;
   void activeHost;
   return false;
 }
 
-export function canRequestBrowserAccess(room: RoomRecord, locked = false): boolean {
+export function canRequestBrowserAccess(room: ClientRoomRecord, locked = false): boolean {
   void room;
   return !locked;
 }
 
-export function canHostBrowserAction(room: RoomRecord, user: LocalHostUser, locked = false): boolean {
+export function canHostBrowserAction(room: ClientRoomRecord, user: LocalHostUser, locked = false): boolean {
   return canRequestBrowserAccess(room, locked) && isLocalUserActiveHostForRoom(room, user);
 }
 
@@ -81,7 +81,7 @@ export function roomBrowserRequestMessage<T extends BrowserRequestCandidate>(
   return "Browser request is available.";
 }
 
-export function browserAccessGateMessage(room: RoomRecord, locked = false): string {
+export function browserAccessGateMessage(room: ClientRoomRecord, locked = false): string {
   if (locked) return "Unlock this room before using browser access.";
   void room;
   return "Browser access is available for this room.";

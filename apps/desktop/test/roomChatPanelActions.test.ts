@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { createRoomChatPanelActions } from "../src/lib/roomChatPanelActions";
 import { createRoomHeaderActions } from "../src/lib/roomHeaderActions";
 import { createTerminalPanelActions } from "../src/lib/terminalPanelActions";
 import { createWorkspaceFilesPanelActions } from "../src/lib/workspaceFilesPanelActions";
 import { useAppStore } from "../src/store/appStore";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-preview",
   teamId: "team-alpha",
   name: "Preview",
@@ -29,7 +29,7 @@ const noop = () => undefined;
 const noopAsync = async () => undefined;
 
 test("local preview actions resolve the selected room when invoked", () => {
-  const opened: Array<{ room: RoomRecord; url: string; reason: string }> = [];
+  const opened: Array<{ room: ClientRoomRecord; url: string; reason: string }> = [];
   const preview = {
     eventType: "local.preview" as const,
     id: "preview-1",

@@ -1,17 +1,17 @@
-import type { CodexEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
+import type { CodexEventPlaintextPayload, ClientRoomRecord } from "@multaiplayer/protocol";
 import type { ChatMessage, HostHandoffRecord } from "../types";
 
 export interface UseCodexTurnActionsOptions {
   localUser: { id: string; name: string };
   maxTerminalActivityLines: number;
-  replaceRoom: (room: RoomRecord) => void;
+  replaceRoom: (room: ClientRoomRecord) => void;
   publishCodexEvent: (
     event: Omit<CodexEventPlaintextPayload, "eventType" | "host" | "hostUserId" | "createdAt">,
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
-  publishChatMessage: (message: ChatMessage, room?: RoomRecord) => Promise<void>;
+  publishChatMessage: (message: ChatMessage, room?: ClientRoomRecord) => Promise<void>;
   publishHostHandoff: (
-    room: RoomRecord,
+    room: ClientRoomRecord,
     reason?: HostHandoffRecord["reason"],
     handoffMessages?: ChatMessage[]
   ) => Promise<void>;

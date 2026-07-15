@@ -1,4 +1,4 @@
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   detectLocalPreviewServers,
   probeCloudflared,
@@ -13,7 +13,7 @@ import { currentLocalIdentity } from "./selectedWorkspace";
 import { reportExpectedFailure } from "./nonFatalReporting";
 
 interface LocalPreviewActionsOptions {
-  publishLocalPreviewEvent: (payload: LocalPreviewRecord, room?: RoomRecord) => Promise<void>;
+  publishLocalPreviewEvent: (payload: LocalPreviewRecord, room?: ClientRoomRecord) => Promise<void>;
 }
 
 export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPreviewActionsOptions) {

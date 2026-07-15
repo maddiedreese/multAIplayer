@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { GitWorkflowEventPlaintextPayload, RoomRecord } from "@multaiplayer/protocol";
+import type { GitWorkflowEventPlaintextPayload, ClientRoomRecord } from "@multaiplayer/protocol";
 import { createPullRequest } from "./authClient";
 import { getGitStatus, runGitWorkflow } from "./localBackend";
 import { buildPullRequestBody } from "./markdownExport";
@@ -19,9 +19,9 @@ interface GitWorkflowActionsOptions {
   maxTerminalActivityLines: number;
   publishGitWorkflowEvent: (
     event: Omit<GitWorkflowEventPlaintextPayload, "eventType" | "runner" | "runnerUserId" | "createdAt">,
-    room?: RoomRecord
+    room?: ClientRoomRecord
   ) => Promise<void>;
-  refreshGitHubActions: (roomArg?: RoomRecord, targetArg?: GitHubActionsTarget) => Promise<void>;
+  refreshGitHubActions: (roomArg?: ClientRoomRecord, targetArg?: GitHubActionsTarget) => Promise<void>;
 }
 
 export function createGitWorkflowActions({

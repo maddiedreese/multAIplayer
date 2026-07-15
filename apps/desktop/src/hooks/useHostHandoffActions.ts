@@ -1,10 +1,9 @@
 import type {
   CodexSandboxLevel,
-  HostHandoffAcceptedPlaintextPayload,
   HostHandoffPlaintextPayload,
   HostHandoffRequestPlaintextPayload,
   MlsRelayMessage,
-  RoomRecord
+  ClientRoomRecord
 } from "@multaiplayer/protocol";
 import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../lib/mlsApplicationMessage";
@@ -26,7 +25,9 @@ import { useAppStore } from "../store/appStore";
 import type { ChatMessage, HostHandoffRecord } from "../types";
 import type { UseHostHandoffActionsOptions } from "./hostHandoffActionTypes";
 import { useFinalizeIncomingHostHandoff } from "./useFinalizeIncomingHostHandoff";
-
+import { ensureRoomDefaults } from "../lib/roomDefaults";
+import { publishRoomConfigSnapshot } from "../lib/roomConfigSnapshot";
+import { publishHostHandoffAccepted } from "../lib/hostHandoffAcceptedPublisher";
 export function useHostHandoffActions({
   hasSelectedRoom,
   selectedRoom,
@@ -63,6 +64,18 @@ export function useHostHandoffActions({
   const markHostHandoffAcceptedForRoom = useAppStore((state) => state.markHostHandoffAcceptedForRoom);
   const markLatestHostHandoffAcceptedForRoom = useAppStore((state) => state.markLatestHostHandoffAcceptedForRoom);
   const setCodexContinuationForRoom = useAppStore((state) => state.setCodexContinuationForRoom);
+  async function publishEncryptedConfig(room: ClientRoomRecord, incrementRevision: boolean) {
+    const client = relayRef.current;
+    if (!client) throw new Error("Relay is unavailable for the encrypted room configuration snapshot.");
+    await publishRoomConfigSnapshot({
+      client,
+      room,
+      senderUserId: localUser.id,
+      senderDeviceId: deviceId,
+      seenEnvelopeIds: seenEnvelopeIds.current,
+      incrementRevision
+    });
+  }
   useFinalizeIncomingHostHandoff({
     room: selectedRoom,
     handoffs: hostHandoffs,
@@ -75,10 +88,10 @@ export function useHostHandoffActions({
     setProjectPathDraft: setProjectPathDraftForRoom,
     setCustomCodexModel: setCustomCodexModelForRoom,
     resetFileContext: resetFileContextForRoom,
-    resetCodexApproval: resetCodexApprovalForRoom
+    resetCodexApproval: resetCodexApprovalForRoom,
+    publishConfig: (room) => publishEncryptedConfig(room, true)
   });
-
-  async function setRoomHost(hostStatus: RoomRecord["hostStatus"]) {
+  async function setRoomHost(hostStatus: ClientRoomRecord["hostStatus"]) {
     if (!hasSelectedRoom) {
       setSelectedHostMessage("Create or join a room before changing the host.");
       return;
@@ -106,8 +119,9 @@ export function useHostHandoffActions({
       const host = localUser.name;
       const hostUserId = localUser.id;
       if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroupWithHistorySettings(roomId);
-      const room = await updateRoomHost(roomId, host, hostUserId, "active", deviceId);
+      const room = ensureRoomDefaults(await updateRoomHost(roomId, host, hostUserId, "active", deviceId), selectedRoom);
       replaceRoom(room);
+      await publishEncryptedConfig(room, true);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setHostMessageForRoom(roomId, `You are hosting ${room.name}.`);
       }
@@ -121,7 +135,6 @@ export function useHostHandoffActions({
       setHostBusyForRoom(roomId, false);
     }
   }
-
   async function acceptHostHandoff(handoff: HostHandoffRecord) {
     if (!hasSelectedRoom) {
       setSelectedHostMessage("Create or join a room before accepting a host handoff.");
@@ -155,9 +168,8 @@ export function useHostHandoffActions({
       setHostBusyForRoom(roomId, false);
     }
   }
-
   async function publishHostHandoff(
-    room: RoomRecord,
+    room: ClientRoomRecord,
     reason: HostHandoffRecord["reason"] = "manual",
     contextMessages: ChatMessage[] = messages
   ) {
@@ -212,13 +224,11 @@ export function useHostHandoffActions({
       status: "available"
     };
     appendHostHandoff(room.id, handoff);
-
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") {
       setHostMessageForRoom(room.id, "Host handoff package saved locally because the relay is not connected.");
       return;
     }
-
     const payload: HostHandoffPlaintextPayload = {
       id: handoff.id,
       fromHost: handoff.fromHost,
@@ -263,7 +273,6 @@ export function useHostHandoffActions({
     seenEnvelopeIds.current.add(envelope.id);
     await publishMlsApplicationMessage(client, envelope);
   }
-
   async function requestHostAuthority(handoff: HostHandoffRecord) {
     const patch = createHandoffSettingsPatch(handoff);
     await resolveHandoffProject(handoff, patch.projectPath);
@@ -304,7 +313,6 @@ export function useHostHandoffActions({
     });
     setHostMessageForRoom(selectedRoom.id, "Host authority request sent. The active host must explicitly approve it.");
   }
-
   async function approveHostCandidate(handoff: HostHandoffRecord) {
     if (!handoff.candidateUserId || !handoff.candidateDeviceId || handoff.candidateLeaf === undefined)
       throw new Error("Host candidate identity is incomplete.");
@@ -358,43 +366,19 @@ export function useHostHandoffActions({
       throw error;
     }
     const committedEpoch = await markMlsPublishSucceeded(selectedRoom.id, commit.outboxId);
-    await publishHostHandoffAccepted(selectedRoom, handoff, candidate.leaf, committedEpoch);
+    await publishHostHandoffAccepted({
+      room: selectedRoom,
+      handoff,
+      hostLeaf: candidate.leaf,
+      committedEpoch,
+      localUserId: localUser.id,
+      deviceId,
+      relayStatus,
+      relayRef,
+      seenEnvelopeIds
+    });
     markHostHandoffAcceptedForRoom(selectedRoom.id, handoff.id);
   }
-
-  async function publishHostHandoffAccepted(
-    room: RoomRecord,
-    handoff: HostHandoffRecord,
-    hostLeaf: number,
-    committedEpoch: number
-  ) {
-    const client = relayRef.current;
-    if (!client || relayStatus === "closed" || relayStatus === "error") return;
-    const acceptedAt = new Date().toISOString();
-    const payload: HostHandoffAcceptedPlaintextPayload = {
-      phase: "accepted",
-      offerId: handoff.id,
-      hostUserId: handoff.candidateUserId!,
-      hostDeviceId: handoff.candidateDeviceId!,
-      hostLeaf,
-      committedEpoch
-    };
-    const envelope: MlsRelayMessage = await createMlsApplicationMessage(
-      {
-        id: crypto.randomUUID(),
-        teamId: room.teamId,
-        roomId: room.id,
-        senderDeviceId: deviceId,
-        senderUserId: localUser.id,
-        createdAt: acceptedAt,
-        kind: "room.host.accepted"
-      },
-      payload
-    );
-    seenEnvelopeIds.current.add(envelope.id);
-    await publishMlsApplicationMessage(client, envelope);
-  }
-
   return {
     setRoomHost,
     acceptHostHandoff,

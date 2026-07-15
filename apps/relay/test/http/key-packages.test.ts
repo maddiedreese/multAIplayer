@@ -40,7 +40,7 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
     const createRoomResponse = await fetch(`${relay.baseUrl}/rooms`, {
       method: "POST",
       headers: hostHeaders,
-      body: JSON.stringify({ teamId: "team-core", name: "Bootstrap", projectPath: "/tmp/bootstrap" })
+      body: JSON.stringify({ teamId: "team-core", name: "Bootstrap" })
     });
     assert.equal(createRoomResponse.status, 201);
     const bootstrapRoom = (

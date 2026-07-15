@@ -34,7 +34,11 @@ export class JsonFileRelayPersistence implements RelayPersistence {
     await this.fileOperations.rename(tempPath, this.dataPath);
   }
 
-  async finalizeLoad(): Promise<void> {}
+  async finalizeLoad(state: () => unknown): Promise<void> {
+    // Persist the normalized allowlist so legacy room config and other retired fields
+    // are removed from the compatibility store, not merely ignored in memory.
+    await this.save(state());
+  }
   async saveChanges(): Promise<boolean> {
     return false;
   }

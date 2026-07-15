@@ -1,4 +1,4 @@
-import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { SidebarMessageHitDisplay, SidebarRoomDisplay, SidebarTeamDisplay } from "../components/DesktopSidebar";
 import type { BrowserAccessRequest, ChatMessage, TerminalCommandRequest } from "../types";
 import { formatTeamMeta } from "./appFormatters";
@@ -29,8 +29,8 @@ export function buildSidebarRoomRows({
   terminalRequestsByRoom,
   browserRequestsByRoom
 }: {
-  rooms: RoomRecord[];
-  allRooms: RoomRecord[];
+  rooms: ClientRoomRecord[];
+  allRooms: ClientRoomRecord[];
   teams: TeamRecord[];
   searchActive: boolean;
   selectedRoomId: string;
@@ -52,7 +52,11 @@ export function buildSidebarRoomRows({
       id: room.id,
       teamId: room.teamId,
       name: room.name,
-      detail: searchActive ? (team?.name ?? "Team") : (room.projectPath.split("/").at(-1) ?? room.projectPath),
+      detail: searchActive
+        ? (team?.name ?? "Team")
+        : room.configPending
+          ? "Waiting for encrypted room configuration…"
+          : (room.projectPath.split("/").at(-1) ?? room.projectPath),
       active: room.id === selectedRoomId,
       attention: roomAttentionTotal,
       unread: roomRecord.unread,
@@ -61,7 +65,10 @@ export function buildSidebarRoomRows({
   });
 }
 
-export function buildSidebarMessageHitRows(hits: SidebarMessageHit[], rooms: RoomRecord[]): SidebarMessageHitDisplay[] {
+export function buildSidebarMessageHitRows(
+  hits: SidebarMessageHit[],
+  rooms: ClientRoomRecord[]
+): SidebarMessageHitDisplay[] {
   return hits.map((hit) => {
     const room = rooms.find((item) => item.id === hit.roomId);
 

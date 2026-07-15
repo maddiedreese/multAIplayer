@@ -12,9 +12,9 @@ import {
   fencedCode,
   inlineCode
 } from "../src/lib/markdownExport";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-test",
   teamId: "team-test",
   name: "Docs & Diff Room",

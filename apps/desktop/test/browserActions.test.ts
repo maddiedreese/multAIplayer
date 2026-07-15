@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { RoomRecord } from "@multaiplayer/protocol";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { createBrowserActions } from "../src/lib/browserActions";
 import { useAppStore } from "../src/store/appStore";
 import type { BrowserAccessRequest } from "../src/types";
@@ -8,7 +8,7 @@ import type { BrowserAccessRequest } from "../src/types";
 const defaultBrowserUrl = "https://example.com/default";
 const defaultBrowserReason = "Default browser reason.";
 
-const room: RoomRecord = {
+const room: ClientRoomRecord = {
   id: "room-browser-actions",
   teamId: "team-browser-actions",
   name: "Browser Actions",
