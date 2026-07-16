@@ -97,15 +97,17 @@ function dispatchJoin(
     return;
   }
   options.rooms.joinRoom(session, message.teamId, message.roomId, message.userId, message.deviceId);
-  send(socket, { type: "joined", teamId: message.teamId, roomId: message.roomId });
-  replayPendingInviteRequests(options, session);
   const key = options.rooms.roomKey(message.teamId, message.roomId);
   for (const backlogMessage of options.state.store.getMlsBacklog(key) ?? []) {
     send(socket, { type: "mls.message", message: backlogMessage });
   }
+  replayPendingInviteRequests(options, session);
   for (const presence of options.state.roomPresence.get(key)?.values() ?? []) {
     send(socket, { type: "presence", ...presence, status: "online" });
   }
+  // `joined` is the recovery barrier: everything retained for this room is
+  // already on the wire before the client resumes outbox/config publication.
+  send(socket, { type: "joined", teamId: message.teamId, roomId: message.roomId });
 }
 
 function replayPendingInviteRequests(options: RelayWebSocketConnectionOptions, session: ClientSession) {

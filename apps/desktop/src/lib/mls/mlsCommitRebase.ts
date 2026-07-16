@@ -1,5 +1,5 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { clearPendingMlsCommit, currentMlsEpoch } from "./mlsClient";
+import { clearPendingMlsCommit } from "./mlsClient";
 import type { RelayClient } from "../relay/relayClient";
 
 export async function clearAndRebaseStaleMlsCommit(
@@ -7,10 +7,10 @@ export async function clearAndRebaseStaleMlsCommit(
   room: ClientRoomRecord,
   identity: { userId: string; deviceId: string; deviceSessionToken: string },
   messageId: string,
-  parentEpoch: number
+  dependencies: { clear?: typeof clearPendingMlsCommit } = {}
 ): Promise<void> {
-  await clearPendingMlsCommit(room.id, messageId);
-  await client.joinAndWaitForAck({
+  await (dependencies.clear ?? clearPendingMlsCommit)(room.id, messageId);
+  await client.rejoinForBacklog({
     type: "join",
     teamId: room.teamId,
     roomId: room.id,
@@ -18,9 +18,4 @@ export async function clearAndRebaseStaleMlsCommit(
     deviceId: identity.deviceId,
     deviceSessionToken: identity.deviceSessionToken
   });
-  const deadline = Date.now() + 5_000;
-  while ((await currentMlsEpoch(room.id)) <= parentEpoch) {
-    if (Date.now() >= deadline) throw new Error("MLS stale-epoch rebase did not receive the accepted Commit backlog.");
-    await new Promise((resolve) => window.setTimeout(resolve, 25));
-  }
 }

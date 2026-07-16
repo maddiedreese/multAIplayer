@@ -293,8 +293,7 @@ export function createInviteRelayActions(
             relay,
             room,
             { userId: context.localUser.id, deviceId, deviceSessionToken: token },
-            commit.id,
-            commit.metadata?.type === "commit" ? commit.metadata.parentEpoch : epoch
+            commit.id
           );
         }
         throw error;

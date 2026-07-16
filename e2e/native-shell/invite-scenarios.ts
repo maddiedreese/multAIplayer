@@ -112,13 +112,150 @@ export async function loadPendingInviteRequest(host: Browser, context: InviteSce
   await visible(host, ".profile-card strong");
   await selectRoom(host, context.roomName);
   await openRoomInspector(host);
-  const request = await visible(host, ".invite-panel .terminal-request.pending", 60_000);
+  const request = await visible(host, ".invite-panel .terminal-request.pending", 60_000).catch(async (error) => {
+    const diagnostics = await collectPendingInviteFailureDiagnostics(host);
+    throw new Error(`${String(error)}; host pending-invite diagnostics: ${JSON.stringify(diagnostics)}`);
+  });
   const requestText = await host.execute(
     () => document.querySelector(".invite-panel .terminal-request.pending")?.textContent ?? ""
   );
   assert.ok(requestText.includes(context.guestUserId), "host did not receive the guest's authenticated identity");
   assert.match(requestText, /Capability-authenticated MLS KeyPackage request/);
   return request;
+}
+
+async function collectPendingInviteFailureDiagnostics(host: Browser) {
+  return host.executeAsync((done) => {
+    Promise.all([
+      import("/src/store/appStore.ts"),
+      import("/src/lib/platform/diagnostics.ts"),
+      import("/src/application/workspace/workspaceClient.ts"),
+      import("/src/lib/mls/mlsClient.ts")
+    ])
+      .then(
+        async ([{ useAppStore }, { loadDiagnosticEntries }, { loadDirectedInviteRequests }, { currentMlsEpoch }]) => {
+          const state = useAppStore.getState();
+          const roomId = state.selectedRoomId;
+          const invite = state.inviteByRoom[roomId];
+          const inviteId = inviteIdFromLink(invite?.link) || invite?.requests?.at(-1)?.inviteId || "";
+          const deviceId = state.deviceIdentity?.deviceId ?? "";
+          const directRequestList = await loadRequestList(loadDirectedInviteRequests, inviteId, deviceId);
+          const nativeMlsEpoch = await loadNativeMlsEpoch(currentMlsEpoch, roomId);
+          const room = state.rooms.find((candidate) => candidate.id === roomId);
+          const snapshot = {
+            selectedRoomId: roomId.slice(0, 160),
+            selectedInspectorTab: {
+              store: state.historyPresenceByRoom[roomId]?.inspectorTab ?? "unavailable",
+              dom:
+                document
+                  .querySelector<HTMLButtonElement>('nav[aria-label="Room tools"] button[aria-pressed="true"]')
+                  ?.textContent?.trim()
+                  .slice(0, 80) ?? "unavailable"
+            },
+            relayStatus: state.relayStatus,
+            deviceId: deviceId.slice(0, 160),
+            deviceSessionTokenPresent: Boolean(state.deviceSessionToken),
+            room: roomSnapshot(room),
+            invite: inviteSnapshot(invite),
+            hostMessage: state.hostMessagesByRoom[roomId]?.slice(0, 300) ?? "",
+            nativeMlsEpoch,
+            directRequestList,
+            diagnostics: loadDiagnosticEntries().slice(-12)
+          };
+          done(snapshot);
+        }
+      )
+      .catch((diagnosticError) => done({ diagnosticError: String(diagnosticError).slice(0, 300) }));
+
+    function inviteIdFromLink(link: string | undefined) {
+      if (!link) return "";
+      try {
+        return (
+          new URL(link).hash
+            .slice(1)
+            .split("&")
+            .find((part) => part.startsWith("invite="))
+            ?.slice(7, 167) ?? ""
+        );
+      } catch {
+        return "";
+      }
+    }
+
+    async function loadRequestList(
+      load: (inviteId: string, deviceId: string) => Promise<unknown[]>,
+      inviteId: string,
+      deviceId: string
+    ): Promise<{ status: string; count?: number; error?: string }> {
+      if (!inviteId || !deviceId) return { status: "unavailable" };
+      try {
+        const requests = await load(inviteId, deviceId);
+        return { status: "loaded", count: requests.length };
+      } catch (requestError) {
+        return { status: "failed", error: String(requestError).slice(0, 300) };
+      }
+    }
+
+    async function loadNativeMlsEpoch(
+      load: (roomId: string) => Promise<number>,
+      roomId: string
+    ): Promise<{ status: string; epoch?: number; error?: string }> {
+      if (!roomId) return { status: "unavailable" };
+      try {
+        return { status: "loaded", epoch: await load(roomId) };
+      } catch (epochError) {
+        return { status: "failed", error: String(epochError).slice(0, 300) };
+      }
+    }
+
+    function roomSnapshot(
+      room:
+        | {
+            id: string;
+            hostStatus: string;
+            hostUserId?: string;
+            activeHostDeviceId?: string;
+            acceptedMlsEpoch?: number;
+          }
+        | undefined
+    ) {
+      if (!room) return null;
+      return {
+        id: room.id.slice(0, 160),
+        hostStatus: room.hostStatus,
+        hostUserId: room.hostUserId?.slice(0, 160),
+        activeHostDeviceId: room.activeHostDeviceId?.slice(0, 160),
+        acceptedMlsEpoch: room.acceptedMlsEpoch
+      };
+    }
+
+    function inviteSnapshot(
+      invite:
+        | {
+            message?: string;
+            requests?: Array<{
+              id: string;
+              inviteId: string;
+              requesterUserId: string;
+              requesterDeviceId: string;
+              status: string;
+            }>;
+          }
+        | undefined
+    ) {
+      return {
+        message: invite?.message?.slice(0, 300) ?? "",
+        requests:
+          invite?.requests?.slice(0, 20).map((candidate) => ({
+            id: candidate.id.slice(0, 160),
+            inviteId: candidate.inviteId.slice(0, 160),
+            requesterUserId: candidate.requesterUserId.slice(0, 160),
+            requesterDeviceId: candidate.requesterDeviceId.slice(0, 160),
+            status: candidate.status
+          })) ?? []
+      };
+    }
+  });
 }
 
 async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, assertionContext: string) {

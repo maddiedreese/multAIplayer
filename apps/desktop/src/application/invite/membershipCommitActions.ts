@@ -51,8 +51,7 @@ export function createMembershipCommitActions(options: RoomMembershipActionOptio
             client,
             room,
             { userId: localUser.id, deviceId, deviceSessionToken: token },
-            commit.outboxId,
-            commit.parentEpoch
+            commit.outboxId
           );
         }
         throw error;

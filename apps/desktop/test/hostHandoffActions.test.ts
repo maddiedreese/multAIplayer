@@ -326,6 +326,9 @@ test("stale host-transfer commits are cleared and rebased before remaining retry
         joinAndWaitForAck: async () => {
           joins += 1;
         },
+        rejoinForBacklog: async () => {
+          joins += 1;
+        },
         close: noop
       }
     },
@@ -341,7 +344,7 @@ test("stale host-transfer commits are cleared and rebased before remaining retry
   await act(() => result.current.acceptHostHandoff(requested));
 
   assert.equal(nativeCommands.includes("mls_clear_pending_commit"), true);
-  assert.equal(nativeCommands.includes("mls_current_epoch"), true);
+  assert.equal(nativeCommands.includes("mls_current_epoch"), false);
   assert.equal(joins, 1);
   assert.equal(nativeCommands.includes("mls_publish_succeeded"), false);
 });

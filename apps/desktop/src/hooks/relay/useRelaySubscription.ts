@@ -7,6 +7,7 @@ import { useAppStore } from "../../store/appStore";
 import type { ChatMessage, RoomPresence } from "../../types";
 import { useLatestRef } from "../useLatestRef";
 import { recoverAuthenticatedHostTransfer, routeMlsMessage } from "./routeMlsMessage";
+import { handleExactLocalMlsReplay } from "./mlsReplay";
 import {
   currentMlsEpoch,
   listMlsJoinAdmissions,
@@ -338,6 +339,16 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           .then(async () => {
             if (cancelled || seenEnvelopeIds.current.has(message.message.id)) return;
             try {
+              if (
+                await handleExactLocalMlsReplay(
+                  message.message,
+                  { userId: current.localUser.id, deviceId: current.deviceId },
+                  recoverAuthenticatedHostTransfer
+                )
+              ) {
+                seenEnvelopeIds.current.add(message.message.id);
+                return;
+              }
               const epoch = await currentMlsEpoch(roomId);
               if (message.message.messageType === "commit" && message.message.epochHint < epoch) {
                 if (message.message.commitEffect === "host_handoff") {

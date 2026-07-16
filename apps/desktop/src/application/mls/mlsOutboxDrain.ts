@@ -75,7 +75,7 @@ export async function drainMlsOutboxForRoom(
         continue;
       }
       if (message.messageType === "commit" && isStaleMlsPublish(error))
-        await clearAndRebaseStaleMlsCommit(client, room, identity, item.id, message.epochHint);
+        await clearAndRebaseStaleMlsCommit(client, room, identity, item.id);
       throw error;
     }
   }
