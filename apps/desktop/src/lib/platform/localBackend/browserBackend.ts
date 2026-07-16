@@ -1,6 +1,6 @@
 import { invokeNative } from "../nativeCommandError";
 
-import { isTauriRuntime } from "./runtime";
+import { isTauriRuntime, requireNativeRuntime } from "./runtime";
 
 export interface BrowserViewBounds {
   x: number;
@@ -15,14 +15,10 @@ export async function openBrowserView(
   url: string,
   bounds: BrowserViewBounds
 ): Promise<void> {
-  if (isTauriRuntime()) {
-    await invokeNative<void>("open_browser_view", {
-      request: { roomId, projectPath, url, bounds }
-    });
-    return;
-  }
-
-  window.open(url, "_blank", "noopener,noreferrer");
+  if (!isTauriRuntime()) return requireNativeRuntime("Embedded browser views");
+  await invokeNative<void>("open_browser_view", {
+    request: { roomId, projectPath, url, bounds }
+  });
 }
 
 export async function positionBrowserView(
@@ -30,14 +26,14 @@ export async function positionBrowserView(
   projectPath: string,
   bounds: BrowserViewBounds
 ): Promise<void> {
-  if (!isTauriRuntime()) return;
+  if (!isTauriRuntime()) return requireNativeRuntime("Embedded browser views");
   await invokeNative<void>("position_browser_view", {
     request: { roomId, projectPath, bounds }
   });
 }
 
 export async function closeBrowserView(roomId: string, projectPath: string): Promise<void> {
-  if (!isTauriRuntime()) return;
+  if (!isTauriRuntime()) return requireNativeRuntime("Embedded browser views");
   await invokeNative<void>("close_browser_view", {
     request: { roomId, projectPath }
   });

@@ -18,6 +18,18 @@ permissions:
   security-events: write
 
 jobs:
+  exception-policy:
+    name: Temporary security-exception expiry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+      - name: Reject expired scanner and advisory exceptions
+        run: node tools/security/check-exception-expiry.mjs
+
   secrets:
     name: Gitleaks history scan
     runs-on: ubuntu-latest

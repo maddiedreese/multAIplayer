@@ -1,3 +1,5 @@
+//! Bounded projection of untrusted Codex app-server activity.
+
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::Value;

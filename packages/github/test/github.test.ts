@@ -48,6 +48,7 @@ test("normalizeGitHubBranchName accepts safe names and rejects unsafe ones", () 
   ]) {
     assert.throws(() => normalizeGitHubBranchName(branch), /GitHub branch is required|Unsafe GitHub branch name/);
   }
+  assert.throws(() => normalizeGitHubBranchName(`codex/${"x".repeat(200)}`), /Unsafe GitHub branch name/);
 });
 
 test("normalizePullRequestDraft normalizes repo, title, head, and base", () => {

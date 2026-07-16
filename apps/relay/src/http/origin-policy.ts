@@ -6,6 +6,7 @@ export interface RelayOriginPolicy {
   corsOptions: CorsOptions;
   isAllowedOrigin: (origin: string | undefined) => boolean;
   enforceAllowedOrigin: RequestHandler;
+  enforceCookieMutationCsrf: RequestHandler;
 }
 
 export function createRelayOriginPolicy({
@@ -33,6 +34,29 @@ export function createRelayOriginPolicy({
       }
       sendRelayError(res, 403, "forbidden", "Origin not allowed");
     },
+    enforceCookieMutationCsrf(req, res, next) {
+      if (!isCookieAuthenticatedMutation(req.method, req.cookies?.multaiplayer_session)) {
+        next();
+        return;
+      }
+
+      // Browser mutations must carry an exact allowlisted Origin. The earlier
+      // origin middleware has already rejected a supplied but disallowed value.
+      // Native and server-side clients may omit both Origin and Fetch Metadata;
+      // browsers cannot suppress these forbidden headers. Rejecting browser
+      // Fetch Metadata without Origin closes that omission without inventing a
+      // bearer CSRF token for non-browser clients.
+      if (req.get("origin") !== undefined) {
+        next();
+        return;
+      }
+      const fetchSite = req.get("sec-fetch-site");
+      if (fetchSite === undefined || fetchSite === "none") {
+        next();
+        return;
+      }
+      sendRelayError(res, 403, "forbidden", "Browser mutations require an allowed Origin.");
+    },
     corsOptions: {
       credentials: true,
       origin(origin, callback) {
@@ -40,4 +64,8 @@ export function createRelayOriginPolicy({
       }
     }
   };
+}
+
+function isCookieAuthenticatedMutation(method: string, sessionCookie: unknown): boolean {
+  return ["POST", "PUT", "PATCH", "DELETE"].includes(method) && typeof sessionCookie === "string";
 }

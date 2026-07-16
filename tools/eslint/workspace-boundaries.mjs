@@ -7,9 +7,12 @@ const workspacePackages = [
 ];
 const relativeWorkspaceSourcePattern =
   "^(?:\\.\\./)+(?:apps/(?:desktop|relay)|packages/(?:codex|git|github|protocol))(?:/|$)";
+const intentionalPackageDependencies = {
+  "@multaiplayer/github": ["@multaiplayer/git"]
+};
 
 export function packageBoundaryRule(workspaceName, dependencies = []) {
-  const dependencySet = new Set(dependencies);
+  const dependencySet = new Set([...dependencies, ...(intentionalPackageDependencies[workspaceName] ?? [])]);
   const forbiddenPackages = workspacePackages.filter((packageName) => !dependencySet.has(packageName));
 
   return [
