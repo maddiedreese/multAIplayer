@@ -4,8 +4,10 @@ import {
   maxEmbeddedAttachmentBytesPerMessage,
   maxMessageAttachments
 } from "@multaiplayer/protocol";
-import { RoomMainColumn } from "../components/RoomMainColumn";
-import { GuidedFirstTurn, type GuidedActivityKind, type GuidedFirstTurnPhase } from "../components/GuidedFirstTurn";
+import { RoomMainColumn } from "./RoomMainColumn";
+import type { RoomChatPanel } from "./RoomChatPanel";
+import type { RoomHeader } from "./RoomHeader";
+import { GuidedFirstTurn, type GuidedActivityKind, type GuidedFirstTurnPhase } from "./GuidedFirstTurn";
 import { useAppStore, type AppStoreState } from "../store/appStore";
 import { loadOrCreateDeviceId } from "../application/runtime/appRuntime";
 import { canApproveCodexTurn } from "../lib/codex/codexApproval";
@@ -36,50 +38,76 @@ import {
   buildRoomChatMessageRows
 } from "../presentation/chat/chatDisplayRows";
 import { detectCodexTurnRiskFlags } from "../lib/codex/codexTurn";
-import { buildRoomNotices } from "./roomNotices";
+import { buildRoomNotices } from "../hooks/roomNotices";
 import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
 import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibilityWarning";
-import type { createAppRoomPanelActions } from "./appRoomPanelActions";
-import type { useHostHandoffActions } from "./useHostHandoffActions";
-import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";
-import type { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
 import {
   deriveMainColumnValues,
   guidedActivityKind,
   mainColumnLocalUser,
   replyTargetDisplay
-} from "./roomMainColumnCompositionValues";
-import { useRoomMainColumnInteractions } from "./useRoomMainColumnInteractions";
+} from "../hooks/activeRoomMainColumnValues";
+import { useRoomMainColumnInteractions } from "../hooks/useRoomMainColumnInteractions";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 const noMessages: NonNullable<AppStoreState["messagesByRoom"][string]> = [];
 const noPreviews: NonNullable<NonNullable<AppStoreState["localPreviewByRoom"][string]>["previews"]> = [];
 
-type RoomRuntime = ReturnType<typeof useRoomRuntimeContext>;
-type WorkspaceFlow = ReturnType<typeof useWorkspaceFlowContext>;
-type HostHandoffActions = ReturnType<typeof useHostHandoffActions>;
-type RoomPanels = ReturnType<typeof createAppRoomPanelActions>;
+type HeaderProps = React.ComponentProps<typeof RoomHeader>;
+type ChatProps = React.ComponentProps<typeof RoomChatPanel>;
 
+type RoomChatActions = Pick<
+  ChatProps,
+  | "onCopyMessageMarkdown"
+  | "onOpenAttachment"
+  | "onToggleReaction"
+  | "onEditMessage"
+  | "onDeleteMessage"
+  | "onDenyApproval"
+  | "onApproveApproval"
+  | "onInvokeCodex"
+  | "onPauseGoal"
+  | "onResumeGoal"
+  | "onEditGoal"
+  | "onDeleteGoal"
+  | "onTickGoalElapsed"
+  | "onOpenLocalPreview"
+  | "onCopyLocalPreviewLink"
+  | "onStopLocalPreview"
+  | "onOpenFileSelector"
+  | "onReplyToMessage"
+  | "onCancelReply"
+  | "onCancelQueuedCodexTurn"
+  | "onDraftChange"
+>;
+
+/** UI capabilities required to render and operate the selected-room main column. */
 export interface RoomMainColumnSources {
-  roomRuntime: Pick<
-    RoomRuntime,
-    | "renameRoom"
-    | "setCodexModel"
-    | "setCodexReasoningEffort"
-    | "setCodexSpeed"
-    | "openLocalPreviewDialog"
-    | "openRoomBrowserNow"
-    | "sendMessage"
-  >;
-  workspaceFlow: Pick<
-    WorkspaceFlow,
-    "copyRoomMarkdown" | "copySelectedMessagesMarkdown" | "removePendingAttachment" | "copyMarkdownWithFallback"
-  >;
-  hostHandoff: Pick<HostHandoffActions, "setRoomHost">;
-  chatActions: RoomPanels["roomChatPanelActions"];
+  roomRuntime: {
+    renameRoom: HeaderProps["onRenameRoom"];
+    setCodexModel: HeaderProps["onSelectModel"];
+    setCodexReasoningEffort: HeaderProps["onSelectReasoningEffort"];
+    setCodexSpeed: HeaderProps["onSelectSpeed"];
+    openLocalPreviewDialog: HeaderProps["onShareLocalPreview"];
+    openRoomBrowserNow: () => void;
+    sendMessage: ChatProps["onSendMessage"];
+  };
+  workspaceFlow: {
+    copyRoomMarkdown: HeaderProps["onCopyRoomMarkdown"];
+    copySelectedMessagesMarkdown: HeaderProps["onCopySelectedMarkdown"];
+    removePendingAttachment: ChatProps["onRemovePendingAttachment"];
+    copyMarkdownWithFallback: (
+      title: string,
+      markdown: string,
+      setMessage: (message: string) => void,
+      roomId: string
+    ) => Promise<void>;
+  };
+  hostHandoff: { setRoomHost: HeaderProps["onSetHost"] };
+  chatActions: RoomChatActions;
 }
 
-export function useRoomMainColumnComposition({
+export function ActiveRoomMainColumn({
   sources,
   selectedRoom
 }: {

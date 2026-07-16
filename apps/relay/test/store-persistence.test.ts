@@ -148,10 +148,15 @@ test("scheduled mutation failures poison persistence until restart and still clo
 });
 
 test("an expected competing MLS commit does not poison persistence", async () => {
+  const retriedChanges: unknown[][] = [];
+  let mutationDrains = 0;
   const persistence = {
     load: async () => null,
     save: async () => {},
-    saveChanges: () => true,
+    saveChanges: (changes: unknown[]) => {
+      retriedChanges.push(changes);
+      return true;
+    },
     saveKeyPackages: () => {},
     saveMlsBacklog: () => true,
     saveMlsMessage: () => true,
@@ -165,7 +170,8 @@ test("an expected competing MLS commit does not poison persistence", async () =>
     isExpiredAttachmentBlob: () => false,
     applyStoredRelayState: () => {},
     pruneExpiredRelayState: () => {},
-    drainStoredRelayMutations: () => [],
+    drainStoredRelayMutations: () =>
+      mutationDrains++ === 0 ? [{ entity: "rooms" as const, key: "room", operation: "delete" as const }] : [],
     discardStoredRelayMutations: () => {},
     toStoredRelayState: () => ({ version: 1 }) as never
   };
@@ -190,6 +196,8 @@ test("an expected competing MLS commit does not poison persistence", async () =>
     RelayStaleEpochError
   );
   assert.equal(coordinator.isHealthy(), true);
+  coordinator.scheduleStoreSave();
+  assert.deepEqual(retriedChanges, [[{ entity: "rooms", key: "room", operation: "delete" }]]);
 });
 
 test("unsupported stored versions remain fail-closed across supervised restarts", async () => {

@@ -3,7 +3,6 @@ import { GitHubIcon } from "./GitHubIcon";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import type { DeviceIdentity } from "../lib/identity/deviceIdentity";
-import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/identity/authClient";
 import { saveNativeDiagnosticBundle } from "../lib/platform/diagnostics";
 import { InfoRow } from "./common";
 import { CodexAccountPanel } from "./CodexAccountPanel";
@@ -12,6 +11,10 @@ import {
   deleteHostedAccount,
   recheckHostedAccountDeletion,
   hostedAccountDeletionConfirmation,
+  summarizeGitHubOAuthPurposes,
+  type GitHubAuthConfig,
+  type GitHubDeviceStart,
+  type SignedInUser,
   type HostedAccountDeletionResult
 } from "../lib/identity/authClient";
 
@@ -222,10 +225,12 @@ function ProfileEnvironment({
   deviceId: string;
   deviceIdentity: DeviceIdentity | null;
 }) {
+  const oauthPurposes = summarizeGitHubOAuthPurposes(authConfig?.scopes ?? []);
   return (
     <section className="drawer-section">
       <InfoRow label="GitHub sign-in" value={authConfig?.configured === false ? "Not configured" : "Ready"} />
-      <InfoRow label="GitHub access" value={authConfig?.scopes.join(", ") || "Unavailable"} />
+      <InfoRow label="GitHub identity scope" value={oauthPurposes.identity} />
+      <InfoRow label="Repository workflow scope" value={oauthPurposes.repositoryWorkflows} />
       <InfoRow label="App origins" value={authConfig?.allowedOrigins.join(", ") || "Local/default"} />
       <InfoRow label="Workspace edits" value={authConfig?.mutationsRequireAuth ? "Requires sign-in" : "Local only"} />
       <InfoRow label="Relay sessions" value={relaySessionPersistence} />
@@ -261,10 +266,20 @@ function ProfileSignInControls({
           <X size={15} /> Sign out
         </button>
       ) : (
-        <button className="primary-wide" onClick={onSignIn} disabled={authBusy || !authConfigured}>
-          <GitHubIcon size={15} />
-          {!authConfigured ? "GitHub sign-in not configured" : authBusy ? "Waiting for GitHub" : "Sign in with GitHub"}
-        </button>
+        <>
+          <p>
+            GitHub sign-in establishes workspace identity. The same alpha grant also requests <code>repo</code> for
+            optional pull-request and Actions API workflows, including private repositories available to your account.
+          </p>
+          <button className="primary-wide" onClick={onSignIn} disabled={authBusy || !authConfigured}>
+            <GitHubIcon size={15} />
+            {!authConfigured
+              ? "GitHub sign-in not configured"
+              : authBusy
+                ? "Waiting for GitHub"
+                : "Sign in with GitHub"}
+          </button>
+        </>
       )}
       {deviceFlow && (
         <div className="device-flow drawer-flow">

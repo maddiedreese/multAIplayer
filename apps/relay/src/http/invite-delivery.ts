@@ -16,6 +16,7 @@ import {
   type StrictDirectedInviteRequest
 } from "../opaque.js";
 import { isActiveInviteTarget, isActiveRoom } from "../relay-domain.js";
+import { persistMutationOrRollback } from "./durable-mutation.js";
 
 const maxOpaqueChars = 1_400_000;
 interface Options {
@@ -430,14 +431,13 @@ async function saveInviteResponseAtomically(
 ): Promise<boolean> {
   store.inviteRequests.delete(request.requestId);
   store.inviteResponses.set(record.requestId, record);
-  try {
-    await saveRelayStore();
-    return true;
-  } catch {
-    store.inviteResponses.delete(record.requestId);
-    store.inviteRequests.set(request.requestId, request);
-    return false;
-  }
+  return persistMutationOrRollback({
+    persist: saveRelayStore,
+    rollback: () => {
+      store.inviteResponses.delete(record.requestId);
+      store.inviteRequests.set(request.requestId, request);
+    }
+  });
 }
 
 export function isExactInviteAckReceipt(
@@ -595,18 +595,18 @@ export async function ackInviteResponseAtomically(
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
   });
   pruneInviteAckReceipts(store);
-  try {
-    await saveRelayStore();
-    return "ok";
-  } catch {
-    store.inviteResponses.set(record.requestId, record);
-    store.setTeamMembers(team.id, previousMembers);
-    store.setTeam(team);
-    if (invite) store.setInvite(invite);
-    store.inviteAckReceipts.clear();
-    for (const [id, receipt] of previousReceipts) store.inviteAckReceipts.set(id, receipt);
-    return "persistence_failed";
-  }
+  const persisted = await persistMutationOrRollback({
+    persist: saveRelayStore,
+    rollback: () => {
+      store.inviteResponses.set(record.requestId, record);
+      store.setTeamMembers(team.id, previousMembers);
+      store.setTeam(team);
+      if (invite) store.setInvite(invite);
+      store.inviteAckReceipts.clear();
+      for (const [id, receipt] of previousReceipts) store.inviteAckReceipts.set(id, receipt);
+    }
+  });
+  return persisted ? "ok" : "persistence_failed";
 }
 
 function pruneInviteAckReceipts(store: RelayStore) {

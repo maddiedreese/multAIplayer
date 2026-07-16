@@ -1,5 +1,6 @@
-import { useRoomInspectorComposition, type RoomInspectorSources } from "../hooks/useRoomInspectorComposition";
+import { ActiveRoomInspector, type RoomInspectorSources } from "./ActiveRoomInspector";
 import { useAppStore } from "../store/appStore";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 export type { RoomInspectorSources };
 
@@ -14,7 +15,7 @@ function ActiveRoomInspectorContainer({
   selectedRoom
 }: {
   sources: RoomInspectorSources;
-  selectedRoom: NonNullable<ReturnType<typeof useAppStore.getState>["rooms"][number]>;
+  selectedRoom: ClientRoomRecord;
 }) {
-  return useRoomInspectorComposition({ sources, selectedRoom });
+  return <ActiveRoomInspector sources={sources} selectedRoom={selectedRoom} />;
 }

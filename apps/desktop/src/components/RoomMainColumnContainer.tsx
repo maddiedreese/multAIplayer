@@ -1,4 +1,5 @@
-import { useRoomMainColumnComposition, type RoomMainColumnSources } from "../hooks/useRoomMainColumnComposition";
+import { ActiveRoomMainColumn, type RoomMainColumnSources } from "./ActiveRoomMainColumn";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 
 export type { RoomMainColumnSources };
@@ -20,7 +21,7 @@ function ActiveRoomMainColumnContainer({
   selectedRoom
 }: {
   sources: RoomMainColumnSources;
-  selectedRoom: NonNullable<ReturnType<typeof useAppStore.getState>["rooms"][number]>;
+  selectedRoom: ClientRoomRecord;
 }) {
-  return useRoomMainColumnComposition({ sources, selectedRoom });
+  return <ActiveRoomMainColumn sources={sources} selectedRoom={selectedRoom} />;
 }

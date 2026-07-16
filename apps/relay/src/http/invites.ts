@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import type { InviteRecord as InviteRecordType } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
 import { isActiveRoom } from "../relay-domain.js";
+import { persistMutationOrRollback } from "./durable-mutation.js";
 
 interface RegisterInviteRoutesOptions {
   app: Express;
@@ -76,10 +77,11 @@ export function registerInviteRoutes({
       expiresAt: new Date(Date.now() + inviteTtlDays * 24 * 60 * 60 * 1000).toISOString()
     };
     store.setInvite(invite);
-    try {
-      await saveRelayStore();
-    } catch {
-      store.deleteInvite(invite.id);
+    const persisted = await persistMutationOrRollback({
+      persist: saveRelayStore,
+      rollback: () => store.deleteInvite(invite.id)
+    });
+    if (!persisted) {
       return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite quota and invite.");
     }
     res.status(201).json({ invite });

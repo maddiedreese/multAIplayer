@@ -1,6 +1,6 @@
 import type { ClientRoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import { formatTeamMemberName, formatTeamRole } from "../../lib/formatting/appFormatters";
-import { buildDeviceFingerprintMarkdown } from "../../lib/identity/deviceTrust";
+import { buildDeviceFingerprintMarkdown } from "../../lib/identity/deviceFingerprintComparisons";
 import { removeTeamMember, transferTeamOwnership, updateTeamMemberRole } from "../workspace/workspaceClient";
 import { useAppStore } from "../../store/appStore";
 import type { RoomPresence } from "../../types";
@@ -9,8 +9,8 @@ import { isRelayHttpErrorCode } from "../../lib/core/httpResponse";
 
 interface MemberActionsOptions {
   setDeviceIdentityMessage: (message: string | null) => void;
-  trustDeviceForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
-  untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
+  recordDeviceFingerprintComparisonForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
+  removeDeviceFingerprintComparisonForRoom: (roomId: string, deviceId: string) => void;
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
   removeMembersFromMlsGroup: (
@@ -29,8 +29,8 @@ interface MemberActionsOptions {
 
 export function createMemberActions({
   setDeviceIdentityMessage,
-  trustDeviceForRoom,
-  untrustDeviceForRoom,
+  recordDeviceFingerprintComparisonForRoom,
+  removeDeviceFingerprintComparisonForRoom,
   updateTeamRoleForTeam,
   updateTeamMemberCountForTeam,
   removeMembersFromMlsGroup,
@@ -46,28 +46,30 @@ export function createMemberActions({
     };
   };
 
-  function trustRoomMemberDevice(member: RoomPresence) {
+  function markRoomMemberFingerprintCompared(member: RoomPresence) {
     const { selectedRoom } = currentWorkspace();
     if (!selectedRoom) return;
     const fingerprint = member.publicKeyFingerprint;
     if (!fingerprint) {
-      setDeviceIdentityMessage(`${member.displayName} has no registered device identity to trust.`);
+      setDeviceIdentityMessage(`${member.displayName} has no registered device fingerprint to compare.`);
       return;
     }
-    trustDeviceForRoom(selectedRoom.id, member.deviceId, fingerprint);
-    setDeviceIdentityMessage(`Trusted ${member.displayName}'s device identity for ${selectedRoom.name}.`);
-  }
-
-  function untrustRoomMemberDevice(member: RoomPresence) {
-    const { selectedRoom } = currentWorkspace();
-    if (!selectedRoom) return;
-    untrustDeviceForRoom(selectedRoom.id, member.deviceId);
+    recordDeviceFingerprintComparisonForRoom(selectedRoom.id, member.deviceId, fingerprint);
     setDeviceIdentityMessage(
-      `Removed local trust for ${member.displayName}'s device identity in ${selectedRoom.name}.`
+      `Marked ${member.displayName}'s fingerprint as compared on this device for ${selectedRoom.name}. This advisory note grants no access or authority.`
     );
   }
 
-  async function copyRoomMemberDeviceFingerprint(member: RoomPresence, trusted: boolean) {
+  function clearRoomMemberFingerprintComparison(member: RoomPresence) {
+    const { selectedRoom } = currentWorkspace();
+    if (!selectedRoom) return;
+    removeDeviceFingerprintComparisonForRoom(selectedRoom.id, member.deviceId);
+    setDeviceIdentityMessage(
+      `Cleared this device's fingerprint comparison note for ${member.displayName} in ${selectedRoom.name}.`
+    );
+  }
+
+  async function copyRoomMemberDeviceFingerprint(member: RoomPresence, comparedLocally: boolean) {
     const { selectedRoom } = currentWorkspace();
     if (!selectedRoom) return;
     const fingerprint = member.publicKeyFingerprint;
@@ -80,7 +82,7 @@ export function createMemberActions({
       displayName: member.displayName,
       deviceId: member.deviceId,
       fingerprint,
-      trusted
+      comparedLocally
     });
     await copyMarkdownWithFallback(
       `${member.displayName} device fingerprint`,
@@ -191,8 +193,8 @@ export function createMemberActions({
   }
 
   return {
-    trustRoomMemberDevice,
-    untrustRoomMemberDevice,
+    markRoomMemberFingerprintCompared,
+    clearRoomMemberFingerprintComparison,
     copyRoomMemberDeviceFingerprint,
     changeTeamMemberRole,
     transferOwnershipToTeamMember,

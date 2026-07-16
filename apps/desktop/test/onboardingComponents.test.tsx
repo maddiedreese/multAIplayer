@@ -132,7 +132,10 @@ test("readiness stays in canonical order, warnings are actionable, and blocked r
   assert.equal((view.getByRole("button", { name: /Continue/ }) as HTMLButtonElement).disabled, true);
   fireEvent.click(view.getByRole("button", { name: "Update Codex" }));
   assert.deepEqual(actions, ["update_codex"]);
-  assert.match(view.container.querySelector(".onboarding-auth-explainer")?.textContent ?? "", /GitHub.*identifies/);
+  const authExplainer = view.container.querySelector(".onboarding-auth-explainer")?.textContent ?? "";
+  assert.match(authExplainer, /GitHub identity is required for hosted workspaces/);
+  assert.match(authExplainer, /repo.*optional pull-request and Actions API workflows/);
+  assert.match(authExplainer, /private repositories/);
 });
 
 test("create form keeps folder selection local and retries only the room after partial team success", async () => {

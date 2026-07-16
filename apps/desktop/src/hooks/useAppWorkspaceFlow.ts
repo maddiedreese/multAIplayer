@@ -106,8 +106,8 @@ export function useAppWorkspaceFlow({
     workspaceRoomActions: {
       members: {
         setDeviceIdentityMessage: storeAction("setDeviceIdentityStatusMessage"),
-        trustDeviceForRoom: storeAction("trustDeviceForRoom"),
-        untrustDeviceForRoom: storeAction("untrustDeviceForRoom"),
+        recordDeviceFingerprintComparisonForRoom: storeAction("recordDeviceFingerprintComparisonForRoom"),
+        removeDeviceFingerprintComparisonForRoom: storeAction("removeDeviceFingerprintComparisonForRoom"),
         updateTeamRoleForTeam: storeAction("updateTeamRoleForTeam"),
         updateTeamMemberCountForTeam: storeAction("updateTeamMemberCountForTeam"),
         removeMembersFromMlsGroup: inviteActions.removeMembersFromMlsGroup

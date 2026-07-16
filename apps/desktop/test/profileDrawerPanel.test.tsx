@@ -74,6 +74,11 @@ test("accepted hosted-account deletion is reported as protected and pending clea
       />
     );
     assert.equal(view.queryByRole("button", { name: "Reset device identity" }), null);
+    assert.match(view.getByText("GitHub identity scope").parentElement?.textContent ?? "", /workspace identity/i);
+    assert.match(
+      view.getByText("Repository workflow scope").parentElement?.textContent ?? "",
+      /public and private repository workflows/i
+    );
 
     fireEvent.click(view.getByRole("button", { name: "Delete hosted account data" }));
     const confirmation = view.getByLabelText(/Type delete my account to confirm/) as HTMLInputElement;

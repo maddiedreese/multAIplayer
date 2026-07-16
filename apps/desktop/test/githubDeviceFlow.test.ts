@@ -7,8 +7,20 @@ import {
   logout,
   nextGitHubDevicePollIntervalSeconds,
   recheckHostedAccountDeletion,
+  summarizeGitHubOAuthPurposes,
   type GitHubDevicePollResult
 } from "../src/lib/identity/authClient";
+
+test("GitHub OAuth copy separates identity from repository authority", () => {
+  assert.deepEqual(summarizeGitHubOAuthPurposes(["read:user", "repo"]), {
+    identity: "read:user — workspace identity",
+    repositoryWorkflows: "repo — public and private repository workflows"
+  });
+  assert.deepEqual(summarizeGitHubOAuthPurposes(["read:user"]), {
+    identity: "read:user — workspace identity",
+    repositoryWorkflows: "No repository workflow scope"
+  });
+});
 
 Object.defineProperty(globalThis, "localStorage", {
   configurable: true,

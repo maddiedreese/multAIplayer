@@ -243,8 +243,8 @@ test("member actions update the current Zustand roster without React", async () 
       localUser: { id: "github:maddie", name: "Maddie" },
       currentUser: null,
       setDeviceIdentityMessage: () => undefined,
-      trustDeviceForRoom: () => undefined,
-      untrustDeviceForRoom: () => undefined,
+      recordDeviceFingerprintComparisonForRoom: () => undefined,
+      removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
       rotateRoomKeyForDevices: async () => undefined,
@@ -281,8 +281,8 @@ test("member removal aborts before relay revocation unless every active room is 
   try {
     const actions = createMemberActions({
       setDeviceIdentityMessage: () => undefined,
-      trustDeviceForRoom: () => undefined,
-      untrustDeviceForRoom: () => undefined,
+      recordDeviceFingerprintComparisonForRoom: () => undefined,
+      removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
       rotateRoomKeyForDevices: async () => undefined,
@@ -324,8 +324,8 @@ test("member removal reports relay-revoked but incomplete cryptographic transiti
     let commitAttempts = 0;
     const actions = createMemberActions({
       setDeviceIdentityMessage: () => undefined,
-      trustDeviceForRoom: () => undefined,
-      untrustDeviceForRoom: () => undefined,
+      recordDeviceFingerprintComparisonForRoom: () => undefined,
+      removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
       removeMembersFromMlsGroup: async () => {

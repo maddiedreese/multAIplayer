@@ -310,22 +310,31 @@ export async function createRelayApp(
     app,
     config: relayConfig,
     store: relayStore,
-    auth: authSessionManager,
-    authz: relayAuthz,
-    persistence: relayStorePersistence,
-    metrics: relayMetrics,
-    codec: relayStoreCodec,
-    fanout: relayFanout,
-    roomManager: relayRoomManager,
-    keyPackageValidator,
-    scheduleStoreSave,
-    revokeTeamInvites: teamMutations.revokeTeamInvites,
-    requesterFromRequest,
-    reclaimDurableCapacity: relayStorePersistence.reclaimDurableCapacity,
-    deletionLedger,
-    isAccountRestricted: (userId) => isAccountRestricted(relayStore, userId),
-    isReady: relayIsReady,
-    readinessFailureCode: () => (relayStorePersistence.isHealthy() ? "relay_shutting_down" : "persistence_unavailable")
+    identity: {
+      sessions: authSessionManager,
+      authorization: relayAuthz,
+      deletionLedger,
+      isAccountRestricted: (userId) => isAccountRestricted(relayStore, userId)
+    },
+    durability: {
+      persistence: relayStorePersistence,
+      codec: relayStoreCodec,
+      scheduleStoreSave,
+      reclaimDurableCapacity: relayStorePersistence.reclaimDurableCapacity
+    },
+    collaboration: {
+      fanout: relayFanout,
+      roomManager: relayRoomManager,
+      revokeTeamInvites: teamMutations.revokeTeamInvites,
+      requesterFromRequest,
+      keyPackageValidator
+    },
+    operations: {
+      metrics: relayMetrics,
+      isReady: relayIsReady,
+      readinessFailureCode: () =>
+        relayStorePersistence.isHealthy() ? "relay_shutting_down" : "persistence_unavailable"
+    }
   });
   app.use(relayJsonBodyErrorMiddleware);
   app.use(relayNotFoundMiddleware);

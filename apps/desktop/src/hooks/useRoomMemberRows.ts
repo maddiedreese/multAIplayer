@@ -1,5 +1,5 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import type { TrustedDeviceKey } from "../lib/identity/deviceTrust";
+import type { DeviceFingerprintComparisonRecord } from "../lib/identity/deviceFingerprintComparisons";
 import type { LocalHostUser } from "../lib/access/roomHost";
 import type { RoomPresence } from "../types";
 import { buildRoomMemberRows } from "../presentation/roster/rosterDisplayRows";
@@ -10,7 +10,7 @@ interface UseRoomMemberRowsOptions {
   localUser: LocalHostUser;
   localDeviceId: string;
   localPublicKeyFingerprint?: string;
-  trustedDeviceKeys: TrustedDeviceKey[];
+  deviceFingerprintComparisons: DeviceFingerprintComparisonRecord[];
 }
 
 export function useRoomMemberRows({
@@ -19,7 +19,7 @@ export function useRoomMemberRows({
   localUser,
   localDeviceId,
   localPublicKeyFingerprint,
-  trustedDeviceKeys
+  deviceFingerprintComparisons
 }: UseRoomMemberRowsOptions) {
   if (!selectedRoom) return [];
   return buildRoomMemberRows({
@@ -28,6 +28,6 @@ export function useRoomMemberRows({
     localUser,
     localDeviceId,
     ...(localPublicKeyFingerprint ? { localPublicKeyFingerprint } : {}),
-    trustedDeviceKeys
+    deviceFingerprintComparisons
   });
 }

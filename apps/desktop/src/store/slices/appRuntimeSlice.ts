@@ -1,11 +1,11 @@
 import type { StateCreator } from "zustand";
 import type { DeviceIdentity } from "../../lib/identity/deviceIdentity";
 import {
-  loadTrustedDeviceKeys,
-  trustDeviceKey,
-  untrustDeviceKey,
-  type TrustedDeviceKey
-} from "../../lib/identity/deviceTrust";
+  loadDeviceFingerprintComparisons,
+  recordDeviceFingerprintComparison,
+  removeDeviceFingerprintComparison,
+  type DeviceFingerprintComparisonRecord
+} from "../../lib/identity/deviceFingerprintComparisons";
 import type { CodexProbe } from "../../lib/platform/localBackend";
 import type { AppStoreState } from "../appStore";
 
@@ -14,16 +14,17 @@ export interface AppRuntimeSlice {
   deviceIdentity: DeviceIdentity | null;
   deviceIdentityMessage: string | null;
   deviceSessionToken: string | null;
-  trustedDeviceKeys: TrustedDeviceKey[];
-  trustedDeviceKeysLoaded: boolean;
+  /** Advisory local fingerprint-comparison notes; never authorization state. */
+  deviceFingerprintComparisons: DeviceFingerprintComparisonRecord[];
+  deviceFingerprintComparisonsLoaded: boolean;
   historySearchBusy: boolean;
   replaceCodexProbe: (probe: CodexProbe | null) => void;
   replaceDeviceIdentity: (identity: DeviceIdentity | null) => void;
   setDeviceIdentityStatusMessage: (message: string | null) => void;
   replaceDeviceSessionToken: (token: string | null) => void;
-  loadTrustedDeviceKeysOnce: () => void;
-  trustDeviceForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
-  untrustDeviceForRoom: (roomId: string, deviceId: string) => void;
+  loadDeviceFingerprintComparisonsOnce: () => void;
+  recordDeviceFingerprintComparisonForRoom: (roomId: string, deviceId: string, fingerprint: string) => void;
+  removeDeviceFingerprintComparisonForRoom: (roomId: string, deviceId: string) => void;
   startHistorySearch: () => void;
   finishHistorySearch: () => void;
 }
@@ -33,8 +34,8 @@ export const emptyAppRuntimeState = {
   deviceIdentity: null,
   deviceIdentityMessage: null,
   deviceSessionToken: null,
-  trustedDeviceKeys: [] as TrustedDeviceKey[],
-  trustedDeviceKeysLoaded: false,
+  deviceFingerprintComparisons: [] as DeviceFingerprintComparisonRecord[],
+  deviceFingerprintComparisonsLoaded: false,
   historySearchBusy: false
 };
 
@@ -44,17 +45,29 @@ export const createAppRuntimeSlice: StateCreator<AppStoreState, [], [], AppRunti
   replaceDeviceIdentity: (deviceIdentity) => set({ deviceIdentity }),
   setDeviceIdentityStatusMessage: (deviceIdentityMessage) => set({ deviceIdentityMessage }),
   replaceDeviceSessionToken: (deviceSessionToken) => set({ deviceSessionToken }),
-  loadTrustedDeviceKeysOnce: () => {
-    if (get().trustedDeviceKeysLoaded) return;
-    set({ trustedDeviceKeys: loadTrustedDeviceKeys(), trustedDeviceKeysLoaded: true });
+  loadDeviceFingerprintComparisonsOnce: () => {
+    if (get().deviceFingerprintComparisonsLoaded) return;
+    set({
+      deviceFingerprintComparisons: loadDeviceFingerprintComparisons(),
+      deviceFingerprintComparisonsLoaded: true
+    });
   },
-  trustDeviceForRoom: (roomId, deviceId, fingerprint) =>
+  recordDeviceFingerprintComparisonForRoom: (roomId, deviceId, fingerprint) =>
     set((state) => ({
-      trustedDeviceKeys: trustDeviceKey(state.trustedDeviceKeys, roomId, deviceId, fingerprint)
+      deviceFingerprintComparisons: recordDeviceFingerprintComparison(
+        state.deviceFingerprintComparisons,
+        roomId,
+        deviceId,
+        fingerprint
+      )
     })),
-  untrustDeviceForRoom: (roomId, deviceId) =>
+  removeDeviceFingerprintComparisonForRoom: (roomId, deviceId) =>
     set((state) => ({
-      trustedDeviceKeys: untrustDeviceKey(state.trustedDeviceKeys, roomId, deviceId)
+      deviceFingerprintComparisons: removeDeviceFingerprintComparison(
+        state.deviceFingerprintComparisons,
+        roomId,
+        deviceId
+      )
     })),
   startHistorySearch: () => set({ historySearchBusy: true }),
   finishHistorySearch: () => set({ historySearchBusy: false })

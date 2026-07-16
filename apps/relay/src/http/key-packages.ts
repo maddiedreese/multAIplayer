@@ -14,6 +14,7 @@ import type { KeyPackageValidator } from "../mls/key-package-validator.js";
 import { isCanonicalPaddedBase64 } from "../opaque.js";
 import { hasDeviceSession } from "./device-auth.js";
 import { commitValidatedKeyPackages, type KeyPackageUploadCommitResult } from "./key-package-upload-transaction.js";
+import { persistMutationOrRollback } from "./durable-mutation.js";
 
 const maxBatchSize = 20;
 const maxLivePackagesPerDevice = 50;
@@ -166,11 +167,14 @@ export function registerKeyPackageRoutes({
       approvedDeviceId: item.deviceId,
       keyPackageHash: item.keyPackageHash
     });
-    try {
-      await saveRelayStore();
-    } catch {
-      store.setKeyPackage(item);
-      store.setInvite(invite);
+    const persisted = await persistMutationOrRollback({
+      persist: saveRelayStore,
+      rollback: () => {
+        store.setKeyPackage(item);
+        store.setInvite(invite);
+      }
+    });
+    if (!persisted) {
       return void sendRelayError(res, 503, "persistence_unavailable", "Could not consume KeyPackage durably.");
     }
     res.json({ keyPackage: item });
