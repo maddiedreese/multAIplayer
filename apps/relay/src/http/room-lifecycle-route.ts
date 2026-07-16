@@ -9,7 +9,7 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
     store,
     getAuthSession,
     allowMutation,
-    canAccessRoom,
+    isTeamMember,
     requesterFromRequest,
     isRoomHost,
     scheduleStoreSave,
@@ -25,7 +25,7 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
     const room = store.getRoom(roomId);
     if (!room || room.deletedAt || store.getTeam(room.teamId)?.deletedAt)
       return void sendRelayError(res, 404, "room_not_found", "Room not found");
-    if (session && !canAccessRoom(room.teamId, room.id, session.user.id))
+    if (session && !isTeamMember(room.teamId, session.user.id))
       return void sendRelayError(res, 403, "forbidden", "Join this room before changing its archive state.");
     if (!isRoomLifecycleAction(action))
       return void sendRelayError(res, 400, "invalid_request", "action must be archive, restore, or delete");

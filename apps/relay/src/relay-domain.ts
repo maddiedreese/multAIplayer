@@ -26,6 +26,20 @@ export function roomKey(teamId: string, roomId: string): RoomKey {
   return `${teamId}:${roomId}`;
 }
 
+export function isActiveTeam(store: Pick<RelayStore, "getTeam">, teamId: string): boolean {
+  const team = store.getTeam(teamId);
+  return Boolean(team && !team.archivedAt && !team.deletedAt);
+}
+
+export function isActiveRoom(store: Pick<RelayStore, "getTeam" | "getRoom">, teamId: string, roomId: string): boolean {
+  const room = store.getRoom(roomId);
+  return isActiveTeam(store, teamId) && Boolean(room && room.teamId === teamId && !room.archivedAt && !room.deletedAt);
+}
+
+export function isActiveInviteTarget(store: RelayStore, invite: InviteRecord | undefined): boolean {
+  return Boolean(invite && isActiveRoom(store, invite.teamId, invite.roomId));
+}
+
 export function normalizeAuthSessionId(value: unknown): string {
   return normalizeRelayId(value, maxAuthSessionIdChars) ?? "";
 }

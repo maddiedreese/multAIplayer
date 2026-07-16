@@ -1,6 +1,7 @@
 import type { WebSocket } from "ws";
 import type { TeamRole } from "@multaiplayer/protocol";
 import type { ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
+import { isActiveRoom, isActiveTeam } from "../relay-domain.js";
 
 interface CreateRelayRoomSocketManagerOptions {
   store: RelayStore;
@@ -63,9 +64,7 @@ export function createRelayRoomSocketManager({
   }
 
   function isKnownRoom(teamId: string, roomId: string): boolean {
-    const team = store.getTeam(teamId);
-    const room = store.getRoom(roomId);
-    return Boolean(team && !team.deletedAt && room && !room.deletedAt && room.teamId === teamId);
+    return isActiveRoom(store, teamId, roomId);
   }
 
   function canJoinRoom(
@@ -100,6 +99,7 @@ export function createRelayRoomSocketManager({
   }
 
   function canSubscribeTeam(session: ClientSession, teamId: string, userId: string): boolean {
+    if (!isActiveTeam(store, teamId)) return false;
     if (!mutationsRequireAuth) return true;
     return Boolean(session.authSession && session.authSession.user.id === userId && isTeamMember(teamId, userId));
   }
@@ -194,6 +194,7 @@ export function createRelayRoomSocketManager({
     userId: string,
     deviceId: string
   ): ReturnType<RelayStore["getInvite"]> | null {
+    if (!isActiveRoom(store, teamId, roomId)) return null;
     const invite = store.getInvite(inviteId);
     if (!invite || invite.teamId !== teamId || invite.roomId !== roomId) return null;
     if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {

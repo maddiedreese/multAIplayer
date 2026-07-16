@@ -117,6 +117,13 @@ test("invite admission requires the exact durable Welcome, approved user, and de
   assert.equal(store.getInvite("invite"), undefined);
   assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-approved"), true);
 
+  store.setTeam({ ...store.getTeam("team")!, archivedAt: new Date().toISOString() });
+  assert.equal(manager.isKnownRoom("team", "room"), false);
+  assert.equal(manager.canSubscribeTeam(session, "team", "github:joiner"), false);
+  store.setTeam({ ...store.getTeam("team")!, archivedAt: undefined, deletedAt: new Date().toISOString() });
+  assert.equal(manager.canSubscribeTeam(session, "team", "github:joiner"), false);
+  store.setTeam({ ...store.getTeam("team")!, deletedAt: undefined });
+
   store.setTeamMembers("team", new Map());
   store.setInvite(invite);
   store.inviteRequests.set("request", {

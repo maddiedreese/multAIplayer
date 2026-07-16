@@ -3,10 +3,11 @@ import type { MlsRelayMessage, RelayServerMessage, RoomRecord, TeamRecord } from
 import type { RelayMetrics } from "../observability.js";
 import type { ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 import { createHash, createPublicKey, verify } from "node:crypto";
+import { isActiveRoom } from "../relay-domain.js";
 
 export class RelayPublishError extends Error {
   constructor(
-    readonly code: "stale_epoch" | "application_epoch_expired" | "not_active_host" | "invalid_message",
+    readonly code: "stale_epoch" | "application_epoch_expired" | "not_active_host" | "invalid_message" | "not_joined",
     message: string
   ) {
     super(message);
@@ -54,9 +55,11 @@ export function createRelayFanout(options: Options) {
   function broadcastWorkspaceUpdated(team: TeamRecord) {
     for (const socket of options.workspaceSockets) {
       const session = options.sessions.get(socket);
+      const userId = session?.authSession?.user.id ?? session?.userId;
+      if (!userId || !options.store.hasTeamMember(team.id, userId)) continue;
       send(socket, {
         type: "team.updated",
-        team: options.teamRecordForUser(team, options.store, session?.authSession?.user.id ?? session?.userId)
+        team: options.teamRecordForUser(team, options.store, userId)
       });
     }
   }
@@ -82,6 +85,9 @@ export function createRelayFanout(options: Options) {
   }
   async function publishForRoom(key: RoomKey, message: MlsRelayMessage) {
     await options.reclaimDurableCapacity?.();
+    if (!isActiveRoom(options.store, message.teamId, message.roomId)) {
+      throw new RelayPublishError("not_joined", "Room is archived, deleted, or unavailable.");
+    }
     const digest = retryDigest(message);
     const receiptKey = `${key}\0${message.id}`;
     const acceptedReceipt = options.store.acceptedMessageReceipts.get(receiptKey);

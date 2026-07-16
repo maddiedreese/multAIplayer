@@ -32,6 +32,70 @@ test("only the active host device may commit and stale commits rebase", async ()
   );
 });
 
+test("queued publishes fail after room lifecycle changes without restoring durable activity", async () => {
+  let writes = 0;
+  const { store, key } = setup(async () => {
+    writes += 1;
+  });
+  const fanout = fanoutFor(
+    store,
+    key,
+    async () => {
+      writes += 1;
+    },
+    async () => {
+      writes += 1;
+    },
+    createRelayMetrics(),
+    async () => {
+      store.setRoom({ ...store.getRoom("room-desktop")!, archivedAt: new Date().toISOString() });
+    }
+  );
+
+  await assert.rejects(fanout.publishMlsMessage(message("after-archive", "application", 0)), (error: unknown) => {
+    return error instanceof Error && "code" in error && error.code === "not_joined";
+  });
+  assert.equal(writes, 0);
+  assert.equal(store.getMlsBacklog(key), undefined);
+  assert.equal(store.acceptedMessageReceipts.size, 0);
+});
+
+test("workspace updates are sent only to current team members", () => {
+  const store = createRelayStore();
+  const team = { id: "team-core", name: "Core", members: 1 };
+  store.setTeam(team);
+  store.setTeamMembers(
+    team.id,
+    new Map([
+      ["github:member", { teamId: team.id, userId: "github:member", role: "owner", joinedAt: new Date().toISOString() }]
+    ])
+  );
+  const member = recordingSocket();
+  const unrelated = recordingSocket();
+  for (const [socket, userId] of [
+    [member.socket, "github:member"],
+    [unrelated.socket, "github:unrelated"]
+  ] as const) {
+    store.workspaceSockets.add(socket);
+    store.sessions.set(socket, {
+      socket,
+      authSession: {
+        sessionIdHash: "a".repeat(64),
+        user: { id: userId, login: userId },
+        expiresAt: Date.now() + 60_000
+      },
+      rateClientId: userId,
+      subscribedTeamIds: new Set(),
+      workspaceSubscribed: true
+    });
+  }
+
+  fanoutFor(store, "team-core:room-desktop", async () => undefined).broadcastWorkspaceUpdated(team);
+
+  assert.equal(member.sent.length, 1);
+  assert.equal(unrelated.sent.length, 0);
+});
+
 test("identical retries acknowledge without rebroadcast while conflicting ids fail", async () => {
   let writes = 0;
   const { store, fanout, key } = setup(async () => {
@@ -92,6 +156,7 @@ test("applications may arrive from the three retained epochs but fail distinctly
 test("successful publishes record queue-to-fanout and WebSocket send latency", async () => {
   const store = createRelayStore();
   const key = "team-core:room-desktop" as RoomKey;
+  store.setTeam({ id: "team-core", name: "Core", members: 1 });
   store.setRoom({
     id: "room-desktop",
     teamId: "team-core",
@@ -244,6 +309,7 @@ test("host transfer requires an outgoing-host signature bound to exact commit an
 function setup(saveMlsCommit: () => Promise<void>, saveMlsMessage: () => Promise<void> = async () => undefined) {
   const store = createRelayStore(),
     key = "team-core:room-desktop" as RoomKey;
+  store.setTeam({ id: "team-core", name: "Core", members: 1 });
   store.setRoom({
     id: "room-desktop",
     teamId: "team-core",
@@ -261,7 +327,8 @@ function fanoutFor(
   key: RoomKey,
   saveMlsCommit: () => Promise<void>,
   saveMlsMessage: () => Promise<void> = async () => undefined,
-  metrics = createRelayMetrics()
+  metrics = createRelayMetrics(),
+  reclaimDurableCapacity?: () => Promise<void>
 ) {
   return createRelayFanout({
     store,
@@ -274,10 +341,24 @@ function fanoutFor(
     roomKey: () => key,
     pruneMlsBacklog: (items) => items,
     addTeamMember: () => undefined,
+    reclaimDurableCapacity,
     saveMlsMessage,
     saveMlsCommit,
     teamRecordForUser: (team) => team
   });
+}
+
+function recordingSocket() {
+  const sent: string[] = [];
+  const socket = {
+    OPEN: 1,
+    readyState: 1,
+    send(payload: string, callback: () => void) {
+      sent.push(payload);
+      callback();
+    }
+  } as unknown as WebSocket;
+  return { socket, sent };
 }
 function message(id: string, messageType: MlsRelayMessage["messageType"], epochHint: number): MlsRelayMessage {
   return {

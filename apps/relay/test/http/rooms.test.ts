@@ -453,6 +453,13 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
     };
     assert.ok(archivedWorkspace.rooms.find((room) => room.id === "room-desktop")?.archivedAt);
 
+    const inviteWhileArchived = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(inviteWhileArchived.status, 409);
+
     const restoreResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
       method: "PATCH",
       headers: { "content-type": "application/json", cookie: ownerCookie },
@@ -858,6 +865,7 @@ async function startLifecycleRouteHarness(initialRoom: RoomRecord) {
       return false;
     },
     canAccessRoom: () => canAccess,
+    isTeamMember: () => canAccess,
     requesterFromRequest: () => ({ id: session.user.id, name: "Maddie" }),
     isRoomHost: () => isHost,
     scheduleStoreSave: () => saves++,

@@ -3,7 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import type { InviteRecord, InviteResponseRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
+import type {
+  InviteRecord,
+  InviteResponseRecord,
+  RoomRecord,
+  TeamMemberRecord,
+  TeamRecord
+} from "@multaiplayer/protocol";
 import { ackInviteResponseAtomically, isExactInviteAckReceipt } from "../../src/http/invite-delivery.js";
 import { createRelayPersistence } from "../../src/persistence.js";
 import { InMemoryRelayStore } from "../../src/state.js";
@@ -123,8 +129,18 @@ test("denied invite ACK deletes the dead capability, persists a retry receipt, a
   assert.equal(isExactInviteAckReceipt(store, invite.id, denied.requestId, "github:joiner", "device-joiner"), true);
 });
 
+test("invite ACK cannot add membership while its room is archived", async () => {
+  const { store, response } = seededStore();
+  store.setRoom({ ...store.getRoom("room-one")!, archivedAt: new Date().toISOString() });
+
+  assert.equal(await ackInviteResponseAtomically(store, response, async () => undefined), "inactive_target");
+  assert.equal(store.hasTeamMember("team-core", "github:joiner"), false);
+  assert.equal(store.inviteResponses.has(response.requestId), true);
+});
+
 interface PersistedFixture {
   teams: TeamRecord[];
+  rooms: RoomRecord[];
   invites: InviteRecord[];
   inviteResponses: InviteResponseRecord[];
   inviteAckReceipts: Array<{
@@ -184,6 +200,21 @@ function seededStore() {
     createdAt
   };
   store.setTeam(team);
+  store.setRoom({
+    id: invite.roomId,
+    teamId: team.id,
+    name: "Room",
+    host: "Host",
+    hostUserId: "github:host",
+    activeHostDeviceId: "device-host",
+    hostStatus: "active",
+    approvalPolicy: "ask_every_turn",
+    mode: { chat: true, code: true, workspace: true, browser: false },
+    browserAllowedOrigins: [],
+    browserProfilePersistent: false,
+    unread: 0,
+    acceptedMlsEpoch: 1
+  });
   store.setTeamMembers(
     team.id,
     new Map([["github:host", { teamId: team.id, userId: "github:host", role: "owner", joinedAt: createdAt }]])
@@ -219,6 +250,7 @@ function snapshot(store: InMemoryRelayStore) {
 function hydrate(value: PersistedFixture): InMemoryRelayStore {
   const store = new InMemoryRelayStore();
   for (const team of value.teams) store.setTeam(team);
+  for (const room of value.rooms) store.setRoom(room);
   for (const invite of value.invites) store.setInvite(invite);
   for (const response of value.inviteResponses) store.inviteResponses.set(response.requestId, response);
   for (const receipt of value.inviteAckReceipts) store.inviteAckReceipts.set(receipt.requestId, receipt);

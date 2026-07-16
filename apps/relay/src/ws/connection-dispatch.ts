@@ -222,7 +222,7 @@ function dispatchPresence(
   session: ClientSession,
   message: Extract<RelayClientMessage, { type: "presence" }>
 ) {
-  if (!isPresenceForJoinedSession(session, message)) {
+  if (!options.rooms.isKnownRoom(message.teamId, message.roomId) || !isPresenceForJoinedSession(session, message)) {
     options.transport.send(session.socket, {
       type: "error",
       message: "Join the room before publishing presence with this user and device."

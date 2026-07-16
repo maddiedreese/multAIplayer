@@ -3,6 +3,7 @@ import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
 import type { InviteRecord as InviteRecordType } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
+import { isActiveRoom } from "../relay-domain.js";
 
 interface RegisterInviteRoutesOptions {
   app: Express;
@@ -43,6 +44,10 @@ export function registerInviteRoutes({
     const room = store.getRoom(roomId);
     if (!room || room.deletedAt || room.teamId !== teamId) {
       sendRelayError(res, 404, "room_not_found", "Room not found");
+      return;
+    }
+    if (!isActiveRoom(store, teamId, roomId)) {
+      sendRelayError(res, 409, "conflict", "Restore the team and room before creating invites.");
       return;
     }
     if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
@@ -101,6 +106,10 @@ export function registerInviteRoutes({
       deleteInviteArtifacts(store, invite.id);
       scheduleStoreSave();
       sendRelayError(res, 404, "invite_not_found", "Invite target no longer exists");
+      return;
+    }
+    if (!isActiveRoom(store, invite.teamId, invite.roomId)) {
+      sendRelayError(res, 409, "conflict", "Restore the team and room before using this invite.");
       return;
     }
 
