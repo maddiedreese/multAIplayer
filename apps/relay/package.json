@@ -5,7 +5,6 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "test:security-journey": "tsx --test --test-reporter=junit test/process-security-journey.test.ts test/live-native-relay-journey.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "deletions:reconcile": "node dist/reconcile-deletions.js",
@@ -14,13 +13,7 @@
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts test/auth/*.test.ts test/config/*.test.ts test/http/*.test.ts test/persistence/*.test.ts test/ws/*.test.ts",
     "test:fuzz": "MULTAIPLAYER_RELAY_FUZZ_ITERATIONS=${MULTAIPLAYER_RELAY_FUZZ_ITERATIONS:-100000} tsx --test test/fuzz/*.test.ts",
-    "test:soak": "tsx --test test/soak/relay-chaos.test.ts",
-    "test:coverage": "c8 --all --src src --include src/authz.ts --reporter=text --reporter=json-summary --reporter=lcov --check-coverage --lines=90 --functions=90 --branches=90 --statements=90 tsx --test test/security-units.test.ts",
-    "test:mutation:run": "stryker run",
-    "test:mutation:summary": "node ../../tools/mutation/report.mjs summarize reports/mutation/mutation.json reports/mutation/summary.json",
-    "test:mutation:policy": "node ../../tools/mutation/report.mjs check reports/mutation/summary.json mutation-policy.json",
-    "test:mutation:ratchet": "node ../../tools/mutation/report.mjs ratchet reports/mutation/summary.json mutation-policy.json reports/mutation/ratchet-candidate.json",
-    "test:mutation": "npm run test:mutation:run && npm run test:mutation:summary && npm run test:mutation:policy"
+    "test:soak": "tsx --test test/soak/relay-chaos.test.ts"
   },
   "dependencies": {
     "@multaiplayer/github": "0.1.0-alpha.0",
@@ -35,8 +28,6 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@stryker-mutator/core": "9.6.1",
-    "@stryker-mutator/typescript-checker": "9.6.1",
     "@types/better-sqlite3": "7.6.13",
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",

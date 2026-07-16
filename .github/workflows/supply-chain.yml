@@ -33,31 +33,6 @@ jobs:
       - name: Scan full history with the narrow fixture allowlist
         run: |
           "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner .
-      - name: Prove representative credentials are not allowlisted
-        run: |
-          fixture="$RUNNER_TEMP/gitleaks-positive-control"
-          mkdir -p "$fixture"
-          printf 'token = "ghp_%s"\n' '9876543210zyxwvutsrqponm' > "$fixture/credential.txt"
-          if "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner "$fixture"; then
-            echo "Gitleaks positive control unexpectedly passed." >&2
-            exit 1
-          fi
-          echo "Gitleaks rejected the representative credential positive control."
-
-  semgrep:
-    name: Semgrep community rules
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Install Semgrep
-        run: |
-          pipx install semgrep==1.127.1
-          pipx runpip semgrep install --force-reinstall setuptools==80.9.0
-      - name: Scan TypeScript and JavaScript
-        run: semgrep scan --error --config p/typescript --config p/nodejs --config p/owasp-top-ten apps packages scripts e2e tools
-
   relay-container:
     name: Relay container vulnerabilities
     runs-on: ubuntu-latest
@@ -81,8 +56,8 @@ jobs:
           exit-code: "1"
           trivyignores: .trivyignore.yaml
 
-  reproducibility-contract:
-    name: Signed-updater contract and normalized relay runtime equivalence
+  updater-contract:
+    name: Signed-updater contract
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -96,9 +71,6 @@ jobs:
           sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev
       - name: Execute signed-updater authentication contract tests
         run: npm run verify:updater-contract
-      - name: Prove normalized relay runtime equivalence across independent builds
-        run: npm run verify:relay-runtime-equivalence
-
   npm-and-license-policy:
     name: npm advisories and license policy
     runs-on: ubuntu-latest

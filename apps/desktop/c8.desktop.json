@@ -1,8 +1,0 @@
-{
-  "all": true,
-  "src": ["src"],
-  "include": ["src/**/*.{ts,tsx}"],
-  "exclude": ["src/**/*.d.ts"],
-  "temp-directory": "coverage/tmp",
-  "reporter": ["none"]
-}

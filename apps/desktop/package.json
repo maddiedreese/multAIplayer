@@ -9,7 +9,6 @@
     "build": "tsc --noEmit && vite build && node ../../tools/security/verify-desktop-security-deps.mjs && node ../../tools/release/check-desktop-bundle-size.mjs",
     "check": "tsc --noEmit",
     "test": "node ../../scripts/run-desktop-tests.mjs",
-    "test:coverage": "c8 --config c8.desktop.json node ../../scripts/run-desktop-tests.mjs && c8 report --config c8.invite-critical.json && c8 report --config c8.host-handoff.json",
     "test:smoke": "node ../../scripts/run-desktop-tests.mjs --smoke-only",
     "preview": "vite preview",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",

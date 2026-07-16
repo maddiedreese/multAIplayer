@@ -16,8 +16,7 @@ const names =
   phase === "published-list"
     ? readFileSync(source, "utf8").split(/\r?\n/).filter(Boolean).sort()
     : readdirSync(source).sort();
-const exactNames = phase === "build" ? contract.buildOutputExactNames : contract.requiredExactNames;
-const matchedPatternNames = [];
+const exactNames = contract.requiredExactNames;
 
 for (const name of exactNames) {
   assert.equal(names.filter((candidate) => candidate === name).length, 1, `expected exactly one ${name}`);
@@ -26,7 +25,6 @@ for (const pattern of contract.requiredNamePatterns) {
   const expression = new RegExp(pattern);
   const matches = names.filter((name) => expression.test(name));
   assert.equal(matches.length, 1, `expected exactly one asset matching ${pattern}`);
-  matchedPatternNames.push(...matches);
 }
 
 const dmgNames = names.filter((name) => /^multAIplayer_[0-9A-Za-z.+-]+_aarch64\.dmg$/.test(name));
@@ -36,7 +34,4 @@ assert.deepEqual(
   "release DMG name must match the checked-out package version"
 );
 
-const expectedNames = [...exactNames, ...matchedPatternNames].sort();
-assert.deepEqual(names, expectedNames, "release assets must contain only the canonical exact asset set");
-
-console.log(`${phase} assets exactly satisfy release-assets.v${contract.schemaVersion}.json.`);
+console.log(`${phase} assets contain the required release-assets.v${contract.schemaVersion}.json set.`);

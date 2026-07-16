@@ -98,9 +98,9 @@ explicit and outside the production desktop graph.
 ### Security-boundary changes
 
 Keep changes to `packages/protocol`, `apps/desktop/src-tauri`, and the Rust MLS
-core small and independently testable. A pull request must identify AI-authored
-security-boundary changes and name the focused property, fuzz, mutation, native,
-or journey evidence that applies. This single-maintainer project does not require
+core small and independently testable. A pull request changing a security
+boundary must name the focused behavior, property, fuzz, native, or journey
+evidence that applies. This single-maintainer project does not require
 a second approval that cannot exist; required CI and branch protection are the
 merge gate.
 
@@ -155,27 +155,23 @@ and with the focused build check.
 
 This section is not required reading for an ordinary contribution. Operators
 should also use [Self-hosting](docs/self-hosting.md); release reviewers should use
-[Reproducing release builds](docs/reproducible-builds.md).
+[Verifying releases](docs/reproducible-builds.md).
 
 ### Continuous-integration policy
 
-`ci.yml` contains fast blocking checks: workspace lint/type/test/build, relay authorization coverage, per-file desktop invite and host-handoff coverage floors, and Rust formatting/Clippy/tests. `journeys.yml` runs UI, deterministic security, native two-client, and macOS package evidence on `main`, tags, schedules, and pull requests that change executable product or journey code. Documentation-only edits do not start product journeys, and generated prose is not a merge gate. Coverage and journey jobs are controls that can fail; CI does not create report-only or routing-only jobs that look like verification.
+`ci.yml` contains blocking workspace lint, type, behavior-test, build, Rust
+formatting, Clippy, and native-test checks. `journeys.yml` always reports one
+required aggregate: executable product changes run the UI, native two-client,
+and packaged macOS journeys, while documentation-only changes report that there
+was no executable product change. Repository settings should require the
+always-present `Required product journeys` aggregate rather than path-filtered
+individual jobs.
 
-Desktop source files have an advisory 400-line ESLint ceiling. A warning names the
-specific file and overage so the next related change can extract a cohesive
-component or application action; warnings are visible but do not fail CI. Do not
-silence the warning by excluding or renaming a file. Journey path filters stay
-broad for executable product changes: timing failures are fixed at their
-polling/state boundary rather than worked around by narrowing triggers or blind
-reruns.
-
-Mutation testing, parser fuzzing, extended supply-chain scans, reproducibility comparisons, soak/restore drills, and the scheduled macOS two-client run are advisory or scheduled evidence. The relay mutation policy preserves the measured `authz.ts` 100%/zero-survivor baseline and the existing 60% score/survivor ceilings for session, WebSocket-admission, and room-route decisions, with an explicit 80% target. Each weekly shard fails visibly on tooling errors or regression below its checked-in baseline. The first run each month emits a reviewable candidate that advances score floors in five-point steps and never increases a survivor ceiling; maintainers review and commit justified advances rather than letting automation rewrite policy silently. Investigate regressions and promote a check to blocking only when it reliably enforces a release-critical property at a cost appropriate for every pull request.
-
-The deterministic security journey fails if its Rust production boundary or
-the tested relay lifecycle is unavailable. It retains the executed test report
-as an artifact. The threat model summarizes that test by hand and is not
-regenerated from CI output. Coverage artifacts describe execution; only named
-floors are merge gates.
+Scheduled parser/native fuzzing, relay churn/restore exercises, container
+scanning, dependency review, and the macOS two-client run cover expensive or
+platform-specific boundaries. Promote a check to pull-request CI only when it
+reliably enforces a user-visible or security-critical property at a cost
+appropriate for every pull request.
 
 ### Dependencies and releases
 
@@ -187,8 +183,8 @@ and removal condition.
 Release artifacts come only from a validated tag through `release.yml`. The
 workflow keeps the GitHub Release in draft state until the blocking native
 two-client journey, signed/notarized build, authenticated metadata and updater
-archive, checksums, artifact SBOM, provenance, Sigstore evidence, and release-asset
-contract all pass. The protected `public-alpha-release` environment gates the
+archive, checksums, and release-asset contract all pass. The protected
+`public-alpha-release` environment gates the
 publishing deployment. GitHub records deployment status, timestamps, and reviewer
 identity when required reviewers are configured; it does not durably capture the
 contents of the cold/warm universal-link, accessibility, or two-device exploratory
@@ -202,10 +198,10 @@ If publication succeeds but updater-channel advancement fails, open the original
 release workflow run and choose **Re-run failed jobs**. That preserves the tagged
 build and retries only the failed channel job plus its dependents. Do not dispatch
 a new full workflow for an already-public tag: the workflow rejects that before
-rebuilding or emitting new transparency records. If GitHub reported the publish
+rebuilding or replacing it. If GitHub reported the publish
 job as failed after it actually made the release public, re-running failed jobs
-authenticates the retained build subset and the complete canonical public asset
-set, skips signing and mutation, and then permits the channel retry.
+authenticates the retained build subset and the required public asset
+set, leaves the public release unchanged, and then permits the channel retry.
 
 The root `packageManager` field is authoritative. CI and release workflows use
 the repository composite setup action to install that exact npm version. The root
@@ -220,13 +216,13 @@ package-manager installation operations that do not execute repository code.
 Pull requests are squash-merged. Their title becomes the sole commit title and
 must use Conventional Commit form so Release Please receives one unambiguous
 change record. Before merging a release PR, review the generated section as
-customer-facing copy and run `node tools/release/check-release-notes.mjs`; remove
-duplicate merge-history entries and internal implementation noise rather than
-publishing raw automation output. Repository settings should disable merge commits
-and rebase merges, use the PR title for squash commits, and delete merged branches.
+customer-facing copy; manually remove duplicate merge-history entries and
+internal implementation noise rather than publishing raw automation output.
+Repository settings should disable merge commits and rebase merges, use the PR
+title for squash commits, and delete merged branches.
 
 The updater key fingerprint, manual verification, and release-channel mechanics
-are maintained in [Reproducing release builds](docs/reproducible-builds.md). Keep
+are maintained in [Verifying releases](docs/reproducible-builds.md). Keep
 the private updater key out of the repository, logs, artifacts, and shell history;
 keep an encrypted offline recovery copy. Before the first public build, verify the
 committed key fingerprint against the project website and a maintainer-controlled

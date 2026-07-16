@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { assertReleasePleaseBootstrap } from "../../scripts/check-release-versions.mjs";
 import {
   discoverWorkspacePackagePaths,
   synchronizeCargoLockVersion,
@@ -53,6 +54,28 @@ test("Cargo manifest and lock synchronizers change only the native package versi
       "0.2.0-alpha.1"
     ),
     '[[package]]\nname = "dependency"\nversion = "9.0.0"\n\n[[package]]\nname = "multaiplayer"\nversion = "0.2.0-alpha.1"\n'
+  );
+});
+
+test("release-please bootstrap remains fixed when the prospective manifest version advances", () => {
+  const bootstrapSha = "a".repeat(40);
+  assertReleasePleaseBootstrap(
+    {
+      "bootstrap-sha": bootstrapSha,
+      packages: {
+        ".": {
+          "include-component-in-tag": false,
+          draft: true,
+          "force-tag-creation": true,
+          "extra-files": [
+            { path: "apps/desktop/package.json", jsonpath: "$.version" },
+            { path: "apps/desktop/src-tauri/Cargo.toml", jsonpath: "$.package.version" }
+          ]
+        }
+      }
+    },
+    { ".": "0.2.0-alpha.0" },
+    (sha) => ({ commit: sha, isAncestor: true })
   );
 });
 

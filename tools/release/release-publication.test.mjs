@@ -42,7 +42,7 @@ test("an ambiguous publish retry authenticates the retained build subset indepen
   const digest = createHash("sha256").update("retained-build").digest("hex");
   const metadata = [
     { name: "latest.json", digest: `sha256:${digest}` },
-    { name: "generated.sigstore.json", digest: `sha256:${"1".repeat(64)}` }
+    { name: "unselected-release-asset.txt", digest: `sha256:${"1".repeat(64)}` }
   ];
   assert.deepEqual(validateReleaseAssetDigests(directory, metadata, ["latest.json"]), ["latest.json"]);
   assert.throws(
