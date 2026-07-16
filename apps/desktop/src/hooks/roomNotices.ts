@@ -2,7 +2,7 @@ import type { RoomNoticeDisplay } from "../components/RoomStatusBanners";
 import { useAppStore } from "../store/appStore";
 
 interface BuildRoomNoticesOptions {
-  roomId: string;
+  roomId: string | null;
   hostMessage: string | null;
   chatMessage: string | null;
 }
@@ -14,7 +14,7 @@ export function buildRoomNotices({ roomId, hostMessage, chatMessage }: BuildRoom
           key: "host",
           label: "Codex",
           message: hostMessage,
-          onDismiss: () => useAppStore.getState().setHostMessageForRoom(roomId, null)
+          onDismiss: roomId ? () => useAppStore.getState().setHostMessageForRoom(roomId, null) : undefined
         }
       : null,
     chatMessage && chatMessage !== hostMessage
@@ -22,7 +22,7 @@ export function buildRoomNotices({ roomId, hostMessage, chatMessage }: BuildRoom
           key: "chat",
           label: "Chat",
           message: chatMessage,
-          onDismiss: () => useAppStore.getState().setChatMessageForRoom(roomId, null)
+          onDismiss: roomId ? () => useAppStore.getState().setChatMessageForRoom(roomId, null) : undefined
         }
       : null
   ].filter((notice): notice is RoomNoticeDisplay => Boolean(notice));

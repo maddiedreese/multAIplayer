@@ -6,7 +6,7 @@ import { omitRecordKey } from "../../lib/core/setUtils";
 type CurrentRef<T> = { current: T };
 
 export function createRoomSettingsMutationContext(
-  selectedRoomIdRef: CurrentRef<string>,
+  selectedRoomIdRef: CurrentRef<string | null>,
   settingsBusyRef: CurrentRef<Record<string, boolean>>
 ) {
   const isCurrentUserActiveHost = () => currentSelectedRoomContext()?.isActiveHost ?? false;
@@ -33,12 +33,16 @@ export function createRoomSettingsMutationContext(
     currentRoomSettingsActor,
     currentRoomAccess,
     setSettingsBusyForRoom,
-    setSelectedSettingsMessage: (message: string | null) =>
-      useAppStore.getState().setSettingsMessageForRoom(selectedRoomIdRef.current, message),
+    setSelectedSettingsMessage: (message: string | null) => {
+      const roomId = selectedRoomIdRef.current;
+      if (roomId) useAppStore.getState().setSettingsMessageForRoom(roomId, message);
+    },
     setSettingsMessageForRoom: (roomId: string, message: string | null) =>
       useAppStore.getState().setSettingsMessageForRoom(roomId, message),
-    setSelectedBrowserMessage: (message: string | null) =>
-      useAppStore.getState().setBrowserMessageForRoom(selectedRoomIdRef.current, message),
+    setSelectedBrowserMessage: (message: string | null) => {
+      const roomId = selectedRoomIdRef.current;
+      if (roomId) useAppStore.getState().setBrowserMessageForRoom(roomId, message);
+    },
     setBrowserMessageForRoom: (roomId: string, message: string | null) =>
       useAppStore.getState().setBrowserMessageForRoom(roomId, message),
     clearBrowserStatusForRoom: (roomId: string) => useAppStore.getState().clearBrowserStatusForRoom(roomId),

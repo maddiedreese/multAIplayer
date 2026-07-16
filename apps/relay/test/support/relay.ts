@@ -277,7 +277,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
 
 export async function patchHostStatus(
   baseUrl: string,
-  body: { host: string; hostUserId: string; hostStatus: "active" | "handoff" | "offline" }
+  body: { host: string; hostUserId: string; hostStatus: "active" }
 ): Promise<number> {
   const response = await fetch(`${baseUrl}/rooms/room-desktop/host`, {
     method: "PATCH",

@@ -5,7 +5,7 @@ import { useAppStore } from "../store/appStore";
 interface UseProjectFilesSearchOptions {
   hasSelectedRoom: boolean;
   canReadLocalWorkspace: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectedRoomProjectPath: string;
   fileQuery: string;
   localWorkspaceMessage: string;
@@ -20,7 +20,7 @@ export function useProjectFilesSearch({
   localWorkspaceMessage
 }: UseProjectFilesSearchOptions) {
   useEffect(() => {
-    if (!hasSelectedRoom) {
+    if (!hasSelectedRoom || !selectedRoomId) {
       return;
     }
     const roomId = selectedRoomId;

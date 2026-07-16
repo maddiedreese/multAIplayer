@@ -146,7 +146,6 @@ export function attachmentTypeFromName(name: string): string {
 
 export function formatHostStatus(room: ClientRoomRecord): string {
   if (room.hostStatus === "active") return `Hosted by ${room.host}`;
-  if (room.hostStatus === "handoff") return `Handoff from ${room.host}`;
   return "No active host";
 }
 

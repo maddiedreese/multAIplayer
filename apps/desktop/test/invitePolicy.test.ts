@@ -22,11 +22,9 @@ test("room invites require the active host", () => {
   assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), false);
 });
 
-test("room invites remain unavailable during host handoff", () => {
-  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }), true);
-  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), false);
+test("offline rooms cannot create invites", () => {
   assert.equal(
-    canCreateRoomInvite({ ...room, hostStatus: "handoff" }, { id: "github:maddiedreese", name: "Maddie" }),
+    canCreateRoomInvite({ ...room, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }),
     false
   );
 });

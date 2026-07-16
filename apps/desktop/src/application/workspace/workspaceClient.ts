@@ -265,14 +265,13 @@ export async function updateRoomHost(
   roomId: string,
   host: string,
   hostUserId: string,
-  hostStatus: ClientRoomRecord["hostStatus"],
   hostDeviceId?: string
 ): Promise<ClientRoomRecord> {
   const response = await fetch(`${getRelayHttpUrl()}/rooms/${encodeURIComponent(roomId)}/host`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "content-type": "application/json", ...(hostStatus === "active" ? deviceSessionHeaders() : {}) },
-    body: JSON.stringify({ host, hostUserId, hostStatus, ...(hostStatus === "active" ? { hostDeviceId } : {}) })
+    headers: { "content-type": "application/json", ...deviceSessionHeaders() },
+    body: JSON.stringify({ host, hostUserId, hostStatus: "active", hostDeviceId })
   });
   const body = await readJsonResponse<{ room: ClientRoomRecord }>(response, "Failed to update room host");
   return body.room as ClientRoomRecord;

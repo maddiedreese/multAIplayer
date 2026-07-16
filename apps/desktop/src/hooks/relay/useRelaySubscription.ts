@@ -50,10 +50,10 @@ interface UseRelaySubscriptionOptions {
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   roomsRef: MutableRefObject<ClientRoomRecord[]>;
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   markIncomingChatUnread: (
     roomId: string,
-    selectedRoomId: string,
+    selectedRoomId: string | null,
     senderDeviceId: string,
     localDeviceId: string
   ) => void;

@@ -5,7 +5,7 @@ import { useAppStore } from "../store/appStore";
 interface UseRoomGitStatusRefreshOptions {
   hasSelectedRoom: boolean;
   canReadLocalWorkspace: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectedRoomProjectPath: string;
 }
 
@@ -16,7 +16,7 @@ export function useRoomGitStatusRefresh({
   selectedRoomProjectPath
 }: UseRoomGitStatusRefreshOptions) {
   useEffect(() => {
-    if (!hasSelectedRoom) {
+    if (!hasSelectedRoom || !selectedRoomId) {
       return;
     }
     if (!canReadLocalWorkspace) {

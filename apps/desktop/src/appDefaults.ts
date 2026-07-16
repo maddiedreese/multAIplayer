@@ -3,7 +3,7 @@ import type { BrowserStatus } from "./types";
 
 export const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",
-  never_host: "Never host this room"
+  never_host: "Disable Codex in this room"
 };
 
 export const roomModeLabels: Record<keyof RoomMode, string> = {

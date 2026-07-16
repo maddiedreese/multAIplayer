@@ -6,7 +6,7 @@ import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibil
 
 interface UseSelectedRoomContextOptions {
   rooms: ClientRoomRecord[];
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   inspectorTabsByRoom: Record<string, InspectorTab>;
   secretWarningsVisibleByRoom: Record<string, boolean>;
   terminals: TerminalSnapshot[];

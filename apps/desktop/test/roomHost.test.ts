@@ -4,7 +4,6 @@ import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   findEnvelopeRoom,
   isEnvelopeFromActiveRoomHost,
-  isEnvelopeFromHandoffInitiator,
   isLocalUserActiveHostForRoom,
   roomHostEnvelopeRejectionMessage
 } from "../src/lib/access/roomHost";
@@ -41,13 +40,6 @@ test("isLocalUserActiveHostForRoom rejects active rooms without a stable host id
 test("isLocalUserActiveHostForRoom rejects inactive host states", () => {
   assert.equal(
     isLocalUserActiveHostForRoom(
-      { ...activeRoom, hostStatus: "handoff" },
-      { id: "github:maddiedreese", name: "Maddie" }
-    ),
-    false
-  );
-  assert.equal(
-    isLocalUserActiveHostForRoom(
       { ...activeRoom, hostStatus: "offline" },
       { id: "github:maddiedreese", name: "Maddie" }
     ),
@@ -59,26 +51,11 @@ test("room host envelopes must come from stable active host identity", () => {
   assert.equal(isEnvelopeFromActiveRoomHost(activeRoom, { senderUserId: "github:maddiedreese" }), true);
   assert.equal(isEnvelopeFromActiveRoomHost(activeRoom, { senderUserId: "github:member" }), false);
   assert.equal(
-    isEnvelopeFromActiveRoomHost({ ...activeRoom, hostStatus: "handoff" }, { senderUserId: "github:maddiedreese" }),
-    false
-  );
-  assert.equal(
     isEnvelopeFromActiveRoomHost({ ...activeRoom, hostUserId: undefined }, { senderUserId: "github:maddiedreese" }),
     false
   );
-});
-
-test("handoff packages remain bound to the initiating host across the room-state race", () => {
-  const handoffRoom = { ...activeRoom, hostStatus: "handoff" as const };
-  assert.equal(isEnvelopeFromHandoffInitiator(activeRoom, { senderUserId: "github:maddiedreese" }), true);
-  assert.equal(isEnvelopeFromHandoffInitiator(handoffRoom, { senderUserId: "github:maddiedreese" }), true);
-  assert.equal(isEnvelopeFromHandoffInitiator(handoffRoom, { senderUserId: "github:member" }), false);
   assert.equal(
-    isEnvelopeFromHandoffInitiator({ ...handoffRoom, hostUserId: undefined }, { senderUserId: "github:maddiedreese" }),
-    false
-  );
-  assert.equal(
-    isEnvelopeFromHandoffInitiator({ ...handoffRoom, hostStatus: "offline" }, { senderUserId: "github:maddiedreese" }),
+    isEnvelopeFromActiveRoomHost({ ...activeRoom, hostStatus: "offline" }, { senderUserId: "github:maddiedreese" }),
     false
   );
 });

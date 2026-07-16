@@ -30,6 +30,7 @@ test("active rooms require a stable host identity", () => {
 
   assert.equal(RoomRecord.safeParse(room).success, false);
   assert.equal(RoomRecord.safeParse({ ...room, hostUserId: "github:maddie" }).success, true);
+  assert.equal(RoomRecord.safeParse({ ...room, hostUserId: "github:maddie", hostStatus: "handoff" }).success, false);
 });
 
 test("room protocol derives its reasoning enum from the shared options", () => {

@@ -77,10 +77,10 @@ Codex runs through the active host's local Codex app-server/session. Any room me
 
 The approval card shows what Codex will receive, including chat context, attachments, model, sandbox, project path, Git status, terminal names, and browser access when those contexts are enabled. High-privilege context is called out before approval.
 
-Approval presets are host-side labels:
+Approval policies are room-wide settings. They continue to apply when hosting moves to another member:
 
 - Ask every Codex turn: every turn requires active host approval.
-- Never host this room: this device should not host Codex for the room.
+- Disable Codex in this room: no host can run Codex turns for the room until the policy changes.
 
 The Codex sandbox controls the local Codex app-server request:
 

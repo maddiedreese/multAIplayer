@@ -63,7 +63,7 @@ export const RoomRecord = z
     host: z.string().min(1).max(maxDisplayNameChars),
     hostUserId: UserId.optional(),
     activeHostDeviceId: DeviceId.optional(),
-    hostStatus: z.enum(["active", "offline", "handoff"]),
+    hostStatus: z.enum(["active", "offline"]),
     approvalPolicy: z.enum(["ask_every_turn", "never_host"]),
     mode: RoomModeSchema,
     browserProfilePersistent: z.boolean(),

@@ -13,7 +13,7 @@ interface UseSidebarNavigationOptions {
   rooms: ClientRoomRecord[];
   teams: TeamRecord[];
   selectedTeam: string;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   messagesByRoom: Record<string, ChatMessage[]>;
   historySearchMessagesByRoom: Record<string, ChatMessage[]>;
   approvalVisibleByRoom: Record<string, boolean>;

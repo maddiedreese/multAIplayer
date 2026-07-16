@@ -66,7 +66,7 @@ test("relay can require auth for workspace mutations", async () => {
       await patchHostStatus(relay.baseUrl, {
         host: "Maddie",
         hostUserId: "github:maddiedreese",
-        hostStatus: "handoff"
+        hostStatus: "active"
       }),
       401
     );

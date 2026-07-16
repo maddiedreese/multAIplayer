@@ -9,7 +9,7 @@ import { updateRoomSettings } from "../workspace/workspaceClient";
 import { maxRoomProjectPathChars, normalizeProjectPath } from "../../lib/workspace/workspaceCreation";
 
 interface ProjectActionsOptions {
-  selectedRoomId: () => string;
+  selectedRoomId: () => string | null;
   reportInFlight: (roomId: string) => boolean;
   replaceRoom: (room: ClientRoomRecord) => void;
   publishEvent: (

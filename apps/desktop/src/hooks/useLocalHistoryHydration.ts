@@ -18,7 +18,7 @@ import type { ChatMessage, LocalRoomHistoryPayload, LocalRoomReadState } from ".
 
 interface UseLocalHistoryHydrationOptions {
   hasSelectedRoom: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectedRoomTeamId: string;
   forgottenRoomIds: Set<string>;
   replaceHistorySettings: (next: LocalHistorySettings) => void;
@@ -35,11 +35,11 @@ export function useLocalHistoryHydration({
   hydrateLocalRoomHistoryForRoom,
   hydrateRoomReadState
 }: UseLocalHistoryHydrationOptions) {
-  const hydrationAttempt = useAppStore(
-    (state) => state.historyPresenceByRoom[selectedRoomId]?.historyHydrationAttempt ?? 0
+  const hydrationAttempt = useAppStore((state) =>
+    selectedRoomId ? (state.historyPresenceByRoom[selectedRoomId]?.historyHydrationAttempt ?? 0) : 0
   );
   useEffect(() => {
-    if (!hasSelectedRoom) return;
+    if (!hasSelectedRoom || !selectedRoomId) return;
     if (forgottenRoomIds.has(selectedRoomId)) {
       replaceHistorySettings(loadHistorySettings(selectedRoomId));
       return;

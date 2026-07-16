@@ -4,17 +4,19 @@ import { useAppStore } from "../store/appStore";
 const noSelectedMessageIds: string[] = [];
 
 interface UseMarkdownSelectionOptions {
-  activeRoomId: string;
+  activeRoomId: string | null;
   enabled: boolean;
-  resetKey: string;
+  resetKey: string | null;
 }
 
 export function useMarkdownSelection({ activeRoomId, enabled, resetKey }: UseMarkdownSelectionOptions) {
-  const markdownSelectionMode = useAppStore(
-    (state) => state.roomChatByRoom[activeRoomId]?.markdownSelectionMode ?? false
+  const markdownSelectionMode = useAppStore((state) =>
+    activeRoomId ? (state.roomChatByRoom[activeRoomId]?.markdownSelectionMode ?? false) : false
   );
-  const selectedMessageIds = useAppStore(
-    (state) => state.roomChatByRoom[activeRoomId]?.selectedMessageIds ?? noSelectedMessageIds
+  const selectedMessageIds = useAppStore((state) =>
+    activeRoomId
+      ? (state.roomChatByRoom[activeRoomId]?.selectedMessageIds ?? noSelectedMessageIds)
+      : noSelectedMessageIds
   );
   const toggleSelectedMessageForRoom = useAppStore((state) => state.toggleSelectedMessageForRoom);
   const clearSelectedMessagesForRoom = useAppStore((state) => state.clearSelectedMessagesForRoom);
@@ -22,20 +24,20 @@ export function useMarkdownSelection({ activeRoomId, enabled, resetKey }: UseMar
   const disableMarkdownSelectionModeForRoom = useAppStore((state) => state.disableMarkdownSelectionModeForRoom);
 
   useEffect(() => {
-    disableMarkdownSelectionModeForRoom(activeRoomId);
+    if (activeRoomId) disableMarkdownSelectionModeForRoom(activeRoomId);
   }, [activeRoomId, disableMarkdownSelectionModeForRoom, resetKey]);
 
   function toggleMessageSelection(messageId: string) {
-    if (!enabled) return;
+    if (!enabled || !activeRoomId) return;
     toggleSelectedMessageForRoom(activeRoomId, messageId);
   }
 
   function clearSelectedMessages() {
-    clearSelectedMessagesForRoom(activeRoomId);
+    if (activeRoomId) clearSelectedMessagesForRoom(activeRoomId);
   }
 
   function toggleMarkdownSelectionMode() {
-    toggleMarkdownSelectionModeForRoom(activeRoomId);
+    if (activeRoomId) toggleMarkdownSelectionModeForRoom(activeRoomId);
   }
 
   return {

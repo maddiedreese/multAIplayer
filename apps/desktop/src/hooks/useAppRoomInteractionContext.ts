@@ -69,7 +69,7 @@ export function useAppRoomInteractionContext({
       setTerminalErrorForRoom
     },
     notices: {
-      roomId: selectedRoom?.id ?? "",
+      roomId: selectedRoom?.id ?? null,
       hostMessage,
       chatMessage
     },

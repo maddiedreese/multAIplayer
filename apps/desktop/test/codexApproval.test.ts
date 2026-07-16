@@ -43,6 +43,5 @@ test("Codex approvals reset when room execution context changes", () => {
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, host: "Jordan", hostUserId: "github:jordan" }),
     false
   );
-  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, hostStatus: "handoff" }), false);
   assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, unread: 2 }), false);
 });

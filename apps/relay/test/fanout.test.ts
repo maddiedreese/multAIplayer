@@ -305,13 +305,6 @@ test("host transfer requires an outgoing-host signature bound to exact commit an
     rejected.publishMlsMessage({ ...handoff, nextHostDeviceId: "different-device" }),
     /authorization/
   );
-  const { store: legacyStore, fanout: legacyFanout } = setup(async () => undefined);
-  legacyStore.setRoom({ ...legacyStore.getRoom("room-desktop")!, hostStatus: "handoff" });
-  legacyStore.setDevice(store.getDevice("github:host", "device-host")!);
-  legacyStore.setDevice(store.getDevice("github:next", "device-next")!);
-  legacyStore.setTeamMembers("team-core", store.getTeamMembers("team-core")!);
-  await legacyFanout.publishMlsMessage(handoff);
-  assert.equal(legacyStore.getRoom("room-desktop")?.hostUserId, "github:next");
 });
 
 function setup(saveMlsCommit: () => Promise<void>, saveMlsMessage: () => Promise<void> = async () => undefined) {

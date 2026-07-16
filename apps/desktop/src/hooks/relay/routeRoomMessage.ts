@@ -8,7 +8,6 @@ import {
 import {
   findEnvelopeRoom,
   isEnvelopeFromActiveRoomHost,
-  isEnvelopeFromHandoffInitiator,
   roomHostEnvelopeRejectionMessage
 } from "../../lib/access/roomHost";
 import { buildRoomSettingsSystemMessage } from "../../presentation/rooms/roomSettingsMessages";
@@ -102,7 +101,7 @@ async function routeHostHandoffOffer(
   const parsed = HostHandoffPlaintextPayload.safeParse(await decrypt());
   if (!parsed.success) return;
   const room = findEnvelopeRoom(context.roomsRef.current, envelope.roomId);
-  if (!isEnvelopeFromHandoffInitiator(room, envelope) || parsed.data.fromUserId !== envelope.senderUserId) {
+  if (!isEnvelopeFromActiveRoomHost(room, envelope) || parsed.data.fromUserId !== envelope.senderUserId) {
     store.setHostMessageForRoom(envelope.roomId, roomHostEnvelopeRejectionMessage(room, "host handoff"));
   } else store.appendHostHandoff(envelope.roomId, hostHandoffRecord(parsed.data));
 }

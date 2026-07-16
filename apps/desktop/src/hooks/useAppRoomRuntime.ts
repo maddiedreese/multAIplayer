@@ -223,25 +223,25 @@ export function useAppRoomRuntime({
       roomGitStatusRefresh: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: roomId ?? "",
+        selectedRoomId: roomId,
         selectedRoomProjectPath: roomSelection.projectPath
       },
       gitHubRemoteInference: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: roomId ?? "",
+        selectedRoomId: roomId,
         selectedRoomProjectPath: roomSelection.projectPath,
         selectedRoomIdRef: appRefs.selectedRoomIdRef
       },
       gitHubActionsDraftReset: {
         hasSelectedRoom,
-        selectedRoomId: roomId ?? "",
+        selectedRoomId: roomId,
         gitWorkflowDraft
       },
       projectFilesSearch: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: roomId ?? "",
+        selectedRoomId: roomId,
         selectedRoomProjectPath: roomSelection.projectPath,
         fileQuery,
         localWorkspaceMessage: roomInteraction.localWorkspaceMessage
@@ -249,7 +249,7 @@ export function useAppRoomRuntime({
       terminalLifecycle: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: roomId ?? "",
+        selectedRoomId: roomId,
         selectedTerminalId,
         selectedTerminalRunning: selectedRuntime.selectedTerminal?.running
       },
@@ -261,12 +261,12 @@ export function useAppRoomRuntime({
         isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
         terminalBusy,
         roomTerminalCount: roomTerminals.length,
-        selectedRoomId: roomId ?? "",
+        selectedRoomId: roomId,
         terminalAutoOpenedRoomsRef
       },
       roomDraftCleanup: {
         hasSelectedRoom,
-        selectedRoomId: roomId ?? "",
+        selectedRoomId: roomId,
         selectedRoomProjectPath: roomSelection.projectPath,
         selectedCodexModel
       }

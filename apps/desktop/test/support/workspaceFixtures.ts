@@ -41,7 +41,7 @@ export const seededRooms: ClientRoomRecord[] = [
     projectPath: "/test/workspace",
     host: "Other User",
     hostUserId: "github:other-user",
-    hostStatus: "handoff",
+    hostStatus: "offline",
     unread: 2
   }
 ];

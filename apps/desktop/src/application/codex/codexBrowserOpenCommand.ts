@@ -14,7 +14,7 @@ interface LocalUser {
 
 interface CreateCodexBrowserOpenCommandOptions {
   localUser: LocalUser;
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
