@@ -2,9 +2,9 @@
 
 Packet revision: 2026-07-15.
 
-This packet is for an independent reviewer. It deliberately does not restate product security claims: [the threat model](threat-model.md) is the only normative claims source. Maintainer workflow, CI, dependency, release, and relay operations live in [CONTRIBUTING.md](../CONTRIBUTING.md).
+This design packet is preparation material for a future independent review. It is not a merge gate or an audit result, and it deliberately does not restate product security claims: [the threat model](../threat-model.md) is the only normative claims source. Maintainer workflow, CI, dependency, release, and relay operations live in [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
-The multAIplayer cryptographic integration has **not received an independent professional audit**. Record the exact commit or tag reviewed, reviewer identity, dates, and findings before changing that status anywhere in the product or documentation. Potentially exploitable findings use the private process in [SECURITY.md](../SECURITY.md).
+The multAIplayer cryptographic integration has **not received an independent professional audit**. Record the exact commit or tag reviewed, reviewer identity, dates, and findings before changing that status anywhere in the product or documentation. Potentially exploitable findings use the private process in [SECURITY.md](../../SECURITY.md).
 
 ## Review scope
 
@@ -38,7 +38,7 @@ Until that record exists, the invite flow and public documentation must continue
 
 ### Tauri IPC review
 
-The second focused review surface is every `#[tauri::command]` registered by the invocation handler in `apps/desktop/src-tauri/src/lib.rs`. The repository-owned [IPC audit](tauri-ipc-boundary-audit.md) records, command by command:
+The second focused review surface is every `#[tauri::command]` registered by the invocation handler in `apps/desktop/src-tauri/src/lib.rs`. The repository-owned [IPC audit](../tauri-ipc-boundary-audit.md) records, command by command:
 
 1. whether the return value can contain secret material;
 2. whether every caller-controlled input is parsed, bounded, canonicalized, and authorized in Rust;
@@ -56,7 +56,9 @@ The initial review does not certify the complete Tauri shell, relay availability
 
 ### Relay reliability boundary
 
-The single-node relay is not part of the narrow cryptography certification scope, but reviewers should not infer a conventional relational data model from “SQLite persistence.” The process keeps durable entities in memory, stores entity payloads as JSON rows, and synchronously commits tracked mutations before success or broadcast; whole-state serialization is limited to legacy import. Review the fail-stop path as part of this boundary: a runtime SQLite failure must poison readiness, close active sockets, and refuse later product traffic until restart rather than serve divergent memory. A configured durable-entry ceiling fails startup or insertion explicitly, and quota-consuming compound insertions must roll back their contributed quota/entity state on capacity rejection. The [single-node decision](decisions/single-node-relay.md) records this tradeoff, and [self-hosting](self-hosting.md) records the operational recovery and trusted-proxy checks.
+The single-node relay is not part of the narrow cryptography certification scope, but reviewers should not infer a conventional relational data model from “SQLite persistence.” The process keeps durable entities in memory, stores entity payloads as JSON rows, and synchronously commits tracked mutations before success or broadcast; whole-state serialization is limited to legacy import. Review the fail-stop path as part of this boundary: a runtime SQLite failure must poison readiness, close active sockets, emit `relay_store_persistence_poisoned`, and terminate the production process for supervised restart rather than serve divergent memory. Global and per-team durable-entry ceilings fail startup or insertion explicitly, actual stored attachment-ciphertext bytes drive live/upload quotas, and quota-consuming compound insertions must roll back their contributed quota/entity state on capacity rejection. The [single-node decision](../decisions/single-node-relay.md) records this tradeoff, and [self-hosting](../self-hosting.md) records the operational recovery and trusted-proxy checks.
+
+The checked-in [synchronous-persistence soak](../benchmarks/relay-soak-2026-07-15.md) records request/publish p99, event-loop p99/max, WAL bounds, room/member cardinality, restarts, and integrity evidence before and after WAL checkpoint tuning. It is local alpha evidence, not a hosted SLO.
 
 ## Locked choices
 

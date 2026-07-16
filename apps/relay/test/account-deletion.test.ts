@@ -48,7 +48,11 @@ test("account deletion removes identity-owned records while preserving shared en
     used: 1,
     resetAt: Date.now() + 60_000
   });
-  store.rateLimitStore.set("auth:session:session-leaving", { count: 1, resetAt: Date.now() + 60_000 });
+  store.rateLimitStore.set("auth:session:session-leaving", {
+    tokens: 0,
+    updatedAt: Date.now(),
+    lastSeenAt: Date.now()
+  });
   store.deviceChallenges.set("challenge-leaving", { userId, deviceId: "device-one", expiresAt: Date.now() + 60_000 });
   store.invites.set("invite-leaving", {
     id: "invite-leaving",

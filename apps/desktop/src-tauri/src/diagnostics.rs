@@ -8,6 +8,8 @@ use std::sync::{Arc, LazyLock, Mutex};
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
+use crate::atomic_file::atomic_write_private_file;
+
 const MAX_MESSAGE_CHARS: usize = 240;
 const MAX_DETAIL_CHARS: usize = 800;
 const MAX_LOG_BYTES: usize = 256 * 1024;
@@ -332,98 +334,24 @@ fn append_line(path: &Path, encoded: &[u8]) -> Result<(), String> {
 
 fn write_diagnostic_bundle(path: &Path, encoded: &[u8]) -> Result<(), String> {
     ensure_safe_export_target(path)?;
-    let parent = path
-        .parent()
-        .ok_or_else(|| "Diagnostic export path has no parent directory".to_string())?;
-    let file_name = path
-        .file_name()
-        .map(|name| name.to_string_lossy())
-        .unwrap_or_else(|| "diagnostics.json".into());
-    let temporary = parent.join(format!(
-        ".{file_name}.{}.{}.tmp",
-        std::process::id(),
-        temporary_file_nonce()
-    ));
-    let result = (|| {
-        let mut options = OpenOptions::new();
-        options.create_new(true).write(true);
-        configure_private_create_mode(&mut options);
-        let mut file = options
-            .open(&temporary)
-            .map_err(|error| format!("Failed to create diagnostic export: {error}"))?;
-        ensure_open_regular_file(&file)?;
-        ensure_private_file(&temporary)?;
+    atomic_write_private_file(path, |file| {
         file.write_all(encoded)
             .map_err(|error| format!("Failed to write diagnostic export: {error}"))?;
-        file.flush()
-            .map_err(|error| format!("Failed to flush diagnostic export: {error}"))?;
-        file.sync_all()
-            .map_err(|error| format!("Failed to sync diagnostic export: {error}"))?;
-        drop(file);
-        replace_file(&temporary, path)?;
-        ensure_private_file(path)
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    result
+        Ok(())
+    })?;
+    ensure_private_file(path)
 }
 
 fn rewrite_entries(path: &Path, entries: &[DiagnosticEntry]) -> Result<(), String> {
     ensure_safe_log_target(path)?;
-    let parent = path
-        .parent()
-        .ok_or_else(|| "Diagnostic log path has no parent directory".to_string())?;
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("diagnostics.jsonl");
-    let temporary = parent.join(format!(
-        ".{file_name}.{}.{}.tmp",
-        std::process::id(),
-        temporary_file_nonce()
-    ));
-    let result = (|| {
-        let mut options = OpenOptions::new();
-        options.create_new(true).write(true);
-        configure_private_create_mode(&mut options);
-        let mut file = options
-            .open(&temporary)
-            .map_err(|error| format!("Failed to create diagnostic rewrite: {error}"))?;
-        ensure_open_regular_file(&file)?;
-        ensure_private_file(&temporary)?;
+    atomic_write_private_file(path, |file| {
         for entry in entries {
             file.write_all(&encode_line(entry)?)
                 .map_err(|error| format!("Failed to rewrite diagnostic log: {error}"))?;
         }
-        file.flush()
-            .map_err(|error| format!("Failed to flush diagnostic rewrite: {error}"))?;
-        file.sync_all()
-            .map_err(|error| format!("Failed to sync diagnostic rewrite: {error}"))?;
-        drop(file);
-        replace_file(&temporary, path)?;
-        ensure_private_file(path)
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    result
-}
-
-#[cfg(not(windows))]
-fn replace_file(temporary: &Path, path: &Path) -> Result<(), String> {
-    fs::rename(temporary, path)
-        .map_err(|error| format!("Failed to replace diagnostic log: {error}"))
-}
-
-#[cfg(windows)]
-fn replace_file(temporary: &Path, path: &Path) -> Result<(), String> {
-    if path.exists() {
-        fs::remove_file(path)
-            .map_err(|error| format!("Failed to replace diagnostic log: {error}"))?;
-    }
-    fs::rename(temporary, path)
-        .map_err(|error| format!("Failed to replace diagnostic log: {error}"))
+        Ok(())
+    })?;
+    ensure_private_file(path)
 }
 
 fn create_private_directory(path: &Path) -> Result<(), String> {
@@ -493,12 +421,6 @@ fn ensure_open_regular_file(file: &File) -> Result<(), String> {
     } else {
         Err("Diagnostic log must be a regular file".to_string())
     }
-}
-
-fn temporary_file_nonce() -> u64 {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
 fn ensure_private_file(path: &Path) -> Result<(), String> {

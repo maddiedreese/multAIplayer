@@ -112,6 +112,39 @@ test("main-column container reads and mutates selected-room state at its compone
   assert.equal(useAppStore.getState().historyPresenceByRoom[selectedRoom.id]?.inspectorTab, "terminal");
 });
 
+test("browser selection opens a session only when the selected room has no active URL", () => {
+  const selectedRoom = seededRooms[0];
+  assert.ok(selectedRoom);
+  let browserOpens = 0;
+  const browserSources = {
+    ...sources,
+    roomRuntime: {
+      ...sources.roomRuntime,
+      openRoomBrowserNow: () => {
+        browserOpens += 1;
+      }
+    }
+  } as RoomMainColumnSources;
+  const view = render(createElement(RoomMainColumnContainer, { sources: browserSources }));
+
+  fireEvent.click(view.getByText("Browser"));
+  assert.equal(browserOpens, 1);
+
+  act(() =>
+    useAppStore.setState((state) => ({
+      browserByRoom: {
+        ...state.browserByRoom,
+        [selectedRoom.id]: {
+          ...state.browserByRoom[selectedRoom.id],
+          activeUrl: "https://example.test"
+        }
+      }
+    }))
+  );
+  fireEvent.click(view.getByText("Browser"));
+  assert.equal(browserOpens, 1);
+});
+
 test("main-column container projects lock state without parent view-model wiring", () => {
   const selectedRoom = seededRooms[0];
   assert.ok(selectedRoom);

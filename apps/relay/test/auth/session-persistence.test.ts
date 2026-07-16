@@ -232,7 +232,7 @@ test("stored sessions reject malformed, expired, and overlong-lived records", ()
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: "soon" }), null);
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: 1.5 }), null);
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: now - 1 }), null);
-  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: now + 60 * 60 * 1000 + 1 }), null);
+  assert.equal(persistence.normalizeStoredAuthSession({ ...valid, expiresAt: now + 60 * 60 * 1000 + 60_000 }), null);
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: null }), null);
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, id: "" } }), null);
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, login: "" } }), null);

@@ -195,64 +195,74 @@ export function emptyWorkspaceFixture(): StoredRelayStateFixture {
   };
 }
 
-function defaultWorkspaceFixture(): StoredRelayStateFixture {
+export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredRelayStateFixture {
+  const rooms = [
+    {
+      id: "room-desktop",
+      teamId: "team-core",
+      name: "Desktop app",
+      projectPath: "/tmp/multaiplayer",
+      host: "Maddie",
+      hostUserId: "github:maddiedreese",
+      activeHostDeviceId: "host-device-1",
+      hostStatus: "active",
+      approvalPolicy: "ask_every_turn",
+      approvalDelegationPolicy: "host_only",
+      trustedApproverUserIds: [],
+      mode: { chat: true, code: true, workspace: true, browser: true },
+      codexModel: "gpt-5.4",
+      codexReasoningEffort: "medium",
+      codexSpeed: "standard",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      unread: 0
+    },
+    {
+      id: "room-relay",
+      teamId: "team-core",
+      name: "Relay ops",
+      projectPath: "/tmp/multaiplayer",
+      host: "Alex",
+      hostUserId: "github:alex",
+      activeHostDeviceId: "alex-device-1",
+      hostStatus: "active",
+      approvalPolicy: "ask_every_turn",
+      approvalDelegationPolicy: "host_only",
+      trustedApproverUserIds: [],
+      mode: { chat: true, code: true, workspace: true, browser: false },
+      codexModel: "gpt-5.4",
+      codexReasoningEffort: "medium",
+      codexSpeed: "standard",
+      browserAllowedOrigins: ["https://github.com"],
+      browserProfilePersistent: true,
+      unread: 0
+    }
+  ];
+  while (rooms.length < roomCount) {
+    const index = rooms.length;
+    rooms.push({ ...rooms[1]!, id: `room-soak-${index}`, name: `Soak room ${index}` });
+  }
+  const members = [
+    { userId: "github:maddiedreese", role: "owner", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { userId: "github:alex", role: "admin", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { userId: "github:tester", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { userId: "github:design", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" }
+  ];
+  while (members.length < memberCount) {
+    const index = members.length;
+    members.push({ userId: `github:soak-${index}`, role: "member", joinedAt: "2026-07-04T00:00:00.000Z" });
+  }
   return {
     version: 1,
     savedAt: new Date().toISOString(),
-    teams: [{ id: "team-core", name: "Core Team", members: 4 }],
-    rooms: [
-      {
-        id: "room-desktop",
-        teamId: "team-core",
-        name: "Desktop app",
-        projectPath: "/tmp/multaiplayer",
-        host: "Maddie",
-        hostUserId: "github:maddiedreese",
-        activeHostDeviceId: "host-device-1",
-        hostStatus: "active",
-        approvalPolicy: "ask_every_turn",
-        approvalDelegationPolicy: "host_only",
-        trustedApproverUserIds: [],
-        mode: { chat: true, code: true, workspace: true, browser: true },
-        codexModel: "gpt-5.4",
-        codexReasoningEffort: "medium",
-        codexSpeed: "standard",
-        browserAllowedOrigins: ["https://github.com"],
-        browserProfilePersistent: true,
-        unread: 0
-      },
-      {
-        id: "room-relay",
-        teamId: "team-core",
-        name: "Relay ops",
-        projectPath: "/tmp/multaiplayer",
-        host: "Alex",
-        hostUserId: "github:alex",
-        activeHostDeviceId: "alex-device-1",
-        hostStatus: "active",
-        approvalPolicy: "ask_every_turn",
-        approvalDelegationPolicy: "host_only",
-        trustedApproverUserIds: [],
-        mode: { chat: true, code: true, workspace: true, browser: false },
-        codexModel: "gpt-5.4",
-        codexReasoningEffort: "medium",
-        codexSpeed: "standard",
-        browserAllowedOrigins: ["https://github.com"],
-        browserProfilePersistent: true,
-        unread: 0
-      }
-    ],
+    teams: [{ id: "team-core", name: "Core Team", members: members.length }],
+    rooms,
     invites: [],
     teamMembers: [
       {
         teamId: "team-core",
-        members: [
-          { userId: "github:maddiedreese", role: "owner", joinedAt: "2026-07-04T00:00:00.000Z" },
-          { userId: "github:alex", role: "admin", joinedAt: "2026-07-04T00:00:00.000Z" },
-          { userId: "github:tester", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" },
-          { userId: "github:design", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" }
-        ],
-        userIds: ["github:maddiedreese", "github:alex", "github:tester", "github:design"]
+        members,
+        userIds: members.map((member) => member.userId)
       }
     ],
     encryptedBacklog: []

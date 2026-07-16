@@ -57,6 +57,29 @@ test("relay falls back safely for invalid shutdown drain values", () => {
   }
 });
 
+test("production fail-stop exits for supervisor restart unless explicitly overridden", () => {
+  const previous = {
+    nodeEnv: process.env.NODE_ENV,
+    exit: process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON,
+    ledgerPath: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH,
+    ledgerKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY
+  };
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON;
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH = ".multaiplayer/test-deletion-ledger";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
+    assert.equal(loadRelayConfig().exitOnPersistencePoison, true);
+    process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON = "false";
+    assert.equal(loadRelayConfig().exitOnPersistencePoison, false);
+  } finally {
+    restoreEnv("NODE_ENV", previous.nodeEnv);
+    restoreEnv("MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON", previous.exit);
+    restoreEnv("MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH", previous.ledgerPath);
+    restoreEnv("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY", previous.ledgerKey);
+  }
+});
+
 test("relay supports only SQLite persistence", () => {
   const previousStorage = process.env.MULTAIPLAYER_RELAY_STORAGE;
   const previousDataPath = process.env.MULTAIPLAYER_RELAY_DATA_PATH;
@@ -110,3 +133,8 @@ test("relay loads configuration from env files without overriding process env", 
     await rm(tempDir, { recursive: true, force: true });
   }
 });
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

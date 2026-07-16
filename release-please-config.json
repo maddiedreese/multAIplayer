@@ -2,12 +2,15 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "node",
   "include-v-in-tag": true,
+  "include-component-in-tag": false,
+  "bootstrap-sha": "6ce611f2ee3a363f2ee57df44b05c403fe5ff60b",
   "prerelease": true,
   "signoff": "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
   "plugins": ["node-workspace"],
   "packages": {
     ".": {
       "package-name": "multAIplayer",
+      "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md",
       "prerelease-type": "alpha",
       "extra-files": [

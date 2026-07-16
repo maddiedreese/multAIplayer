@@ -6,6 +6,8 @@ export interface RelayConfig {
   nodeEnv: string;
   port: number;
   dataPath: string;
+  minimumDiskHeadroomBytes: number;
+  sqliteWalAutoCheckpointPages: number;
   legacyJsonImportPath: string | null;
   mlsBacklogLimit: number;
   mlsBacklogRetentionDays: number;
@@ -13,6 +15,7 @@ export interface RelayConfig {
   attachmentBlobTtlDays: number;
   attachmentBlobMaxBytes: number;
   attachmentBlobLiveQuotaBytes: number;
+  attachmentBlobTeamLiveQuotaBytes: number;
   attachmentBlobUploadBytesPerWindow: number;
   attachmentBlobUploadWindowMs: number;
   jsonBodyLimitBytes: number;
@@ -44,6 +47,7 @@ export interface RelayConfig {
   rateLimitsEnabled: boolean;
   trustProxyHeaders: boolean;
   structuredLogsEnabled: boolean;
+  exitOnPersistencePoison: boolean;
   rateLimitWindowMs: number;
   rateLimitCaps: {
     auth: number;
@@ -69,6 +73,7 @@ export interface RelayConfig {
   liveKeyPackageCapPerUser: number;
   liveInviteCapPerUser: number;
   maxDurableEntries: number;
+  maxDurableEntriesPerTeam: number;
 }
 
 export function loadRelayConfig(): RelayConfig {
@@ -85,6 +90,12 @@ export function loadRelayConfig(): RelayConfig {
     1,
     50_000_000
   );
+  const maxDurableEntries = parseIntegerEnv(
+    process.env.MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES,
+    250_000,
+    1_000,
+    10_000_000
+  );
   const jsonBodyLimitBytes = Math.ceil(Math.max(1_000_000, attachmentBlobMaxBytes * 1.5 + 100_000));
 
   const deletionLedger = parseDeletionLedgerConfig();
@@ -99,6 +110,18 @@ export function loadRelayConfig(): RelayConfig {
     nodeEnv,
     port: parseIntegerEnv(process.env.PORT, 4321, 1, 65_535),
     dataPath: resolve(process.env.MULTAIPLAYER_RELAY_DATA_PATH ?? ".multaiplayer/relay-store.sqlite"),
+    minimumDiskHeadroomBytes: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES,
+      1_000_000_000,
+      100_000_000,
+      1_000_000_000_000
+    ),
+    sqliteWalAutoCheckpointPages: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_SQLITE_WAL_AUTOCHECKPOINT_PAGES,
+      1_000,
+      50,
+      10_000
+    ),
     legacyJsonImportPath: process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH
       ? resolve(process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH)
       : !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
@@ -112,6 +135,12 @@ export function loadRelayConfig(): RelayConfig {
     attachmentBlobLiveQuotaBytes: parseIntegerEnv(
       process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES,
       250_000_000,
+      attachmentBlobMaxBytes,
+      10_000_000_000
+    ),
+    attachmentBlobTeamLiveQuotaBytes: parseIntegerEnv(
+      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_TEAM_LIVE_QUOTA_BYTES,
+      1_000_000_000,
       attachmentBlobMaxBytes,
       10_000_000_000
     ),
@@ -144,6 +173,10 @@ export function loadRelayConfig(): RelayConfig {
       parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false) &&
       parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED, false),
     structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
+    exitOnPersistencePoison: parseBooleanEnv(
+      process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON,
+      nodeEnv === "production"
+    ),
     rateLimitWindowMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000),
     rateLimitCaps: {
       auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),
@@ -173,7 +206,13 @@ export function loadRelayConfig(): RelayConfig {
       100_000
     ),
     liveInviteCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER, 100, 1, 100_000),
-    maxDurableEntries: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES, 250_000, 1_000, 10_000_000)
+    maxDurableEntries,
+    maxDurableEntriesPerTeam: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM,
+      25_000,
+      100,
+      maxDurableEntries
+    )
   };
 }
 

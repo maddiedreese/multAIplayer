@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { monitorEventLoopDelay } from "node:perf_hooks";
 import type { NextFunction, Request, Response } from "express";
 
 export interface RelayMetricsSnapshot {
@@ -9,6 +10,8 @@ export interface RelayMetricsSnapshot {
   sqliteWalBytes?: number;
   sqliteFilesystemAvailableBytes?: number;
   sqliteBackupLastSuccessTimestampSeconds?: number;
+  eventLoopDelayP99Seconds?: number;
+  eventLoopDelayMaxSeconds?: number;
   envelopesPublishedTotal: number;
   attachmentBlobUploadsTotal: number;
   attachmentBlobUploadBytesTotal: number;
@@ -90,6 +93,18 @@ export function relayMetricsToPrometheus(snapshot: RelayMetricsSnapshot): string
     "gauge",
     "Currently active relay WebSocket sessions.",
     snapshot.activeSockets
+  );
+  metric(
+    "multaiplayer_relay_event_loop_delay_p99_seconds",
+    "gauge",
+    "Observed p99 Node.js event-loop delay since process start.",
+    snapshot.eventLoopDelayP99Seconds ?? 0
+  );
+  metric(
+    "multaiplayer_relay_event_loop_delay_max_seconds",
+    "gauge",
+    "Maximum observed Node.js event-loop delay since process start.",
+    snapshot.eventLoopDelayMaxSeconds ?? 0
   );
   metric(
     "multaiplayer_relay_live_attachment_blobs",
@@ -260,6 +275,8 @@ export function logRelayEvent(
 
 export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
   const startedAtMs = now();
+  const eventLoopDelay = monitorEventLoopDelay({ resolution: 10 });
+  eventLoopDelay.enable();
   let envelopesPublishedTotal = 0;
   let attachmentBlobUploadsTotal = 0;
   let attachmentBlobUploadBytesTotal = 0;
@@ -339,11 +356,17 @@ export function createRelayMetrics(now = () => Date.now()): RelayMetrics {
         publishToFanoutDurationSeconds: publishToFanoutDuration.snapshot(),
         webSocketSendDurationSeconds: webSocketSendDuration.snapshot(),
         sqliteWriteDurationSeconds: sqliteWriteDuration.snapshot(),
+        eventLoopDelayP99Seconds: finiteEventLoopDelaySeconds(eventLoopDelay.percentile(99)),
+        eventLoopDelayMaxSeconds: finiteEventLoopDelaySeconds(eventLoopDelay.max),
         startedAt: new Date(startedAtMs).toISOString(),
         uptimeSeconds: Math.max(0, Math.floor((now() - startedAtMs) / 1000))
       };
     }
   };
+}
+
+function finiteEventLoopDelaySeconds(nanoseconds: number): number {
+  return Number.isFinite(nanoseconds) ? nanoseconds / 1_000_000_000 : 0;
 }
 
 const latencyBucketsSeconds = [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5] as const;

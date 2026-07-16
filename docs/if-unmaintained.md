@@ -1,6 +1,6 @@
 # If this project goes unmaintained
 
-multAIplayer is currently maintained by one person. If releases, security fixes, or the hosted relay stop, the repository remains available under the Apache-2.0 license, but nobody is promising continued hosted infrastructure or compatibility with future operating systems and upstream services.
+multAIplayer is currently maintained by one person, Maddie. D. Reese. If releases, security fixes, or the hosted relay stop, the repository remains available under the Apache-2.0 license, but nobody is promising continued hosted infrastructure or compatibility with future operating systems and upstream services.
 
 ## Preserve and export your data
 

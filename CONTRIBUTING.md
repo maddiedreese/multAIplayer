@@ -125,6 +125,10 @@ second policy.
 - Prefer compiler-, schema-, or established-tool checks over source regexes. If a
   narrow repository script is unavoidable, consume structured input, test it, and
   source volatile facts from one manifest.
+- Keep a repository-owned `.mjs` helper only while it is an active package or
+  workflow entry point, supports one through an import, or is focused coverage for
+  one. Prefer an established tool when it expresses the same contract, and delete
+  orphaned generators, comparators, and policy checks with their stale outputs.
 
 ### Native failures and diagnostics
 
@@ -151,8 +155,9 @@ and with the focused build check.
 
 This section is not required reading for an ordinary contribution. Operators
 should also use [Self-hosting](docs/self-hosting.md); release reviewers should use
-[Reproducing release builds](docs/reproducible-builds.md) and the
-[external review packet](docs/external-review-packet.md).
+[Reproducing release builds](docs/reproducible-builds.md). The
+[external review preparation packet](docs/design/external-review-packet.md) is
+planning material for a future independent engagement, not a merge gate.
 
 ### Stabilization
 
@@ -164,13 +169,22 @@ declare the same minimum window and record any reset.
 
 ### Continuous-integration policy
 
-`ci.yml` contains fast blocking checks: workspace lint/type/test/build, relay authorization coverage, per-file desktop invite and host-handoff coverage floors, and Rust formatting/Clippy/tests. `journeys.yml` runs UI, deterministic security, native two-client, and macOS package evidence on `main`, tags, schedules, and every pull request that changes `apps/`, `packages/`, `e2e/`, or the security-journey control files. Coverage and journey jobs are controls that can fail; CI does not create report-only or routing-only jobs that look like verification.
+`ci.yml` contains fast blocking checks: workspace lint/type/test/build, relay authorization coverage, per-file desktop invite and host-handoff coverage floors, and Rust formatting/Clippy/tests. `journeys.yml` runs UI, deterministic security, native two-client, and macOS package evidence on `main`, tags, schedules, and pull requests that change executable product or journey code. Documentation-only edits do not start product journeys, and generated prose is not a merge gate. Coverage and journey jobs are controls that can fail; CI does not create report-only or routing-only jobs that look like verification.
+
+Desktop source files have an advisory 400-line ESLint ceiling. A warning names the
+specific file and overage so the next related change can extract a cohesive
+component or application action; warnings are visible but do not fail CI. Do not
+silence the warning by excluding or renaming a file. Journey path filters stay
+broad for executable product changes: timing failures are fixed at their
+polling/state boundary rather than worked around by narrowing triggers or blind
+reruns.
 
 Mutation testing, parser fuzzing, extended supply-chain scans, reproducibility comparisons, soak/restore drills, and the scheduled macOS two-client run are advisory or scheduled evidence. The relay mutation policy preserves the measured `authz.ts` 100%/zero-survivor baseline and the existing 60% score/survivor ceilings for session, WebSocket-admission, and room-route decisions, with an explicit 80% target. Each weekly shard fails visibly on tooling errors or regression below its checked-in baseline. The first run each month emits a reviewable candidate that advances score floors in five-point steps and never increases a survivor ceiling; maintainers review and commit justified advances rather than letting automation rewrite policy silently. Investigate regressions; do not turn them into a Tuesday bugfix blocker without deleting or demoting an existing blocking check. No new blocking check may be added without removing or demoting another one.
 
 The deterministic security journey fails if its Rust production boundary or
-machine-readable claims manifest is unavailable. Generated threat-model evidence
-must match that manifest. Coverage artifacts describe execution; only named
+the tested relay lifecycle is unavailable. It retains the executed test report
+as an artifact. The threat model summarizes that test by hand and is not
+regenerated from CI output. Coverage artifacts describe execution; only named
 floors are merge gates.
 
 ### Dependencies and releases

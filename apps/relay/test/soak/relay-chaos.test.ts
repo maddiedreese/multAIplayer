@@ -5,6 +5,7 @@ import {
   Database,
   WebSocket,
   assert,
+  defaultWorkspaceFixture,
   delay,
   join,
   onceOpen,
@@ -27,10 +28,12 @@ const deviceId = "host-device-1";
 const durationMs = envInteger("MULTAIPLAYER_RELAY_SOAK_DURATION_MS", 1_500);
 const concurrentClients = envInteger("MULTAIPLAYER_RELAY_SOAK_CLIENTS", 8);
 const restartCycles = envInteger("MULTAIPLAYER_RELAY_SOAK_RESTART_CYCLES", 2);
+const roomCount = envInteger("MULTAIPLAYER_RELAY_SOAK_ROOMS", 50);
+const memberCount = envInteger("MULTAIPLAYER_RELAY_SOAK_MEMBERS", 100);
 
 test("deterministic relay chaos preserves SQLite and MLS ordering", { timeout: durationMs + 60_000 }, async () => {
   const startedAt = Date.now();
-  const relay = await startRelayWithWorkspace(env);
+  const relay = await startRelayWithWorkspace(env, defaultWorkspaceFixture(roomCount, memberCount));
   const backupPath = join(relay.tempDir, "relay-live-backup.sqlite");
   let current: Awaited<ReturnType<typeof startRelayWithWorkspace>> | null = relay;
   let restored: Awaited<ReturnType<typeof startRelayWithWorkspace>> | null = null;
@@ -38,10 +41,13 @@ test("deterministic relay chaos preserves SQLite and MLS ordering", { timeout: d
   const messageIds: string[] = [];
   const acknowledgementLatencies: number[] = [];
   const reconnectLatencies: number[] = [];
+  const requestLatencies: number[] = [];
   const errors: string[] = [];
   let maxActiveSockets = 0;
   let maxMetricsBytes = 0;
   let maxWalBytes = 0;
+  let maxEventLoopDelayP99Ms = 0;
+  let maxEventLoopDelayMs = 0;
   let reconnects = 0;
   let nextMessage = 0;
   try {
@@ -59,17 +65,20 @@ test("deterministic relay chaos preserves SQLite and MLS ordering", { timeout: d
         (count) => (reconnects += count)
       );
       const sample = sampleOperationalBounds(active, phaseDeadline);
+      const requests = requestUntil(active.baseUrl, phaseDeadline, requestLatencies, errors);
       const backup = cycle === 0 ? delay(50).then(() => liveBackup(active.dataPath, backupPath)) : Promise.resolve();
       while (Date.now() < phaseDeadline) {
         const id = `soak-application-${nextMessage++}`;
         acknowledgementLatencies.push(await publish(publisher, message(id, "application", 1)));
         messageIds.push(id);
       }
-      await Promise.all([churn, backup]);
+      await Promise.all([churn, backup, requests]);
       const bounds = await sample;
       maxActiveSockets = Math.max(maxActiveSockets, bounds.maxActiveSockets);
       maxMetricsBytes = Math.max(maxMetricsBytes, bounds.maxMetricsBytes);
       maxWalBytes = Math.max(maxWalBytes, bounds.maxWalBytes);
+      maxEventLoopDelayP99Ms = Math.max(maxEventLoopDelayP99Ms, bounds.maxEventLoopDelayP99Ms);
+      maxEventLoopDelayMs = Math.max(maxEventLoopDelayMs, bounds.maxEventLoopDelayMs);
       publisher.close();
       publisher = null;
       await delay(100);
@@ -105,6 +114,8 @@ test("deterministic relay chaos preserves SQLite and MLS ordering", { timeout: d
           configuredDurationMs: durationMs,
           durationMs: Date.now() - startedAt,
           concurrentClients,
+          roomCount,
+          memberCount,
           restartCycles,
           reconnects,
           publishedMessages: messageIds.length,
@@ -114,6 +125,8 @@ test("deterministic relay chaos preserves SQLite and MLS ordering", { timeout: d
           integrity: source.integrity,
           acknowledgementLatencyMs: latencySummary(acknowledgementLatencies),
           reconnectLatencyMs: latencySummary(reconnectLatencies),
+          requestLatencyMs: latencySummary(requestLatencies),
+          eventLoopDelayMs: { p99: maxEventLoopDelayP99Ms, max: maxEventLoopDelayMs },
           maxActiveSockets,
           maxWalBytes,
           maxMetricsBytes,
@@ -132,6 +145,21 @@ test("deterministic relay chaos preserves SQLite and MLS ordering", { timeout: d
     else await relay.close();
   }
 });
+
+async function requestUntil(baseUrl: string, deadline: number, latencies: number[], errors: string[]) {
+  while (Date.now() < deadline) {
+    const started = performance.now();
+    try {
+      const response = await fetch(`${baseUrl}/teams`);
+      await response.arrayBuffer();
+      if (!response.ok) throw new Error(`request returned ${response.status}`);
+      latencies.push(performance.now() - started);
+    } catch (error) {
+      errors.push(String(error));
+    }
+    await delay(10);
+  }
+}
 
 async function joinedSocket(wsUrl: string, socketDeviceId: string): Promise<WebSocket> {
   const socket = new WebSocket(wsUrl);
@@ -215,14 +243,18 @@ async function sampleOperationalBounds(relay: { baseUrl: string; dataPath: strin
   let maxActiveSockets = 0;
   let maxMetricsBytes = 0;
   let maxWalBytes = 0;
+  let maxEventLoopDelayP99Ms = 0;
+  let maxEventLoopDelayMs = 0;
   while (Date.now() < deadline) {
     const metrics = await relayMetrics(relay.baseUrl);
     maxActiveSockets = Math.max(maxActiveSockets, metrics.activeSockets);
     maxMetricsBytes = Math.max(maxMetricsBytes, metrics.bytes);
+    maxEventLoopDelayP99Ms = Math.max(maxEventLoopDelayP99Ms, metrics.eventLoopDelayP99Ms);
+    maxEventLoopDelayMs = Math.max(maxEventLoopDelayMs, metrics.eventLoopDelayMaxMs);
     maxWalBytes = Math.max(maxWalBytes, await fileSize(`${relay.dataPath}-wal`));
     await delay(100);
   }
-  return { maxActiveSockets, maxMetricsBytes, maxWalBytes };
+  return { maxActiveSockets, maxMetricsBytes, maxWalBytes, maxEventLoopDelayP99Ms, maxEventLoopDelayMs };
 }
 
 async function relayMetrics(baseUrl: string) {
@@ -234,8 +266,14 @@ async function relayMetrics(baseUrl: string) {
   assert.ok(text.length > 0 && text.length < 1_000_000);
   assert.match(text, /multaiplayer_relay_envelopes_published_total/);
   const activeSockets = Number(text.match(/^multaiplayer_relay_active_sockets (\d+)$/m)?.[1] ?? "NaN");
+  const eventLoopDelayP99Ms =
+    Number(text.match(/^multaiplayer_relay_event_loop_delay_p99_seconds ([\d.e+-]+)$/m)?.[1] ?? "NaN") * 1_000;
+  const eventLoopDelayMaxMs =
+    Number(text.match(/^multaiplayer_relay_event_loop_delay_max_seconds ([\d.e+-]+)$/m)?.[1] ?? "NaN") * 1_000;
   assert.ok(Number.isFinite(activeSockets));
-  return { activeSockets, bytes: text.length };
+  assert.ok(Number.isFinite(eventLoopDelayP99Ms));
+  assert.ok(Number.isFinite(eventLoopDelayMaxMs));
+  return { activeSockets, bytes: text.length, eventLoopDelayP99Ms, eventLoopDelayMaxMs };
 }
 
 async function fileSize(path: string): Promise<number> {

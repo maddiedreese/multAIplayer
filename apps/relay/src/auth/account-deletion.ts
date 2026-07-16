@@ -17,6 +17,7 @@ import type {
   DeviceSessionRecord,
   InviteAckReceipt,
   RateLimitRecord,
+  TokenBucketRecord,
   RelayStore
 } from "../state.js";
 
@@ -57,7 +58,7 @@ interface AccountDeletionStateSnapshot {
   dailyRoomCreationCounts: Map<string, RateLimitRecord>;
   attachmentBlobUploadByteCounts: Map<string, ByteQuotaRecord>;
   accountQuotaRecords: Map<string, AccountQuotaRecord>;
-  rateLimitStore: Map<string, RateLimitRecord>;
+  rateLimitStore: Map<string, TokenBucketRecord>;
   deviceChallenges: Map<string, DeviceChallengeRecord>;
   appliedDeletionLedgerEntries: Map<string, AppliedDeletionLedgerEntry>;
 }

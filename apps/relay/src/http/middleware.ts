@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { IncomingMessage } from "node:http";
 import type { createRelayMetrics } from "../observability.js";
 import { parseCookieHeader } from "../auth/session.js";
-import type { RateLimitRecord } from "../state.js";
+import type { TokenBucketRecord } from "../state.js";
 
 interface RelayRequestGuardsOptions {
   rateLimitsEnabled: boolean;
@@ -16,7 +16,7 @@ interface RelayRequestGuardsOptions {
     websocket: number;
     websocketConnect: number;
   };
-  rateLimitStore: Map<string, RateLimitRecord>;
+  rateLimitStore: Map<string, TokenBucketRecord>;
   trustProxyHeaders: boolean;
   metrics: ReturnType<typeof createRelayMetrics>;
   normalizeSessionId: (value: unknown) => string;
@@ -72,20 +72,30 @@ export function createRelayRequestGuards({
     const now = Date.now();
     pruneRateLimitStore(now);
     const key = `${bucket}:${clientId}`;
+    const capacity = rateLimitCaps[bucket];
+    const refillPerMs = capacity / rateLimitWindowMs;
     const current = rateLimitStore.get(key);
-    const resetAt = current && current.resetAt > now ? current.resetAt : now + rateLimitWindowMs;
-    const count = current && current.resetAt > now ? current.count + 1 : 1;
-    rateLimitStore.set(key, { count, resetAt });
-    nextRateLimitPruneAt = nextRateLimitPruneAt === 0 ? resetAt : Math.min(nextRateLimitPruneAt, resetAt);
-    return count <= rateLimitCaps[bucket] ? { allowed: true, resetAt } : { allowed: false, resetAt };
+    const tokens = current
+      ? Math.min(capacity, current.tokens + Math.max(0, now - current.updatedAt) * refillPerMs)
+      : capacity;
+    const allowed = tokens >= 1;
+    const remaining = allowed ? tokens - 1 : tokens;
+    const resetAt = allowed
+      ? now + Math.ceil((capacity - remaining) / refillPerMs)
+      : now + Math.ceil((1 - remaining) / refillPerMs);
+    rateLimitStore.set(key, { tokens: remaining, updatedAt: now, lastSeenAt: now });
+    const pruneAt = now + rateLimitWindowMs * 2;
+    nextRateLimitPruneAt = nextRateLimitPruneAt === 0 ? pruneAt : Math.min(nextRateLimitPruneAt, pruneAt);
+    return allowed ? { allowed: true, resetAt } : { allowed: false, resetAt };
   }
 
   function pruneRateLimitStore(now = Date.now()) {
     if (now < nextRateLimitPruneAt) return;
     let earliestLiveExpiry = Number.POSITIVE_INFINITY;
     for (const [key, record] of rateLimitStore.entries()) {
-      if (record.resetAt <= now) rateLimitStore.delete(key);
-      else earliestLiveExpiry = Math.min(earliestLiveExpiry, record.resetAt);
+      const expiresAt = record.lastSeenAt + rateLimitWindowMs * 2;
+      if (expiresAt <= now) rateLimitStore.delete(key);
+      else earliestLiveExpiry = Math.min(earliestLiveExpiry, expiresAt);
     }
     nextRateLimitPruneAt = Number.isFinite(earliestLiveExpiry) ? earliestLiveExpiry : now + rateLimitWindowMs;
   }

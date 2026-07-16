@@ -13,6 +13,7 @@ interface RegisterAttachmentRoutesOptions {
   store: RelayStore;
   attachmentBlobMaxBytes: number;
   attachmentBlobLiveQuotaBytes: number;
+  attachmentBlobTeamLiveQuotaBytes: number;
   attachmentBlobUploadBytesPerWindow: number;
   attachmentBlobUploadWindowMs: number;
   attachmentBlobTtlDays: number;
@@ -37,6 +38,7 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
     app,
     store,
     attachmentBlobLiveQuotaBytes,
+    attachmentBlobTeamLiveQuotaBytes,
     attachmentBlobUploadBytesPerWindow,
     attachmentBlobUploadWindowMs,
     attachmentBlobTtlDays,
@@ -60,7 +62,7 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
     const payload = validateAttachmentPayload(options, req.body, res);
     if (!payload) return;
     const { teamId, roomId, blobId } = target;
-    const { name, type, size, epoch, sealedBlob } = payload;
+    const { name, type, size, epoch, sealedBlob, storageBytes } = payload;
     const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
     let reservation: ReturnType<typeof reserveAttachmentQuota> | null = null;
     let blob: AttachmentBlobRecordType | null = null;
@@ -70,8 +72,10 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
         ? reserveAttachmentQuota({
             store,
             session,
-            size,
+            teamId,
+            storageBytes,
             liveLimit: attachmentBlobLiveQuotaBytes,
+            teamLiveLimit: attachmentBlobTeamLiveQuotaBytes,
             uploadLimit: attachmentBlobUploadBytesPerWindow,
             uploadWindowMs: attachmentBlobUploadWindowMs,
             isExpiredAttachmentBlob,
@@ -102,7 +106,7 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
         scheduleStoreSave();
       }
       durableCommitCompleted = true;
-      recordUpload?.(size);
+      recordUpload?.(storageBytes);
       res.status(201).json({ blob });
     } catch (error) {
       if (durableCommitCompleted) throw error;
@@ -196,7 +200,11 @@ function validateAttachmentPayload(
   options: RegisterAttachmentRoutesOptions,
   body: Record<string, unknown>,
   res: Response
-): Pick<AttachmentBlobRecordType, "name" | "type" | "size" | "epoch" | "sealedBlob"> | null {
+):
+  | (Pick<AttachmentBlobRecordType, "name" | "type" | "size" | "epoch" | "sealedBlob"> & {
+      storageBytes: number;
+    })
+  | null {
   const name = options.normalizeMetadataText(body.name, options.maxAttachmentBlobNameChars);
   const requestedType = String(body.type ?? "file").trim() || "file";
   const type = options.normalizeMetadataText(requestedType, options.maxAttachmentBlobTypeChars);
@@ -227,7 +235,7 @@ function validateAttachmentPayload(
     options.recordUploadRejection?.("ciphertext_encoding");
     return attachmentPayloadError(res, "sealedBlob must be a canonical exporter ciphertext record");
   }
-  return { name, type, size, epoch, sealedBlob };
+  return { name, type, size, epoch, sealedBlob, storageBytes: Buffer.byteLength(sealedBlob, "utf8") };
 }
 
 function attachmentPayloadError(res: Response, message: string, status = 400): null {
@@ -243,8 +251,10 @@ type AllowedQuotaReservation = {
 function reserveAttachmentQuota({
   store,
   session,
-  size,
+  teamId,
+  storageBytes,
   liveLimit,
+  teamLiveLimit,
   uploadLimit,
   uploadWindowMs,
   isExpiredAttachmentBlob,
@@ -254,8 +264,10 @@ function reserveAttachmentQuota({
 }: {
   store: RelayStore;
   session: AuthSession;
-  size: number;
+  teamId: string;
+  storageBytes: number;
   liveLimit: number;
+  teamLiveLimit: number;
   uploadLimit: number;
   uploadWindowMs: number;
   isExpiredAttachmentBlob: (blob: AttachmentBlobRecordType) => boolean;
@@ -264,7 +276,7 @@ function reserveAttachmentQuota({
   res: Response;
 }): AllowedQuotaReservation | null {
   const usedBytes = liveAttachmentBlobBytesForUser(store, session.user.id, isExpiredAttachmentBlob);
-  if (usedBytes + size > liveLimit) {
+  if (usedBytes + storageBytes > liveLimit) {
     recordQuotaRejection?.("live_attachment_blob_bytes");
     recordUploadRejection?.("live_quota");
     sendRelayError(res, 413, "quota_exceeded", "Live encrypted attachment blob storage quota exceeded.", {
@@ -277,11 +289,25 @@ function reserveAttachmentQuota({
     });
     return null;
   }
+  const teamUsedBytes = liveAttachmentBlobBytesForTeam(store, teamId, isExpiredAttachmentBlob);
+  if (teamUsedBytes + storageBytes > teamLiveLimit) {
+    recordQuotaRejection?.("team_live_attachment_blob_bytes");
+    recordUploadRejection?.("team_live_quota");
+    sendRelayError(res, 413, "quota_exceeded", "Team encrypted attachment blob storage quota exceeded.", {
+      quota: {
+        type: "team_live_attachment_blob_bytes",
+        limit: teamLiveLimit,
+        used: teamUsedBytes,
+        remaining: Math.max(0, teamLiveLimit - teamUsedBytes)
+      }
+    });
+    return null;
+  }
   const reservation = reserveDurableQuota({
     store,
     quota: "attachment_upload_bytes",
     userId: session.user.id,
-    amount: size,
+    amount: storageBytes,
     limit: uploadLimit,
     resetAt: Date.now() + uploadWindowMs
   });
@@ -344,7 +370,24 @@ function liveAttachmentBlobBytesForUser(
   let total = 0;
   for (const blob of store.attachmentBlobs.values()) {
     if (blob.uploadedByUserId !== userId || isExpiredAttachmentBlob(blob)) continue;
-    total += blob.size;
+    total += attachmentBlobStorageBytes(blob);
   }
   return total;
+}
+
+function liveAttachmentBlobBytesForTeam(
+  store: RelayStore,
+  teamId: string,
+  isExpiredAttachmentBlob: (blob: AttachmentBlobRecordType) => boolean
+): number {
+  let total = 0;
+  for (const blob of store.attachmentBlobs.values()) {
+    if (blob.teamId !== teamId || isExpiredAttachmentBlob(blob)) continue;
+    total += attachmentBlobStorageBytes(blob);
+  }
+  return total;
+}
+
+export function attachmentBlobStorageBytes(blob: Pick<AttachmentBlobRecordType, "sealedBlob">): number {
+  return Buffer.byteLength(blob.sealedBlob, "utf8");
 }

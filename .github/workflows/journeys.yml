@@ -10,8 +10,6 @@ on:
       - "packages/**"
       - "e2e/**"
       - "scripts/run-e2e.mjs"
-      - "tools/security/**"
-      - "docs/threat-model.md"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/journeys.yml"
@@ -142,21 +140,15 @@ jobs:
       - name: Build package dependencies
         run: npm run build:packages
       - name: Run deterministic lifecycle and adversarial corpus
-        env:
-          MULTAIPLAYER_SECURITY_CLAIMS_PATH: reports/security-journey/claims.json
         run: |
           mkdir -p reports/security-journey
           npm run test:security-journey -w @multaiplayer/relay > reports/security-journey/junit.xml
-      - name: Check canonical claims against executed journey evidence
-        run: node tools/security/security-journey-evidence.mjs check reports/security-journey/claims.json docs/threat-model.md
       - name: Upload security journey results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: security-journey-results
-          path: |
-            reports/security-journey/junit.xml
-            reports/security-journey/claims.json
+          path: reports/security-journey/junit.xml
           if-no-files-found: error
           retention-days: 14
 

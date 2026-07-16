@@ -1,10 +1,11 @@
 import Database from "better-sqlite3";
 import { chmodSync, existsSync } from "node:fs";
 
-export function openRelayDatabase(dataPath: string): Database.Database {
+export function openRelayDatabase(dataPath: string, walAutoCheckpointPages = 1_000): Database.Database {
   const db = new Database(dataPath);
   chmodSync(dataPath, 0o600);
   db.pragma("journal_mode = WAL");
+  db.pragma(`wal_autocheckpoint = ${walAutoCheckpointPages}`);
   db.pragma("foreign_keys = ON");
   db.exec(`
     create table if not exists relay_snapshots (id text primary key, state_json text not null, saved_at text not null);

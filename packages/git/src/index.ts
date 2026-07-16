@@ -142,5 +142,7 @@ export function normalizeCommitMessage(message: string): string {
 }
 
 function quoteGitArg(value: string): string {
+  // Display-only preview text. Never pass this string to a shell or command executor;
+  // execution must continue to use validated arguments as a structured argv array.
   return `'${value.replace(/'/g, "'\\''")}'`;
 }

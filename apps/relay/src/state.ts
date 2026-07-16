@@ -81,6 +81,11 @@ export interface RateLimitRecord {
   count: number;
   resetAt: number;
 }
+export interface TokenBucketRecord {
+  tokens: number;
+  updatedAt: number;
+  lastSeenAt: number;
+}
 export interface ByteQuotaRecord {
   bytes: number;
   resetAt: number;
@@ -158,7 +163,7 @@ export interface RelayStore {
   keyPackages: Map<string, KeyPackageRecord>;
   attachmentBlobs: Map<string, AttachmentBlobRecord>;
   teamMembers: Map<string, Map<string, TeamMemberRecord>>;
-  rateLimitStore: Map<string, RateLimitRecord>;
+  rateLimitStore: Map<string, TokenBucketRecord>;
   dailyTeamCreationCounts: Map<string, RateLimitRecord>;
   dailyRoomCreationCounts: Map<string, RateLimitRecord>;
   attachmentBlobUploadByteCounts: Map<string, ByteQuotaRecord>;
@@ -198,8 +203,15 @@ export interface RelayStore {
 export class RelayStoreCapacityError extends Error {
   override readonly name = "RelayStoreCapacityError";
 
-  constructor(readonly maxDurableEntries: number) {
-    super(`Relay durable in-memory state reached its configured ceiling of ${maxDurableEntries} entries.`);
+  constructor(
+    readonly maxDurableEntries: number,
+    readonly teamId?: string
+  ) {
+    super(
+      teamId
+        ? `Team durable in-memory state reached its configured ceiling of ${maxDurableEntries} entries.`
+        : `Relay durable in-memory state reached its configured ceiling of ${maxDurableEntries} entries.`
+    );
   }
 }
 
@@ -211,22 +223,30 @@ export class InMemoryRelayStore implements RelayStore {
   readonly teamSockets = new Map<string, Set<WebSocket>>();
   readonly workspaceSockets = new Set<WebSocket>();
   readonly roomPresence = new Map<RoomKey, Map<string, PresenceRecord>>();
-  readonly mlsBacklog = this.trackedMap<RoomKey, MlsRelayMessage[]>("mlsBacklog");
+  readonly mlsBacklog = this.trackedMap<RoomKey, MlsRelayMessage[]>("mlsBacklog", (_value, key) =>
+    teamFromRoomKey(key)
+  );
   readonly authSessions = this.trackedMap<string, AuthSession>("authSessions");
   readonly accountRestrictions = this.trackedMap<string, AccountRestriction>("accountRestrictions");
   readonly accountQuotaRecords = this.trackedMap<string, AccountQuotaRecord>("accountQuotaRecords");
-  readonly teams = this.trackedMap<string, TeamRecord>("teams");
-  readonly rooms = this.trackedMap<string, RoomRecord>("rooms");
-  readonly invites = this.trackedMap<string, InviteRecord>("invites");
+  readonly teams = this.trackedMap<string, TeamRecord>("teams", (value) => value.id);
+  readonly rooms = this.trackedMap<string, RoomRecord>("rooms", (value) => value.teamId);
+  readonly invites = this.trackedMap<string, InviteRecord>("invites", (value) => value.teamId);
   readonly inviteRequests = this.trackedMap<string, InviteJoinRequestRecord>("inviteRequests");
-  readonly inviteResponses = this.trackedMap<string, InviteResponseRecord>("inviteResponses");
-  readonly inviteAckReceipts = this.trackedMap<string, InviteAckReceipt>("inviteAckReceipts");
-  readonly acceptedMessageReceipts = this.trackedMap<string, AcceptedMessageReceipt>("acceptedMessageReceipts");
+  readonly inviteResponses = this.trackedMap<string, InviteResponseRecord>(
+    "inviteResponses",
+    (value) => value.responseBinding.teamId
+  );
+  readonly inviteAckReceipts = this.trackedMap<string, InviteAckReceipt>("inviteAckReceipts", (value) => value.teamId);
+  readonly acceptedMessageReceipts = this.trackedMap<string, AcceptedMessageReceipt>(
+    "acceptedMessageReceipts",
+    (value) => teamFromRoomKey(value.roomKey)
+  );
   readonly devices = this.trackedMap<string, DeviceRecord>("devices");
   readonly keyPackages = this.trackedMap<string, KeyPackageRecord>("keyPackages");
-  readonly attachmentBlobs = this.trackedMap<string, AttachmentBlobRecord>("attachmentBlobs");
+  readonly attachmentBlobs = this.trackedMap<string, AttachmentBlobRecord>("attachmentBlobs", (value) => value.teamId);
   readonly teamMembers: TeamMemberCollectionMap;
-  readonly rateLimitStore = new Map<string, RateLimitRecord>();
+  readonly rateLimitStore = new Map<string, TokenBucketRecord>();
   readonly dailyTeamCreationCounts = new Map<string, RateLimitRecord>();
   readonly dailyRoomCreationCounts = new Map<string, RateLimitRecord>();
   readonly attachmentBlobUploadByteCounts = new Map<string, ByteQuotaRecord>();
@@ -236,8 +256,8 @@ export class InMemoryRelayStore implements RelayStore {
     "appliedDeletionLedgerEntries"
   );
 
-  constructor(maxDurableEntries = 250_000) {
-    this.capacity.configure(maxDurableEntries);
+  constructor(maxDurableEntries = 250_000, maxDurableEntriesPerTeam = maxDurableEntries) {
+    this.capacity.configure(maxDurableEntries, maxDurableEntriesPerTeam);
     this.teamMembers = new TeamMemberCollectionMap(
       (key) => this.durableMutations.push({ entity: "teamMembers", key }),
       this.capacity
@@ -362,13 +382,23 @@ export class InMemoryRelayStore implements RelayStore {
     this.durableMutations = [];
   }
 
-  private trackedMap<Key extends string, Value>(entity: RelayStoreMutationEntity): Map<Key, Value> {
-    return new DurableMutationMap<Key, Value>((key) => this.durableMutations.push({ entity, key }), this.capacity);
+  private trackedMap<Key extends string, Value>(
+    entity: RelayStoreMutationEntity,
+    teamIdForEntry: (value: Value, key: Key) => string | null = () => null
+  ): Map<Key, Value> {
+    return new DurableMutationMap<Key, Value>(
+      (key) => this.durableMutations.push({ entity, key }),
+      this.capacity,
+      teamIdForEntry
+    );
   }
 }
 
-export function createRelayStore(maxDurableEntries = 250_000): RelayStore {
-  return new InMemoryRelayStore(maxDurableEntries);
+export function createRelayStore(
+  maxDurableEntries = 250_000,
+  maxDurableEntriesPerTeam = maxDurableEntries
+): RelayStore {
+  return new InMemoryRelayStore(maxDurableEntries, maxDurableEntriesPerTeam);
 }
 
 function deviceKey(userId: string, deviceId: string): string {
@@ -378,32 +408,38 @@ function deviceKey(userId: string, deviceId: string): string {
 class DurableMutationMap<Key extends string, Value> extends Map<Key, Value> {
   constructor(
     private readonly onMutation: (key: string) => void,
-    private readonly capacity: DurableEntryCapacity
+    private readonly capacity: DurableEntryCapacity,
+    private readonly teamIdForEntry: (value: Value, key: Key) => string | null = () => null
   ) {
     super();
   }
 
   override set(key: Key, value: Value): this {
-    if (!this.has(key)) this.capacity.claim();
+    const previous = this.get(key);
+    if (previous === undefined) this.capacity.claim(this.teamIdForEntry(value, key));
+    else this.capacity.move(this.teamIdForEntry(previous, key), this.teamIdForEntry(value, key));
     super.set(key, value);
     this.onMutation(key);
     return this;
   }
 
   override delete(key: Key): boolean {
+    const previous = this.get(key);
     const deleted = super.delete(key);
-    if (deleted) {
-      this.capacity.release();
+    if (deleted && previous !== undefined) {
+      this.capacity.release(this.teamIdForEntry(previous, key));
       this.onMutation(key);
     }
     return deleted;
   }
 
   override clear(): void {
-    const keys = Array.from(this.keys());
+    const entries = Array.from(this.entries());
     super.clear();
-    this.capacity.adjust(-keys.length);
-    for (const key of keys) this.onMutation(key);
+    for (const [key, value] of entries) {
+      this.capacity.release(this.teamIdForEntry(value, key));
+      this.onMutation(key);
+    }
   }
 }
 
@@ -417,10 +453,11 @@ class TeamMemberCollectionMap extends Map<string, Map<string, TeamMemberRecord>>
 
   override set(teamId: string, members: Map<string, TeamMemberRecord>): this {
     const previousSize = this.get(teamId)?.size ?? 0;
-    this.capacity.adjust(members.size - previousSize + (this.has(teamId) ? 0 : 1));
+    this.capacity.adjust(members.size - previousSize + (this.has(teamId) ? 0 : 1), teamId);
     const trackedMembers = new DurableMutationMap<string, TeamMemberRecord>(
       () => this.onTeamMutation(teamId),
-      this.capacity
+      this.capacity,
+      () => teamId
     );
     for (const [userId, member] of members) Map.prototype.set.call(trackedMembers, userId, member);
     Map.prototype.set.call(this, teamId, trackedMembers);
@@ -432,7 +469,7 @@ class TeamMemberCollectionMap extends Map<string, Map<string, TeamMemberRecord>>
     const members = this.get(teamId);
     const deleted = super.delete(teamId);
     if (deleted) {
-      this.capacity.adjust(-(1 + (members?.size ?? 0)));
+      this.capacity.adjust(-(1 + (members?.size ?? 0)), teamId);
       this.onTeamMutation(teamId);
     }
     return deleted;
@@ -445,22 +482,52 @@ class TeamMemberCollectionMap extends Map<string, Map<string, TeamMemberRecord>>
 
 class DurableEntryCapacity {
   private used = 0;
+  private readonly usedByTeam = new Map<string, number>();
   private maximum = Number.POSITIVE_INFINITY;
+  private maximumPerTeam = Number.POSITIVE_INFINITY;
 
-  configure(maximum: number) {
+  configure(maximum: number, maximumPerTeam: number) {
     this.maximum = maximum;
+    this.maximumPerTeam = maximumPerTeam;
   }
 
-  adjust(delta: number) {
+  adjust(delta: number, teamId: string | null = null) {
     if (delta > 0 && this.used + delta > this.maximum) throw new RelayStoreCapacityError(this.maximum);
+    const teamUsed = teamId ? (this.usedByTeam.get(teamId) ?? 0) : 0;
+    if (teamId && delta > 0 && teamUsed + delta > this.maximumPerTeam) {
+      throw new RelayStoreCapacityError(this.maximumPerTeam, teamId);
+    }
     this.used += delta;
+    if (teamId) {
+      const next = teamUsed + delta;
+      if (next === 0) this.usedByTeam.delete(teamId);
+      else this.usedByTeam.set(teamId, next);
+    }
   }
 
-  claim() {
-    this.adjust(1);
+  claim(teamId: string | null = null) {
+    this.adjust(1, teamId);
   }
 
-  release() {
-    this.used--;
+  release(teamId: string | null = null) {
+    this.adjust(-1, teamId);
   }
+
+  move(fromTeamId: string | null, toTeamId: string | null) {
+    if (fromTeamId === toTeamId) return;
+    const toUsed = toTeamId ? (this.usedByTeam.get(toTeamId) ?? 0) : 0;
+    if (toTeamId && toUsed + 1 > this.maximumPerTeam) {
+      throw new RelayStoreCapacityError(this.maximumPerTeam, toTeamId);
+    }
+    if (fromTeamId) {
+      const next = (this.usedByTeam.get(fromTeamId) ?? 0) - 1;
+      if (next === 0) this.usedByTeam.delete(fromTeamId);
+      else this.usedByTeam.set(fromTeamId, next);
+    }
+    if (toTeamId) this.usedByTeam.set(toTeamId, toUsed + 1);
+  }
+}
+
+function teamFromRoomKey(key: RoomKey): string {
+  return key.slice(0, key.indexOf(":"));
 }

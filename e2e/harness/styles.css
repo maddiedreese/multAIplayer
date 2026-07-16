@@ -27,33 +27,25 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 }
 
 .readme-feature {
-  box-sizing: content-box;
-  width: min(720px, calc(100vw - 120px));
+  box-sizing: border-box;
+  width: min(760px, calc(100vw - 120px));
+  height: 560px;
   margin: 0 auto;
   padding: 0;
   overflow: visible;
   background: transparent;
 }
 
-.readme-feature[data-scenario="codex-chat-parity"] {
-  width: min(920px, calc(100vw - 120px));
-}
-
-.readme-feature[data-scenario="readme-browser"],
-.readme-feature[data-scenario="readme-terminal"] {
-  width: min(760px, calc(100vw - 120px));
-}
-
+.readme-chat-surface,
 .readme-browser-surface,
 .readme-terminal-surface {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
-}
-
-.readme-browser-surface {
-  height: 560px;
 }
 
 .readme-browser-surface .browser-panel.browser-open {
@@ -65,7 +57,16 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 }
 
 .readme-terminal-surface .terminal-panel {
+  height: 100%;
   margin: 0;
+}
+
+.readme-terminal-surface .terminal-panel .panel-title-actions {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1.15fr) 36px;
+}
+
+.readme-chat-surface .chat-panel {
+  height: 100%;
 }
 
 .readme-presentation .e2e-chat-parity {

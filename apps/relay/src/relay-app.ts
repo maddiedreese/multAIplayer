@@ -74,6 +74,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     rateLimitsEnabled,
     trustProxyHeaders,
     maxDurableEntries,
+    maxDurableEntriesPerTeam,
     structuredLogsEnabled,
     rateLimitWindowMs,
     rateLimitCaps,
@@ -92,6 +93,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
   const relayPersistence = createRelayPersistence({
     dataPath,
     legacyJsonImportPath,
+    sqliteWalAutoCheckpointPages: relayConfig.sqliteWalAutoCheckpointPages,
     recordSqliteWriteDuration: relayMetrics.recordSqliteWriteDuration
   });
   const originPolicy = createRelayOriginPolicy({ nodeEnv, allowedCorsOrigins });
@@ -117,7 +119,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     }
   });
 
-  const relayStore = createRelayStore(maxDurableEntries);
+  const relayStore = createRelayStore(maxDurableEntries, maxDurableEntriesPerTeam);
   const { sessions, roomSockets, teamSockets, workspaceSockets, roomPresence, authSessions, rateLimitStore } =
     relayStore;
   const relayAuthz = createRelayAuthz(relayStore);
@@ -191,6 +193,9 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
   });
   poisonRelayImpl = () => {
     for (const socket of wss.clients) socket.close(1012, "Relay persistence unavailable");
+    if (relayConfig.exitOnPersistencePoison) {
+      setTimeout(() => process.exit(1), 250).unref();
+    }
   };
   scheduleStoreSaveImpl = () => relayStorePersistence.scheduleStoreSave();
   const relayLifecycle = createRelayLifecycle({

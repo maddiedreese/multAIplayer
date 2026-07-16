@@ -108,6 +108,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     parseIntegerValue,
     attachmentBlobMaxBytes: config.attachmentBlobMaxBytes,
     attachmentBlobLiveQuotaBytes: config.attachmentBlobLiveQuotaBytes,
+    attachmentBlobTeamLiveQuotaBytes: config.attachmentBlobTeamLiveQuotaBytes,
     attachmentBlobUploadBytesPerWindow: config.attachmentBlobUploadBytesPerWindow,
     attachmentBlobUploadWindowMs: config.attachmentBlobUploadWindowMs,
     attachmentBlobTtlDays: config.attachmentBlobTtlDays,

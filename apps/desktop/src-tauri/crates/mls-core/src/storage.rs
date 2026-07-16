@@ -19,8 +19,10 @@ use zeroize::Zeroizing;
 mod atomic_group;
 mod delivery_receipts;
 mod encrypted_store;
+mod history_ciphertext;
 mod invite_receipts;
 mod outbox;
+mod pending_invites;
 mod retained_material;
 
 use encrypted_store::{
