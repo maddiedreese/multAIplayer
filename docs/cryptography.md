@@ -1,6 +1,6 @@
 # Cryptography mechanism
 
-This document describes formats, algorithms, state transitions, and storage locations. It does not state product security claims or audit conclusions; those belong only in the [threat model](threat-model.md). Non-normative [review preparation](design/external-review-packet.md) sketches a possible first independent review scope.
+This document describes formats, algorithms, state transitions, and storage locations. It does not state product security claims or audit conclusions; those belong only in the [threat model](threat-model.md).
 
 ## Ciphersuite and credentials
 
@@ -71,4 +71,4 @@ The resumable onboarding record is a bounded webview workflow record. Its schema
 | Exporter/history/blob records    | `engine/exporter.rs`, retained-material storage                          | round trips, epoch transitions, plaintext-marker journey                 |
 | Tauri exposure                   | `apps/desktop/src-tauri/src/lib.rs`, `mls_native*`                       | [command audit](tauri-ipc-boundary-audit.md), native command tests       |
 
-Protocol or storage compatibility decisions are recorded under [docs/decisions](decisions/README.md). Candidate reviewer questions and a narrow engagement outline are in the non-normative [review preparation packet](design/external-review-packet.md).
+Protocol or storage compatibility decisions are recorded under [docs/decisions](decisions/README.md).

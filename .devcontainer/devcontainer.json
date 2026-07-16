@@ -2,9 +2,8 @@
   "name": "multAIplayer web development",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "features": {
-    "ghcr.io/devcontainers/features/rust:1": { "version": "stable" },
-    "ghcr.io/devcontainers/features/python:1": { "version": "3.13" }
+    "ghcr.io/devcontainers/features/rust:1": { "version": "stable" }
   },
-  "postCreateCommand": "npm ci && python3 -m pip install --user cryptography==45.0.5 && npm run doctor",
-  "forwardPorts": [1421, 4322]
+  "postCreateCommand": "npm install --global npm@11.16.0 --ignore-scripts && npm ci && npm run doctor",
+  "forwardPorts": [1420, 4321]
 }

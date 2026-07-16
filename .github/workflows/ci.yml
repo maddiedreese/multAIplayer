@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+    types: [opened, reopened, synchronize, edited]
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +16,27 @@ permissions:
   contents: read
 
 jobs:
+  workflow-policy:
+    name: GitHub Actions syntax and repository policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Install checksum-pinned actionlint 1.7.7
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            --output "$archive"
+          echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -version
+      - name: Validate every GitHub Actions workflow
+        run: |
+          "$RUNNER_TEMP/actionlint" -color
+
   web-and-relay:
     name: Web, relay, and packages
     runs-on: ubuntu-latest
@@ -22,17 +44,22 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 22
-          cache: npm
-      - name: Match the Railway builder package manager
-        run: npm install --global npm@11.16.0
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
+      - name: Validate squash-commit title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: node scripts/check-pr-title.mjs "$PR_TITLE"
       - name: Install dependencies
         run: npm ci
+      - name: Derive the relay runtime closure from the real locked npm tree
+        run: |
+          npm ls --omit=dev --all --json -w @multaiplayer/relay > "$RUNNER_TEMP/relay-production-tree.json"
+          node tools/release/relay-runtime-dependency-closure.mjs \
+            check-tree node_modules "$RUNNER_TEMP/relay-production-tree.json"
       - name: Verify web, relay, and packages
-        run: npm run lint && npm run format:check && npm run build:packages && npm run test:harness && npm run test:workspaces && npm run build:apps
+        run: npm run lint && npm run format:check && npm run verify:repository-policy && npm run build:packages && npm run test:harness && npm run test:workspaces && npm run build:apps
       - name: Enforce the relay authorization coverage floor
         run: npm run test:coverage
       - name: Upload gated relay authorization coverage
@@ -51,11 +78,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 22
-          cache: npm
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
       - name: Install dependencies
         run: npm ci
       - name: Build package dependencies
@@ -82,11 +106,8 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 22
-          cache: npm
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
       - name: Install dependencies
         run: npm ci
       - name: Install native Linux build dependencies

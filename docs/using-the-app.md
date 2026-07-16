@@ -189,7 +189,7 @@ Open **Room settings → Encrypted room archives** to export the selected room. 
 
 The app checks `releases/latest.json` on this repository's pinned HTTPS `update-channel` branch when the app shell mounts. The release workflow advances the manifest only after the complete GitHub Release is published, including prereleases. Before showing the banner, native Rust verifies authenticated metadata binding the claimed version, exact updater archive URL, archive signature, and displayed notes, and rejects non-increasing versions. When a valid newer version exists, the banner offers **Install signed update**; nothing downloads until you choose it. If a newer manifest is rejected by that authentication boundary, the app shows **Update check could not be verified** instead of silently presenting the same state as “up to date”; no download or installation begins, and the notice points to the manual checksum/Sigstore verification path. Tauri separately verifies an accepted updater bundle against the public key embedded in the app before installation, then relaunches the app. Supported public builds are Apple-silicon-only, Developer ID signed, notarized, and produced by the tagged release workflow. No supported public build has been published yet.
 
-The embedded updater key's minisign key id is `5F97AE260BE16B2F`. The SHA-256 fingerprint of the exact `updater-public.key` file is `626f3a15f71fc8c5794c9ce00392a12f782cd05ec47a88ce27858b43ce774673`; compare it with the copy at `https://multaiplayer.com/security/updater-key` before a first install or compromise recovery.
+The embedded updater key's minisign key id is `5F97AE260BE16B2F`. The SHA-256 fingerprint of the exact `updater-public.key` file is `626f3a15f71fc8c5794c9ce00392a12f782cd05ec47a88ce27858b43ce774673`; compare that hash with the independently published fingerprint at `https://multaiplayer.com/security/updater-key` before a first install or compromise recovery.
 
 ## Accessibility and localization
 
@@ -209,7 +209,7 @@ The setup surface reflows to a single narrow column. Progress transitions are re
 
 ### Release audit
 
-Before a public release, record an audit issue covering keyboard operation and focus; VoiceOver on the supported macOS version for sign-in, invite acceptance, host handoff, Codex approval, messaging, settings, and recovery; 200% text zoom, narrow-window reflow, reduced motion, and contrast; axe checks plus manual review; labels, status announcements, validation, dialogs, and icon-only controls; and WCAG 2.2 AA color contrast.
+Before approving public-alpha publication, the maintainer checks keyboard operation and focus; VoiceOver on the supported macOS version for sign-in, invite acceptance, host handoff, Codex approval, messaging, settings, and recovery; 200% text zoom, narrow-window reflow, reduced motion, and contrast; axe results plus manual review; labels, status announcements, validation, dialogs, and icon-only controls; and WCAG 2.2 AA color contrast. The release-environment deployment records its reviewer and status, but approval alone does not prove the checklist ran. This is human verification, not a result inferred from automated axe checks.
 
 Record the commit, OS/browser versions, assistive technology, findings, severity, owner, and remediation status. A finding that prevents a security approval, sign-in, messaging, or recovery flow blocks release.
 

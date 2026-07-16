@@ -41,3 +41,9 @@ vulnerabilities:
   - id: CVE-2026-9538
     statement: Debian Perl archive path is not invoked by the relay runtime.
     expired_at: 2026-08-01
+  - id: CVE-2026-13221
+    statement: The relay never invokes Perl, so no network input reaches the affected Perl regex trie compiler or gates a relay decision.
+    expired_at: 2026-08-01
+  - id: CVE-2026-57432
+    statement: The relay never invokes Perl or passes untrusted templates to the affected Perl pack and unpack implementation.
+    expired_at: 2026-08-01

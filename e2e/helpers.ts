@@ -53,6 +53,8 @@ export async function authenticateContext(
   context: BrowserContext,
   identity: TestIdentity = hostIdentity
 ): Promise<void> {
+  // The E2E relay is an in-process server bound to 127.0.0.1; TLS would not protect a network hop here.
+  // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
   const response = await fetch(`${relayUrl}/debug/auth-session`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -66,10 +68,14 @@ export async function authenticateContext(
   ]);
   if (identity.id === hostIdentity.id) {
     const cookie = `multaiplayer_session=${sessionCookie}`;
+    // This request remains inside the loopback-only E2E relay process.
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
     const workspaceResponse = await fetch(`${relayUrl}/teams`, { headers: { cookie } });
     expect(workspaceResponse.status).toBe(200);
     const workspace = (await workspaceResponse.json()) as { teams: Array<{ name: string }> };
     if (!workspace.teams.some((team) => team.name === "E2E Team")) {
+      // This request remains inside the loopback-only E2E relay process.
+      // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
       const teamResponse = await fetch(`${relayUrl}/teams`, {
         method: "POST",
         headers: { "content-type": "application/json", cookie },

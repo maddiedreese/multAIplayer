@@ -31,6 +31,16 @@ ignore = [
   "RUSTSEC-2025-0081",
   "RUSTSEC-2025-0098",
   "RUSTSEC-2025-0100",
+  # age 0.12.1 unconditionally selects i18n-embed-fl 0.10.0, whose
+  # proc-macro-error2 build dependency is now unmaintained. age and
+  # i18n-embed-fl are current and no maintained compatible replacement is
+  # selectable. Review by 2026-08-01 and remove when age migrates its macro.
+  { id = "RUSTSEC-2026-0173", reason = "Build-only age localization macro dependency; current upstream has no compatible maintained replacement" },
+  # mls-rs 0.55.2 (the current release) requires spin ^0.10, for which 0.10.0
+  # is the only published match and is yanked. This is a registry lifecycle
+  # signal, not a vulnerability advisory. Review by 2026-08-01 and remove as
+  # soon as mls-rs publishes support for a non-yanked spin release.
+  { crate = "spin@0.10.0", reason = "Only version satisfying current mls-rs; upstream release and main still require spin ^0.10" },
 ]
 
 [sources]

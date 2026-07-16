@@ -9,6 +9,14 @@
   "engines": {
     "node": ">=22"
   },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.1": true,
+    "edgedriver@6.3.0": false,
+    "fsevents@2.3.2": false,
+    "fsevents@2.3.3": false,
+    "geckodriver@6.1.0": false
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -26,6 +34,7 @@
     "test:workspaces": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage -w @multaiplayer/relay",
     "test:coverage:desktop": "npm run test:coverage -w @multaiplayer/desktop",
+    "verify:repository-policy": "node --test scripts/repository-policy.test.mjs tools/release/release-publication.test.mjs tools/release/sync-release-metadata.test.mjs tools/release/verify-relay-runtime-equivalence.test.mjs",
     "audit:npm": "npm audit --audit-level=high",
     "test": "npm run build:packages && npm run test:architecture-lint && npm run test:harness && npm run test:workspaces",
     "test:e2e": "node scripts/run-e2e.mjs",
@@ -37,14 +46,18 @@
     "lint:rust": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-targets --all-features -- -D warnings",
     "test:native": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-features",
     "hooks:install": "git config core.hooksPath .githooks",
-    "verify": "npm run lint && npm run format:check && npm run build:packages && npm run test:architecture-lint && npm run test:harness && npm run test:workspaces && npm run build:apps && npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native",
+    "verify": "npm run lint && npm run format:check && npm run verify:repository-policy && npm run build:packages && npm run test:architecture-lint && npm run test:harness && npm run test:workspaces && npm run build:apps && npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native",
     "release:preflight": "node scripts/doctor.mjs && npm run license:check && npm run sqlite:backup-restore-drill && npm run verify",
     "verify:aasa": "node scripts/verify-macos-associated-domains.mjs --live",
     "verify:macos-associated-domains": "node scripts/verify-macos-associated-domains.mjs",
     "check:release-versions": "node scripts/check-release-versions.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "sync:release-versions": "node tools/release/sync-release-metadata.mjs",
     "license:check": "node scripts/license-check.mjs",
     "sqlite:backup-restore-drill": "node --import tsx e2e/relay/sqlite-backup-restore-drill.mjs --fixture",
-    "verify:relay-container-reproducibility": "node tools/release/verify-relay-container-reproducibility.mjs",
+    "verify:relay-runtime-equivalence": "node tools/release/verify-relay-runtime-equivalence.mjs",
+    "verify:release-assets": "node tools/release/check-release-assets.mjs",
+    "verify:updater-contract": "node tools/release/verify-reproducible-builds.mjs",
     "dev": "concurrently -k --names relay,desktop --prefix-colors cyan,green \"npm:dev:relay\" \"npm:dev:desktop\"",
     "dev:desktop": "npm run dev -w @multaiplayer/desktop",
     "build:mls-validator:dev": "cargo build --locked --manifest-path apps/desktop/src-tauri/Cargo.toml -p mls-core --bin mls-keypackage-validator",
@@ -71,6 +84,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.7.0",
     "prettier": "3.9.5",
+    "smol-toml": "1.7.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.64.0",
     "webdriverio": "9.29.1"

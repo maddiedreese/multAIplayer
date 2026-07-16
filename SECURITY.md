@@ -6,7 +6,7 @@ multAIplayer is an honest alpha. Please treat it as security-sensitive software 
 
 Security reports are welcome for the current `main` branch and latest published alpha release. Older alphas and unreleased branches are unsupported; upgrade or reproduce on `main` when possible.
 
-The [threat model](docs/threat-model.md) is the only normative source for intended security properties, trust assumptions, relay-visible metadata, and residual risks. Please evaluate a report against that exact revision rather than summaries elsewhere. The non-normative [external review preparation packet](docs/design/external-review-packet.md) maps a possible future engagement to implementation evidence, and [CONTRIBUTING.md](CONTRIBUTING.md) owns CI, dependency, release, and relay operations.
+The [threat model](docs/threat-model.md) is the only normative source for intended security properties, trust assumptions, relay-visible metadata, and residual risks. Please evaluate a report against that exact revision rather than summaries elsewhere. [CONTRIBUTING.md](CONTRIBUTING.md) owns CI, dependency, release, and relay operations.
 
 ## Reporting
 

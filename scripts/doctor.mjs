@@ -1,4 +1,4 @@
-import { existsSync, statfsSync } from "node:fs";
+import { existsSync, readFileSync, statfsSync } from "node:fs";
 import { platform } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -12,7 +12,7 @@ const checks = [];
 const productionRelay = process.argv.includes("--production-relay");
 
 checkNode();
-checkCommand("npm", ["--version"], "npm is required to install and run workspace scripts.");
+checkNpmVersion();
 checkLocalFile("package-lock.json", "package-lock.json is present for npm ci.");
 checkLocalFile(".env.example", ".env.example is present for relay/self-host configuration.");
 checkOptionalFile(".env", "optional: copy .env.example to .env for local relay/GitHub configuration.");
@@ -64,6 +64,22 @@ function checkNode() {
     ok: Number.isFinite(major) && major >= 22,
     label: "node",
     detail: `found ${process.version}; Node 22 or newer is expected`
+  });
+}
+
+function checkNpmVersion() {
+  const expected = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"))
+    .packageManager?.split("@")
+    .at(-1);
+  const result = spawnSync("npm", ["--version"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const actual = result.stdout?.trim();
+  checks.push({
+    ok: result.status === 0 && actual === expected,
+    label: "npm",
+    detail:
+      result.status === 0
+        ? `found ${actual}; repository packageManager requires ${expected}`
+        : "npm is required to install and run workspace scripts."
   });
 }
 

@@ -2,6 +2,26 @@
   "version": 1,
   "owner": "@maddiedreese",
   "reviewBy": "2026-08-01",
+  "denyExceptions": [
+    "RUSTSEC-2024-0411",
+    "RUSTSEC-2024-0412",
+    "RUSTSEC-2024-0413",
+    "RUSTSEC-2024-0414",
+    "RUSTSEC-2024-0415",
+    "RUSTSEC-2024-0416",
+    "RUSTSEC-2024-0417",
+    "RUSTSEC-2024-0418",
+    "RUSTSEC-2024-0419",
+    "RUSTSEC-2024-0420",
+    "RUSTSEC-2024-0370",
+    "RUSTSEC-2025-0075",
+    "RUSTSEC-2025-0080",
+    "RUSTSEC-2025-0081",
+    "RUSTSEC-2025-0098",
+    "RUSTSEC-2025-0100",
+    "RUSTSEC-2026-0173",
+    "crate:spin@0.10.0"
+  ],
   "advisoryGroups": [
     {
       "name": "glib VariantStrIter soundness",
@@ -72,6 +92,24 @@
       "platformScope": "Transitive Tauri build and URL-pattern graph on supported and compatibility targets",
       "reachability": "Used transitively for generated Tauri URL-pattern validation; no direct application dependency",
       "disposition": "Time-bounded cargo-deny exceptions; remove when Tauri replaces urlpattern's rust-unic graph"
+    },
+    {
+      "name": "age localization macro maintenance",
+      "advisoryIds": ["RUSTSEC-2026-0173"],
+      "packages": ["proc-macro-error2 2.0.1"],
+      "dependencyPath": "proc-macro-error2 2.0.1 -> i18n-embed-fl 0.10.0 -> age 0.12.1 -> multAIplayer room-archive encryption",
+      "platformScope": "Build-time procedural macro dependency on supported and compatibility targets",
+      "reachability": "Runs only while compiling age's localization messages; no proc-macro-error2 code is included in the runtime application",
+      "disposition": "Time-bounded cargo-deny exception; age and i18n-embed-fl are current and expose no compatible maintained macro release, so remove when age migrates upstream"
+    },
+    {
+      "name": "mls-rs spin yank",
+      "advisoryIds": [],
+      "packages": ["spin 0.10.0"],
+      "dependencyPath": "spin 0.10.0 -> mls-rs 0.55.2 -> multAIplayer MLS core",
+      "platformScope": "Runtime MLS dependency on supported and compatibility targets",
+      "reachability": "Compiled and reachable through mls-rs synchronization; the yank is a registry lifecycle signal, not a RustSec vulnerability advisory",
+      "disposition": "Time-bounded exact-package cargo-deny exception; mls-rs 0.55.2 and upstream main still require spin ^0.10, whose only published match is 0.10.0, so remove at the first compatible mls-rs release"
     }
   ]
 }

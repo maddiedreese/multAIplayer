@@ -1,7 +1,18 @@
+title = "multAIplayer narrow deterministic-fixture allowlist"
+
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Versioned injection corpus uses one public synthetic credential marker"
-paths = ['''apps/desktop/test/fixtures/injection-red-team-v1\.json''']
-regexes = ['''JOURNEY_CREDENTIAL_TOKEN_31c4''']
+[[allowlists]]
+description = "Exact public placeholders and deterministic cryptographic/test vectors"
+regexTarget = "secret"
+regexes = [
+  '''^test-deletion-ledger-key-at-least-32-characters$''',
+  '''^abcdefghijklmnopqrstuvwxzy123456$''',
+  '''^2c14369ea984a7be95679b66e0f1a6f1d8faa6832da3f296c9167d9487267463$''',
+  '''^AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=$''',
+  '''^ghp_1234567890abcdefghijklmnop$''',
+  '''^token=ghp_1234567890abcdefghijklmnop$''',
+  '''^JOURNEY_CREDENTIAL_TOKEN_31c4$''',
+  '''^replace_with_at_least_32_chars$'''
+]
