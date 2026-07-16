@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, type ComponentProps } from "react";
+import React, { useMemo, type ComponentProps } from "react";
 import {
   defaultCodexSandboxLevel,
   maxEmbeddedAttachmentBytesPerMessage,
@@ -43,10 +43,7 @@ import {
   buildRoomMainHeaderProps
 } from "../presentation/containers/containerPropBuilders";
 import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
-import {
-  acknowledgeRoomVisibilityWarning,
-  hasAcknowledgedRoomVisibilityWarning
-} from "../lib/history/roomVisibilityWarning";
+import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibilityWarning";
 import type { createAppRoomPanelActions } from "./appRoomPanelActions";
 import type { useHostHandoffActions } from "./useHostHandoffActions";
 import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";
@@ -57,6 +54,7 @@ import {
   mainColumnLocalUser,
   replyTargetDisplay
 } from "./roomMainColumnCompositionValues";
+import { useRoomMainColumnInteractions } from "./useRoomMainColumnInteractions";
 
 type MainColumnProps = ComponentProps<typeof RoomMainColumn>;
 type HeaderProps = MainColumnProps["headerProps"];
@@ -165,52 +163,26 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   const resolvedSettings = resolveCodexRunSettings(selectedRoom, codexProbe);
 
   const { onOpenRoomBrowser, ...headerCapabilities } = capabilities.header;
-  const onSelectTeam = useCallback(
-    (teamId: string) => useAppStore.getState().selectTeamRoom(teamId, selectedRoomId),
-    [selectedRoomId]
-  );
-  const onSelectInspectorTab = useCallback(
-    (tab: HeaderProps["activeInspectorTab"]) => {
-      useAppStore.getState().setInspectorTabForRoom(roomId, tab);
-      if (tab === "browser" && !useAppStore.getState().browserByRoom[roomId]?.activeUrl) {
-        onOpenRoomBrowser();
-      }
-    },
-    [onOpenRoomBrowser, roomId]
-  );
-  const onToggleMarkdownSelection = useCallback(
-    () => useAppStore.getState().toggleMarkdownSelectionModeForRoom(roomId),
-    [roomId]
-  );
-  const onClearSelectedMessages = useCallback(
-    () => useAppStore.getState().clearSelectedMessagesForRoom(roomId),
-    [roomId]
-  );
-  const onToggleMessageSelection = useCallback(
-    (messageId: string) => useAppStore.getState().toggleSelectedMessageForRoom(roomId, messageId),
-    [roomId]
-  );
-  const onOpenFileSelector = useCallback(
-    () => useAppStore.getState().setInspectorTabForRoom(roomId, "files"),
-    [roomId]
-  );
-  const onReplyToMessage = useCallback(
-    (messageId: string) => useAppStore.getState().setReplyToMessageForRoom(roomId, messageId),
-    [roomId]
-  );
-  const onCancelReply = useCallback(() => useAppStore.getState().setReplyToMessageForRoom(roomId, null), [roomId]);
-  const onDraftChange = useCallback((draft: string) => useAppStore.getState().setDraftForRoom(roomId, draft), [roomId]);
-  const onAcknowledgeSecretWarning = useCallback(() => {
-    acknowledgeRoomVisibilityWarning(roomId);
-    useAppStore.getState().setSecretWarningVisibleForRoom(roomId, false);
-  }, [roomId]);
-  const onDismissMarkdownFallback = useCallback(
-    () => useAppStore.getState().setMarkdownCopyFallbackForRoom(roomId, null),
-    [roomId]
-  );
-  const onRetryMarkdownCopy = useCallback(() => {
-    if (fallback) capabilities.retryMarkdownCopy(fallback.title, fallback.markdown, roomId);
-  }, [capabilities, fallback, roomId]);
+  const {
+    onSelectTeam,
+    onSelectInspectorTab,
+    onToggleMarkdownSelection,
+    onClearSelectedMessages,
+    onToggleMessageSelection,
+    onOpenFileSelector,
+    onReplyToMessage,
+    onCancelReply,
+    onDraftChange,
+    onAcknowledgeSecretWarning,
+    onDismissMarkdownFallback,
+    onRetryMarkdownCopy
+  } = useRoomMainColumnInteractions({
+    roomId,
+    selectedRoomId,
+    fallback,
+    onOpenRoomBrowser,
+    retryMarkdownCopy: capabilities.retryMarkdownCopy
+  });
   const chatMessageRows = useMemo(
     () =>
       buildRoomChatMessageRows({

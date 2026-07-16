@@ -1,14 +1,10 @@
 import type { MutableRefObject } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import {
-  maxEmbeddedAttachmentBytes,
-  maxEmbeddedAttachmentBytesPerMessage,
   type MlsRelayMessage,
   type RequestStatusPlaintextPayload,
   type WorkspaceFileSaveRequestPlaintextPayload
 } from "@multaiplayer/protocol";
-import { createAttachmentBlob, loadAttachmentBlob } from "../workspace/workspaceClient";
-import { decryptMlsBlob, encryptMlsBlob, type MlsBlobCiphertext } from "../../lib/mls/mlsClient";
 import { createMlsApplicationMessage, publishMlsApplicationMessage } from "../mls/mlsApplicationMessage";
 import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
 import {
@@ -19,29 +15,13 @@ import {
   type ProjectFileContent
 } from "../../lib/platform/localBackend";
 import { resolveFilePreviewTab, type FilePreviewTab } from "../../lib/files/filePreview";
-import {
-  attachmentReviewMessage,
-  attachmentReviewScopeKey,
-  decideAttachmentReview,
-  reviewedAttachmentPathForScope
-} from "../../lib/files/attachmentPolicy";
-import { canStageRoomChatAttachment, roomChatGateMessage } from "../../lib/chat/chatPolicy";
 import { roomLockMessage } from "../runtime/appRuntime";
-import { shouldApplyRoomScopedUiUpdate } from "../../lib/room/roomScopedUi";
-import { createImageThumbnail } from "../codex/codexGeneratedImage";
-import { isAttachmentBlobContent } from "../../lib/history/localRoomHistoryPayload";
-import {
-  attachmentTypeFromName,
-  canOpenProjectAttachment,
-  embeddedAttachmentBytes,
-  encodedBytes,
-  validatePendingAttachments
-} from "../../lib/formatting/appFormatters";
 import type { ChatAttachment } from "../../types";
 import type { RelayClient } from "../../lib/relay/relayClient";
 import type { WorkspaceFileSaveRequest } from "../../types";
 import { useAppStore } from "../../store/appStore";
 import { currentSelectedRoom, currentSelectedRoomContext } from "../workspace/selectedWorkspace";
+import { createFileAttachmentActions } from "./fileAttachmentActions";
 
 interface FileActionsOptions {
   selectedRoomIdRef: MutableRefObject<string>;
@@ -126,143 +106,6 @@ export function createFileActions({
       if (selectedRoomIdRef.current === room.id) setFileMessageForRoom(room.id, String(error));
     } finally {
       setFileBusyForRoom(room.id, false);
-    }
-  }
-
-  async function attachSelectedFileToMessage() {
-    const context = selectedFileAttachmentContext();
-    if (!context) return;
-    const { selectedRoom, fileToAttach, roomPendingAttachments } = context;
-    const roomId = selectedRoom.id;
-    const teamId = selectedRoom.teamId;
-    const attachment: ChatAttachment = {
-      id: crypto.randomUUID(),
-      name: fileToAttach.path,
-      type: fileToAttach.mediaType ?? attachmentTypeFromName(fileToAttach.path),
-      size: fileToAttach.size,
-      content: fileToAttach.content,
-      truncated: fileToAttach.truncated
-    };
-    if (roomPendingAttachments.some((item) => item.name === attachment.name)) {
-      setFileMessageForRoom(roomId, `${attachment.name} is already attached to the next room message.`);
-      return;
-    }
-    const selectedContentBytes = encodedBytes(attachment.content ?? "");
-    const shouldUploadBlob =
-      selectedContentBytes > maxEmbeddedAttachmentBytes ||
-      embeddedAttachmentBytes(roomPendingAttachments) + selectedContentBytes > maxEmbeddedAttachmentBytesPerMessage;
-    if (shouldUploadBlob) {
-      const uploaded = await uploadAttachmentBlob(attachment, fileToAttach, teamId, roomId, selectedContentBytes);
-      if (!uploaded) return;
-    }
-    const nextPendingAttachments = [...roomPendingAttachments, attachment];
-    const validationError = validatePendingAttachments(nextPendingAttachments);
-    if (validationError) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
-        setFileMessageForRoom(roomId, validationError);
-      return;
-    }
-    appendPendingAttachmentForRoom(roomId, attachment);
-    if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-      setSensitiveAttachmentReviewKey(null);
-      setFileMessageForRoom(
-        roomId,
-        attachment.blobId
-          ? `Attached ${fileToAttach.path} as an encrypted blob for the next room message.`
-          : `Attached ${fileToAttach.path} to the next room message.`
-      );
-    }
-  }
-
-  function selectedFileAttachmentContext() {
-    const selectedRoom = currentSelectedRoom();
-    if (!selectedRoom) {
-      setSelectedFileMessage("Create or join a room before attaching project files.");
-      return;
-    }
-    if (!currentContext()?.canReadLocalWorkspace) {
-      setSelectedFileMessage(currentContext()?.localWorkspaceMessage ?? "Workspace unavailable.");
-      return;
-    }
-    const { locked } = currentRoomAccess(selectedRoom);
-    if (!canStageRoomChatAttachment(selectedRoom, locked)) {
-      setSelectedFileMessage(roomChatGateMessage(selectedRoom, locked));
-      return;
-    }
-    const store = useAppStore.getState();
-    const selectedFile = store.filePanelByRoom[selectedRoom.id]?.selectedFile ?? null;
-    if (!selectedFile) {
-      setSelectedFileMessage("Select a project file before attaching it to the room.");
-      return;
-    }
-    const roomId = selectedRoom.id;
-    const fileToAttach = selectedFile;
-    const roomPendingAttachments = store.roomChatByRoom[roomId]?.pendingAttachments ?? [];
-    const review = decideAttachmentReview(
-      fileToAttach.content,
-      fileToAttach.path,
-      reviewedAttachmentPathForScope(
-        store.sensitiveAttachmentReviewKey,
-        roomId,
-        selectedRoom.projectPath,
-        fileToAttach.path
-      )
-    );
-    if (!review.canAttach) {
-      setSensitiveAttachmentReviewKey(attachmentReviewScopeKey(roomId, selectedRoom.projectPath, fileToAttach.path));
-      setFileMessageForRoom(roomId, attachmentReviewMessage(fileToAttach.path, review.risks));
-      return;
-    }
-    return { selectedRoom, fileToAttach, roomPendingAttachments };
-  }
-
-  async function uploadAttachmentBlob(
-    attachment: ChatAttachment,
-    file: ProjectFileContent,
-    teamId: string,
-    roomId: string,
-    contentBytes: number
-  ) {
-    if (reportRoomFileActionInFlight(roomId)) return false;
-    try {
-      setFileBusyForRoom(roomId, true);
-      const inlineThumbnail = file.mediaType
-        ? await createImageThumbnail(attachment.content ?? "").catch(() => {
-            reportExpectedFailure("create an inline project-image thumbnail");
-            return null;
-          })
-        : null;
-      const blobId = `blob_${crypto.randomUUID()}`;
-      const sealed = await encryptMlsBlob(roomId, blobId, {
-        name: file.path,
-        type: attachment.type,
-        size: file.size,
-        content: file.content,
-        truncated: file.truncated
-      });
-      const blob = await createAttachmentBlob({
-        blobId,
-        teamId,
-        roomId,
-        name: file.path,
-        type: attachment.type,
-        size: file.size,
-        epoch: sealed.epoch,
-        sealedBlob: JSON.stringify(sealed)
-      });
-      if (inlineThumbnail) attachment.content = inlineThumbnail;
-      else delete attachment.content;
-      attachment.blobId = blob.id;
-      attachment.blobBytes = contentBytes;
-      attachment.truncated = file.truncated || contentBytes > maxEmbeddedAttachmentBytes;
-      return true;
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setFileMessageForRoom(roomId, `Could not upload encrypted attachment blob: ${String(error)}`);
-      }
-      return false;
-    } finally {
-      setFileBusyForRoom(roomId, false);
     }
   }
 
@@ -466,72 +309,24 @@ export function createFileActions({
     setFileMessageForRoom(room.id, "Denied file edit request.");
   }
 
-  function removePendingAttachment(attachmentId: string) {
-    const selectedRoom = currentSelectedRoom();
-    if (selectedRoom) removePendingAttachmentForRoom(selectedRoom.id, attachmentId);
-  }
-
-  async function openEncryptedAttachmentBlob(attachment: ChatAttachment) {
-    const selectedRoom = currentSelectedRoom();
-    if (!selectedRoom) {
-      setSelectedFileMessage("Create or join a room before opening encrypted attachments.");
-      return;
-    }
-    const { locked, revoked } = currentRoomAccess(selectedRoom);
-    if (locked) {
-      setSelectedFileMessage(roomLockMessage(selectedRoom, revoked));
-      return;
-    }
-    const room = selectedRoom;
-    if (!attachment.blobId) {
-      if (attachment.content) {
-        if (selectedRoomIdRef.current !== room.id) return;
-        setSelectedDiffForRoom(room.id, null);
-        setSelectedFileForRoom(room.id, {
-          path: attachment.name,
-          size: attachment.size,
-          truncated: Boolean(attachment.truncated),
-          content: attachment.content
-        });
-        setInspectorTabForRoom(room.id, "files");
-        setFileMessageForRoom(room.id, `Opened inline attachment ${attachment.name}.`);
-      } else if (canOpenProjectAttachment(attachment)) {
-        await openProjectFile(attachment.name, "file");
-      }
-      return;
-    }
-    if (reportRoomFileActionInFlight(room.id)) return;
-    setFileBusyForRoom(room.id, true);
-    setFileMessageForRoom(room.id, null);
-    try {
-      const blob = await loadAttachmentBlob(attachment.blobId, room.teamId, room.id);
-      if (blob.roomId !== room.id || blob.teamId !== room.teamId) {
-        throw new Error("Attachment blob belongs to a different room.");
-      }
-      const sealed = JSON.parse(blob.sealedBlob) as MlsBlobCiphertext;
-      if (sealed.epoch !== blob.epoch) throw new Error("Attachment blob epoch metadata is inconsistent.");
-      const decrypted = await decryptMlsBlob(room.id, blob.id, sealed);
-      if (!isAttachmentBlobContent(decrypted)) {
-        throw new Error("Attachment blob payload was not a supported file preview.");
-      }
-      if (selectedRoomIdRef.current !== room.id) return;
-      setSelectedDiffForRoom(room.id, null);
-      setSelectedFileForRoom(room.id, {
-        path: decrypted.name || attachment.name,
-        size: decrypted.size ?? attachment.size,
-        truncated: Boolean(decrypted.truncated),
-        content: decrypted.content
-      });
-      setInspectorTabForRoom(room.id, "files");
-      setFileMessageForRoom(room.id, `Opened encrypted attachment ${decrypted.name || attachment.name}.`);
-    } catch (error) {
-      if (selectedRoomIdRef.current === room.id) {
-        setFileMessageForRoom(room.id, `Could not open encrypted attachment: ${String(error)}`);
-      }
-    } finally {
-      setFileBusyForRoom(room.id, false);
-    }
-  }
+  const { attachSelectedFileToMessage, removePendingAttachment, openEncryptedAttachmentBlob } =
+    createFileAttachmentActions({
+      selectedRoomIdRef,
+      reportRoomFileActionInFlight,
+      currentRoom: currentSelectedRoom,
+      currentContext,
+      currentRoomAccess,
+      setSelectedFileMessage,
+      setFileBusyForRoom,
+      setSelectedFileForRoom,
+      setSelectedDiffForRoom,
+      setFileMessageForRoom,
+      setSensitiveAttachmentReviewKey,
+      setInspectorTabForRoom,
+      appendPendingAttachmentForRoom,
+      removePendingAttachmentForRoom,
+      openProjectFile
+    });
 
   return {
     openProjectFile,
