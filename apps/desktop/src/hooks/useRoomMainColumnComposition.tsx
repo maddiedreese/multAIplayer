@@ -36,12 +36,7 @@ import { detectCodexTurnRiskFlags } from "../lib/codex/codexTurn";
 import { buildRoomNotices } from "./roomNotices";
 import { selectRoomMainColumnView } from "../application/views/containerViewSelectors";
 import { buildRoomMainColumnCapabilities } from "./containerCapabilities";
-import {
-  buildHighPrivilegeLabels,
-  buildQueuedCodexTurnRows,
-  buildRoomMainChatProps,
-  buildRoomMainHeaderProps
-} from "../presentation/containers/containerPropBuilders";
+import { buildHighPrivilegeLabels, buildQueuedCodexTurnRows } from "../presentation/containers/containerPropBuilders";
 import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
 import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibilityWarning";
 import type { createAppRoomPanelActions } from "./appRoomPanelActions";
@@ -197,7 +192,7 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   const pendingAttachmentRows = useMemo(() => buildPendingAttachmentRows(pendingAttachments), [pendingAttachments]);
   const localPreviewCards = useMemo(() => buildLocalPreviewCards(previews, localUser.id), [localUser.id, previews]);
   function composeHeaderProps() {
-    return buildRoomMainHeaderProps({
+    return {
       teams: teams.map((team) => ({ id: team.id, name: team.name })),
       selectedTeamId: selectedTeam,
       roomName: selectedRoom.name,
@@ -224,7 +219,7 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
       onToggleMarkdownSelection,
       onClearSelectedMessages,
       ...headerCapabilities
-    });
+    };
   }
   const headerProps = composeHeaderProps();
 
@@ -262,42 +257,40 @@ export function useRoomMainColumnComposition({ sources }: { sources: RoomMainCol
   function composeChatProps() {
     const canUseChat = canUseRoomChat(selectedRoom, roomLocked);
     return {
-      ...buildRoomMainChatProps({
-        messages: chatMessageRows,
-        codexActivities: codex?.activities ?? [],
-        approvalVisible: codex?.approvalVisible ?? false,
-        approvalSummary: composeApprovalSummary(),
-        isActiveHost,
-        codexRunning: codex?.running ?? false,
-        canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, roomLocked),
-        canUseChat,
-        canSendMessage: canUseChat && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
+      messages: chatMessageRows,
+      codexActivities: codex?.activities ?? [],
+      approvalVisible: codex?.approvalVisible ?? false,
+      approvalSummary: composeApprovalSummary(),
+      isActiveHost,
+      codexRunning: codex?.running ?? false,
+      canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, roomLocked),
+      canUseChat,
+      canSendMessage: canUseChat && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
+      roomLocked,
+      lockedPlaceholder: roomLockMessage(selectedRoom, revoked),
+      chatEnabled: !roomLocked,
+      draft: chat?.draft ?? "",
+      replyTarget: composeReplyTarget(),
+      roomGoal: codex?.goal ?? null,
+      pendingAttachments: pendingAttachmentRows,
+      queuedCodexTurns: buildQueuedCodexTurnRows(
+        queuedApprovals,
+        currentMessagesSinceLastCodex,
         roomLocked,
-        lockedPlaceholder: roomLockMessage(selectedRoom, revoked),
-        chatEnabled: !roomLocked,
-        draft: chat?.draft ?? "",
-        replyTarget: composeReplyTarget(),
-        roomGoal: codex?.goal ?? null,
-        pendingAttachments: pendingAttachmentRows,
-        queuedCodexTurns: buildQueuedCodexTurnRows(
-          queuedApprovals,
-          currentMessagesSinceLastCodex,
-          roomLocked,
-          localUser.id,
-          selectedRoom.hostUserId
-        ),
-        localPreviewCards,
-        pendingAttachmentSummary:
-          `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
-          `${formatBytes(embeddedAttachmentBytes(pendingAttachments))}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`,
-        markdownSelectionMode,
-        onToggleMessageSelection,
-        onOpenFileSelector,
-        onReplyToMessage,
-        onCancelReply,
-        onDraftChange,
-        ...capabilities.chat
-      }),
+        localUser.id,
+        selectedRoom.hostUserId
+      ),
+      localPreviewCards,
+      pendingAttachmentSummary:
+        `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
+        `${formatBytes(embeddedAttachmentBytes(pendingAttachments))}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`,
+      markdownSelectionMode,
+      onToggleMessageSelection,
+      onOpenFileSelector,
+      onReplyToMessage,
+      onCancelReply,
+      onDraftChange,
+      ...capabilities.chat,
       guidedFirstTurn
     };
   }

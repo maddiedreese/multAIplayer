@@ -1,5 +1,4 @@
 const workspacePackages = [
-  "@multaiplayer/codex",
   "@multaiplayer/desktop",
   "@multaiplayer/git",
   "@multaiplayer/github",

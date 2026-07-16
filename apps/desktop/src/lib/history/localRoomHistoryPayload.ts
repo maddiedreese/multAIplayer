@@ -24,7 +24,6 @@ import {
 } from "@multaiplayer/protocol";
 import type { GitHubActionRun } from "../identity/authClient";
 import { normalizeChatMessage } from "../chat/chatSanitizer";
-import { normalizeCodexThreadId } from "../codex/codexThread";
 import { normalizeCodexThreadGraph } from "../codex/codexThreadGraph";
 import { maxCodexThreadGraphNodes } from "../codex/codexThreadGraph";
 import { isCurrentLocalRoomReadState, sanitizeLocalRoomReadState } from "./roomUnread";
@@ -68,25 +67,21 @@ export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
 }
 
 export function normalizeLocalRoomHistory(value: unknown): LocalRoomHistoryPayload {
-  if (Array.isArray(value)) {
-    assertLegacyContainerBound("messages", value);
-    return {
-      ...emptyLocalRoomHistoryPayload(),
-      messages: normalizeChatHistoryMessages(value)
-    };
-  }
+  if (!isRecord(value)) throw new InvalidLocalRoomHistoryError("Encrypted local history is not an object.");
+  if (value.version !== 3) throw new UnsupportedLocalRoomHistoryVersionError();
+  assertCurrentLocalHistoryShape(value);
 
-  if (!isRecord(value))
-    throw new InvalidLocalRoomHistoryError("Encrypted local history is not an object or legacy message list.");
-  if (!isSupportedLocalHistoryVersion(value.version)) throw new UnsupportedLocalRoomHistoryVersionError();
-  if (value.version === 3) assertCurrentLocalHistoryShape(value);
-  else assertLegacyLocalHistoryShape(value);
+  return normalizeHistoryContainers(value);
+}
 
-  // One-way v2-alpha migration: old encrypted history may contain the former
-  // flat thread-id mirror, but all normalized and newly persisted payloads are
-  // graph-only. No runtime state writes the mirror back.
-  const codexThreadId = normalizeCodexThreadId(value.codexThreadId);
-  const codexThreadGraph = normalizeCodexThreadGraph(value.codexThreadGraph, codexThreadId);
+/** Sanitizes the deliberately user-editable archive format without treating it as live persisted state. */
+export function normalizeReadOnlyRoomArchiveHistory(value: unknown): LocalRoomHistoryPayload {
+  if (!isRecord(value)) throw new InvalidLocalRoomHistoryError("Room archive history is not an object.");
+  return normalizeHistoryContainers(value);
+}
+
+function normalizeHistoryContainers(value: Record<string, unknown>): LocalRoomHistoryPayload {
+  const codexThreadGraph = normalizeCodexThreadGraph(value.codexThreadGraph);
   const readState = sanitizeLocalRoomReadState(value.readState);
   return {
     version: 3,
@@ -137,7 +132,7 @@ export function normalizeRetainedLocalRoomHistory(value: unknown, retentionDays:
 
 function historyArray(value: Record<string, unknown>, key: string): unknown[] {
   const candidate = value[key];
-  return Array.isArray(candidate) ? candidate : [];
+  return Array.isArray(candidate) ? candidate.slice(-maxLocalHistoryItemsPerContainer) : [];
 }
 
 function assertCurrentLocalHistoryShape(value: Record<string, unknown>): void {
@@ -168,40 +163,6 @@ function assertCurrentLocalHistoryShape(value: Record<string, unknown>): void {
   }
   if (value.codexThreadGraph !== undefined && !isCurrentCodexThreadGraph(value.codexThreadGraph)) {
     throw new InvalidLocalRoomHistoryError();
-  }
-}
-
-const legacyHistoryContainerKeys = [
-  "messages",
-  "chatEdits",
-  "chatDeletes",
-  "terminalRequests",
-  "fileSaveRequests",
-  "browserRequests",
-  "inviteRequests",
-  "codexEvents",
-  "codexActivities",
-  "gitWorkflowEvents",
-  "githubActionsEvents",
-  "localPreviews",
-  "terminalSnapshots",
-  "hostHandoffs",
-  "queuedCodexTurns"
-] as const;
-
-function assertLegacyLocalHistoryShape(value: Record<string, unknown>): void {
-  if (value.version === undefined && !legacyHistoryContainerKeys.some((key) => key in value)) {
-    throw new InvalidLocalRoomHistoryError("Unversioned encrypted local history has no recognized containers.");
-  }
-  for (const key of legacyHistoryContainerKeys) {
-    const items = value[key];
-    if (items !== undefined && Array.isArray(items)) assertLegacyContainerBound(key, items);
-  }
-}
-
-function assertLegacyContainerBound(key: string, items: unknown[]): void {
-  if (items.length > maxLocalHistoryItemsPerContainer) {
-    throw new InvalidLocalRoomHistoryError(`Encrypted local history container ${key} exceeds its migration limit.`);
   }
 }
 
@@ -240,10 +201,6 @@ function isCurrentCodexThreadGraph(value: unknown): boolean {
       Number(node.updatedAt) >= 0
     );
   });
-}
-
-function isSupportedLocalHistoryVersion(value: unknown): boolean {
-  return value === undefined || value === 1 || value === 2 || value === 3;
 }
 
 export function isChatMessage(value: unknown): value is ChatMessage {

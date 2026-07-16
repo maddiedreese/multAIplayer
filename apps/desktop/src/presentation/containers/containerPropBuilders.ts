@@ -1,24 +1,8 @@
 import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import type { ComponentProps } from "react";
 import type { BrowserAccessPanel } from "../../components/BrowserAccessPanel";
-import type { RoomInspectorWorkPanel } from "../../components/RoomInspectorWorkPanel";
-import type { RoomMainColumn } from "../../components/RoomMainColumn";
 
-type InspectorWorkProps = Omit<ComponentProps<typeof RoomInspectorWorkPanel>, "activeTab">;
 type BrowserPanelProps = ComponentProps<typeof BrowserAccessPanel>;
-type RoomMainProps = ComponentProps<typeof RoomMainColumn>;
-
-export function buildRoomMainHeaderProps(props: RoomMainProps["headerProps"]): RoomMainProps["headerProps"] {
-  return props;
-}
-
-export function buildRoomMainChatProps(props: RoomMainProps["chatProps"]): RoomMainProps["chatProps"] {
-  return props;
-}
-
-export function buildRoomInspectorWorkProps(props: InspectorWorkProps): InspectorWorkProps {
-  return props;
-}
 
 export function buildRoomBrowserProps(input: {
   roomId: string;

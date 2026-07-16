@@ -655,7 +655,7 @@ fn codex_thread_request_starts_or_resumes_room_thread() {
 fn codex_server_key_is_scoped_to_room_project_and_model() {
     let sandbox = codex_sandbox_config(Some("workspace_write")).expect("workspace sandbox");
     let base = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",
@@ -664,7 +664,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     )
     .expect("valid codex session key");
     let same = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",
@@ -673,7 +673,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     )
     .expect("same codex session key");
     let different_room = codex_server_key(
-        Some("room-beta"),
+        "room-beta",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",
@@ -682,7 +682,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     )
     .expect("different room key");
     let different_project = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/other",
         "gpt-5.3-codex",
         "medium",
@@ -691,7 +691,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     )
     .expect("different project key");
     let different_model = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex-spark",
         "medium",
@@ -700,7 +700,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     )
     .expect("different model key");
     let different_reasoning = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex",
         "high",
@@ -709,7 +709,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     )
     .expect("different reasoning key");
     let different_speed = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",
@@ -718,7 +718,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     )
     .expect("different speed key");
     let different_sandbox = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",
@@ -735,7 +735,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
     assert_ne!(base, different_speed);
     assert_ne!(base, different_sandbox);
     assert!(codex_server_key(
-        Some("room/alpha"),
+        "room/alpha",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",
@@ -749,7 +749,7 @@ fn codex_server_key_is_scoped_to_room_project_and_model() {
 fn codex_room_shutdown_matches_all_sessions_for_room_only() {
     let sandbox = codex_sandbox_config(Some("workspace_write")).expect("workspace sandbox");
     let room_a_main = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",
@@ -758,7 +758,7 @@ fn codex_room_shutdown_matches_all_sessions_for_room_only() {
     )
     .expect("room alpha key");
     let room_a_model = codex_server_key(
-        Some("room-alpha"),
+        "room-alpha",
         "/tmp/project",
         "gpt-5.3-codex-spark",
         "medium",
@@ -767,7 +767,7 @@ fn codex_room_shutdown_matches_all_sessions_for_room_only() {
     )
     .expect("room alpha model key");
     let room_b = codex_server_key(
-        Some("room-beta"),
+        "room-beta",
         "/tmp/project",
         "gpt-5.3-codex",
         "medium",

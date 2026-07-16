@@ -10,11 +10,7 @@ import { resolveFilePreviewTab } from "../lib/files/filePreview";
 import { resolveGitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
 import { selectRoomInspectorView } from "../application/views/containerViewSelectors";
 import { buildRoomInspectorCapabilities } from "./containerCapabilities";
-import {
-  buildProjectControlState,
-  buildRoomBrowserProps,
-  buildRoomInspectorWorkProps
-} from "../presentation/containers/containerPropBuilders";
+import { buildProjectControlState, buildRoomBrowserProps } from "../presentation/containers/containerPropBuilders";
 import { defaultProjectPath } from "../lib/platform/localBackend";
 import { buildRoomMemberRows, buildTeamMemberRows } from "../presentation/roster/rosterDisplayRows";
 import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
@@ -216,8 +212,8 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
       onRefresh: capabilities.github.refresh
     };
   }
-  function composeCommonWorkProps() {
-    return buildRoomInspectorWorkProps({
+  function composeCommonWorkProps(): Omit<React.ComponentProps<typeof RoomInspectorWorkPanel>, "activeTab"> {
+    return {
       project: {
         projectPath: selectedRoom.projectPath,
         projectPathDraft,
@@ -324,7 +320,7 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
         ...capabilities.terminal,
         onSelectTerminal: (terminalId) => setSelectedTerminalIdForRoom(selectedRoom.id, terminalId)
       }
-    });
+    };
   }
 
   function composeTeamRosterProps() {

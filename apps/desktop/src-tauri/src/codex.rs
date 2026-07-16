@@ -57,7 +57,7 @@ pub(crate) struct CodexGeneratedImage {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CodexTurnRequest {
-    room_id: Option<String>,
+    room_id: String,
     client_turn_id: Option<String>,
     cwd: String,
     input: String,
@@ -123,7 +123,7 @@ pub(crate) async fn run_codex_turn(
     rpc_state: tauri::State<'_, CodexRpcState>,
     authorization_state: tauri::State<'_, CodexAuthorizationState>,
 ) -> crate::command_error::CommandResult<CodexTurnResult> {
-    let lifecycle_room_id = request.room_id.as_deref().unwrap_or("__legacy_room");
+    let lifecycle_room_id = request.room_id.as_str();
     ensure_room_id(lifecycle_room_id)?;
     let turn_lease = CodexTurnLease::begin(lifecycle_room_id)?;
     ensure_existing_dir(&request.cwd)?;
@@ -200,7 +200,7 @@ pub(crate) async fn run_codex_turn(
         .into_string()
         .map_err(|_| "Codex project root must be valid UTF-8".to_string())?;
     let key = codex_server_key(
-        request.room_id.as_deref(),
+        &request.room_id,
         &canonical_cwd,
         &model,
         &reasoning_effort,
@@ -409,14 +409,13 @@ impl CodexTurnResult {
 }
 
 pub(crate) fn codex_server_key(
-    room_id: Option<&str>,
+    room_id: &str,
     cwd: &str,
     model: &str,
     reasoning_effort: &str,
     service_tier: &str,
     sandbox_config: &CodexSandboxConfig,
 ) -> Result<CodexServerKey, String> {
-    let room_id = room_id.unwrap_or("__legacy_room");
     ensure_room_id(room_id)?;
     Ok(CodexServerKey {
         room_id: room_id.to_string(),

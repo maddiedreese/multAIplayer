@@ -65,12 +65,6 @@ test("activity timeline retains only the newest bounded room items", () => {
   assert.equal(activities[0]?.itemId, "item-10");
 });
 
-test("legacy local history migrates to an empty canonical activity timeline", () => {
-  const legacy = emptyLocalRoomHistoryPayload();
-  delete legacy.codexActivities;
-  assert.deepEqual(normalizeLocalRoomHistory(legacy).codexActivities, []);
-});
-
 test("local-history round trips omit absent optional state", () => {
   const empty = emptyLocalRoomHistoryPayload();
   assert.equal(Object.hasOwn(empty, "readState"), false);
@@ -87,23 +81,6 @@ test("local-history normalization rejects non-objects and unknown schema version
     () => normalizeRetainedLocalRoomHistory({ version: 99, messages: [{ body: "untrusted" }] }, 30),
     UnsupportedLocalRoomHistoryVersionError
   );
-});
-
-test("legacy local-history versions still sanitize malformed optional entries", () => {
-  const normalized = normalizeRetainedLocalRoomHistory(
-    {
-      version: 2,
-      messages: "not-an-array",
-      browserRequests: [null, { requestedAt: false }],
-      codexActivities: [{}],
-      readState: { lastReadAt: false }
-    },
-    30
-  );
-  assert.deepEqual(normalized.messages, []);
-  assert.deepEqual(normalized.browserRequests, []);
-  assert.deepEqual(normalized.codexActivities, []);
-  assert.deepEqual(normalized.readState, { unread: 0 });
 });
 
 test("current local-history schema fails closed on malformed required containers and entries", () => {
@@ -123,19 +100,6 @@ test("current local-history schema fails closed on malformed required containers
         30
       ),
     InvalidLocalRoomHistoryError
-  );
-});
-
-test("legacy local-history migration is recognized and container-bounded", () => {
-  assert.throws(() => normalizeLocalRoomHistory({}), InvalidLocalRoomHistoryError);
-  assert.throws(
-    () => normalizeLocalRoomHistory({ version: 2, messages: Array.from({ length: 10_001 }, () => null) }),
-    InvalidLocalRoomHistoryError
-  );
-  assert.equal(
-    normalizeLocalRoomHistory([{ id: "legacy", author: "Maddie", role: "human", body: "Migrated", time: "earlier" }])
-      .messages[0]?.id,
-    "legacy"
   );
 });
 

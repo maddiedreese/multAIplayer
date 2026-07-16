@@ -1,18 +1,12 @@
 /** Public website, native intake, and manual paste share this complete-link bound. */
 export const maxInviteLinkChars = 12_288;
 
-export type InviteUrlPayload =
-  | {
-      kind: "join";
-      encoded: string;
-      inviteId: string | null;
-      approvalRequested: boolean;
-      cleanupPath: string;
-    }
-  | {
-      kind: "legacy-secret";
-      cleanupPath: string;
-    };
+export type InviteUrlPayload = {
+  kind: "join";
+  encoded: string;
+  inviteId: string;
+  cleanupPath: string;
+};
 
 export interface InviteUrlParts {
   hash: string;
@@ -21,25 +15,25 @@ export interface InviteUrlParts {
 }
 
 export function readInviteUrlPayload(location: InviteUrlParts): InviteUrlPayload | null {
+  if (location.search) return null;
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ""));
-  // Manual paste keeps one alpha-generation compatibility window for links
-  // whose opaque relay id preceded the fragment. OS intake rejects query data.
-  const inviteId = fragment.get("invite") ?? new URLSearchParams(location.search).get("invite");
-  const approvalRequested = fragment.get("approval") === "request";
+  const allowedKeys = new Set(["invite", "multaiplayerJoin", "approval"]);
+  if (
+    [...fragment.keys()].some((key) => !allowedKeys.has(key)) ||
+    fragment.getAll("invite").length !== 1 ||
+    fragment.getAll("multaiplayerJoin").length !== 1 ||
+    fragment.getAll("approval").length !== 1 ||
+    fragment.get("approval") !== "request"
+  ) {
+    return null;
+  }
+  const inviteId = fragment.get("invite");
   const joinInvite = fragment.get("multaiplayerJoin");
-  if (joinInvite) {
+  if (joinInvite && inviteId) {
     return {
       kind: "join",
       encoded: joinInvite,
       inviteId,
-      approvalRequested,
-      cleanupPath: location.pathname
-    };
-  }
-  const secretInvite = fragment.get("multaiplayerInvite");
-  if (secretInvite) {
-    return {
-      kind: "legacy-secret",
       cleanupPath: location.pathname
     };
   }

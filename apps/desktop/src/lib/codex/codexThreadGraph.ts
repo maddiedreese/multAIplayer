@@ -8,39 +8,14 @@ export function emptyCodexThreadGraph(): CodexThreadGraph {
   return { activeThreadId: null, nodesById: {} };
 }
 
-export function legacyCodexThreadGraph(threadId: string | null): CodexThreadGraph {
-  if (!threadId) return emptyCodexThreadGraph();
-  return {
-    activeThreadId: threadId,
-    nodesById: {
-      [threadId]: { id: threadId, title: "Codex thread", status: "unknown", createdAt: 0, updatedAt: 0 }
-    }
-  };
-}
-
-export function normalizeCodexThreadGraph(value: unknown, legacyThreadId?: unknown): CodexThreadGraph {
-  const legacy = normalizeCodexThreadId(legacyThreadId);
-  if (!isRecord(value) || Array.isArray(value)) return legacyCodexThreadGraph(legacy);
+export function normalizeCodexThreadGraph(value: unknown): CodexThreadGraph {
+  if (!isRecord(value) || Array.isArray(value)) return emptyCodexThreadGraph();
   const rawNodes = isRecord(value.nodesById) && !Array.isArray(value.nodesById) ? Object.values(value.nodesById) : [];
   const nodes = rawNodes.map(normalizeNode).filter((node): node is CodexThreadGraphNode => Boolean(node));
   const bounded = nodes.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, maxCodexThreadGraphNodes);
   const nodesById = Object.fromEntries(bounded.map((node) => [node.id, node]));
   const requestedActive = normalizeCodexThreadId(value.activeThreadId);
-  const activeThreadId =
-    requestedActive && nodesById[requestedActive]
-      ? requestedActive
-      : legacy && nodesById[legacy]
-        ? legacy
-        : (bounded[0]?.id ?? legacy);
-  if (activeThreadId && !nodesById[activeThreadId]) {
-    nodesById[activeThreadId] = {
-      id: activeThreadId,
-      title: "Codex thread",
-      status: "unknown",
-      createdAt: 0,
-      updatedAt: 0
-    };
-  }
+  const activeThreadId = requestedActive && nodesById[requestedActive] ? requestedActive : (bounded[0]?.id ?? null);
   return { activeThreadId: activeThreadId ?? null, nodesById };
 }
 

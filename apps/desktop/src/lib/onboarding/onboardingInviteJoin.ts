@@ -8,7 +8,6 @@ export type OnboardingInviteJoinStatus =
   | "no_invite"
   | "approval_pending"
   | "invalid_invite"
-  | "legacy_invite"
   | "expired_invite"
   | "sign_in_required"
   | "verification_failed"
@@ -96,14 +95,6 @@ export function createOnboardingInviteJoinAdapter({
         );
       }
 
-      if (payload.kind === "legacy-secret") {
-        return result(
-          "legacy_invite",
-          "This legacy invite is no longer accepted. Ask the active host for a new approval-gated invite.",
-          true,
-          false
-        );
-      }
       return request(payload.encoded, payload.inviteId);
     }
   };
@@ -131,13 +122,6 @@ function safeJoinFailure(error: unknown): OnboardingInviteJoinResult {
     switch (error.code) {
       case "invite_expired":
         return result("expired_invite", "This invite has expired. Ask the active host for a new one.", true, false);
-      case "legacy_invite":
-        return result(
-          "legacy_invite",
-          "This legacy invite is no longer accepted. Ask the active host for a new approval-gated invite.",
-          true,
-          false
-        );
       case "active_host_mismatch":
       case "host_hpke_key_mismatch":
       case "invite_metadata_mismatch":

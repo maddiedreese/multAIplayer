@@ -165,7 +165,7 @@ test("dismiss, skip, reopen, resume, and checklist dismissal remain independent"
   assert.equal(deriveOnboardingProgress(state).checklistVisible, true);
 });
 
-test("version zero migrates to the bounded version one shape without retaining extra data", () => {
+test("pre-release onboarding versions are discarded without retaining extra data", () => {
   const storage = new MemoryStorage();
   storage.setItem(
     onboardingStorageKey,
@@ -193,16 +193,8 @@ test("version zero migrates to the bounded version one shape without retaining e
     })
   );
 
-  const migrated = loadOnboardingState(storage);
-  assert.equal(migrated.version, 1);
-  assert.equal(migrated.presentation, "dismissed");
-  assert.deepEqual(migrated.markers.membership, { teamId: "team_alpha", roomId: "room_alpha" });
-  assert.equal(migrated.markers.teammateJoined, false);
-  const persisted = storage.getItem(onboardingStorageKey) ?? "";
-  assert.doesNotMatch(
-    persisted,
-    /private prompt|accessToken|secret|github-user-code|auth\.openai\.com|protected-invite-fragment/
-  );
+  assert.deepEqual(loadOnboardingState(storage), createInitialOnboardingState());
+  assert.equal(storage.getItem(onboardingStorageKey), null);
 });
 
 test("unsupported, malformed, and internally inconsistent persisted state fails closed", () => {

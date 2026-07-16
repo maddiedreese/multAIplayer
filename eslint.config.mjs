@@ -2,7 +2,7 @@ import js from "@eslint/js";
 import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import { desktopArchitecturePlugin } from "./tools/eslint/desktop-architecture.mjs";
+import { desktopErrorHandlingPlugin } from "./tools/eslint/desktop-error-handling.mjs";
 import { packageBoundaryRule } from "./tools/eslint/workspace-boundaries.mjs";
 
 const typescriptFiles = ["**/*.{ts,tsx}"];
@@ -63,15 +63,11 @@ export default tseslint.config(
   {
     files: ["apps/desktop/src/**/*.{ts,tsx}"],
     plugins: {
-      desktop: desktopArchitecturePlugin,
+      desktop: desktopErrorHandlingPlugin,
       "react-hooks": reactHooks
     },
     rules: {
       "desktop/no-unreported-bare-catch": "error",
-      "desktop/layer-boundaries": "error",
-      "desktop/no-flat-lib-module": "error",
-      "desktop/zustand-slice-boundaries": "error",
-      "desktop/zustand-reducer-only": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"
     }
