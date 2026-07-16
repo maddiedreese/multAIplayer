@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { lstat, readFile, readdir, readlink } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readdir, readlink } from "node:fs/promises";
 import { join, posix } from "node:path";
 
 export const runtimeExcludedPaths = new Set([
@@ -41,8 +42,8 @@ async function visit(rootDirectory, relativePath, entries) {
     gid: stat.gid
   };
   if (stat.isFile()) {
-    const content = await readFile(absolutePath);
-    entry.size = stat.size;
+    const { content, openedStat } = await readRegularFile(absolutePath, stat);
+    entry.size = openedStat.size;
     entry.sha256 = createHash("sha256").update(content).digest("hex");
   } else if (stat.isSymbolicLink()) {
     entry.target = await readlink(absolutePath);
@@ -54,6 +55,23 @@ async function visit(rootDirectory, relativePath, entries) {
   const children = (await readdir(absolutePath)).sort();
   for (const child of children) {
     await visit(rootDirectory, posix.join(relativePath, child), entries);
+  }
+}
+
+async function readRegularFile(path, directoryEntryStat) {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const openedStat = await handle.stat();
+    if (
+      !openedStat.isFile() ||
+      openedStat.dev !== directoryEntryStat.dev ||
+      openedStat.ino !== directoryEntryStat.ino
+    ) {
+      throw new Error(`Filesystem entry changed while building runtime manifest: ${path}`);
+    }
+    return { content: await handle.readFile(), openedStat };
+  } finally {
+    await handle.close();
   }
 }
 
