@@ -29,7 +29,6 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 .readme-feature {
   box-sizing: border-box;
   width: min(760px, calc(100vw - 120px));
-  height: 560px;
   margin: 0 auto;
   padding: 0;
   overflow: visible;
@@ -41,22 +40,37 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 .readme-terminal-surface {
   box-sizing: border-box;
   width: 100%;
-  height: 100%;
   overflow: hidden;
+  background: transparent;
+}
+
+.readme-chat-surface {
+  height: 560px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
 }
 
-.readme-browser-surface .browser-panel.browser-open {
-  height: 100%;
+.readme-browser-surface {
+  height: 520px;
 }
 
 .readme-terminal-surface {
-  padding: 16px;
+  height: 540px;
+}
+
+.readme-browser-surface .browser-panel.browser-open {
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.readme-terminal-surface {
+  display: flex;
 }
 
 .readme-terminal-surface .terminal-panel {
+  width: 100%;
   height: 100%;
   margin: 0;
 }

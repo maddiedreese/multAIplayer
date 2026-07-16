@@ -54,7 +54,7 @@ const activities: CodexActivity[] = [
 
 export default function ReadmeChatScenario() {
   return (
-    <section className="readme-chat-surface" aria-label="Shared Codex room chat feature">
+    <section className="readme-chat-surface" data-readme-capture aria-label="Shared Codex room chat feature">
       <RoomChatPanel
         messages={messages}
         codexActivities={activities}

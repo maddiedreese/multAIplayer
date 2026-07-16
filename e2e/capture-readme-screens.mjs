@@ -54,18 +54,20 @@ async function capture(page, scenario, filename) {
 }
 
 async function captureFeature(page, filename) {
-  const feature = page.locator(".readme-feature");
+  const feature = page.locator("[data-readme-capture]");
   await feature.waitFor({ state: "visible" });
   if (filename === "room-browser.png") {
-    await page
-      .frameLocator('iframe[title="Room browser"]')
-      .getByRole("heading", { name: /Ship the work/ })
-      .waitFor();
+    const address = feature.getByRole("textbox", { name: "Browser URL" });
+    if ((await address.inputValue()) !== "") throw new Error("README browser capture must use an empty address bar.");
+    if ((await feature.getByRole("tab").count()) !== 0)
+      throw new Error("README browser capture must not include named tabs.");
+    if ((await feature.locator("iframe").count()) !== 0)
+      throw new Error("README browser capture must not include preview content.");
   }
   if (filename === "room-terminal.png") {
-    await page.waitForFunction(() =>
-      globalThis.document.querySelector(".xterm-rows")?.textContent?.includes("VITE ready")
-    );
+    await feature.locator(".xterm").waitFor({ state: "visible" });
+    const terminalOutput = (await feature.locator(".xterm-rows").textContent())?.trim() ?? "";
+    if (terminalOutput !== "") throw new Error("README terminal capture must not include session output.");
   }
   await settlePage(page);
   const dimensions = await feature.evaluate((element) => ({
@@ -83,7 +85,7 @@ async function captureFeature(page, filename) {
 async function settlePage(page) {
   await page.addStyleTag({
     content:
-      "*, *::before, *::after { animation: none !important; caret-color: transparent !important; transition: none !important; }"
+      "*, *::before, *::after { animation: none !important; caret-color: transparent !important; transition: none !important; } .xterm-helper-textarea, .xterm-cursor { opacity: 0 !important; }"
   });
   await page.evaluate(() => globalThis.document.fonts.ready);
 }
