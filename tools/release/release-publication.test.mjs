@@ -57,11 +57,21 @@ test("an ambiguous publish retry authenticates the retained build subset indepen
 
 test("updater channel ordering follows strict SemVer precedence", () => {
   assert.equal(compareSemver("0.1.0-alpha.10", "0.1.0-alpha.2"), 1);
+  assert.equal(compareSemver("9007199254740993.0.0", "9007199254740992.0.0"), 1);
+  assert.equal(compareSemver("0.1.0-alpha.9007199254740993", "0.1.0-alpha.9007199254740992"), 1);
   assert.equal(compareSemver("0.1.0", "0.1.0-rc.9"), 1);
   assert.equal(compareSemver("0.1.0+build.2", "0.1.0+build.1"), 0);
   assert.doesNotThrow(() => assertChannelDoesNotRegress({ version: "0.2.0-alpha.0" }, { version: "0.1.9" }));
   assert.throws(
     () => assertChannelDoesNotRegress({ version: "0.1.0-alpha.1" }, { version: "0.1.0-alpha.2" }),
+    /regression/
+  );
+  assert.throws(
+    () =>
+      assertChannelDoesNotRegress(
+        { version: "0.1.0-alpha.9007199254740992" },
+        { version: "0.1.0-alpha.9007199254740993" }
+      ),
     /regression/
   );
   assert.throws(

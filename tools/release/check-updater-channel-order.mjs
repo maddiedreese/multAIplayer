@@ -11,7 +11,7 @@ export function parseSemver(version) {
   const match = semverPattern.exec(version);
   assert.ok(match, `updater version is not strict SemVer: ${version}`);
   return {
-    core: match.slice(1, 4).map(Number),
+    core: match.slice(1, 4).map((part) => BigInt(part)),
     prerelease: match[4]?.split(".") ?? []
   };
 }
@@ -33,7 +33,7 @@ export function compareSemver(leftVersion, rightVersion) {
     if (leftPart === rightPart) continue;
     const leftNumeric = /^\d+$/.test(leftPart);
     const rightNumeric = /^\d+$/.test(rightPart);
-    if (leftNumeric && rightNumeric) return Number(leftPart) < Number(rightPart) ? -1 : 1;
+    if (leftNumeric && rightNumeric) return BigInt(leftPart) < BigInt(rightPart) ? -1 : 1;
     if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
     return leftPart < rightPart ? -1 : 1;
   }
