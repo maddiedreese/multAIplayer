@@ -25,6 +25,40 @@ test("Gitleaks exceptions are exact secret fixtures, not path or commit exclusio
   assert.doesNotMatch(config, /\[\[rules\]\]/);
 });
 
+test("Rust advisory exceptions have an unexpired owner-reviewed policy that matches deny.toml", () => {
+  const policy = JSON.parse(readFileSync(".github/rust-advisory-policy.json", "utf8"));
+  const deny = readFileSync("deny.toml", "utf8");
+  const ignoreBlock = deny.match(/ignore = \[([\s\S]*?)\n\]/)?.[1];
+  assert.ok(ignoreBlock, "deny.toml must retain an explicit advisories.ignore block");
+  assert.equal(policy.version, 1);
+  assert.match(policy.owner, /^@[A-Za-z0-9-]+$/);
+  assert.match(policy.reviewBy, /^\d{4}-\d{2}-\d{2}$/);
+  const reviewDeadline = Date.parse(`${policy.reviewBy}T23:59:59.999Z`);
+  assert.ok(Number.isFinite(reviewDeadline), "Rust advisory reviewBy must be a valid UTC calendar date");
+  assert.ok(Date.now() <= reviewDeadline, `Rust advisory exceptions expired on ${policy.reviewBy}`);
+
+  const configuredExceptions = [
+    ...ignoreBlock.matchAll(/"(RUSTSEC-\d{4}-\d{4})"/g),
+    ...ignoreBlock.matchAll(/crate\s*=\s*"([^"]+)"/g)
+  ]
+    .map((match) => (match[0].startsWith("crate") ? `crate:${match[1]}` : match[1]))
+    .sort();
+  assert.deepEqual([...policy.denyExceptions].sort(), configuredExceptions);
+
+  const documentedAdvisories = new Set(policy.advisoryGroups.flatMap((group) => group.advisoryIds));
+  for (const exception of policy.denyExceptions) {
+    if (exception.startsWith("RUSTSEC-")) {
+      assert.ok(documentedAdvisories.has(exception), `${exception} lacks structured ownership and reachability`);
+    }
+  }
+  for (const group of policy.advisoryGroups) {
+    for (const field of ["name", "dependencyPath", "platformScope", "reachability", "disposition"]) {
+      assert.equal(typeof group[field], "string", `${group.name ?? "advisory group"}.${field} must be documented`);
+      assert.ok(group[field].trim().length > 0, `${group.name}.${field} must not be empty`);
+    }
+  }
+});
+
 test("required-only journey dispatch excludes every scheduled depth job", () => {
   const workflow = readFileSync(".github/workflows/journeys.yml", "utf8");
   assert.match(workflow, /When true, run only the four branch-protected pull-request journey jobs/);
