@@ -5,7 +5,14 @@ pub(crate) fn mls_group_state(
     request: RoomRequest,
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<RosterPublic> {
-    Ok(with_engine(&state, |engine| {
+    let mut lock = state
+        .engine
+        .lock()
+        .map_err(|_| crate::command_error::CommandError::unavailable("MLS state is unavailable"))?;
+    let engine = lock.as_mut().ok_or_else(|| {
+        crate::command_error::CommandError::unavailable("MLS identity is not initialized")
+    })?;
+    (|| {
         let roster = engine.roster(&request.room_id)?;
         let self_leaf = engine.self_leaf(&request.room_id)?;
         let epoch = engine.current_epoch(&request.room_id)?;
@@ -25,7 +32,22 @@ pub(crate) fn mls_group_state(
             host_device_id: host.host_device_id,
             host_transfer_id: host.transfer_id,
         })
-    })?)
+    })()
+    .map_err(group_state_command_error)
+}
+
+pub(super) fn group_state_command_error(
+    error: mls_core::EngineError,
+) -> crate::command_error::CommandError {
+    match error {
+        mls_core::EngineError::GroupNotFound => {
+            crate::command_error::CommandError::not_found("MLS group is not open.")
+        }
+        mls_core::EngineError::RequiresRejoin { .. } => {
+            crate::command_error::CommandError::requires_rejoin("MLS room requires rejoin.")
+        }
+        other => crate::command_error::CommandError::from(engine_error(other)),
+    }
 }
 
 #[typed_tauri_command::command]

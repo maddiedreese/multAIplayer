@@ -4,10 +4,10 @@ use super::invites::{
 };
 use super::{
     decode_stored_signing_secret, delete_all_history_native, delete_room_local_data_native,
-    engine_error, fingerprint, is_corruption_error_message, quarantine_store,
-    validate_room_config_payload, BasicAppCredential, CapabilityBinding, EncryptRequest,
-    EncryptedStore, MlsEngine, PendingInviteRequestPublic, PendingJoinAdmissionPublic,
-    StoredMlsIdentity,
+    engine_error, fingerprint, group_state_command_error, is_corruption_error_message,
+    quarantine_store, validate_room_config_payload, BasicAppCredential, CapabilityBinding,
+    EncryptRequest, EncryptedStore, MlsEngine, PendingInviteRequestPublic,
+    PendingJoinAdmissionPublic, StoredMlsIdentity,
 };
 
 fn request_binding() -> CapabilityBinding {
@@ -258,6 +258,25 @@ fn quarantine_classification_rejects_transient_database_errors() {
         "MLS storage operation load_group_snapshot failed"
     );
     assert!(!ipc_error.contains("private"));
+}
+
+#[test]
+fn group_state_classifies_absent_and_corrupt_groups_without_exposing_causes() {
+    let missing = group_state_command_error(mls_core::EngineError::GroupNotFound);
+    assert_eq!(
+        missing.code,
+        crate::command_error::CommandErrorCode::NotFound
+    );
+
+    let corrupt = group_state_command_error(mls_core::EngineError::requires_rejoin(
+        "load_group",
+        "secret database path /Users/private/rooms.db",
+    ));
+    assert_eq!(
+        corrupt.code,
+        crate::command_error::CommandErrorCode::RequiresRejoin
+    );
+    assert!(!corrupt.message.contains("private"));
 }
 
 #[test]
