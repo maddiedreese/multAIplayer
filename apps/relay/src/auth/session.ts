@@ -181,6 +181,7 @@ export function createRelayAuthSessionPersistence({
     },
     normalizeStoredAuthSession(stored) {
       if (!isRecord(stored)) return null;
+      const now = Date.now();
       const sessionIdHash = normalizeStoredSessionIdHash(stored, maxAuthSessionIdChars);
       const user = normalizeStoredSessionUser(stored.user, {
         maxDisplayNameChars,
@@ -191,8 +192,8 @@ export function createRelayAuthSessionPersistence({
         !sessionIdHash ||
         typeof stored.expiresAt !== "number" ||
         !Number.isSafeInteger(stored.expiresAt) ||
-        stored.expiresAt <= Date.now() ||
-        stored.expiresAt > Date.now() + authSessionMaxAgeMs ||
+        stored.expiresAt <= now ||
+        stored.expiresAt > now + authSessionMaxAgeMs ||
         !user
       ) {
         return null;
