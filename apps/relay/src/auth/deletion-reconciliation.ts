@@ -5,6 +5,7 @@ import {
 } from "./account-deletion.js";
 import type { DeletionLedger, DeletionLedgerEntry } from "./deletion-ledger.js";
 import type { RelayStore } from "../state.js";
+import { revokeRoomInvites, revokeTeamInviteArtifacts } from "../relay-domain.js";
 
 export class DeletionReconciliationBlockedError extends Error {
   override readonly name = "DeletionReconciliationBlockedError";
@@ -54,7 +55,10 @@ export async function reconcileDeletionLedger(options: {
       }
       for (const room of blockers.hostedRooms) {
         const record = options.store.getRoom(room.id);
-        if (record) options.store.setRoom({ ...record, deletedAt, hostStatus: "offline" });
+        if (record) {
+          options.store.setRoom({ ...record, deletedAt, hostStatus: "offline" });
+          revokeRoomInvites(options.store, room.teamId, room.id);
+        }
       }
       conflictsResolved += 1;
     }
@@ -104,18 +108,7 @@ function deleteOwnedTeam(store: RelayStore, teamId: string, deletedAt: string): 
       store.setRoom({ ...room, archivedAt: undefined, deletedAt });
     }
   }
-  const revokedInviteIds = new Set<string>();
-  for (const [inviteId, invite] of store.invites) {
-    if (invite.teamId !== teamId) continue;
-    store.invites.delete(inviteId);
-    revokedInviteIds.add(inviteId);
-  }
-  for (const [requestId, request] of store.inviteRequests) {
-    if (revokedInviteIds.has(request.inviteId)) store.inviteRequests.delete(requestId);
-  }
-  for (const [requestId, response] of store.inviteResponses) {
-    if (revokedInviteIds.has(response.inviteId)) store.inviteResponses.delete(requestId);
-  }
+  revokeTeamInviteArtifacts(store, teamId);
 }
 
 function groupBySubject(entries: DeletionLedgerEntry[]): Map<string, DeletionLedgerEntry[]> {

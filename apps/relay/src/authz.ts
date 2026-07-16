@@ -48,7 +48,11 @@ export function createRelayAuthz(store: RelayStore): RelayAuthz {
       return members;
     },
     canAccessRoom(teamId, roomId, userId) {
-      return store.getRoom(roomId)?.teamId === teamId && isTeamMember(teamId, userId);
+      const team = store.getTeam(teamId);
+      const room = store.getRoom(roomId);
+      return Boolean(
+        team && !team.deletedAt && room && !room.deletedAt && room.teamId === teamId && isTeamMember(teamId, userId)
+      );
     }
   };
 }

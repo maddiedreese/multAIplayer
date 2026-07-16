@@ -462,6 +462,14 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
     const restored = (await restoreResponse.json()) as { room: { id: string; archivedAt?: string } };
     assert.equal(restored.room.archivedAt, undefined);
 
+    const inviteResponse = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(inviteResponse.status, 201);
+    const { invite } = (await inviteResponse.json()) as { invite: { id: string } };
+
     const deleteResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
       method: "PATCH",
       headers: { "content-type": "application/json", cookie: ownerCookie },
@@ -470,6 +478,14 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
     assert.equal(deleteResponse.status, 200);
     const deleted = (await deleteResponse.json()) as { room: { id: string; deletedAt?: string } };
     assert.ok(deleted.room.deletedAt);
+
+    const rejectedInvite = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(rejectedInvite.status, 404);
+    assert.equal((await fetch(`${relay.baseUrl}/invites/${invite.id}`)).status, 404);
 
     const workspaceAfterDelete = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie: ownerCookie } });
     const deletedWorkspace = (await workspaceAfterDelete.json()) as { rooms: Array<{ id: string }> };

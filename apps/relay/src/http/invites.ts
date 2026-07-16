@@ -35,11 +35,13 @@ export function registerInviteRoutes({
 
     const teamId = String(req.body?.teamId ?? "");
     const roomId = String(req.body?.roomId ?? "");
-    if (!store.hasTeam(teamId)) {
+    const team = store.getTeam(teamId);
+    if (!team || team.deletedAt) {
       sendRelayError(res, 404, "team_not_found", "Team not found");
       return;
     }
-    if (store.getRoom(roomId)?.teamId !== teamId) {
+    const room = store.getRoom(roomId);
+    if (!room || room.deletedAt || room.teamId !== teamId) {
       sendRelayError(res, 404, "room_not_found", "Room not found");
       return;
     }
@@ -94,7 +96,10 @@ export function registerInviteRoutes({
 
     const team = store.getTeam(invite.teamId);
     const room = store.getRoom(invite.roomId);
-    if (!team || !room) {
+    if (!team || team.deletedAt || !room || room.deletedAt || room.teamId !== team.id) {
+      store.deleteInvite(invite.id);
+      deleteInviteArtifacts(store, invite.id);
+      scheduleStoreSave();
       sendRelayError(res, 404, "invite_not_found", "Invite target no longer exists");
       return;
     }
@@ -153,5 +158,8 @@ function deleteInviteArtifacts(store: RelayStore, inviteId: string) {
   }
   for (const [requestId, response] of store.inviteResponses) {
     if (response.inviteId === inviteId) store.inviteResponses.delete(requestId);
+  }
+  for (const [requestId, receipt] of store.inviteAckReceipts) {
+    if (receipt.inviteId === inviteId) store.inviteAckReceipts.delete(requestId);
   }
 }

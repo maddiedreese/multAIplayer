@@ -154,6 +154,59 @@ test("offline resolution deletes only resources owned by the exact reported subj
   assert.equal(store.teamMembers.get("team")?.has(userId), false);
 });
 
+test("offline resolution revokes invite artifacts for a restored hosted room", async () => {
+  const store = createRelayStore();
+  const userId = "github:host";
+  const ledger = ledgerFor(userId);
+  store.teams.set("team", { id: "team", name: "Team", members: 2 });
+  store.teamMembers.set(
+    "team",
+    new Map([
+      ["github:owner", { teamId: "team", userId: "github:owner", role: "owner", joinedAt: "2026-01-01T00:00:00.000Z" }],
+      [userId, { teamId: "team", userId, role: "member", joinedAt: "2026-01-01T00:00:00.000Z" }]
+    ])
+  );
+  store.rooms.set("room", {
+    id: "room",
+    teamId: "team",
+    name: "Room",
+    host: "Host",
+    hostUserId: userId,
+    hostStatus: "active",
+    approvalPolicy: "ask_every_turn",
+    mode: { chat: true, code: true, workspace: true, browser: false },
+    browserAllowedOrigins: [],
+    browserProfilePersistent: false,
+    unread: 0
+  });
+  store.invites.set("invite", {
+    id: "invite",
+    teamId: "team",
+    roomId: "room",
+    createdAt: "2026-01-01T00:00:00.000Z"
+  });
+  store.inviteResponses.set("request", {
+    requestId: "request",
+    inviteId: "invite",
+    requesterUserId: "github:joiner",
+    requesterDeviceId: "device",
+    status: "approved",
+    responseBinding: { teamId: "team", hostUserId: userId }
+  } as never);
+
+  const result = await reconcileDeletionLedger({
+    ledger,
+    store,
+    deleteOwnedResourcesForSubject: ledger.subjectFor(userId),
+    persist: async () => undefined
+  });
+
+  assert.equal(result.conflictsResolved, 1);
+  assert.ok(store.rooms.get("room")?.deletedAt);
+  assert.equal(store.invites.size, 0);
+  assert.equal(store.inviteResponses.size, 0);
+});
+
 test("reconciliation removes only markers whose external protection has expired", async () => {
   const store = createRelayStore();
   const ledger = ledgerFor("github:active");

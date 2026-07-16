@@ -63,7 +63,9 @@ export function createRelayRoomSocketManager({
   }
 
   function isKnownRoom(teamId: string, roomId: string): boolean {
-    return store.hasTeam(teamId) && store.getRoom(roomId)?.teamId === teamId;
+    const team = store.getTeam(teamId);
+    const room = store.getRoom(roomId);
+    return Boolean(team && !team.deletedAt && room && !room.deletedAt && room.teamId === teamId);
   }
 
   function canJoinRoom(

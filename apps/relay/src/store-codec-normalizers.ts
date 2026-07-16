@@ -190,9 +190,9 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
     if (!parsed.success) return null;
     const id = normalizeRelayId(parsed.data.id, options.maxEnvelopeIdChars);
     if (!id) return null;
-    if (!store.teams.has(parsed.data.teamId)) return null;
-    if (!store.rooms.has(parsed.data.roomId) || store.rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId)
-      return null;
+    const team = store.teams.get(parsed.data.teamId);
+    const room = store.rooms.get(parsed.data.roomId);
+    if (!team || team.deletedAt || !room || room.deletedAt || room.teamId !== team.id) return null;
     return { ...parsed.data, id };
   }
 
