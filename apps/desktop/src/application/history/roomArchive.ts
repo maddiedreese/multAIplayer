@@ -1,7 +1,10 @@
 import type { AppStoreState } from "../../store/appStore";
 import type { ChatAttachment, ChatMessage } from "../../types";
 import type { RoomArchiveBody } from "../../lib/platform/localBackend";
-import { normalizeLocalRoomHistory } from "../../lib/history/localRoomHistoryPayload";
+import {
+  normalizeLocalRoomHistory,
+  normalizeReadOnlyRoomArchiveHistory
+} from "../../lib/history/localRoomHistoryPayload";
 
 export const roomArchiveOmissions = [
   "MLS group, epoch, exporter, device, signing, HPKE, and private-key state",
@@ -65,11 +68,7 @@ export interface ReadOnlyRoomArchiveProjection {
 
 /** Converts untrusted decrypted JSON to the same bounded history types used by live local history. */
 export function projectReadOnlyRoomArchive(archive: RoomArchiveBody): ReadOnlyRoomArchiveProjection {
-  const history = normalizeLocalRoomHistory({
-    // Archive version 1 is an explicitly lossy, user-editable interchange
-    // format. Keep its bounded sanitizing migration separate from strict v3
-    // encrypted-history recovery.
-    version: 2,
+  const history = normalizeReadOnlyRoomArchiveHistory({
     messages: archive.history.messages,
     chatEdits: archive.history.chatEdits,
     chatDeletes: archive.history.chatDeletes,

@@ -6,7 +6,6 @@ export type InviteJoinErrorCode =
   | "invite_id_missing"
   | "invite_metadata_mismatch"
   | "key_package_hash_mismatch"
-  | "legacy_invite"
   | "pending_recovery_mismatch";
 
 export class InviteJoinError extends Error {

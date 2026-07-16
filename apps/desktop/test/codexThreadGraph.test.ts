@@ -8,42 +8,32 @@ import {
   mergeCodexThreadGraph,
   normalizeCodexThreadGraph
 } from "../src/lib/codex/codexThreadGraph";
-import { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } from "../src/lib/history/localRoomHistoryPayload";
 import { useAppStore } from "../src/store/appStore";
-import type { CodexActivity, CodexThreadGraph, LocalRoomHistoryPayload } from "../src/types";
+import type { CodexActivity, CodexThreadGraph } from "../src/types";
 
 test.beforeEach(() => useAppStore.getState().resetAppStore());
 
-test("legacy active thread state migrates into a normalized durable graph", () => {
-  const graph = normalizeCodexThreadGraph(undefined, "thread-legacy");
-  assert.equal(graph.activeThreadId, "thread-legacy");
-  assert.equal(graph.nodesById["thread-legacy"]?.title, "Codex thread");
-});
-
-test("legacy persisted thread ids migrate one-way to graph-only history", () => {
-  const legacy = {
-    ...emptyLocalRoomHistoryPayload(),
-    codexThreadId: "thread-legacy"
-  } as unknown as LocalRoomHistoryPayload;
-  const normalized = normalizeLocalRoomHistory(legacy);
-  assert.equal(normalized.codexThreadGraph?.activeThreadId, "thread-legacy");
-  assert.equal("codexThreadId" in normalized, false);
-});
-
 test("thread graph merge adopts only the active session tree", () => {
-  const graph = mergeCodexThreadGraph(normalizeCodexThreadGraph(undefined, "thread-root"), [
-    node("thread-root", "session-a"),
-    node("thread-child", "session-a", "thread-root"),
-    node("unrelated", "session-b")
-  ]);
+  const graph = mergeCodexThreadGraph(
+    normalizeCodexThreadGraph({
+      activeThreadId: "thread-root",
+      nodesById: { "thread-root": node("thread-root", "session-a") }
+    }),
+    [node("thread-root", "session-a"), node("thread-child", "session-a", "thread-root"), node("unrelated", "session-b")]
+  );
   assert.deepEqual(Object.keys(graph.nodesById).sort(), ["thread-child", "thread-root"]);
 });
 
 test("thread graph discovery fails closed when the unresolved active thread is absent", () => {
-  const graph = mergeCodexThreadGraph(normalizeCodexThreadGraph(undefined, "thread-root"), [
-    node("unrelated-a", "session-a"),
-    node("unrelated-b", "session-b")
-  ]);
+  const graph = mergeCodexThreadGraph(
+    normalizeCodexThreadGraph({
+      activeThreadId: "thread-root",
+      nodesById: {
+        "thread-root": { id: "thread-root", title: "Root", status: "idle", createdAt: 1, updatedAt: 1 }
+      }
+    }),
+    [node("unrelated-a", "session-a"), node("unrelated-b", "session-b")]
+  );
   assert.deepEqual(Object.keys(graph.nodesById), ["thread-root"]);
 });
 

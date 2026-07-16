@@ -41,14 +41,18 @@ export function parseInviteInput(raw: string) {
   if (raw.length > maxInviteLinkChars) {
     throw new InviteJoinError("invalid_invite", "A complete host-approved multAIplayer invite link is required.");
   }
+  if (!raw.startsWith("#")) {
+    try {
+      if (new URL(raw).search) {
+        throw new InviteJoinError("invalid_invite", "Invite data must be contained in the URL fragment.");
+      }
+    } catch (error) {
+      if (error instanceof InviteJoinError) throw error;
+      throw new InviteJoinError("invalid_invite", "A complete host-approved multAIplayer invite link is required.");
+    }
+  }
   const fragment = raw.includes("#") ? raw.slice(raw.indexOf("#") + 1) : raw.replace(/^#/, "");
   const params = new URLSearchParams(fragment);
-  if (params.has("multaiplayerInvite")) {
-    throw new InviteJoinError(
-      "legacy_invite",
-      "This pre-v2 invite is invalid. Ask the active host for a new MLS invite."
-    );
-  }
   const allowedFragmentKeys = new Set(["invite", "multaiplayerJoin", "approval"]);
   if (
     [...params.keys()].some((key) => !allowedFragmentKeys.has(key)) ||
@@ -62,25 +66,9 @@ export function parseInviteInput(raw: string) {
   if (fragmentInviteIds.length > 1) {
     throw new InviteJoinError("invalid_invite", "A complete host-approved multAIplayer invite link is required.");
   }
-  let queryInviteId: string | null = null;
-  try {
-    const query = new URL(raw).searchParams;
-    if ([...query.keys()].some((key) => key !== "invite") || query.getAll("invite").length > 1) {
-      throw new InviteJoinError("invalid_invite", "The invite link query is ambiguous.");
-    }
-    queryInviteId = query.get("invite");
-  } catch {
-    if (!raw.startsWith("#")) {
-      throw new InviteJoinError("invalid_invite", "A complete host-approved multAIplayer invite link is required.");
-    }
-  }
   const fragmentInviteId = fragmentInviteIds[0] ?? null;
-  if (fragmentInviteId && queryInviteId) {
-    throw new InviteJoinError("invalid_invite", "A complete host-approved multAIplayer invite link is required.");
-  }
-  const inviteId = fragmentInviteId ?? queryInviteId;
   const joinInvite = params.get("multaiplayerJoin");
-  if (!joinInvite || !inviteId)
+  if (!joinInvite || !fragmentInviteId)
     throw new InviteJoinError("invalid_invite", "A complete host-approved multAIplayer invite link is required.");
-  return { inviteId, joinInvite };
+  return { inviteId: fragmentInviteId, joinInvite };
 }

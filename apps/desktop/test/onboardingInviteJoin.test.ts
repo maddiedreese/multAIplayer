@@ -76,7 +76,7 @@ test("scrub failure fails closed without sending the bearer capability", async (
   assert.equal(outcome.status, "temporarily_unavailable");
 });
 
-test("legacy and incomplete manual invites are rejected without entering MLS", async () => {
+test("obsolete and incomplete manual invites are rejected without entering MLS", async () => {
   let calls = 0;
   const adapter = createOnboardingInviteJoinAdapter({
     requestNoSecretInviteAccess: async () => {
@@ -87,23 +87,10 @@ test("legacy and incomplete manual invites are rejected without entering MLS", a
     "https://app.example.test/#invite=old&multaiplayerInvite=legacy-room-secret"
   );
   const incomplete = await adapter.joinManualInput("https://app.example.test/");
-  assert.equal(legacy.status, "legacy_invite");
+  assert.equal(legacy.status, "invalid_invite");
   assert.equal(incomplete.status, "invalid_invite");
   assert.equal(calls, 0);
   assert.doesNotMatch(JSON.stringify([legacy, incomplete]), /legacy-room-secret/);
-});
-
-test("URL legacy invite is scrubbed and rejected without entering MLS", async () => {
-  const order: string[] = [];
-  const adapter = createOnboardingInviteJoinAdapter({
-    requestNoSecretInviteAccess: async () => order.push("request")
-  });
-  const outcome = await adapter.joinFromUrl(
-    { pathname: "/", search: "", hash: "#invite=old&multaiplayerInvite=legacy-room-secret" },
-    () => order.push("scrub")
-  );
-  assert.equal(outcome.status, "legacy_invite");
-  assert.deepEqual(order, ["scrub"]);
 });
 
 test("relay errors map to actionable fixed statuses without forwarding server details", async () => {

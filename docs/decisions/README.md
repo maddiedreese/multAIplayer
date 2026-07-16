@@ -2,7 +2,6 @@
 
 These records explain durable implementation constraints that are easy to miss when reading one feature at a time. Each record states the accepted decision, its consequences, and the conditions that would justify revisiting it.
 
-- [Zustand store boundaries](zustand-store-boundaries.md)
 - [Active-host authorization](active-host-authorization.md)
 - [Host handoff and key authority](host-handoff.md)
 - [Bounded structured Codex collaboration activity](metadata-only-codex-activity.md)

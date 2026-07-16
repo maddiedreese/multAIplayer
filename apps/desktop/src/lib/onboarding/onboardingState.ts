@@ -263,10 +263,9 @@ export function loadOnboardingState(storage: StorageLike | undefined = browserSt
 
   try {
     const decoded: unknown = JSON.parse(raw);
-    const migrated = migrateOnboardingState(decoded);
-    if (!migrated) throw new Error("Unsupported or invalid onboarding state");
-    if (!isVersionOne(decoded)) safeWrite(storage, migrated);
-    return migrated;
+    const state = normalizeVersionOne(decoded);
+    if (!state) throw new Error("Unsupported or invalid onboarding state");
+    return state;
   } catch {
     reportNonFatal("discard corrupt local onboarding state");
     safeRemove(storage);
@@ -282,40 +281,6 @@ export function saveOnboardingState(state: OnboardingState, storage: StorageLike
     return;
   }
   safeWrite(storage, normalized);
-}
-
-function migrateOnboardingState(value: unknown): OnboardingState | null {
-  if (!isRecord(value)) return null;
-  if (value.version === onboardingStateVersion) return normalizeVersionOne(value);
-  if (value.version !== 0) return null;
-
-  const progress = isRecord(value.progress) ? value.progress : {};
-  const intent = validIntent(value.intent) ? value.intent : null;
-  const membership =
-    intent !== null && validTeamId(progress.teamId) && validRoomId(progress.roomId)
-      ? { teamId: progress.teamId, roomId: progress.roomId }
-      : null;
-  const surface = validSurface(value.step) ? value.step : "welcome";
-  const firstTurnCompleted = membership !== null && progress.firstTurnCompleted === true;
-  return normalizeVersionOne({
-    version: onboardingStateVersion,
-    intent,
-    surface,
-    presentation: value.skipped === true ? "skipped" : value.dismissed === true ? "dismissed" : "open",
-    assistantCompleted: firstTurnCompleted,
-    checklistDismissed: value.checklistDismissed === true,
-    markers: {
-      codexConnected: progress.codexConnected === true,
-      workspaceCreatedTeamId: null,
-      membership,
-      projectAttached: membership !== null && progress.projectAttached === true,
-      firstTurnCompleted,
-      // Version zero recorded an invitation, not observed membership. It cannot
-      // safely satisfy the renamed teammate milestone.
-      teammateJoined: false,
-      teammateDeferred: false
-    }
-  });
 }
 
 function normalizeVersionOne(value: unknown): OnboardingState | null {
@@ -449,10 +414,6 @@ function validTeamId(value: unknown): value is string {
 
 function validRoomId(value: unknown): value is string {
   return typeof value === "string" && value.length >= 3 && value.length <= maxRoomIdChars && relayIdPattern.test(value);
-}
-
-function isVersionOne(value: unknown): boolean {
-  return isRecord(value) && value.version === onboardingStateVersion;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -21,13 +21,12 @@ The alpha intentionally supports Apple-silicon macOS, GitHub identity, Codex app
 | `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, invite cryptography, exporters, and encrypted state   |
 | `apps/relay`                             | Authenticated HTTP/WebSocket routing, quotas, and SQLite persistence |
 | `packages/protocol`                      | Shared wire records and runtime validation                           |
-| `packages/codex`                         | Codex app-server adapter and compatibility contract                  |
 | `packages/git`, `packages/github`        | Host-side repository and GitHub adapters                             |
 | `e2e`                                    | UI contracts and multi-process desktop journeys                      |
 | `tools`                                  | Focused verification, release, and maintenance utilities             |
 | `docs/decisions`                         | Normative architecture decision records                              |
 
-Imports are directional. Desktop code is split into pure domain/platform modules under `src/lib`, store-aware workflows under `src/application`, component-facing projections under `src/presentation`, and rendering under `src/components`. ESLint rules enforce the important layer and ownership boundaries.
+Desktop code is organized into domain/platform helpers under `src/lib`, store-aware workflows under `src/application`, component-facing projections under `src/presentation`, and rendering under `src/components`. TypeScript, React Hooks linting, and workspace package boundaries are enforced automatically; code organization is reviewed where it affects clarity rather than duplicated in a hand-maintained dependency registry.
 
 ## Key flows
 

@@ -84,7 +84,7 @@ Pull requests run workspace checks and product journeys when executable code cha
 | `apps/desktop/src-tauri/crates/mls-core`            | MLS, invite cryptography, exporters, encrypted state    |
 | `apps/relay`                                        | Authenticated transport, SQLite persistence, and quotas |
 | `packages/protocol`                                 | Shared wire records and runtime validation              |
-| `packages/codex`, `packages/git`, `packages/github` | Host-side integrations                                  |
+| `packages/git`, `packages/github`                   | Host-side integrations                                  |
 | `e2e`                                               | UI contracts and multi-process journeys                 |
 | `docs/decisions`                                    | Normative architecture decisions                        |
 
