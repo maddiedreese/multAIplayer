@@ -112,7 +112,6 @@ test("relay rejects expired invite metadata loaded from store", async () => {
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
           mode: { chat: true, code: true, workspace: true, browser: false },
-          codexModel: "gpt-5.4",
           browserAllowedOrigins: ["https://github.com"],
           browserProfilePersistent: true,
           unread: 0
@@ -155,7 +154,6 @@ test("relay drops invalid persisted invite metadata", async () => {
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
           mode: { chat: true, code: true, workspace: true, browser: false },
-          codexModel: "gpt-5.4",
           browserAllowedOrigins: ["https://github.com"],
           browserProfilePersistent: true,
           unread: 0
@@ -228,7 +226,6 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
           mode: { chat: true, code: true, workspace: true, browser: false },
-          codexModel: "gpt-5.4",
           browserAllowedOrigins: ["https://github.com"],
           browserProfilePersistent: true,
           unread: 0

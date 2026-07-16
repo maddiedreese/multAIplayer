@@ -16,8 +16,6 @@ const room: RoomRecord = {
   hostUserId: "github:maddiedreese",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
   mode: { chat: true, code: true, workspace: true, browser: true },
   browserAllowedOrigins: ["https://github.com"],
   browserProfilePersistent: false
@@ -115,15 +113,6 @@ test("room settings reject host-local fields and invalid public settings with pr
       [{ name: "" }, "Room name is required and must be up to 160 characters"],
       [{ name: "x".repeat(161) }, "Room name is required and must be up to 160 characters"],
       [{ approvalPolicy: "sometimes" }, "approvalPolicy is invalid"],
-      [{ approvalDelegationPolicy: "everyone" }, "approvalDelegationPolicy is invalid"],
-      [{ trustedApproverUserIds: "github:peer" }, "trustedApproverUserIds must be up to 50 user ids"],
-      [
-        { trustedApproverUserIds: Array.from({ length: 51 }, (_, index) => `user:${index}`) },
-        "trustedApproverUserIds must be up to 50 user ids"
-      ],
-      [{ trustedApproverUserIds: [""] }, "trustedApproverUserIds must be up to 50 user ids"],
-      [{ trustedApproverUserIds: ["x".repeat(161)] }, "trustedApproverUserIds must be up to 50 user ids"],
-      [{ trustedApproverUserIds: ["github:peer\u0000"] }, "trustedApproverUserIds must be up to 50 user ids"],
       [{ mode: { chat: true } }, "mode must include boolean chat, code, workspace, and browser fields"],
       [
         { browserAllowedOrigins: ["ftp://example.com"] },
@@ -151,8 +140,6 @@ test("room settings normalize and persist every public setting while preserving 
     const response = await harness.patch({
       name: "  Renamed room  ",
       approvalPolicy: "never",
-      approvalDelegationPolicy: "trusted_approvers",
-      trustedApproverUserIds: [" github:peer ", "github:peer", "github:second"],
       mode,
       browserAllowedOrigins: ["https://example.com/path", "https://github.com"],
       browserProfilePersistent: true
@@ -163,8 +150,6 @@ test("room settings normalize and persist every public setting while preserving 
       ...room,
       name: "Renamed room",
       approvalPolicy: "never",
-      approvalDelegationPolicy: "trusted_approvers",
-      trustedApproverUserIds: ["github:peer", "github:second"],
       mode,
       browserAllowedOrigins: ["https://example.com", "https://github.com"],
       browserProfilePersistent: true
@@ -179,10 +164,6 @@ test("room settings normalize and persist every public setting while preserving 
     assert.equal(harness.browserNormalizationCalls(), 0);
     assert.equal(harness.saves(), 1);
     assert.equal(harness.broadcasts(), 1);
-
-    harness.reset(updated);
-    const cleared = ((await (await harness.patch({ trustedApproverUserIds: [] })).json()) as { room: RoomRecord }).room;
-    assert.deepEqual(cleared.trustedApproverUserIds, []);
   } finally {
     await harness.close();
   }
@@ -255,7 +236,6 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
       return origins;
     },
     isApprovalPolicy: (value) => ["ask_every_turn", "never"].includes(value),
-    isApprovalDelegationPolicy: (value) => ["host_only", "trusted_approvers"].includes(value),
     isRoomMode: (value): value is RoomRecord["mode"] => {
       if (!value || typeof value !== "object") return false;
       const candidate = value as Record<string, unknown>;

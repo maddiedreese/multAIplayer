@@ -12,8 +12,6 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
   mode: { chat: true, code: true, workspace: false, browser: false },
   codexModel: "gpt-5.4",
   browserAllowedOrigins: ["https://github.com"],
@@ -36,12 +34,7 @@ test("Codex approvals reset when room execution context changes", () => {
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, projectPath: "/Users/maddie/other-project" }),
     true
   );
-  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, approvalPolicy: "auto_chat_only" }), true);
-  assert.equal(
-    shouldResetCodexApprovalForRoomUpdate(room, { ...room, approvalDelegationPolicy: "members_can_approve" }),
-    true
-  );
-  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, trustedApproverUserIds: ["github:peer"] }), true);
+  assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, approvalPolicy: "never_host" }), true);
   assert.equal(
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, mode: { ...room.mode, workspace: true } }),
     false

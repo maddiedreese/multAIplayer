@@ -141,17 +141,13 @@ export function deleteAccountOwnedRelayData(store: RelayStore, userId: string): 
   }
 
   for (const room of store.allRooms()) {
-    const trustedApproverUserIds = room.trustedApproverUserIds.filter((candidate) => candidate !== userId);
     if (room.deletedAt && room.hostUserId === userId) {
       const { hostUserId: _hostUserId, activeHostDeviceId: _activeHostDeviceId, ...withoutHostIdentity } = room;
       store.setRoom({
         ...withoutHostIdentity,
         host: "Deleted user",
-        hostStatus: "offline",
-        trustedApproverUserIds
+        hostStatus: "offline"
       });
-    } else if (trustedApproverUserIds.length !== room.trustedApproverUserIds.length) {
-      store.setRoom({ ...room, trustedApproverUserIds });
     }
   }
 
@@ -216,11 +212,7 @@ function snapshotAccountDeletionState(
     deviceSessions: select(store.deviceSessions, (_key, session) => session.userId === userId),
     devices: select(store.devices, (_key, device) => device.userId === userId),
     keyPackages: select(store.keyPackages, (_key, keyPackage) => keyPackage.userId === userId),
-    rooms: select(
-      store.rooms,
-      (_key, room) =>
-        (Boolean(room.deletedAt) && room.hostUserId === userId) || room.trustedApproverUserIds.includes(userId)
-    ),
+    rooms: select(store.rooms, (_key, room) => Boolean(room.deletedAt) && room.hostUserId === userId),
     invites: select(
       store.invites,
       (_key, invite) => invite.creatorUserId === userId || invite.approvedUserId === userId

@@ -11,18 +11,6 @@ export function normalizeCatalogSelectionPolicy(
   return value === "auto" || value === "pinned" ? value : null;
 }
 
-export function normalizeTrustedApproverUserIds(value: unknown, maxUserIdChars: number): string[] | null {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 50) return null;
-  const ids = new Set<string>();
-  for (const item of value) {
-    const normalized = typeof item === "string" ? item.trim() : "";
-    if (!normalized || normalized.length > maxUserIdChars || /[\u0000-\u001f\u007f]/.test(normalized)) return null;
-    ids.add(normalized);
-  }
-  return [...ids];
-}
-
 export function allowTotalRoomQuota({
   store,
   teamIds,

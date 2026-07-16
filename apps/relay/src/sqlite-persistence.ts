@@ -1,8 +1,7 @@
 import Database from "better-sqlite3";
-import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, rename, stat } from "node:fs/promises";
+import { chmod, mkdir, rename, stat } from "node:fs/promises";
 import { dirname } from "node:path";
-import { isRecord, type MlsRelayMessage } from "@multaiplayer/protocol";
+import { type MlsRelayMessage } from "@multaiplayer/protocol";
 import { logRelayEvent } from "./observability.js";
 import type { RelayPersistence, StoredRelayMutation } from "./persistence-types.js";
 import { openRelayDatabase } from "./sqlite-schema.js";
@@ -11,7 +10,6 @@ import {
   applyStoredRelayMutations,
   applyStoredRelayMutationsInTransaction,
   loadNormalizedRelayState,
-  purgeLegacyRoomConfigFields,
   saveMlsBacklogRows,
   saveNormalizedRelayState
 } from "./sqlite-state-repository.js";
@@ -19,12 +17,8 @@ import type { RoomKey } from "./state.js";
 
 export class SqliteRelayPersistence implements RelayPersistence {
   private db: Database.Database | null = null;
-  private pendingLegacyImport = false;
-
   constructor(
     private readonly dataPath: string,
-    private readonly legacyJsonImportPath: string | null,
-    private readonly renameLegacyFile: typeof rename = rename,
     private readonly recordWriteDuration: (durationMs: number) => void = () => undefined,
     private readonly sqliteWalAutoCheckpointPages = 1_000
   ) {}
@@ -32,99 +26,36 @@ export class SqliteRelayPersistence implements RelayPersistence {
   async load(): Promise<unknown | null> {
     await ensureDataDirectory(dirname(this.dataPath));
     const db = this.getDb();
-    const normalized = loadNormalizedRelayState(db);
-    if (normalized !== null) {
-      await this.finishInterruptedLegacyBackup(db);
-      return normalized;
-    }
-    const row = db.prepare("select state_json from relay_snapshots where id = ?").get("current") as
-      { state_json?: unknown } | undefined;
-    if (typeof row?.state_json === "string") return JSON.parse(row.state_json) as unknown;
-    if (!this.legacyJsonImportPath || !existsSync(this.legacyJsonImportPath)) return null;
-    try {
-      const legacyState = JSON.parse(await readFile(this.legacyJsonImportPath, "utf8")) as unknown;
-      if (!isRecord(legacyState) || legacyState.version !== 1)
-        throw new Error("Legacy relay store has an unsupported version.");
-      this.pendingLegacyImport = true;
-      return legacyState;
-    } catch (error) {
-      throw new RelayPersistenceMigrationError(`Could not import legacy relay store at ${this.legacyJsonImportPath}`, {
-        cause: error
-      });
-    }
-  }
-
-  async finalizeLoad(state: () => unknown): Promise<void> {
-    if (!this.pendingLegacyImport || !this.legacyJsonImportPath) {
-      const normalized = state();
-      const normalizedRooms = isRecord(normalized) && Array.isArray(normalized.rooms) ? normalized.rooms : null;
-      if (normalizedRooms) this.timedWrite(() => purgeLegacyRoomConfigFields(this.getDb(), normalizedRooms));
-      return;
-    }
-    this.timedWrite(() => saveNormalizedRelayState(this.getDb(), state(), this.legacyJsonImportPath!));
-    try {
-      await this.renameLegacyFile(this.legacyJsonImportPath, availableMigrationBackupPath(this.legacyJsonImportPath));
-    } catch (error) {
-      throw new RelayPersistenceMigrationError(
-        `Could not preserve migrated legacy relay store at ${this.legacyJsonImportPath}`,
-        { cause: error }
-      );
-    }
-    this.pendingLegacyImport = false;
-  }
-
-  private async finishInterruptedLegacyBackup(db: Database.Database): Promise<void> {
-    if (!this.legacyJsonImportPath || !existsSync(this.legacyJsonImportPath)) return;
-    const marker = db.prepare("select value from relay_meta where key = ?").get("legacyJsonImportedFrom") as
-      { value?: unknown } | undefined;
-    if (marker?.value !== this.legacyJsonImportPath) return;
-    try {
-      await this.renameLegacyFile(this.legacyJsonImportPath, availableMigrationBackupPath(this.legacyJsonImportPath));
-    } catch (error) {
-      throw new RelayPersistenceMigrationError(
-        `Could not preserve migrated legacy relay store at ${this.legacyJsonImportPath}`,
-        { cause: error }
-      );
-    }
+    return loadNormalizedRelayState(db);
   }
 
   async save(state: unknown): Promise<void> {
     await ensureDataDirectory(dirname(this.dataPath));
     this.timedWrite(() => saveNormalizedRelayState(this.getDb(), state));
   }
-  saveChanges(changes: StoredRelayMutation[]): boolean {
+  saveChanges(changes: StoredRelayMutation[]): void {
     if (changes.length > 0) this.timedWrite(() => applyStoredRelayMutations(this.getDb(), changes));
-    return true;
   }
-  saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): boolean {
+  saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): void {
     this.timedWrite(() => saveMlsBacklogRows(this.getDb(), roomKey, messages));
-    return true;
   }
-  saveKeyPackages(changes: StoredRelayMutation[], _fallbackState: () => unknown): void {
+  saveKeyPackages(changes: StoredRelayMutation[]): void {
     this.timedWrite(() => applyStoredRelayMutations(this.getDb(), changes));
   }
   saveMlsMessage(
     roomKey: RoomKey,
     message: MlsRelayMessage,
     prunedIds: string[],
-    changes: StoredRelayMutation[],
-    _fallbackState: () => unknown
-  ): boolean {
+    changes: StoredRelayMutation[]
+  ): void {
     this.timedWrite(() =>
       this.getDb().transaction(() => {
         appendMlsBacklogRow(this.getDb(), roomKey, message, prunedIds);
         applyStoredRelayMutationsInTransaction(this.getDb(), changes, new Set(["mlsBacklog"]));
       })()
     );
-    return true;
   }
-  saveMlsCommit(
-    roomKey: RoomKey,
-    message: MlsRelayMessage,
-    prunedIds: string[],
-    changes: StoredRelayMutation[],
-    _fallbackState: () => unknown
-  ): void {
+  saveMlsCommit(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[], changes: StoredRelayMutation[]): void {
     this.timedWrite(() =>
       this.getDb().transaction(() => {
         this.getDb().prepare("insert or ignore into relay_room_epochs values (?, ?)").run(roomKey, message.epochHint);
@@ -162,19 +93,8 @@ export class SqliteRelayPersistence implements RelayPersistence {
   }
 }
 
-export class RelayPersistenceMigrationError extends Error {
-  override readonly name = "RelayPersistenceMigrationError";
-}
 export class RelayStaleEpochError extends Error {
   override readonly name = "RelayStaleEpochError";
-}
-
-function availableMigrationBackupPath(legacyPath: string): string {
-  const base = `${legacyPath}.migrated-to-sqlite`;
-  if (!existsSync(base)) return base;
-  let suffix = 1;
-  while (existsSync(`${base}-${suffix}`)) suffix += 1;
-  return `${base}-${suffix}`;
 }
 
 async function ensureDataDirectory(path: string): Promise<void> {

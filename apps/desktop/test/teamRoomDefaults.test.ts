@@ -127,10 +127,10 @@ test("team room defaults sanitize Codex model", () => {
   });
 });
 
-test("team room defaults sanitize browser policy", () => {
+test("team room defaults sanitize unsupported approval policy and browser settings", () => {
   assert.deepEqual(
     sanitizeTeamRoomDefaults({
-      approvalPolicy: "auto_browser_allowed_sites",
+      approvalPolicy: "unsupported" as never,
       codexModel: "gpt-5.4-thinking",
       browserAllowedOrigins: ["https://github.com/path"],
       browserProfilePersistent: "yes" as never
@@ -146,7 +146,7 @@ test("team room defaults sanitize browser policy", () => {
 
   assert.deepEqual(
     sanitizeTeamRoomDefaults({
-      approvalPolicy: "auto_browser_allowed_sites",
+      approvalPolicy: "unsupported" as never,
       codexModel: "gpt-5.4-mini",
       browserAllowedOrigins: ["https://github.com", "https://github.com"],
       browserProfilePersistent: false,

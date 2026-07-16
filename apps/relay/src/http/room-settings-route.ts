@@ -1,6 +1,5 @@
 import { sendRelayError } from "./errors.js";
 import { type RoomRecord } from "@multaiplayer/protocol";
-import { normalizeTrustedApproverUserIds } from "./room-validation.js";
 import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
 
 const encryptedConfigFields = [
@@ -28,8 +27,7 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
     normalizeBrowserAllowedOrigins,
     scheduleStoreSave,
     broadcastRoomUpdated,
-    maxRoomNameChars,
-    maxUserIdChars
+    maxRoomNameChars
   } = options;
 
   app.patch("/rooms/:roomId/settings", (req, res) => {
@@ -46,8 +44,6 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
     const {
       name,
       approvalPolicy,
-      approvalDelegationPolicy,
-      trustedApproverUserIds,
       mode,
       browserAllowedOrigins,
       browserProfilePersistent,
@@ -55,8 +51,7 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
     } = normalizeRoomSettingsInput(req.body, {
       normalizeMetadataText,
       normalizeBrowserAllowedOrigins,
-      maxRoomNameChars,
-      maxUserIdChars
+      maxRoomNameChars
     });
     const requester = requesterFromRequest(req.body, req.cookies?.multaiplayer_session);
     const room = store.getRoom(roomId);
@@ -72,8 +67,6 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
       {
         name,
         approvalPolicy,
-        approvalDelegationPolicy,
-        trustedApproverUserIds,
         mode,
         browserAllowedOrigins,
         browserProfilePersistent,
@@ -84,8 +77,6 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
     if (inputError) return void sendRelayError(res, 400, "invalid_request", inputError);
 
     const validApprovalPolicy = approvalPolicy as RoomRecord["approvalPolicy"] | undefined;
-    const validApprovalDelegationPolicy = approvalDelegationPolicy as
-      RoomRecord["approvalDelegationPolicy"] | undefined;
     const validMode = mode as RoomRecord["mode"] | undefined;
     const validBrowserProfilePersistent = browserProfilePersistent as boolean | undefined;
 
@@ -93,8 +84,6 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
       ...room,
       name: name ?? room.name,
       approvalPolicy: validApprovalPolicy ?? room.approvalPolicy,
-      approvalDelegationPolicy: validApprovalDelegationPolicy ?? room.approvalDelegationPolicy,
-      trustedApproverUserIds: trustedApproverUserIds ?? room.trustedApproverUserIds,
       mode: validMode ?? room.mode,
       browserAllowedOrigins: normalizedBrowserAllowedOrigins ?? room.browserAllowedOrigins,
       browserProfilePersistent: validBrowserProfilePersistent ?? room.browserProfilePersistent
@@ -117,13 +106,6 @@ function roomSettingsInputError(
   if (input.approvalPolicy !== undefined && !options.isApprovalPolicy(input.approvalPolicy)) {
     return "approvalPolicy is invalid";
   }
-  if (
-    input.approvalDelegationPolicy !== undefined &&
-    !options.isApprovalDelegationPolicy(input.approvalDelegationPolicy)
-  ) {
-    return "approvalDelegationPolicy is invalid";
-  }
-  if (input.trustedApproverUserIds === null) return "trustedApproverUserIds must be up to 50 user ids";
   if (input.mode !== undefined && !options.isRoomMode(input.mode)) {
     return "mode must include boolean chat, code, workspace, and browser fields";
   }
@@ -140,24 +122,16 @@ function normalizeRoomSettingsInput(
   body: Record<string, unknown> | undefined,
   options: Pick<
     RegisterRoomRoutesOptions,
-    "normalizeMetadataText" | "normalizeBrowserAllowedOrigins" | "maxRoomNameChars" | "maxUserIdChars"
+    "normalizeMetadataText" | "normalizeBrowserAllowedOrigins" | "maxRoomNameChars"
   >
 ) {
   const name =
     body?.name === undefined ? undefined : options.normalizeMetadataText(body.name, options.maxRoomNameChars);
   const approvalPolicy = body?.approvalPolicy === undefined ? undefined : String(body.approvalPolicy);
-  const approvalDelegationPolicy =
-    body?.approvalDelegationPolicy === undefined ? undefined : String(body.approvalDelegationPolicy);
-  const trustedApproverUserIds =
-    body?.trustedApproverUserIds === undefined
-      ? undefined
-      : normalizeTrustedApproverUserIds(body.trustedApproverUserIds, options.maxUserIdChars);
   const browserAllowedOrigins = body?.browserAllowedOrigins;
   return {
     name,
     approvalPolicy,
-    approvalDelegationPolicy,
-    trustedApproverUserIds,
     mode: body?.mode,
     browserAllowedOrigins,
     browserProfilePersistent: body?.browserProfilePersistent,

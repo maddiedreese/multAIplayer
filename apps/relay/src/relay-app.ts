@@ -11,7 +11,6 @@ import {
   maxAttachmentBlobIdChars,
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
-  maxAuthSessionIdChars,
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
@@ -63,7 +62,11 @@ import type { KeyPackageValidator } from "./mls/key-package-validator.js";
 export { configuredKeyPackageValidator } from "./mls/configured-validator.js";
 
 export async function createRelayApp(
-  options: { keyPackageValidator?: KeyPackageValidator; deletionLedgerForTests?: DeletionLedger } = {}
+  options: {
+    keyPackageValidator?: KeyPackageValidator;
+    deletionLedgerForTests?: DeletionLedger;
+    deleteOwnedResourcesForDeletionSubject?: string;
+  } = {}
 ) {
   const relayConfig = loadRelayConfig();
   const keyPackageValidator = options.keyPackageValidator ?? configuredKeyPackageValidator(relayConfig.nodeEnv);
@@ -71,7 +74,6 @@ export async function createRelayApp(
     nodeEnv,
     port,
     dataPath,
-    legacyJsonImportPath,
     mlsBacklogLimit,
     mlsBacklogRetentionDays,
     attachmentBlobMaxBytes,
@@ -106,7 +108,6 @@ export async function createRelayApp(
       : null);
   const relayPersistence = createRelayPersistence({
     dataPath,
-    legacyJsonImportPath,
     sqliteWalAutoCheckpointPages: relayConfig.sqliteWalAutoCheckpointPages,
     recordSqliteWriteDuration: relayMetrics.recordSqliteWriteDuration
   });
@@ -182,7 +183,6 @@ export async function createRelayApp(
   const { authSessionMaxAgeMs, getAuthSession } = authSessionManager;
   const authSessionPersistence = createRelayAuthSessionPersistence({
     authSessionMaxAgeMs,
-    maxAuthSessionIdChars,
     maxDisplayNameChars,
     maxRoomProjectPathChars,
     maxUserIdChars
@@ -349,9 +349,12 @@ export async function createRelayApp(
     ? await reconcileDeletionLedger({
         ledger: deletionLedger,
         store: relayStore,
-        persist: () => relayStorePersistence.saveRelayStore()
+        persist: () => relayStorePersistence.saveRelayStore(),
+        ...(options.deleteOwnedResourcesForDeletionSubject
+          ? { deleteOwnedResourcesForSubject: options.deleteOwnedResourcesForDeletionSubject }
+          : {})
       })
-    : { entries: 0, pending: 0, identitiesDeleted: 0, markersPruned: 0 };
+    : { entries: 0, pending: 0, identitiesDeleted: 0, markersPruned: 0, conflictsResolved: 0 };
   if (deletionLedger) {
     logRelayEvent("info", "deletion_ledger_reconciled", deletionReconciliation);
   }

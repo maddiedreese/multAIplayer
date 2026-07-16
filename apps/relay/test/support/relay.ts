@@ -69,10 +69,7 @@ export async function startRelay(
   storedState?: StoredRelayStateFixture,
   existingDataPath?: string
 ): Promise<RelayHarness> {
-  const { tempDir, dataPath, initialState, initialStatePath } = await prepareRelayStorage(
-    storedState,
-    existingDataPath
-  );
+  const { tempDir, dataPath } = await prepareRelayStorage(storedState, existingDataPath);
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -85,6 +82,8 @@ export async function startRelay(
         ...process.env,
         MULTAIPLAYER_RELAY_DEBUG:
           extraEnv.MULTAIPLAYER_RELAY_DEBUG ?? (extraEnv.NODE_ENV === "production" ? "false" : "true"),
+        MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH:
+          extraEnv.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH ?? (extraEnv.NODE_ENV === "production" ? "false" : "true"),
         ...extraEnv,
         ...(extraEnv.NODE_ENV === "production" && !extraEnv.MULTAIPLAYER_MLS_VALIDATOR_PATH
           ? { MULTAIPLAYER_MLS_VALIDATOR_PATH: mockValidatorPath }
@@ -98,8 +97,7 @@ export async function startRelay(
           extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY ??
           "relay-test-deletion-ledger-hmac-key-at-least-32-characters",
         MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS:
-          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS ?? "7776000",
-        ...(initialState ? { MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH: initialStatePath } : {})
+          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS ?? "7776000"
       },
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -137,11 +135,27 @@ async function prepareRelayStorage(storedState?: StoredRelayStateFixture, existi
     () => false
   );
   const initialState = storedState ?? (dataAlreadyExists ? undefined : defaultWorkspaceFixture());
-  const initialStatePath = join(tempDir, "initial-relay-state.json");
   if (initialState) {
-    await writeFile(initialStatePath, `${JSON.stringify(initialState, null, 2)}\n`, "utf8");
+    const persistence = createRelayPersistence({ dataPath });
+    try {
+      await persistence.save(initialState);
+      for (const backlog of initialState.mlsBacklog ?? []) {
+        if (
+          typeof backlog === "object" &&
+          backlog !== null &&
+          "key" in backlog &&
+          typeof backlog.key === "string" &&
+          "messages" in backlog &&
+          Array.isArray(backlog.messages)
+        ) {
+          persistence.saveMlsBacklog(backlog.key as `${string}:${string}`, backlog.messages);
+        }
+      }
+    } finally {
+      persistence.close();
+    }
   }
-  return { tempDir, dataPath, initialState, initialStatePath };
+  return { tempDir, dataPath };
 }
 
 function createRelayHarness(
@@ -201,18 +215,13 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       id: "room-desktop",
       teamId: "team-core",
       name: "Desktop app",
-      projectPath: "/tmp/multaiplayer",
       host: "Maddie",
       hostUserId: "github:maddiedreese",
       activeHostDeviceId: "host-device-1",
       hostStatus: "active",
+      acceptedMlsEpoch: 0,
       approvalPolicy: "ask_every_turn",
-      approvalDelegationPolicy: "host_only",
-      trustedApproverUserIds: [],
       mode: { chat: true, code: true, workspace: true, browser: true },
-      codexModel: "gpt-5.4",
-      codexReasoningEffort: "medium",
-      codexSpeed: "standard",
       browserAllowedOrigins: ["https://github.com"],
       browserProfilePersistent: true,
       unread: 0
@@ -221,18 +230,13 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       id: "room-relay",
       teamId: "team-core",
       name: "Relay ops",
-      projectPath: "/tmp/multaiplayer",
       host: "Alex",
       hostUserId: "github:alex",
       activeHostDeviceId: "alex-device-1",
       hostStatus: "active",
+      acceptedMlsEpoch: 0,
       approvalPolicy: "ask_every_turn",
-      approvalDelegationPolicy: "host_only",
-      trustedApproverUserIds: [],
       mode: { chat: true, code: true, workspace: true, browser: false },
-      codexModel: "gpt-5.4",
-      codexReasoningEffort: "medium",
-      codexSpeed: "standard",
       browserAllowedOrigins: ["https://github.com"],
       browserProfilePersistent: true,
       unread: 0
@@ -243,14 +247,19 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
     rooms.push({ ...rooms[1]!, id: `room-soak-${index}`, name: `Soak room ${index}` });
   }
   const members = [
-    { userId: "github:maddiedreese", role: "owner", joinedAt: "2026-07-04T00:00:00.000Z" },
-    { userId: "github:alex", role: "admin", joinedAt: "2026-07-04T00:00:00.000Z" },
-    { userId: "github:tester", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" },
-    { userId: "github:design", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" }
+    { teamId: "team-core", userId: "github:maddiedreese", role: "owner", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { teamId: "team-core", userId: "github:alex", role: "admin", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { teamId: "team-core", userId: "github:tester", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" },
+    { teamId: "team-core", userId: "github:design", role: "member", joinedAt: "2026-07-04T00:00:00.000Z" }
   ];
   while (members.length < memberCount) {
     const index = members.length;
-    members.push({ userId: `github:soak-${index}`, role: "member", joinedAt: "2026-07-04T00:00:00.000Z" });
+    members.push({
+      teamId: "team-core",
+      userId: `github:soak-${index}`,
+      role: "member",
+      joinedAt: "2026-07-04T00:00:00.000Z"
+    });
   }
   return {
     version: 1,
@@ -261,8 +270,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
     teamMembers: [
       {
         teamId: "team-core",
-        members,
-        userIds: members.map((member) => member.userId)
+        members
       }
     ],
     encryptedBacklog: []
@@ -382,11 +390,7 @@ export async function waitForStoredState(
 
 export async function waitForSqliteRows(
   dataPath: string,
-  predicate: (state: {
-    teams: Array<{ data_json: string }>;
-    rooms: Array<{ data_json: string }>;
-    snapshots: Array<{ state_json: string }>;
-  }) => boolean
+  predicate: (state: { teams: Array<{ data_json: string }>; rooms: Array<{ data_json: string }> }) => boolean
 ) {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 30; attempt += 1) {
@@ -395,8 +399,7 @@ export async function waitForSqliteRows(
       db = new Database(dataPath, { readonly: true });
       const state = {
         teams: db.prepare("select data_json from relay_teams").all() as Array<{ data_json: string }>,
-        rooms: db.prepare("select data_json from relay_rooms").all() as Array<{ data_json: string }>,
-        snapshots: db.prepare("select state_json from relay_snapshots").all() as Array<{ state_json: string }>
+        rooms: db.prepare("select data_json from relay_rooms").all() as Array<{ data_json: string }>
       };
       if (predicate(state)) return;
     } catch (error) {

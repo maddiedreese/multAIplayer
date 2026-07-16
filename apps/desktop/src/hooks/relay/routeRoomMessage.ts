@@ -12,7 +12,7 @@ import {
   roomHostEnvelopeRejectionMessage
 } from "../../lib/access/roomHost";
 import { buildRoomSettingsSystemMessage } from "../../presentation/rooms/roomSettingsMessages";
-import { approvalDelegationPolicyLabels, approvalPolicyLabels, roomModeLabels } from "../../appDefaults";
+import { approvalPolicyLabels, roomModeLabels } from "../../appDefaults";
 import type { AppStoreState } from "../../store/appStore";
 import type { MlsMessageRouteContext, MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
 import { applyRoomConfig } from "../../application/mls/roomConfigSnapshot";
@@ -201,7 +201,6 @@ async function routeRoomSettings(
     envelope.roomId,
     buildRoomSettingsSystemMessage(parsed.data, {
       approvalPolicyLabels,
-      approvalDelegationPolicyLabels,
       roomModeLabels
     })
   );

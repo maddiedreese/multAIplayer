@@ -1,12 +1,10 @@
 import {
-  defaultApprovalDelegationPolicy,
   defaultCodexReasoningEffort,
   defaultCodexSpeed,
   codexReasoningEffortOptions,
   codexSpeedOptions,
   type MlsRelayMessage,
   codexModelOptions,
-  type ApprovalDelegationPolicy,
   type CodexCatalogSelectionPolicy,
   type CodexReasoningEffort,
   type CodexSpeed,
@@ -92,16 +90,7 @@ export function maxCiphertextCharactersForBlob(maxBytes: number): number {
 }
 
 export function isApprovalPolicy(value: string): value is RoomRecord["approvalPolicy"] {
-  return ["ask_every_turn", "auto_chat_only", "auto_browser_allowed_sites", "never_host"].includes(value);
-}
-
-export function isApprovalDelegationPolicy(value: string): value is ApprovalDelegationPolicy {
-  return [
-    defaultApprovalDelegationPolicy,
-    "members_can_request",
-    "members_can_approve",
-    "trusted_members_only"
-  ].includes(value as ApprovalDelegationPolicy);
+  return ["ask_every_turn", "never_host"].includes(value);
 }
 
 export function isRoomMode(value: unknown): value is RoomRecord["mode"] {

@@ -88,7 +88,7 @@ Pull requests run workspace checks and product journeys when executable code cha
 | `e2e`                                               | UI contracts and multi-process journeys                 |
 | `docs/decisions`                                    | Normative architecture decisions                        |
 
-The [architecture guide](docs/product-architecture.md) maps flows to code. SQLite is the relay's sole runtime backend, but the alpha relay keeps its durable working set in memory and stores entity payloads as JSON rows rather than exposing a general relational query model. Mutations are synchronously committed before a successful response or broadcast, the in-memory durable-entry count has an explicit ceiling, and startup can perform a one-time import of a legacy JSON snapshot. A runtime SQLite write failure makes the relay not ready and stops further product traffic until restart rather than serving memory that may differ from disk. See the [single-node relay ADR](docs/decisions/single-node-relay.md).
+The [architecture guide](docs/product-architecture.md) maps flows to code. SQLite is the relay's sole runtime backend, but the alpha relay keeps its durable working set in memory and stores entity payloads as JSON rows rather than exposing a general relational query model. Mutations are synchronously committed before a successful response or broadcast, and the in-memory durable-entry count has an explicit ceiling. A runtime SQLite write failure makes the relay not ready and stops further product traffic until restart rather than serving memory that may differ from disk. See the [single-node relay ADR](docs/decisions/single-node-relay.md).
 
 ## Releases and operations
 

@@ -69,15 +69,6 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
     codexSpeed,
     codexServiceTierPolicy: handoff.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy
   };
-  if (handoff.approvalPolicy === "auto_chat_only" || handoff.approvalPolicy === "auto_browser_allowed_sites") {
-    return {
-      projectPath,
-      codexModel,
-      ...catalogSettings,
-      codexSandboxLevel: codexSandboxLevel as ClientRoomRecord["codexSandboxLevel"],
-      approvalPolicy: "ask_every_turn"
-    };
-  }
   if (!approvalPolicies.includes(handoff.approvalPolicy as ApprovalPolicy)) {
     throw new Error(`Host handoff approval policy is not supported: ${handoff.approvalPolicy}`);
   }

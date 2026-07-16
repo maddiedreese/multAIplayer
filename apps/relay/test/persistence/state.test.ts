@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Database, startRelay, startRelayWithWorkspace } from "../support/relay.js";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { Database, startRelayWithWorkspace } from "../support/relay.js";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createRelayPersistence } from "../../src/persistence.js";
-import { RelayPersistenceMigrationError, SqliteRelayPersistence } from "../../src/sqlite-persistence.js";
+import { SqliteRelayPersistence } from "../../src/sqlite-persistence.js";
 
 test("SQLite initializes normalized MLS and KeyPackage tables", async () => {
   const relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_STORAGE: "sqlite" });
@@ -147,44 +147,6 @@ test("SQLite refuses malformed or identity-mismatched MLS backlog rows", async (
   }
 });
 
-test("SQLite startup purges legacy host-local room config from rows, pages, and WAL", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "relay-room-config-purge-"));
-  const path = join(dir, "relay.sqlite");
-  const marker = "/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY";
-  const legacy = new SqliteRelayPersistence(path);
-  const publicRoom = { id: "room", teamId: "team", name: "Room", host: "Host", hostStatus: "offline" };
-  await legacy.save({
-    version: 1,
-    savedAt: new Date().toISOString(),
-    teams: [],
-    rooms: [{ ...publicRoom, projectPath: marker, codexModel: "sentinel-model" }],
-    invites: [],
-    mlsBacklog: []
-  });
-  legacy.close();
-  const reopened = new SqliteRelayPersistence(path);
-  try {
-    await reopened.load();
-    await reopened.finalizeLoad(() => ({
-      version: 1,
-      savedAt: new Date().toISOString(),
-      teams: [],
-      rooms: [publicRoom],
-      invites: [],
-      mlsBacklog: []
-    }));
-    reopened.close();
-    for (const candidate of [path, `${path}-wal`, `${path}-shm`]) {
-      const bytes = await readFile(candidate).catch(() => Buffer.alloc(0));
-      assert.equal(bytes.includes(Buffer.from(marker)), false, candidate);
-      assert.equal(bytes.includes(Buffer.from("sentinel-model")), false, candidate);
-    }
-  } finally {
-    reopened.close();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 test("SQLite accepts only one concurrent Commit for an epoch", async () => {
   const dir = await mkdtemp(join(tmpdir(), "relay-cas-")),
     path = join(dir, "relay.sqlite");
@@ -213,18 +175,8 @@ test("SQLite accepts only one concurrent Commit for an epoch", async () => {
   });
   try {
     const results = await Promise.allSettled([
-      Promise.resolve().then(() =>
-        first.saveMlsCommit("team:room", message("one"), [], [], () => ({
-          ...state,
-          rooms: [{ ...room, acceptedMlsEpoch: 1 }]
-        }))
-      ),
-      Promise.resolve().then(() =>
-        second.saveMlsCommit("team:room", message("two"), [], [], () => ({
-          ...state,
-          rooms: [{ ...room, acceptedMlsEpoch: 1 }]
-        }))
-      )
+      Promise.resolve().then(() => first.saveMlsCommit("team:room", message("one"), [], [])),
+      Promise.resolve().then(() => second.saveMlsCommit("team:room", message("two"), [], []))
     ]);
     assert.equal(results.filter((x) => x.status === "fulfilled").length, 1);
     assert.equal(results.filter((x) => x.status === "rejected").length, 1);
@@ -279,130 +231,6 @@ test("KeyPackage approval and pending request state survive restart", async () =
     assert.equal(loaded.inviteRequests.length, 1);
     assert.equal(loaded.invites[0]?.keyPackageHash, state.invites[0]!.keyPackageHash);
     reopened.close();
-  } finally {
-    persistence.close();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("legacy JSON imports into SQLite, accepts incremental mutations, and survives restart", async () => {
-  let relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_STORAGE: "sqlite" });
-  const dataPath = relay.dataPath;
-  const tempDir = relay.tempDir;
-  try {
-    const created = await fetch(`${relay.baseUrl}/teams`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Created after import" })
-    });
-    assert.equal(created.status, 201);
-    const createdBody = (await created.json()) as { team: { id: string } };
-
-    await relay.close({ preserveData: true });
-    const filesAfterImport = await readdir(tempDir);
-    assert.ok(filesAfterImport.some((name) => name.startsWith("initial-relay-state.json.migrated-to-sqlite")));
-
-    relay = await startRelay({ MULTAIPLAYER_RELAY_STORAGE: "sqlite" }, undefined, dataPath);
-    const workspace = await fetch(`${relay.baseUrl}/teams`);
-    assert.equal(workspace.status, 200);
-    const body = (await workspace.json()) as { teams: Array<{ id: string }>; rooms: Array<{ id: string }> };
-    assert.ok(body.teams.some((team) => team.id === "team-core"));
-    assert.ok(body.teams.some((team) => team.id === createdBody.team.id));
-    assert.ok(body.rooms.some((room) => room.id === "room-desktop"));
-
-    const db = new Database(dataPath, { readonly: true });
-    assert.equal((db.prepare("select count(*) as count from relay_snapshots").get() as { count: number }).count, 0);
-    db.close();
-  } finally {
-    await relay.close().catch(() => {});
-    await rm(tempDir, { recursive: true, force: true });
-  }
-});
-
-test("a post-import backup rename failure preserves committed SQLite state and retries safely", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "relay-import-rename-failure-"));
-  const legacyPath = join(dir, "relay-store.json");
-  const sqlitePath = join(dir, "relay-store.sqlite");
-  const state = {
-    version: 1 as const,
-    savedAt: new Date().toISOString(),
-    teams: [{ id: "team-imported", name: "Imported", members: 0 }],
-    rooms: [],
-    invites: [],
-    mlsBacklog: []
-  };
-  await writeFile(legacyPath, JSON.stringify(state), "utf8");
-  const persistence = new SqliteRelayPersistence(sqlitePath, legacyPath, async () => {
-    throw Object.assign(new Error("forced rename failure"), { code: "EACCES" });
-  });
-  try {
-    assert.deepEqual(await persistence.load(), state);
-    await assert.rejects(
-      persistence.finalizeLoad(() => state),
-      (error) => error instanceof RelayPersistenceMigrationError && /Could not preserve migrated/.test(error.message)
-    );
-    assert.ok((await readdir(dir)).includes("relay-store.json"));
-    const db = new Database(sqlitePath, { readonly: true });
-    assert.equal((db.prepare("select count(*) as count from relay_teams").get() as { count: number }).count, 1);
-    db.close();
-    persistence.close();
-
-    const restarted = createRelayPersistence({
-      dataPath: sqlitePath,
-      legacyJsonImportPath: legacyPath
-    });
-    const loaded = (await restarted.load()) as typeof state;
-    assert.equal(loaded.teams.length, 1);
-    assert.equal(loaded.teams[0]?.id, "team-imported");
-    assert.equal(
-      (await readdir(dir)).some((name) => name.startsWith("relay-store.json.migrated-to-sqlite")),
-      true
-    );
-    restarted.close();
-  } finally {
-    persistence.close();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("invalid legacy JSON aborts migration without moving or replacing the source", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "relay-invalid-legacy-"));
-  const legacyPath = join(dir, "relay-store.json");
-  const sqlitePath = join(dir, "relay-store.sqlite");
-  await writeFile(legacyPath, "{not-json", "utf8");
-  const persistence = createRelayPersistence({
-    dataPath: sqlitePath,
-    legacyJsonImportPath: legacyPath
-  });
-  try {
-    await assert.rejects(persistence.load(), /Could not import legacy relay store/);
-    assert.ok((await readdir(dir)).includes("relay-store.json"));
-    assert.equal(
-      (await readdir(dir)).some((name) => name.includes("migrated-to-sqlite")),
-      false
-    );
-  } finally {
-    persistence.close();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("unsupported legacy JSON versions abort migration and preserve the source", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "relay-unsupported-legacy-"));
-  const legacyPath = join(dir, "relay-store.json");
-  const sqlitePath = join(dir, "relay-store.sqlite");
-  await writeFile(legacyPath, JSON.stringify({ version: 999, teams: [] }), "utf8");
-  const persistence = createRelayPersistence({
-    dataPath: sqlitePath,
-    legacyJsonImportPath: legacyPath
-  });
-  try {
-    await assert.rejects(persistence.load(), /Could not import legacy relay store/);
-    assert.ok((await readdir(dir)).includes("relay-store.json"));
-    assert.equal(
-      (await readdir(dir)).some((name) => name.includes("migrated-to-sqlite")),
-      false
-    );
   } finally {
     persistence.close();
     await rm(dir, { recursive: true, force: true });

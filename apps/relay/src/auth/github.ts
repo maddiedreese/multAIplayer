@@ -56,6 +56,15 @@ export function registerGitHubAuthRoutes({
   maxAccessTokenChars,
   isAccountRestricted
 }: RegisterGitHubAuthRoutesOptions) {
+  async function recordDeletionProtection(userId: string): Promise<string[] | null> {
+    if (!deletionLedger) return [];
+    try {
+      return [(await deletionLedger.record(userId)).id];
+    } catch {
+      return null;
+    }
+  }
+
   app.get("/auth/config", (_req, res) => {
     res.json({
       provider: "github",
@@ -64,7 +73,7 @@ export function registerGitHubAuthRoutes({
       mutationsRequireAuth,
       allowedOrigins: allowedCorsOrigins,
       sessionPersistence: "identity_only",
-      accountDeletion: deletionLedger ? "external_ledger_protected" : "unavailable"
+      accountDeletion: deletionLedger ? "external_ledger_protected" : "primary_store_only"
     });
   });
 
@@ -184,19 +193,8 @@ export function registerGitHubAuthRoutes({
     const memberTeamIds = Array.from(store.teamMembers.entries())
       .filter(([, members]) => members.has(userId))
       .map(([teamId]) => teamId);
-    if (!deletionLedger) {
-      sendRelayError(
-        res,
-        503,
-        "persistence_unavailable",
-        "Hosted account deletion is unavailable until the operator configures its external deletion ledger."
-      );
-      return;
-    }
-    let ledgerEntry;
-    try {
-      ledgerEntry = await deletionLedger.record(userId);
-    } catch {
+    const ledgerEntryIds = await recordDeletionProtection(userId);
+    if (!ledgerEntryIds) {
       sendRelayError(
         res,
         503,
@@ -207,7 +205,7 @@ export function registerGitHubAuthRoutes({
     }
     let deleted;
     try {
-      deleted = await deleteAccountOwnedRelayDataAtomically(store, userId, saveRelayStore, [ledgerEntry.id]);
+      deleted = await deleteAccountOwnedRelayDataAtomically(store, userId, saveRelayStore, ledgerEntryIds);
     } catch {
       for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
       revokeUserPresence(userId);
@@ -217,6 +215,9 @@ export function registerGitHubAuthRoutes({
         }
       }
       res.clearCookie("multaiplayer_session", authCookieOptions());
+      if (!deletionLedger) {
+        return void sendRelayError(res, 503, "persistence_unavailable", "Account deletion could not be persisted.");
+      }
       res.status(202).json({
         ok: true,
         status: "pending",

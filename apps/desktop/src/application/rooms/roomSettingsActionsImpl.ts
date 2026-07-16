@@ -65,7 +65,7 @@ export function createRoomSettingsActions({
     clearBrowserStatusForRoom,
     resetCodexApprovalForRoom
   } = mutationContext;
-  const { setApprovalPolicy, setApprovalDelegationPolicy } = createRoomApprovalSettingsActions({
+  const { setApprovalPolicy } = createRoomApprovalSettingsActions({
     selectedRoomId: () => selectedRoomIdRef.current,
     approvalPolicyLabels,
     reportInFlight: reportRoomSettingsMutationInFlight,
@@ -383,7 +383,6 @@ export function createRoomSettingsActions({
 
   return {
     setApprovalPolicy,
-    setApprovalDelegationPolicy,
     setCodexModel,
     setCodexReasoningEffort,
     setCodexRawReasoningEnabled,

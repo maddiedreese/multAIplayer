@@ -33,8 +33,6 @@ const room: RoomRecord = {
   hostUserId: host.id,
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   codexSandboxLevel: "workspace_write",

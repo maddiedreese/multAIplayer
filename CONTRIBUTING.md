@@ -259,8 +259,8 @@ database under its published backup and deletion horizons.
 ### Compatibility inventory
 
 Every compatibility reader needs an owner and deletion condition. Supported
-readers are limited to the documented Codex range, one-way legacy relay import,
-enumerated local-history/archive versions, and explicit native migrations. Never
+readers are limited to the documented upstream Codex range and released local-history,
+archive, and native formats. Never
 silently accept an old cryptographic wire format. Update
 [the inventory](docs/compatibility-inventory.md) when a reader is added or removed;
 update the threat model only if the trust boundary changes.

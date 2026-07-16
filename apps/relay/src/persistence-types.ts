@@ -7,24 +7,21 @@ export type StoredRelayMutation =
 
 export interface RelayPersistence {
   load(): Promise<unknown | null>;
-  finalizeLoad?(state: () => unknown): Promise<void>;
   save(state: unknown): Promise<void>;
-  saveChanges(changes: StoredRelayMutation[]): boolean;
-  saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): boolean;
-  saveKeyPackages(changes: StoredRelayMutation[], fallbackState: () => unknown): void;
+  saveChanges(changes: StoredRelayMutation[]): void;
+  saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]): void;
+  saveKeyPackages(changes: StoredRelayMutation[]): void;
   saveMlsMessage(
     roomKey: RoomKey,
     message: MlsRelayMessage,
     prunedMessageIds: string[],
-    changes: StoredRelayMutation[],
-    fallbackState: () => unknown
-  ): boolean;
+    changes: StoredRelayMutation[]
+  ): void;
   saveMlsCommit(
     roomKey: RoomKey,
     message: MlsRelayMessage,
     prunedMessageIds: string[],
-    changes: StoredRelayMutation[],
-    fallbackState: () => unknown
+    changes: StoredRelayMutation[]
   ): void;
   quarantine(reason: string): Promise<void>;
   close(): void;

@@ -28,7 +28,6 @@ import { InMemoryRelayStore } from "../src/state.js";
 const fixedNow = Date.parse("2026-07-11T12:00:00.000Z");
 const authSessionPersistence = createRelayAuthSessionPersistence({
   authSessionMaxAgeMs: 30 * 24 * 60 * 60 * 1000,
-  maxAuthSessionIdChars: 128,
   maxDisplayNameChars: 128,
   maxRoomProjectPathChars: 1_024,
   maxUserIdChars: 128
@@ -72,8 +71,6 @@ interface GeneratedState {
   roomName: string;
   members: number;
   unread: number;
-  keyEpoch: number;
-  epochEnvelopeCount: number;
 }
 const storedState: fc.Arbitrary<GeneratedState> = fc.record({
   teamPart: safePart,
@@ -81,10 +78,21 @@ const storedState: fc.Arbitrary<GeneratedState> = fc.record({
   teamName: fc.stringMatching(/^[A-Za-z][A-Za-z0-9 _-]{0,30}$/),
   roomName: fc.stringMatching(/^[A-Za-z][A-Za-z0-9 _-]{0,30}$/),
   members: fc.integer({ min: 1, max: 8 }),
-  unread: fc.nat({ max: 10_000 }),
-  keyEpoch: fc.integer({ min: 1, max: Number.MAX_SAFE_INTEGER }),
-  epochEnvelopeCount: fc.nat({ max: Number.MAX_SAFE_INTEGER })
+  unread: fc.nat({ max: 10_000 })
 });
+
+function currentRoom(overrides: Partial<RoomRecord> & Pick<RoomRecord, "id" | "teamId" | "name">): RoomRecord {
+  return {
+    host: "No host",
+    hostStatus: "offline",
+    approvalPolicy: "ask_every_turn",
+    mode: { chat: true, code: true, workspace: true, browser: false },
+    browserAllowedOrigins: [],
+    browserProfilePersistent: false,
+    unread: 0,
+    ...overrides
+  };
+}
 
 function input(value: GeneratedState): Record<string, unknown> {
   const teamId = `team-${value.teamPart}`;
@@ -94,17 +102,12 @@ function input(value: GeneratedState): Record<string, unknown> {
     savedAt: "2020-01-01T00:00:00.000Z",
     teams: [{ id: teamId, name: value.teamName, members: value.members }],
     rooms: [
-      {
+      currentRoom({
         id: roomId,
         teamId,
         name: value.roomName,
-        projectPath: "/repo",
-        host: "No host",
-        hostStatus: "offline",
-        unread: value.unread,
-        keyEpoch: value.keyEpoch,
-        epochEnvelopeCount: value.epochEnvelopeCount
-      }
+        unread: value.unread
+      })
     ],
     invites: [],
     teamMembers: [
@@ -181,18 +184,16 @@ function pendingInviteState({
     savedAt: createdAt,
     teams: [{ id: "team-core", name: "Core", members: 1 }],
     rooms: [
-      {
+      currentRoom({
         id: "room-desktop",
         teamId: "team-core",
         name: "Desktop",
-        projectPath: "/repo",
         host: "Host",
         hostUserId: "github:host",
         hostStatus: "active",
         activeHostDeviceId: "device-host",
-        unread: 0,
         acceptedMlsEpoch
-      }
+      })
     ],
     invites: [
       {
@@ -250,9 +251,7 @@ test("malformed critical store records fail startup normalization", () => {
     teamName: "Core",
     roomName: "Desktop",
     members: 0,
-    unread: 0,
-    keyEpoch: 0,
-    epochEnvelopeCount: 0
+    unread: 0
   });
   assert.throws(
     () => storeCodec.applyStoredRelayState({ ...valid, teams: [null, ...(valid.teams as unknown[])] }),
@@ -330,8 +329,6 @@ const storedRowKeys: Record<string, ReadonlySet<string>> = {
     "activeHostDeviceId",
     "hostStatus",
     "approvalPolicy",
-    "approvalDelegationPolicy",
-    "trustedApproverUserIds",
     "mode",
     "browserAllowedOrigins",
     "browserProfilePersistent",
@@ -414,7 +411,7 @@ const storedRowKeys: Record<string, ReadonlySet<string>> = {
     "digest",
     "acceptedAt"
   ]),
-  teamMembers: new Set(["teamId", "members", "userIds"]),
+  teamMembers: new Set(["teamId", "members"]),
   authSessions: new Set(["sessionIdHash", "user", "expiresAt"]),
   accountRestrictions: new Set(["userId", "reasonCode", "createdAt", "expiresAt"]),
   accountQuotaRecords: new Set(["key", "userId", "quota", "used", "resetAt"]),
@@ -510,12 +507,11 @@ test("a complete valid relay store strips unknown fields and exercises every per
   const state = {
     ...pending,
     unknownRoot: "must not persist",
-    teams: [{ ...(pending.teams[0] as object), members: 2, unknownTeam: "must not persist" }],
+    teams: [{ ...(pending.teams[0] as object), members: 2 }],
     rooms: [
       {
         ...(pending.rooms[0] as object),
-        mode: { chat: true, code: true, workspace: true, browser: false, unknownMode: true },
-        unknownRoom: "must not persist"
+        mode: { chat: true, code: true, workspace: true, browser: false }
       }
     ],
     invites: [{ ...(pending.invites[0] as object), unknownInvite: "must not persist" }],
@@ -529,8 +525,7 @@ test("a complete valid relay store strips unknown fields and exercises every per
         hpkePublicKey,
         hpkeKeyFingerprint: publicKeyFingerprint(hpkePublicKey),
         registeredAt: createdAt,
-        lastSeenAt: createdAt,
-        unknownDevice: "must not persist"
+        lastSeenAt: createdAt
       }
     ],
     keyPackages: [
@@ -587,8 +582,7 @@ test("a complete valid relay store strips unknown fields and exercises every per
         members: [
           { teamId: "team-core", userId: "github:host", role: "owner", joinedAt: createdAt },
           { teamId: "team-core", userId: "github:joiner", role: "member", joinedAt: createdAt }
-        ],
-        unknownTeamMembers: "must not persist"
+        ]
       }
     ],
     inviteAckReceipts: [
@@ -621,9 +615,8 @@ test("a complete valid relay store strips unknown fields and exercises every per
     authSessions: [
       {
         sessionIdHash: createHash("sha256").update("complete-session").digest("hex"),
-        user: { id: "github:joiner", login: "joiner", unknownUser: "must not persist" },
-        expiresAt: Date.now() + 60_000,
-        unknownSession: "must not persist"
+        user: { id: "github:joiner", login: "joiner" },
+        expiresAt: Date.now() + 60_000
       }
     ],
     accountRestrictions: [
@@ -697,8 +690,10 @@ test("a complete valid relay store strips unknown fields and exercises every per
     );
   }
   assert.equal(stored.teamMembers?.[0]?.members?.length, 2);
-  assert.equal(Object.hasOwn(stored.rooms[0]?.mode ?? {}, "unknownMode"), false);
-  assert.equal(Object.hasOwn(stored.authSessions?.[0]?.user ?? {}, "unknownUser"), false);
+
+  const unknownDeviceField = structuredClone(state);
+  Object.assign(unknownDeviceField.devices[0]!, { unknownDevice: true });
+  assert.throws(() => codec().codec.applyStoredRelayState(unknownDeviceField), /device row failed validation/);
 
   fc.assert(
     fc.property(
@@ -706,18 +701,15 @@ test("a complete valid relay store strips unknown fields and exercises every per
       fc.jsonValue({ maxDepth: 4 }),
       (unknownKey, unknownValue) => {
         const contaminated = structuredClone(state) as Record<string, unknown>;
-        for (const collection of Object.keys(storedRowKeys)) {
+        for (const collection of Object.keys(storedRowKeys).filter(
+          (collection) => !["teams", "rooms", "devices", "teamMembers", "authSessions"].includes(collection)
+        )) {
           const rows = contaminated[collection];
           if (!Array.isArray(rows)) continue;
           for (const row of rows) {
             if (row && typeof row === "object") Object.assign(row, { [unknownKey]: unknownValue });
           }
         }
-        const rooms = contaminated.rooms as Array<{ mode?: Record<string, unknown> }>;
-        Object.assign(rooms[0]?.mode ?? {}, { [unknownKey]: unknownValue });
-        const sessions = contaminated.authSessions as Array<{ user?: Record<string, unknown> }>;
-        Object.assign(sessions[0]?.user ?? {}, { [unknownKey]: unknownValue });
-
         const arbitrary = codec();
         arbitrary.codec.applyStoredRelayState(contaminated);
         const arbitraryStored = arbitrary.codec.toStoredRelayState();
@@ -793,10 +785,14 @@ test("invalid persistence-only rows are dropped independently of valid siblings"
 test("unsupported store versions cannot partially populate an existing store", () => {
   const instance = codec();
   instance.store.teams.set("team-existing", { id: "team-existing", name: "Existing", members: 0 });
-  instance.codec.applyStoredRelayState({
-    version: 2,
-    teams: [{ id: "team-new", name: "New", members: 0 }]
-  });
+  assert.throws(
+    () =>
+      instance.codec.applyStoredRelayState({
+        version: 2,
+        teams: [{ id: "team-new", name: "New", members: 0 }]
+      }),
+    /unsupported version/
+  );
   assert.deepEqual([...instance.store.teams.keys()], ["team-existing"]);
 });
 
@@ -877,15 +873,11 @@ test("startup normalization discards non-canonical opaque encodings", () => {
     savedAt: createdAt,
     teams: [{ id: "team-core", name: "Core", members: 1 }],
     rooms: [
-      {
+      currentRoom({
         id: "room-desktop",
         teamId: "team-core",
-        name: "Desktop",
-        projectPath: "/repo",
-        host: "No host",
-        hostStatus: "offline",
-        unread: 0
-      }
+        name: "Desktop"
+      })
     ],
     invites: [],
     teamMembers: [
@@ -951,7 +943,7 @@ test("startup normalization discards non-canonical opaque encodings", () => {
   assert.equal(store.mlsBacklog.size, 0);
 });
 
-test("startup fails closed on malformed team members while preserving role-bearing v1 forms", () => {
+test("startup accepts only explicit current-schema team membership rows", () => {
   const createdAt = "2026-07-11T11:00:00.000Z";
   const base = {
     version: 1,
@@ -982,45 +974,17 @@ test("startup fails closed on malformed team members while preserving role-beari
       }),
     /team-member row failed validation/
   );
-  const legacyUserIds = codec();
-  legacyUserIds.codec.applyStoredRelayState({
-    ...base,
-    teams: [{ id: "team-core", name: "Core", members: 3 }],
-    teamMembers: [{ teamId: "team-core", userIds: ["github:creator", "github:second", "github:third"] }]
-  });
-  assert.deepEqual(
-    Array.from(legacyUserIds.store.getTeamMembers("team-core")?.values() ?? []).map(({ userId, role }) => ({
-      userId,
-      role
-    })),
-    [
-      { userId: "github:creator", role: "owner" },
-      { userId: "github:second", role: "member" },
-      { userId: "github:third", role: "member" }
-    ]
-  );
-  for (const userIds of [[], ["github:owner", "github:owner"], ["github:owner", null]]) {
-    assert.throws(
-      () =>
-        codec().codec.applyStoredRelayState({
-          ...base,
-          teamMembers: [{ teamId: "team-core", userIds }]
-        }),
-      /team-member row failed validation/
-    );
-  }
-
-  const scopedV1 = codec();
-  scopedV1.codec.applyStoredRelayState({
+  const current = codec();
+  current.codec.applyStoredRelayState({
     ...base,
     teamMembers: [
       {
         teamId: "team-core",
-        members: [{ userId: "github:owner", role: "owner", joinedAt: createdAt }]
+        members: [{ teamId: "team-core", userId: "github:owner", role: "owner", joinedAt: createdAt }]
       }
     ]
   });
-  assert.equal(scopedV1.store.getTeamMember("team-core", "github:owner")?.role, "owner");
+  assert.equal(current.store.getTeamMember("team-core", "github:owner")?.role, "owner");
 });
 
 test("startup rejects membership count, ownership, duplicate rows, and host cross-record corruption", () => {
@@ -1056,15 +1020,14 @@ test("startup rejects membership count, ownership, duplicate rows, and host cros
       codec().codec.applyStoredRelayState({
         ...base,
         rooms: [
-          {
+          currentRoom({
             id: "room-desktop",
             teamId: "team-core",
             name: "Desktop",
             host: "Removed host",
             hostUserId: "github:removed",
-            hostStatus: "offline",
-            unread: 0
-          }
+            hostStatus: "offline"
+          })
         ],
         teamMembers: [
           { teamId: "team-core", members: [member("github:owner", "owner"), member("github:member", "member")] }
@@ -1091,15 +1054,11 @@ test("startup fails closed on malformed current MLS backlog while allowing inten
     version: 1,
     teams: [{ id: "team-core", name: "Core", members: 1 }],
     rooms: [
-      {
+      currentRoom({
         id: "room-desktop",
         teamId: "team-core",
-        name: "Desktop",
-        projectPath: "/repo",
-        host: "No host",
-        hostStatus: "offline",
-        unread: 0
-      }
+        name: "Desktop"
+      })
     ],
     invites: [],
     teamMembers: [
@@ -1167,15 +1126,16 @@ test("startup normalization rejects corrupt invite anchors and retains bounded r
     savedAt: createdAt,
     teams: [{ id: "team-core", name: "Core", members: 2 }],
     rooms: [
-      {
+      currentRoom({
         id: "room-desktop",
         teamId: "team-core",
         name: "Room",
-        projectPath: "/",
         host: "Host",
+        hostUserId: "github:host",
+        activeHostDeviceId: "device-host",
         hostStatus: "active",
-        unread: 0
-      }
+        acceptedMlsEpoch: 1
+      })
     ],
     invites: [
       {
@@ -1192,8 +1152,8 @@ test("startup normalization rejects corrupt invite anchors and retains bounded r
       {
         teamId: "team-core",
         members: [
-          { userId: "github:host", role: "owner", joinedAt: createdAt },
-          { userId: "github:joiner", role: "member", joinedAt: createdAt }
+          { teamId: "team-core", userId: "github:host", role: "owner", joinedAt: createdAt },
+          { teamId: "team-core", userId: "github:joiner", role: "member", joinedAt: createdAt }
         ]
       }
     ],
@@ -1267,7 +1227,7 @@ test("startup normalization retains only the exact approved request from the imm
   });
 });
 
-test("startup normalization preserves an offline room's reserved bootstrap host", () => {
+test("startup accepts a complete current offline room without synthesizing authorization fields", () => {
   const { codec: relayCodec, store } = codec();
   relayCodec.applyStoredRelayState({
     version: 1,
@@ -1278,10 +1238,13 @@ test("startup normalization preserves an offline room's reserved bootstrap host"
         id: "room-bootstrap",
         teamId: "team-core",
         name: "Bootstrap",
-        projectPath: "/tmp/bootstrap",
         host: "Creator",
         hostUserId: "github:creator",
         hostStatus: "offline",
+        approvalPolicy: "ask_every_turn",
+        mode: { chat: true, code: true, workspace: true, browser: true },
+        browserAllowedOrigins: ["https://github.com"],
+        browserProfilePersistent: true,
         unread: 0
       }
     ],
@@ -1305,4 +1268,36 @@ test("startup normalization preserves an offline room's reserved bootstrap host"
   assert.equal(room?.hostStatus, "offline");
   assert.equal(room?.activeHostDeviceId, undefined);
   assert.equal(room?.acceptedMlsEpoch, undefined);
+});
+
+test("startup rejects incomplete or legacy-shaped critical team and room rows", () => {
+  const base = {
+    version: 1,
+    savedAt: "2026-07-12T12:00:00.000Z",
+    teams: [{ id: "team-core", name: "Core", members: 0 }],
+    rooms: [],
+    teamMembers: []
+  };
+  assert.throws(
+    () => codec().codec.applyStoredRelayState({ ...base, teams: [{ id: "team-core", members: 0 }] }),
+    /team row failed validation/
+  );
+  assert.throws(
+    () =>
+      codec().codec.applyStoredRelayState({
+        ...base,
+        rooms: [
+          {
+            id: "room",
+            teamId: "team-core",
+            name: "Room",
+            host: "No host",
+            hostStatus: "offline",
+            approvalPolicy: "ask_every_turn",
+            unread: 0
+          }
+        ]
+      }),
+    /room row failed validation/
+  );
 });

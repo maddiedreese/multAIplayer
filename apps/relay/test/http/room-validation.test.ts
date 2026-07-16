@@ -4,8 +4,7 @@ import type { Response } from "express";
 import {
   allowTotalRoomQuota,
   consumeDailyCreationQuota,
-  normalizeCatalogSelectionPolicy,
-  normalizeTrustedApproverUserIds
+  normalizeCatalogSelectionPolicy
 } from "../../src/http/room-validation.js";
 import { createRelayStore } from "../../src/state.js";
 
@@ -16,34 +15,6 @@ test("catalog selection policy accepts only defined policy values and preserves 
   assert.equal(normalizeCatalogSelectionPolicy("pinned"), "pinned");
   assert.equal(normalizeCatalogSelectionPolicy("manual"), null);
   assert.equal(normalizeCatalogSelectionPolicy(null), null);
-});
-
-test("trusted approver normalization trims, deduplicates, and enforces every boundary", () => {
-  assert.deepEqual(normalizeTrustedApproverUserIds(undefined, 20), []);
-  assert.equal(normalizeTrustedApproverUserIds("user:one", 20), null);
-  assert.deepEqual(normalizeTrustedApproverUserIds([], 20), []);
-  assert.deepEqual(normalizeTrustedApproverUserIds([" user:one ", "user:one", "user:two"], 20), [
-    "user:one",
-    "user:two"
-  ]);
-  assert.equal(
-    normalizeTrustedApproverUserIds(
-      Array.from({ length: 51 }, (_, index) => `u:${index}`),
-      20
-    ),
-    null
-  );
-  assert.equal(
-    normalizeTrustedApproverUserIds(
-      Array.from({ length: 50 }, (_, index) => `u:${index}`),
-      20
-    )?.length,
-    50
-  );
-  assert.deepEqual(normalizeTrustedApproverUserIds(["x".repeat(20)], 20), ["x".repeat(20)]);
-  for (const invalid of ["", "   ", "x".repeat(21), "user\u0000one", "user\u001fone", "user\u007fone", 42]) {
-    assert.equal(normalizeTrustedApproverUserIds([invalid], 20), null);
-  }
 });
 
 test("total room quota counts only live rooms in the user's teams", () => {
@@ -145,8 +116,6 @@ function roomRecord(id: string, teamId: string, deletedAt?: string) {
     host: "Maddie",
     hostStatus: "offline" as const,
     approvalPolicy: "ask_every_turn" as const,
-    approvalDelegationPolicy: "host_only" as const,
-    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: true },
     browserAllowedOrigins: [],
     browserProfilePersistent: false,

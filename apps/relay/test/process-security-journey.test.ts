@@ -21,8 +21,6 @@ const validatorPath = fileURLToPath(
   new URL("../../desktop/src-tauri/target/debug/mls-keypackage-validator", import.meta.url)
 );
 const marker = "MLS-PLAINTEXT-MUST-NEVER-REACH-RELAY";
-const projectPathMarker = "/Users/sentinel/PROJECT-PATH-MUST-NEVER-REACH-RELAY";
-const codexModelMarker = "sentinel-model-MUST-NEVER-REACH-RELAY";
 const rustToolchain = probeRustToolchain(process.env.MULTAIPLAYER_CARGO_BIN ?? "cargo");
 
 interface NativeFixture {
@@ -183,12 +181,14 @@ function workspace(fixture: NativeFixture): StoredRelayStateFixture {
         id: "room-desktop",
         teamId: "team-core",
         name: "Desktop app",
-        projectPath: projectPathMarker,
-        codexModel: codexModelMarker,
         host: "Maddie",
         hostUserId: fixture.host.userId,
         activeHostDeviceId: fixture.host.deviceId,
         hostStatus: "active",
+        approvalPolicy: "ask_every_turn",
+        mode: { chat: true, code: true, workspace: true, browser: false },
+        browserAllowedOrigins: [],
+        browserProfilePersistent: false,
         unread: 0,
         acceptedMlsEpoch: 0
       }
@@ -206,8 +206,8 @@ function workspace(fixture: NativeFixture): StoredRelayStateFixture {
       {
         teamId: "team-core",
         members: [
-          { userId: fixture.host.userId, role: "owner", joinedAt: createdAt },
-          { userId: fixture.nextHost.userId, role: "admin", joinedAt: createdAt }
+          { teamId: "team-core", userId: fixture.host.userId, role: "owner", joinedAt: createdAt },
+          { teamId: "team-core", userId: fixture.nextHost.userId, role: "admin", joinedAt: createdAt }
         ]
       }
     ],
@@ -302,13 +302,7 @@ function waitForPublished(socket: WebSocket, messageId: string): Promise<void> {
 }
 
 async function scanRelay(relay: { dataPath: string }, wire: string[], forbidden: Buffer[]): Promise<void> {
-  const binaryMarkers = [
-    Buffer.from(marker),
-    Buffer.from("MLS-REMOVED-MEMBER-MUST-NOT-DECRYPT"),
-    Buffer.from(projectPathMarker),
-    Buffer.from(codexModelMarker),
-    ...forbidden
-  ];
+  const binaryMarkers = [Buffer.from(marker), Buffer.from("MLS-REMOVED-MEMBER-MUST-NOT-DECRYPT"), ...forbidden];
   const needles = [...binaryMarkers, ...binaryMarkers.map((value) => Buffer.from(value.toString("base64")))];
   for (const path of [relay.dataPath, `${relay.dataPath}-wal`, `${relay.dataPath}-shm`]) {
     const bytes = await readFile(path).catch(() => Buffer.alloc(0));
@@ -330,10 +324,6 @@ async function runSecurityJourney() {
   const generated = await nativeFixture();
   assert.equal(generated.stdout.includes(marker), false);
   assert.equal(generated.stderr.includes(marker), false);
-  assert.equal(generated.stdout.includes(projectPathMarker), false);
-  assert.equal(generated.stderr.includes(projectPathMarker), false);
-  assert.equal(generated.stdout.includes(codexModelMarker), false);
-  assert.equal(generated.stderr.includes(codexModelMarker), false);
   const fixture = generated.fixture;
   const forbidden = fixture.forbiddenValues.map((value) => Buffer.from(value, "base64"));
   assert.ok(forbidden.every((value) => value.length > 0));

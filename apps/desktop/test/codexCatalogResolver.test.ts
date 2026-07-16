@@ -17,8 +17,6 @@ const room: ClientRoomRecord = {
   host: "Host",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
   mode: { chat: true, code: true, workspace: true, browser: false },
   codexModel: "legacy-model",
   codexReasoningEffort: "high",

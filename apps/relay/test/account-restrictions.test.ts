@@ -188,7 +188,7 @@ test("offline restriction CLI survives restart, denies a stored session, and can
     assert.equal(restricted.accountRestrictions?.length, 1);
     reopened.close();
 
-    const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, undefined, dataPath);
+    const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" }, undefined, dataPath);
     try {
       const response = await fetch(`${relay.baseUrl}/auth/me`, {
         headers: { cookie: `multaiplayer_session=${rawSessionId}` }

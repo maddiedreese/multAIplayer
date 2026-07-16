@@ -423,7 +423,7 @@ async function main() {
   const relayEnvironment = {
     NODE_ENV: "test",
     MULTAIPLAYER_RELAY_DEBUG: "true",
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: frontendUrl,
     MULTAIPLAYER_RELAY_STORAGE: "sqlite",
     MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorBinary

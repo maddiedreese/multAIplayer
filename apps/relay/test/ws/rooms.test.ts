@@ -42,8 +42,6 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     host: "Host",
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: false },
     codexModel: "gpt-5.4",
     codexModelPolicy: "pinned",

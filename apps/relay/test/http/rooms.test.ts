@@ -423,7 +423,7 @@ test("relay bounds user-visible metadata strings", async () => {
 });
 
 test("relay lets authorized users archive restore and delete rooms", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const memberCookie = await createDebugSession(relay.baseUrl, "github:design", "design");
   try {
@@ -629,8 +629,6 @@ function hostBootstrapRoom(): RoomRecord {
     hostUserId: "github:maddiedreese",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: true },
     browserAllowedOrigins: [],
     browserProfilePersistent: false,

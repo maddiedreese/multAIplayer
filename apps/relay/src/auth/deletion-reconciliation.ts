@@ -21,7 +21,14 @@ export async function reconcileDeletionLedger(options: {
   store: RelayStore;
   persist: () => Promise<void>;
   now?: () => Date;
-}): Promise<{ entries: number; pending: number; identitiesDeleted: number; markersPruned: number }> {
+  deleteOwnedResourcesForSubject?: string;
+}): Promise<{
+  entries: number;
+  pending: number;
+  identitiesDeleted: number;
+  markersPruned: number;
+  conflictsResolved: number;
+}> {
   // Authenticate and reconcile the complete ledger before expiry collection.
   // An expired entry can still represent a deletion whose primary commit never
   // succeeded; purging it first would resurrect that identity permanently.
@@ -30,12 +37,24 @@ export async function reconcileDeletionLedger(options: {
   const entriesBySubject = groupBySubject(entries);
   const entriesApplied = [...entries];
   let identitiesDeleted = 0;
+  let conflictsResolved = 0;
   for (const userId of relayIdentityIds(options.store)) {
     const subject = options.ledger.subjectFor(userId);
     if (!entriesBySubject.has(subject)) continue;
     const blockers = findAccountDeletionBlockers(options.store, userId);
     if (blockers.ownedTeams.length > 0 || blockers.hostedRooms.length > 0) {
-      throw new DeletionReconciliationBlockedError(subject, blockers);
+      if (options.deleteOwnedResourcesForSubject !== subject) {
+        throw new DeletionReconciliationBlockedError(subject, blockers);
+      }
+      const deletedAt = (options.now ?? (() => new Date()))().toISOString();
+      for (const team of blockers.ownedTeams) {
+        deleteOwnedTeam(options.store, team.id, deletedAt);
+      }
+      for (const room of blockers.hostedRooms) {
+        const record = options.store.getRoom(room.id);
+        if (record) options.store.setRoom({ ...record, deletedAt, hostStatus: "offline" });
+      }
+      conflictsResolved += 1;
     }
     // Extend protection from the actual cleanup attempt, not merely the
     // original request. A failed/delayed primary commit may have allowed newer
@@ -54,8 +73,11 @@ export async function reconcileDeletionLedger(options: {
     await options.persist();
   }
 
-  await options.ledger.purgeExpired();
-  const activeEntryIds = new Set((await options.ledger.list()).map((entry) => entry.id));
+  await options.ledger.purgeExpired(entriesApplied);
+  const now = (options.now ?? (() => new Date()))().getTime();
+  const activeEntryIds = new Set(
+    entriesApplied.filter((entry) => Date.parse(entry.protectUntil) > now).map((entry) => entry.id)
+  );
   let markersPruned = 0;
   for (const entryId of options.store.appliedDeletionLedgerEntries.keys()) {
     if (activeEntryIds.has(entryId)) continue;
@@ -63,7 +85,35 @@ export async function reconcileDeletionLedger(options: {
   }
   if (markersPruned > 0) await options.persist();
 
-  return { entries: entriesApplied.length, pending: pending.length, identitiesDeleted, markersPruned };
+  return {
+    entries: entriesApplied.length,
+    pending: pending.length,
+    identitiesDeleted,
+    markersPruned,
+    conflictsResolved
+  };
+}
+
+function deleteOwnedTeam(store: RelayStore, teamId: string, deletedAt: string): void {
+  const team = store.getTeam(teamId);
+  if (team) store.setTeam({ ...team, archivedAt: undefined, deletedAt });
+  for (const room of store.allRooms()) {
+    if (room.teamId === teamId && !room.deletedAt) {
+      store.setRoom({ ...room, archivedAt: undefined, deletedAt });
+    }
+  }
+  const revokedInviteIds = new Set<string>();
+  for (const [inviteId, invite] of store.invites) {
+    if (invite.teamId !== teamId) continue;
+    store.invites.delete(inviteId);
+    revokedInviteIds.add(inviteId);
+  }
+  for (const [requestId, request] of store.inviteRequests) {
+    if (revokedInviteIds.has(request.inviteId)) store.inviteRequests.delete(requestId);
+  }
+  for (const [requestId, response] of store.inviteResponses) {
+    if (revokedInviteIds.has(response.inviteId)) store.inviteResponses.delete(requestId);
+  }
 }
 
 function groupBySubject(entries: DeletionLedgerEntry[]): Map<string, DeletionLedgerEntry[]> {
@@ -82,7 +132,6 @@ export function relayIdentityIds(store: RelayStore): Set<string> {
   for (const members of store.teamMembers.values()) for (const userId of members.keys()) ids.add(userId);
   for (const room of store.rooms.values()) {
     if (room.hostUserId) ids.add(room.hostUserId);
-    for (const userId of room.trustedApproverUserIds) ids.add(userId);
   }
   for (const invite of store.invites.values()) {
     if (invite.creatorUserId) ids.add(invite.creatorUserId);

@@ -8,7 +8,7 @@ test("relay persistence flushes durable mutations and closes", async () => {
     closed = false;
   const persistence = {
     load: async () => null,
-    save: async () => assert.fail("whole-state save is reserved for legacy migration"),
+    save: async () => assert.fail("whole-state save is reserved for initial state"),
     saveChanges: () => {
       saves++;
       return true;

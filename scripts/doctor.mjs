@@ -176,7 +176,7 @@ function readProductionRelayConfig() {
     deletionLedgerUrlStyle: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE"),
     deletionLedgerProtectionSeconds: envInteger("MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS", 7_776_000),
     allowedOrigins: envValue("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS"),
-    requireAuth: envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true),
+    requireAuth: !envBoolean("MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH", false),
     debug: envBoolean("MULTAIPLAYER_RELAY_DEBUG", false),
     rateLimits: envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true),
     structuredLogs: envBoolean("MULTAIPLAYER_RELAY_STRUCTURED_LOGS", true),
@@ -261,7 +261,7 @@ function checkCoreRelayConfig(config) {
   });
   checks.push({
     ok: requireAuth,
-    label: "production MULTAIPLAYER_RELAY_REQUIRE_AUTH",
+    label: "production authentication",
     detail: requireAuth ? "auth required" : "must not be false for a hosted production relay"
   });
   checks.push({

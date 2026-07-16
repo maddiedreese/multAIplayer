@@ -15,12 +15,11 @@ import {
   tmpdir,
   waitForError,
   waitForStoredState,
-  type RelayHarness,
-  type StoredRelayStateFixture
+  type RelayHarness
 } from "../support/relay.js";
 
 test("relay can require auth for workspace mutations", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   try {
     assert.equal(await postJsonStatus(relay.baseUrl, "/teams", { name: "Private Team" }), 401);
     assert.equal(
@@ -85,7 +84,7 @@ test("relay can require auth for workspace mutations", async () => {
 });
 
 test("relay treats malformed session cookies as unauthenticated", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   let socket: WebSocket | null = null;
   try {
     const validCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
@@ -148,7 +147,7 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
 });
 
 test("relay expires server-side auth sessions independently of cookies", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   try {
     const expiredCookie = await createDebugSession(relay.baseUrl, "github:expired", "expired", -1);
 
@@ -167,7 +166,7 @@ test("relay expires server-side auth sessions independently of cookies", async (
 });
 
 test("relay bounds debug auth session metadata before storing", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   try {
     const oversizedLogin = await fetch(`${relay.baseUrl}/debug/auth-session`, {
       method: "POST",
@@ -194,7 +193,7 @@ test("relay bounds debug auth session metadata before storing", async () => {
 });
 
 test("relay logout clears the session cookie with matching attributes", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   try {
     const cookie = await createDebugSession(relay.baseUrl, "github:logout", "logout");
     const response = await fetch(`${relay.baseUrl}/auth/logout`, {
@@ -219,7 +218,7 @@ test("relay logout clears the session cookie with matching attributes", async ()
 });
 
 test("hosted account deletion requires explicit confirmation and reports ownership blockers", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   try {
     const unauthenticated = await fetch(`${relay.baseUrl}/auth/account`, {
       method: "DELETE",
@@ -260,7 +259,7 @@ test("hosted account deletion requires explicit confirmation and reports ownersh
 
 test("hosted account deletion removes identity-owned relay data durably and retains shared records", async () => {
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false"
   });
   let restarted = null as Awaited<ReturnType<typeof startRelay>> | null;
   try {
@@ -303,7 +302,7 @@ test("hosted account deletion removes identity-owned relay data durably and reta
     await relay.close({ preserveData: true });
     restarted = await startRelay(
       {
-        MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
+        MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false"
       },
       undefined,
       relay.dataPath
@@ -317,11 +316,35 @@ test("hosted account deletion removes identity-owned relay data durably and reta
   }
 });
 
+test("primary-only self-hosting deletes current state without requiring backup protection", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH: "",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY: ""
+  });
+  try {
+    const config = (await (await fetch(`${relay.baseUrl}/auth/config`)).json()) as { accountDeletion: string };
+    assert.equal(config.accountDeletion, "primary_store_only");
+    const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    const response = await fetch(`${relay.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ confirmation: "delete my account" })
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).ok, true);
+    assert.equal((await fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
+  } finally {
+    await relay.close();
+  }
+});
+
 test(
   "hosted account deletion poisons product traffic after the ledger commits and primary persistence fails",
   { skip: process.platform === "win32" || process.geteuid?.() === 0 },
   async () => {
-    const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+    const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
     const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
     const socket = new WebSocket(relay.wsUrl);
     await onceOpen(socket);
@@ -370,7 +393,7 @@ test(
     const ledgerPath = join(tmpdir(), `multaiplayer-unwritable-ledger-${randomUUID()}`);
     await mkdir(ledgerPath, { recursive: true });
     const relay = await startRelay({
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
       MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH: ledgerPath
     });
     const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
@@ -392,8 +415,8 @@ test(
   }
 );
 
-test("relay hashes persisted session ids, migrates legacy ids, and purges legacy token fields", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+test("relay persists only hashed current-schema session ids", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   let restarted: RelayHarness | null = null;
   let closed = false;
   try {
@@ -406,83 +429,12 @@ test("relay hashes persisted session ids, migrates legacy ids, and purges legacy
     assert.match(String((stored.authSessions![0] as Record<string, unknown>).sessionIdHash), /^[a-f0-9]{64}$/);
     await relay.close({ preserveData: true });
     closed = true;
-    const legacy = stored.authSessions![0] as StoredRelayStateFixture["authSessions"][number] & Record<string, unknown>;
-    delete legacy.sessionIdHash;
-    legacy.sessionId = sessionId;
-    legacy.accessToken = "legacy-secret";
-    legacy.encryptedAccessToken = {
-      algorithm: "AES-GCM-256",
-      nonce: "legacy",
-      ciphertext: "legacy-secret",
-      tag: "legacy"
-    };
-    restarted = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, stored);
+    restarted = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" }, undefined, relay.dataPath);
     assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
-    const rewritten = await waitForStoredState(restarted.dataPath, (state) => state.authSessions?.length === 1);
-    assert.doesNotMatch(
-      JSON.stringify(rewritten),
-      new RegExp(`${sessionId}|legacy-secret|accessToken|encryptedAccessToken`)
-    );
-    assert.match(String((rewritten.authSessions![0] as Record<string, unknown>).sessionIdHash), /^[a-f0-9]{64}$/);
     const logout = await fetch(`${restarted.baseUrl}/auth/logout`, { method: "POST", headers: { cookie } });
     assert.equal(logout.status, 200);
     assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 401);
     await waitForStoredState(restarted.dataPath, (state) => state.authSessions?.length === 0);
-  } finally {
-    if (restarted) await restarted.close();
-    else if (!closed) await relay.close();
-  }
-});
-
-test("relay migrates plaintext ids and purges legacy token fields from normalized SQLite session rows", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
-    MULTAIPLAYER_RELAY_STORAGE: "sqlite"
-  });
-  let restarted: RelayHarness | null = null;
-  let closed = false;
-  try {
-    const cookie = await createDebugSession(relay.baseUrl, "github:sqlite-persisted", "sqlite-persisted");
-    const sessionId = cookie.replace(/^multaiplayer_session=([^;]+).*$/, "$1");
-    await relay.close({ preserveData: true });
-    closed = true;
-    const db = new Database(relay.dataPath);
-    const row = db.prepare("select session_id, data_json from relay_auth_sessions limit 1").get() as {
-      session_id: string;
-      data_json: string;
-    };
-    assert.match(row.session_id, /^[a-f0-9]{64}$/);
-    assert.notEqual(row.session_id, sessionId);
-    assert.doesNotMatch(row.data_json, new RegExp(sessionId));
-    const legacy = JSON.parse(row.data_json) as Record<string, unknown>;
-    delete legacy.sessionIdHash;
-    legacy.sessionId = sessionId;
-    legacy.accessToken = "sqlite-legacy-secret";
-    legacy.encryptedAccessToken = { ciphertext: "sqlite-legacy-secret" };
-    db.prepare("update relay_auth_sessions set session_id = ?, data_json = ? where session_id = ?").run(
-      sessionId,
-      JSON.stringify(legacy),
-      row.session_id
-    );
-    db.close();
-    restarted = await startRelay(
-      { MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true", MULTAIPLAYER_RELAY_STORAGE: "sqlite" },
-      undefined,
-      relay.dataPath
-    );
-    assert.equal((await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } })).status, 200);
-    const verifyDb = new Database(restarted.dataPath, { readonly: true });
-    const rewritten = verifyDb.prepare("select session_id, data_json from relay_auth_sessions limit 1").get() as {
-      session_id: string;
-      data_json: string;
-    };
-    verifyDb.close();
-    assert.match(rewritten.session_id, /^[a-f0-9]{64}$/);
-    assert.notEqual(rewritten.session_id, sessionId);
-    assert.doesNotMatch(
-      rewritten.data_json,
-      new RegExp(`${sessionId}|sqlite-legacy-secret|accessToken|encryptedAccessToken`)
-    );
   } finally {
     if (restarted) await restarted.close();
     else if (!closed) await relay.close();

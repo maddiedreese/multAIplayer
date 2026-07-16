@@ -14,7 +14,10 @@ import {
 } from "../support/relay.js";
 
 test("relay scopes authenticated workspace access to team members and admits invitees", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, approvedInviteFixture("device-peer-123"));
+  const relay = await startRelay(
+    { MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" },
+    approvedInviteFixture("device-peer-123")
+  );
   const maddieCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const peerCookie = await createDebugSession(relay.baseUrl, "github:peer", "peer");
   let peerSocket: WebSocket | null = null;
@@ -122,7 +125,7 @@ test("relay scopes authenticated workspace access to team members and admits inv
 
 test("relay revokes live room access and stale invites when a team member is removed", async () => {
   const relay = await startRelay(
-    { MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" },
+    { MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" },
     approvedInviteFixture("device-peer-removed")
   );
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
@@ -205,6 +208,11 @@ function approvedInviteFixture(deviceId: string) {
         hostUserId: "github:maddiedreese",
         hostStatus: "active",
         activeHostDeviceId: "host-device",
+        acceptedMlsEpoch: 0,
+        approvalPolicy: "ask_every_turn",
+        mode: { chat: true, code: true, workspace: true, browser: false },
+        browserAllowedOrigins: [],
+        browserProfilePersistent: false,
         unread: 0
       }
     ],
@@ -253,7 +261,7 @@ function approvedInviteFixture(deviceId: string) {
     teamMembers: [
       {
         teamId: "team-core",
-        members: [{ userId: "github:maddiedreese", role: "owner", joinedAt: createdAt }]
+        members: [{ teamId: "team-core", userId: "github:maddiedreese", role: "owner", joinedAt: createdAt }]
       }
     ],
     encryptedBacklog: []
@@ -262,7 +270,7 @@ function approvedInviteFixture(deviceId: string) {
 
 test("relay assigns team creators owner role", async () => {
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true"
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false"
   });
   const cookie = await createDebugSession(relay.baseUrl, "github:owner", "owner");
   try {
@@ -293,7 +301,7 @@ test("relay assigns team creators owner role", async () => {
 });
 
 test("relay lets authorized team roles manage non-owner members", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const adminCookie = await createDebugSession(relay.baseUrl, "github:alex", "alex");
   const memberCookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
@@ -377,7 +385,7 @@ test("relay lets authorized team roles manage non-owner members", async () => {
 });
 
 test("relay archives restores and deletes teams with their rooms", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const adminCookie = await createDebugSession(relay.baseUrl, "github:alex", "alex");
   try {
@@ -448,7 +456,7 @@ test("relay archives restores and deletes teams with their rooms", async () => {
 });
 
 test("relay preserves requester team role in workspace updates", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const socket = new WebSocket(relay.wsUrl, { headers: { cookie: ownerCookie } });
   try {

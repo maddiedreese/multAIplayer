@@ -39,7 +39,6 @@ export interface RoomInspectorCapabilities {
   invite: Pick<InspectorWorkProps["encryptedInvite"], "onCopyInvite" | "onImportInvite" | "onDecideInviteRequest">;
   settings: {
     selectApprovalPolicy: InspectorWorkProps["approvalPolicy"]["onSelectPolicy"];
-    selectApprovalDelegationPolicy: InspectorWorkProps["approvalPolicy"]["onSelectDelegationPolicy"];
     selectSandboxLevel: InspectorWorkProps["approvalPolicy"]["onSelectSandboxLevel"];
     selectModel: InspectorWorkProps["model"]["onSelectModel"];
     selectReasoningEffort: InspectorWorkProps["model"]["onSelectReasoningEffort"];
@@ -79,7 +78,6 @@ export interface RoomInspectorSources {
     | "chooseProjectPath"
     | "updateProjectPath"
     | "setApprovalPolicy"
-    | "setApprovalDelegationPolicy"
     | "setCodexSandboxLevel"
     | "setCodexModel"
     | "setCodexReasoningEffort"

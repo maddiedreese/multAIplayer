@@ -38,7 +38,6 @@ interface UseRelayPublishersOptions {
   deviceId: string;
   localUser: LocalUser;
   approvalPolicyLabels: Record<string, string>;
-  approvalDelegationPolicyLabels: Record<string, string>;
   roomModeLabels: Record<string, string>;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
@@ -57,7 +56,6 @@ export function useRelayPublishers({
   deviceId,
   localUser,
   approvalPolicyLabels,
-  approvalDelegationPolicyLabels,
   roomModeLabels,
   appendLocalPreviewEvent,
   appendGitWorkflowEvent,
@@ -248,7 +246,6 @@ export function useRelayPublishers({
       room.id,
       buildRoomSettingsSystemMessage(payload, {
         approvalPolicyLabels,
-        approvalDelegationPolicyLabels,
         roomModeLabels
       })
     );

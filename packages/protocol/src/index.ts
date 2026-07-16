@@ -50,7 +50,6 @@ export {
   ChatEditPlaintextPayload,
   ChatPlaintextPayload,
   ChatReactionPlaintextPayload,
-  CodexApprovalPlaintextPayload,
   CodexActivityPlaintextPayload,
   CodexEventPlaintextPayload,
   CodexQueuePlaintextPayload,
@@ -79,7 +78,6 @@ export {
   codexReasoningEffortOptions,
   codexSandboxLevelOptions,
   codexSpeedOptions,
-  defaultApprovalDelegationPolicy,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
@@ -94,7 +92,6 @@ export {
   defaultRoomMode
 } from "./defaults-options.js";
 export type {
-  ApprovalDelegationPolicy,
   ApprovalPolicy,
   CodexCatalogSelectionPolicy,
   CodexReasoningEffort,

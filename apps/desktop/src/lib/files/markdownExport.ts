@@ -32,8 +32,6 @@ export interface MarkdownChatMessage {
 
 const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",
-  auto_chat_only: "Ask every Codex turn",
-  auto_browser_allowed_sites: "Ask every Codex turn",
   never_host: "Never host this room"
 };
 

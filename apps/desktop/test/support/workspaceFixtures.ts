@@ -14,8 +14,6 @@ export const seededTeams: TeamRecord[] = [{ id: "team-core", name: "Core Team", 
 
 const roomDefaults = {
   approvalPolicy: "ask_every_turn" as const,
-  approvalDelegationPolicy: "host_only" as const,
-  trustedApproverUserIds: [],
   mode: defaultRoomMode,
   codexModel: defaultCodexModel,
   codexReasoningEffort: defaultCodexReasoningEffort,

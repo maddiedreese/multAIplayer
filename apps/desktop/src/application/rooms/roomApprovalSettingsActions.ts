@@ -1,9 +1,4 @@
-import type {
-  ApprovalDelegationPolicy,
-  ApprovalPolicy,
-  ClientRoomRecord,
-  RoomSettingsPlaintextPayload
-} from "@multaiplayer/protocol";
+import type { ApprovalPolicy, ClientRoomRecord, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
 import { roomLockMessage } from "../runtime/appRuntime";
 import type { RoomSettingsMutationContext } from "./roomSettingsMutationContext";
 import { shouldApplyRoomScopedUiUpdate } from "../../lib/room/roomScopedUi";
@@ -25,11 +20,7 @@ interface ApprovalActionsOptions {
 export function createRoomApprovalSettingsActions(options: ApprovalActionsOptions) {
   const c = options.context;
 
-  async function mutateApproval(
-    setting: "approvalPolicy" | "approvalDelegationPolicy",
-    nextValue: ApprovalPolicy | ApprovalDelegationPolicy,
-    successMessage: string
-  ): Promise<void> {
+  async function mutateApproval(nextValue: ApprovalPolicy, successMessage: string): Promise<void> {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
       c.setSelectedSettingsMessage("Create or join a room before changing room settings.");
@@ -49,12 +40,12 @@ export function createRoomApprovalSettingsActions(options: ApprovalActionsOption
     c.setSettingsBusyForRoom(roomId, true);
     c.setSettingsMessageForRoom(roomId, null);
     try {
-      const previousValue = selectedRoom[setting];
-      const room = await updateRoomSettings(roomId, { ...c.currentRoomSettingsActor(), [setting]: nextValue });
+      const previousValue = selectedRoom.approvalPolicy;
+      const room = await updateRoomSettings(roomId, { ...c.currentRoomSettingsActor(), approvalPolicy: nextValue });
       options.replaceRoom(room);
       await options.publishEvent(room, {
         id: crypto.randomUUID(),
-        setting,
+        setting: "approvalPolicy",
         previousValue,
         nextValue,
         changedAt: new Date().toISOString()
@@ -74,8 +65,6 @@ export function createRoomApprovalSettingsActions(options: ApprovalActionsOption
 
   return {
     setApprovalPolicy: (policy: ApprovalPolicy) =>
-      mutateApproval("approvalPolicy", policy, `Approval policy set to ${options.approvalPolicyLabels[policy]}.`),
-    setApprovalDelegationPolicy: (policy: ApprovalDelegationPolicy) =>
-      mutateApproval("approvalDelegationPolicy", policy, "Approval delegation updated.")
+      mutateApproval(policy, `Approval policy set to ${options.approvalPolicyLabels[policy]}.`)
   };
 }

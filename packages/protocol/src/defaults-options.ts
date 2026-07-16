@@ -1,11 +1,7 @@
-export type ApprovalPolicy = "ask_every_turn" | "auto_chat_only" | "auto_browser_allowed_sites" | "never_host";
-
-export type ApprovalDelegationPolicy =
-  "host_only" | "members_can_request" | "members_can_approve" | "trusted_members_only";
+export type ApprovalPolicy = "ask_every_turn" | "never_host";
 
 export type CodexCatalogSelectionPolicy = "auto" | "pinned";
 
-export const defaultApprovalDelegationPolicy: ApprovalDelegationPolicy = "host_only";
 export const defaultCodexModel = "gpt-5.6-sol";
 export const defaultCodexReasoningEffort = "medium";
 export const defaultCodexSpeed = "standard";
