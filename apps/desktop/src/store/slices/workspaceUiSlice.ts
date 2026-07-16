@@ -103,6 +103,14 @@ function existingIdOrFirst<T extends { id: string }>(records: T[], currentId: st
   return records.some((record) => record.id === currentId) ? currentId : (records[0]?.id ?? "");
 }
 
+function repairRoomSelection(rooms: ClientRoomRecord[], selectedRoomId: string, selectedTeam: string) {
+  if (rooms.some((room) => room.id === selectedRoomId)) return { selectedRoomId, selectedTeam };
+  const fallbackRoom = rooms[0];
+  return fallbackRoom
+    ? { selectedRoomId: fallbackRoom.id, selectedTeam: fallbackRoom.teamId }
+    : { selectedRoomId: "", selectedTeam };
+}
+
 export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], WorkspaceUiSlice> = (set) => ({
   ...emptyWorkspaceUiState,
   initializeWorkspaceUi: ({ teams, rooms, projectPath, roomId }) => {
@@ -155,7 +163,7 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
       const nextRooms = activeRecords(rooms);
       return {
         rooms: nextRooms,
-        selectedRoomId: existingIdOrFirst(nextRooms, state.selectedRoomId)
+        ...repairRoomSelection(nextRooms, state.selectedRoomId, state.selectedTeam)
       };
     });
   },
@@ -172,7 +180,7 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
           );
       return {
         rooms,
-        selectedRoomId: existingIdOrFirst(rooms, state.selectedRoomId)
+        ...repairRoomSelection(rooms, state.selectedRoomId, state.selectedTeam)
       };
     });
   },
@@ -189,7 +197,7 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
           );
       return {
         rooms,
-        selectedRoomId: existingIdOrFirst(rooms, state.selectedRoomId)
+        ...repairRoomSelection(rooms, state.selectedRoomId, state.selectedTeam)
       };
     });
   },
