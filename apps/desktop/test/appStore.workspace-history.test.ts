@@ -43,50 +43,6 @@ test("desktop store keeps workspace maps scoped", () => {
   assert.deepEqual(state.messagesByRoom["room-b"], []);
 });
 
-test("desktop store seeds initial workspace data only when maps are empty", () => {
-  const store = useAppStore.getState();
-
-  store.seedWorkspaceInitialDataIfEmpty({
-    teamMembersByTeam: {
-      "team-core": [
-        {
-          teamId: "team-core",
-          userId: "github:maddie",
-          role: "owner",
-          joinedAt: "2026-07-06T00:17:00.000Z"
-        }
-      ]
-    },
-    messagesByRoom: {
-      "room-a": [{ id: "message-a", author: "Avery", role: "human", body: "Seeded", time: "10:17" }]
-    }
-  });
-
-  let state = useAppStore.getState();
-  assert.equal(state.teamRosterByTeam["team-core"]?.members?.[0]?.userId, "github:maddie");
-  assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Seeded");
-
-  store.seedWorkspaceInitialDataIfEmpty({
-    teamMembersByTeam: {
-      "team-labs": [
-        {
-          teamId: "team-labs",
-          userId: "github:labs",
-          role: "member",
-          joinedAt: "2026-07-06T00:18:00.000Z"
-        }
-      ]
-    },
-    messagesByRoom: {
-      "room-b": [{ id: "message-b", author: "Jordan", role: "human", body: "Do not merge", time: "10:18" }]
-    }
-  });
-
-  state = useAppStore.getState();
-  assert.equal(state.teamRosterByTeam["team-labs"]?.members, undefined);
-  assert.equal(state.messagesByRoom["room-b"], undefined);
-});
-
 test("desktop store hydrates local room history through one room-scoped action", () => {
   const store = useAppStore.getState();
 

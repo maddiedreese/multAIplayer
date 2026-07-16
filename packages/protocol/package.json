@@ -14,8 +14,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
-    "test:coverage": "c8 --all --src src --include 'src/**/*.ts' --exclude 'src/app-types.ts' --report-dir coverage --reporter=text --reporter=json-summary --reporter=lcov tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "zod": "4.4.3"

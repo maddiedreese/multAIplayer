@@ -25,17 +25,11 @@ export interface TeamRosterState {
 
 export type TeamRosterByTeam = Record<string, TeamRosterState>;
 
-interface WorkspaceInitialData {
-  teamMembersByTeam: TeamMembersByTeam;
-  messagesByRoom: MessagesByRoom;
-}
-
 export interface WorkspaceDataSlice {
   teamRosterByTeam: TeamRosterByTeam;
   messagesByRoom: MessagesByRoom;
   chatEditsByRoom: ChatEditsByRoom;
   chatDeletesByRoom: ChatDeletesByRoom;
-  seedWorkspaceInitialDataIfEmpty: (initialData: WorkspaceInitialData) => void;
   setTeamMembersForTeam: (teamId: string, members: TeamMemberRecord[]) => void;
   setTeamMembersMessageForTeam: (teamId: string, message: string | null) => void;
   setTeamMembersBusyForTeam: (teamId: string, busy: boolean) => void;
@@ -94,25 +88,6 @@ export function projectTeamMembersBusyByTeam(teamRosterByTeam: TeamRosterByTeam)
 
 export const createWorkspaceDataSlice: StateCreator<AppStoreState, [], [], WorkspaceDataSlice> = (set) => ({
   ...emptyWorkspaceDataState,
-  seedWorkspaceInitialDataIfEmpty: ({ teamMembersByTeam, messagesByRoom }) => {
-    set((state) => {
-      const shouldSeedTeamMembers =
-        Object.keys(teamMembersByTeam).length > 0 && Object.keys(state.teamRosterByTeam).length === 0;
-      const shouldSeedMessages =
-        Object.keys(messagesByRoom).length > 0 && Object.keys(state.messagesByRoom).length === 0;
-      if (!shouldSeedTeamMembers && !shouldSeedMessages) return state;
-      return {
-        ...(shouldSeedTeamMembers
-          ? {
-              teamRosterByTeam: Object.fromEntries(
-                Object.entries(teamMembersByTeam).map(([teamId, members]) => [teamId, { members }])
-              )
-            }
-          : {}),
-        ...(shouldSeedMessages ? { messagesByRoom } : {})
-      };
-    });
-  },
   setTeamMembersForTeam: (teamId, members) => {
     set((state) => ({
       teamRosterByTeam: updateTeamRosterForTeam(state.teamRosterByTeam, teamId, (roster) => ({

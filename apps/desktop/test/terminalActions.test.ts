@@ -68,7 +68,7 @@ test.beforeEach(() => {
   };
   const store = useAppStore.getState();
   store.resetAppStore();
-  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   store.replaceCurrentUser({ id: "github:maddie", login: "maddie", name: "Maddie" });
 });
 

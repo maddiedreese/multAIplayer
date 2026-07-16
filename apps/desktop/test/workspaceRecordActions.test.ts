@@ -71,11 +71,9 @@ test("membership removal clears only rooms in the explicitly scoped team", async
   const siblingRoom = { ...room, id: "room-sibling", name: "Sibling" };
   const unaffectedRoom = { ...room, id: "room-other", teamId: "team-other", name: "Other" };
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({
-    teams: [],
+  useAppStore.setState({
     rooms: [room, siblingRoom, unaffectedRoom],
-    projectPath: unaffectedRoom.projectPath,
-    roomId: unaffectedRoom.id
+    selectedRoomId: unaffectedRoom.id
   });
   useAppStore.setState({
     messagesByRoom: {
@@ -127,8 +125,7 @@ test("membership removal clears only rooms in the explicitly scoped team", async
 
 test("unscoped membership errors never revoke or delete a selected room", async () => {
   const calls: string[] = [];
-  const store = useAppStore.getState();
-  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   const actions = createActions({
     revokeWorkspaceAccess: () => calls.push("revoke"),
     forgetRevokedRoomLocalData: async () => void calls.push("delete")
@@ -141,7 +138,7 @@ test("unscoped membership errors never revoke or delete a selected room", async 
 
 test("failed scoped revocation cleanup is visible and leaves the room locked", async () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   const actions = createActions({
     revokeWorkspaceAccess: (teamId, roomId) => store.revokeWorkspaceAccess(teamId, roomId),
     forgetRevokedRoomLocalData: async () => {
@@ -161,12 +158,7 @@ test("one room cleanup success cannot hide another revoked room cleanup failure"
   const siblingRoom = { ...room, id: "room-sibling", name: "Sibling" };
   const roomMessages = new Map<string, string>();
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({
-    teams: [],
-    rooms: [room, siblingRoom],
-    projectPath: room.projectPath,
-    roomId: room.id
-  });
+  useAppStore.setState({ rooms: [room, siblingRoom], selectedRoomId: room.id });
   const actions = createActions({
     revokeWorkspaceAccess: (teamId, roomId) => store.revokeWorkspaceAccess(teamId, roomId),
     forgetRevokedRoomLocalData: (roomId) => (roomId === room.id ? selectedCleanup.promise : siblingCleanup.promise),

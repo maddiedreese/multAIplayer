@@ -55,7 +55,6 @@ Use this index to find the React lifecycle or composition point for a desktop be
 ## Workspace and team lifecycle
 
 - `useAppWorkspaceFlow.ts` composes app-level workspace flows.
-- `useInitializeWorkspaceUi.ts` seeds workspace UI state.
 - `useSelectedTeamData.ts` derives data for the selected team.
 - `useSelectedTeamDefaults.ts` applies defaults for the selected team.
 - `useTeamMembersRefresh.ts` refreshes selected-team membership.
