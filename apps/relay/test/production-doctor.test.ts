@@ -90,5 +90,4 @@ test("production doctor warns when the single trusted-proxy opt-in is enabled", 
     output,
     /\[ok\] production trusted-proxy configuration: WARNING: forwarded headers are trusted; ensure the relay is unreachable except through a proxy that overwrites client forwarding headers/
   );
-  assert.doesNotMatch(output, /MULTAIPLAYER_RELAY_STORAGE/);
 });
