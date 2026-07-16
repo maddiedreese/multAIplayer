@@ -89,7 +89,6 @@ export async function startRelay(
           ? { MULTAIPLAYER_MLS_VALIDATOR_PATH: mockValidatorPath }
           : {}),
         PORT: String(port),
-        MULTAIPLAYER_RELAY_STORAGE: "sqlite",
         MULTAIPLAYER_RELAY_DATA_PATH: dataPath,
         MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH:
           extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH ?? join(tempDir, "external-deletion-ledger"),

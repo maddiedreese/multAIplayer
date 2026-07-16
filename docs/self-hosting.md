@@ -68,7 +68,7 @@ docker run --rm -p 4321:4321 \
   multaiplayer-relay:alpha
 ```
 
-The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_STORAGE=sqlite`, `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite`, and the bundled `MULTAIPLAYER_MLS_VALIDATOR_PATH` by default. Both the container healthcheck and platform readiness use `/readyz`. Its public JSON is deliberately minimal: `{ "ok": true }` while ready, or `{ "ok": false, "code": "relay_shutting_down" | "persistence_unavailable" }` with status `503`; it does not expose filesystem configuration. During shutdown, `/readyz` reports not-ready, new HTTP requests and WebSocket upgrades are rejected, existing room WebSockets close with code `1012` (`Service Restart`), and the relay store is flushed before exit. Give the process a termination grace period long enough for the flush to complete.
+The image sets `NODE_ENV=production`, `PORT=4321`, `MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite`, and the bundled `MULTAIPLAYER_MLS_VALIDATOR_PATH` by default. Both the container healthcheck and platform readiness use `/readyz`. Its public JSON is deliberately minimal: `{ "ok": true }` while ready, or `{ "ok": false, "code": "relay_shutting_down" | "persistence_unavailable" }` with status `503`; it does not expose filesystem configuration. During shutdown, `/readyz` reports not-ready, new HTTP requests and WebSocket upgrades are rejected, existing room WebSockets close with code `1012` (`Service Restart`), and the relay store is flushed before exit. Give the process a termination grace period long enough for the flush to complete.
 
 The official Railway service runs `node apps/relay/dist/predeploy-check.js` before replacing the live deployment. That check parses the production configuration without opening the database or contacting the deletion ledger, rejects missing origins/authentication/rate limits/metrics protection, measures configured-volume disk headroom, and verifies that the bundled MLS KeyPackage validator is executable. Startup and `/readyz` remain the authoritative checks for database access, deletion-ledger reconciliation, and readiness after the volume is attached.
 
@@ -90,17 +90,15 @@ Production startup and `node scripts/doctor.mjs --production-relay` reject a mis
 
 ## Relay Storage
 
-SQLite is the default relay backend, including for local development. With no storage variables set, the relay uses `.multaiplayer/relay-store.sqlite`. Its transactional writes and WAL recovery make it the safer baseline:
+SQLite is the relay's only runtime backend, including for local development. With no data path set, the relay uses `.multaiplayer/relay-store.sqlite`:
 
 ```bash
-MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=.multaiplayer/relay-store.sqlite
 ```
 
-Hosted or internet-facing relays must use SQLite to pass the production relay doctor:
+Hosted or internet-facing relays should place the SQLite database on persistent storage:
 
 ```bash
-MULTAIPLAYER_RELAY_STORAGE=sqlite
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES=250000
 MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM=25000
@@ -213,14 +211,13 @@ MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT=120
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER=20
 MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE=5
 MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=false
-MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=false
 ```
 
-Each configured cap is both burst capacity and tokens refilled over `MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS`, which removes the fixed-window boundary burst. An unsigned attempt consumes the strict client-IP bucket. A request with a server-validated session consumes both its separate hashed-session bucket and a bounded shared-network bucket whose capacity is the configured cap multiplied by `MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER`. This lets several legitimate signed-in users share a home, office, or carrier NAT without collapsing their individual allowance, while valid-session rotation remains bounded at the network level and caller-selected cookie values cannot create trusted buckets. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Forwarded addresses are used only when both proxy variables are true. Set them only when a trusted reverse proxy removes client-supplied forwarding headers and writes its own; the production doctor rejects the unsafe one-sided configuration. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter remains process-local and resets on restart; it is development-grade defense in depth, not durable or distributed enforcement. A second production replica is unsupported: sticky routing does not provide shared quota, persistence, presence, or fanout correctness.
+Each configured cap is both burst capacity and tokens refilled over `MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS`, which removes the fixed-window boundary burst. An unsigned attempt consumes the strict client-IP bucket. A request with a server-validated session consumes both its separate hashed-session bucket and a bounded shared-network bucket whose capacity is the configured cap multiplied by `MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER`. This lets several legitimate signed-in users share a home, office, or carrier NAT without collapsing their individual allowance, while valid-session rotation remains bounded at the network level and caller-selected cookie values cannot create trusted buckets. By default, the relay uses the direct socket address and ignores `X-Forwarded-For`, because direct internet clients can spoof that header. Forwarded addresses are used only when `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS=true`. Set it only when a trusted reverse proxy removes client-supplied forwarding headers and writes its own; the production doctor prints a strong warning whenever header trust is enabled. HTTP requests over the limit receive `429` with `Retry-After`; room WebSocket clients receive an encrypted-room-safe error message and remain connected. The alpha limiter remains process-local and resets on restart; it is development-grade defense in depth, not durable or distributed enforcement. A second production replica is unsupported: sticky routing does not provide shared quota, persistence, presence, or fanout correctness.
 
 For every hosted or internet-facing deployment, the reverse proxy or edge is mandatory even with one replica. It terminates TLS, strips client-supplied forwarding headers, writes one trusted client address, bounds request bodies and connection timeouts, and applies coarse source-IP/volumetric controls before traffic reaches Node. Bind the relay to a private interface or platform-private service so clients cannot bypass that edge. The production doctor checks the relay-side header configuration; it cannot prove network isolation or edge policy, so operators must test both direct-origin reachability and spoofed forwarding headers.
 
-Treat a hosting, CDN, load-balancer, or forwarding-header change as invalidating this trust decision. Disable both proxy variables until the new path is verified, then run `npm --workspace @multaiplayer/relay exec -- tsx --test test/http/rate-limits.test.ts` and independently confirm that the origin is unreachable, a client-supplied forwarding header is stripped, and the provider-authenticated address wins. The automated test covers relay behavior; the last three checks are deployment checks and cannot be inferred from repository configuration.
+Treat a hosting, CDN, load-balancer, or forwarding-header change as invalidating this trust decision. Disable `MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS` until the new path is verified, then run `npm --workspace @multaiplayer/relay exec -- tsx --test test/http/rate-limits.test.ts` and independently confirm that the origin is unreachable, a client-supplied forwarding header is stripped, and the provider-authenticated address wins. The automated test covers relay behavior; the last three checks are deployment checks and cannot be inferred from repository configuration.
 
 MLS derives per-message keys and nonces from its key schedule, so protocol v2 has no cryptographic nonce budget or per-epoch envelope counter. Generic rate, size, backlog, and socket limits remain abuse controls. Commits are instead serialized by expected epoch and active-host identity.
 

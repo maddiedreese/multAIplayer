@@ -86,7 +86,6 @@ export function loadRelayConfig(): RelayConfig {
   loadRelayEnvFiles();
 
   const nodeEnv = process.env.NODE_ENV ?? "development";
-  validateStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE);
   const attachmentBlobMaxBytes = parseIntegerEnv(
     process.env.MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES,
     5_000_000,
@@ -112,12 +111,6 @@ export function loadRelayConfig(): RelayConfig {
     );
   }
   const trustProxyHeadersRequested = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false);
-  const trustedProxyConfigured = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED, false);
-  if (trustProxyHeadersRequested !== trustedProxyConfigured) {
-    throw new Error(
-      "MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS and MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED must be enabled or disabled together."
-    );
-  }
   if (
     nodeEnv === "production" &&
     deletionProtection === "restore_safe" &&
@@ -186,7 +179,7 @@ export function loadRelayConfig(): RelayConfig {
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
     mutationsRequireAuth: !parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH, false),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
-    trustProxyHeaders: trustProxyHeadersRequested && trustedProxyConfigured,
+    trustProxyHeaders: trustProxyHeadersRequested,
     structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
     exitOnPersistencePoison: parseBooleanEnv(
       process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON,
@@ -331,13 +324,6 @@ function deletionLedgerSettings() {
     secretAccessKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY?.trim() ?? "",
     hmacKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY?.trim() ?? ""
   };
-}
-
-function validateStorageBackend(value: string | undefined): void {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized || normalized === "sqlite") return;
-  logRelayEvent("error", "unsupported_storage_backend");
-  throw new Error("MULTAIPLAYER_RELAY_STORAGE must be sqlite; the JSON runtime backend has been removed.");
 }
 
 function loadRelayEnvFiles() {

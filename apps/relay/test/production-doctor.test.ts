@@ -80,3 +80,15 @@ test("production doctor requires distinct S3 transport and HMAC keys in restore-
   assert.notEqual(invalidResult.status, 0);
   assert.match(invalidResult.output, /\[fail\] production external deletion ledger/);
 });
+
+test("production doctor warns when the single trusted-proxy opt-in is enabled", () => {
+  const output = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true"
+  });
+  assert.match(
+    output,
+    /\[ok\] production trusted-proxy configuration: WARNING: forwarded headers are trusted; ensure the relay is unreachable except through a proxy that overwrites client forwarding headers/
+  );
+  assert.doesNotMatch(output, /MULTAIPLAYER_RELAY_STORAGE/);
+});
