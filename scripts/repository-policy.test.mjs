@@ -4,6 +4,29 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFile
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { parse as parseToml } from "smol-toml";
+
+function rustDenyExceptionIdentity(entry) {
+  if (typeof entry === "string") {
+    assert.match(entry, /^RUSTSEC-\d{4}-\d{4}$/, `Unsupported Rust deny exception identity: ${entry}`);
+    return entry;
+  }
+  assert.ok(
+    entry && typeof entry === "object" && !Array.isArray(entry),
+    "Rust deny exceptions must be strings or tables"
+  );
+  const identityKey = Object.hasOwn(entry, "id") ? "id" : Object.hasOwn(entry, "crate") ? "crate" : undefined;
+  assert.ok(identityKey, "Rust deny exception tables must contain id or crate");
+  assert.deepEqual(Object.keys(entry).sort(), [identityKey, "reason"].sort());
+  assert.equal(typeof entry.reason, "string");
+  assert.ok(entry.reason.trim().length > 0, "Rust deny exception reasons must not be empty");
+  if (identityKey === "id") {
+    assert.match(entry.id, /^RUSTSEC-\d{4}-\d{4}$/);
+    return entry.id;
+  }
+  assert.match(entry.crate, /^[a-zA-Z0-9_-]+@\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/);
+  return `crate:${entry.crate}`;
+}
 
 test("PR title policy accepts release-history titles", () => {
   assert.equal(
@@ -28,8 +51,8 @@ test("Gitleaks exceptions are exact secret fixtures, not path or commit exclusio
 test("Rust advisory exceptions have an unexpired owner-reviewed policy that matches deny.toml", () => {
   const policy = JSON.parse(readFileSync(".github/rust-advisory-policy.json", "utf8"));
   const deny = readFileSync("deny.toml", "utf8");
-  const ignoreBlock = deny.match(/ignore = \[([\s\S]*?)\n\]/)?.[1];
-  assert.ok(ignoreBlock, "deny.toml must retain an explicit advisories.ignore block");
+  const parsedDeny = parseToml(deny);
+  assert.ok(Array.isArray(parsedDeny.advisories?.ignore), "deny.toml must retain an advisories.ignore array");
   assert.equal(policy.version, 1);
   assert.match(policy.owner, /^@[A-Za-z0-9-]+$/);
   assert.match(policy.reviewBy, /^\d{4}-\d{2}-\d{2}$/);
@@ -42,12 +65,7 @@ test("Rust advisory exceptions have an unexpired owner-reviewed policy that matc
   );
   assert.ok(Date.now() <= reviewDeadline, `Rust advisory exceptions expired on ${policy.reviewBy}`);
 
-  const configuredExceptions = [
-    ...ignoreBlock.matchAll(/"(RUSTSEC-\d{4}-\d{4})"/g),
-    ...ignoreBlock.matchAll(/crate\s*=\s*"([^"]+)"/g)
-  ]
-    .map((match) => (match[0].startsWith("crate") ? `crate:${match[1]}` : match[1]))
-    .sort();
+  const configuredExceptions = parsedDeny.advisories.ignore.map(rustDenyExceptionIdentity).sort();
   assert.deepEqual([...policy.denyExceptions].sort(), configuredExceptions);
 
   const documentedAdvisories = new Set(policy.advisoryGroups.flatMap((group) => group.advisoryIds));
