@@ -1,6 +1,6 @@
 # Relay synchronous-persistence soak — 2026-07-15
 
-This local measurement quantifies the event-loop cost of synchronous `better-sqlite3` writes under a representative alpha workload. It is a regression datum, not a hosted-service SLO or a capacity claim.
+This record quantifies the event-loop cost of synchronous `better-sqlite3` writes under a representative alpha workload. It combines a short local checkpoint comparison with a longer Railway-volume follow-up. The results are regression and capacity evidence, not a hosted-service SLO.
 
 ## Workload and environment
 
