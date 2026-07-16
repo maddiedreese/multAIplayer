@@ -83,6 +83,9 @@ test("browser prop builder scopes edits and tab actions to the selected room", (
     canHostBrowser: true,
     setUrl: (roomId, url) => calls.push(`url:${roomId}:${url}`),
     openNow: () => calls.push("open"),
+    approveRequest: (request) => calls.push(`approve:${request.id}`),
+    denyRequest: (requestId) => calls.push(`deny:${requestId}`),
+    openApprovedRequest: (request) => calls.push(`approved-open:${request.id}`),
     selectTab: (roomId, tabId) => calls.push(`select:${roomId}:${tabId}`),
     closeTab: (roomId, tabId) => calls.push(`close:${roomId}:${tabId}`)
   });

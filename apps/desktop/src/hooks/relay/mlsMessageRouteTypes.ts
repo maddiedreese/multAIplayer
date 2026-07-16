@@ -1,7 +1,7 @@
 import type { MutableRefObject } from "react";
 import type { MlsRelayMessage, ClientRoomRecord } from "@multaiplayer/protocol";
 import type { AppStoreState } from "../../store/appStore";
-import type { ChatMessage } from "../../types";
+import type { HandleCodexBrowserOpenCommand } from "../../application/codex/codexBrowserOpenCommand";
 
 export type RoutedMlsMessage = MlsRelayMessage & { kind: string };
 
@@ -16,7 +16,7 @@ export interface MlsMessageRouteContext {
     senderDeviceId: string,
     localDeviceId: string
   ) => void;
-  handleCodexBrowserOpenCommand: (message: ChatMessage, room: ClientRoomRecord) => boolean;
+  handleCodexBrowserOpenCommand: HandleCodexBrowserOpenCommand;
 }
 
 export type MlsMessageStoreActions = Pick<

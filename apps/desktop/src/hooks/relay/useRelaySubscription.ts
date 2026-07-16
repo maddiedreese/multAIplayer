@@ -4,7 +4,8 @@ import { connectRelay, type RelayClient } from "../../lib/relay/relayClient";
 import { trustedAvatarUrl } from "../../lib/core/avatarUrl";
 import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { useAppStore } from "../../store/appStore";
-import type { ChatMessage, RoomPresence } from "../../types";
+import type { RoomPresence } from "../../types";
+import type { HandleCodexBrowserOpenCommand } from "../../application/codex/codexBrowserOpenCommand";
 import { useLatestRef } from "../useLatestRef";
 import { recoverAuthenticatedHostTransfer, routeMlsMessage } from "./routeMlsMessage";
 import { handleExactLocalMlsReplay } from "./mlsReplay";
@@ -62,7 +63,7 @@ interface UseRelaySubscriptionOptions {
   upsertTeam: (team: TeamRecord) => void;
   refreshTeamMembers: (teamId: string, quiet?: boolean) => Promise<void>;
   handleInviteRequested: (inviteId: string) => Promise<void>;
-  handleCodexBrowserOpenCommand: (message: ChatMessage, room: ClientRoomRecord) => boolean;
+  handleCodexBrowserOpenCommand: HandleCodexBrowserOpenCommand;
 }
 
 export function useRelaySubscription(options: UseRelaySubscriptionOptions) {

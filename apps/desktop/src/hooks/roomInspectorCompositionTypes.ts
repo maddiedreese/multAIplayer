@@ -5,6 +5,7 @@ import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";
 import type { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
+import type { BrowserAccessRequest } from "../types";
 
 export type InspectorWorkProps = ComponentProps<typeof RoomInspectorWorkPanel>;
 type WorkspaceFileActions = Pick<
@@ -31,7 +32,12 @@ type TerminalActions = Pick<
 >;
 
 export interface RoomInspectorCapabilities {
-  browser: { openNow: () => void };
+  browser: {
+    openNow: () => void;
+    approveRequest: (request: BrowserAccessRequest) => void;
+    denyRequest: (requestId: string) => void;
+    openApprovedRequest: (request: BrowserAccessRequest) => void;
+  };
   project: { choosePath: () => void; updatePath: () => void };
   teamRoster: Pick<InspectorWorkProps["teamRoster"], "onPromote" | "onDemote" | "onTransferOwnership" | "onRemove">;
   roomMembers: Pick<InspectorWorkProps["roomMembers"], "onCopyFingerprint" | "onTrust" | "onUntrust">;
@@ -75,6 +81,9 @@ export interface RoomInspectorSources {
   roomRuntime: Pick<
     RoomRuntime,
     | "openRoomBrowserNow"
+    | "approveBrowserRequest"
+    | "denyBrowserRequest"
+    | "openApprovedBrowserRequest"
     | "chooseProjectPath"
     | "updateProjectPath"
     | "setApprovalPolicy"

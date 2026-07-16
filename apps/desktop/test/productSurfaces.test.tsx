@@ -32,6 +32,8 @@ test("room browser exposes host controls, tab selection, and safe fallback ifram
     <BrowserAccessPanel
       hidden={false}
       activeBrowserUrl="https://preview.example/"
+      browserRequests={[]}
+      browserMessage={null}
       browserTabs={[
         {
           id: "preview",
@@ -46,6 +48,9 @@ test("room browser exposes host controls, tab selection, and safe fallback ifram
       canHostBrowser
       onBrowserUrlChange={(url) => events.push(`url:${url}`)}
       onOpenBrowserNow={() => events.push("open")}
+      onApproveBrowserRequest={(request) => events.push(`approve:${request.id}`)}
+      onDenyBrowserRequest={(requestId) => events.push(`deny:${requestId}`)}
+      onOpenApprovedBrowserRequest={(request) => events.push(`approved-open:${request.id}`)}
       onSelectBrowserTab={(id) => events.push(`select:${id}`)}
       onCloseBrowserTab={(id) => events.push(`close:${id}`)}
     />
@@ -62,6 +67,52 @@ test("room browser exposes host controls, tab selection, and safe fallback ifram
 
   assert.deepEqual(events, ["select:docs", "url:https://docs.example/", "close:docs", "open"]);
   assert.ok(view.getByRole("button", { name: "Return browser to column" }));
+});
+
+test("room browser exposes pending request provenance and explicit host approval actions", () => {
+  const events: string[] = [];
+  const pending = {
+    id: "pending-browser",
+    requester: "Teammate",
+    requesterUserId: "github:teammate",
+    url: "https://review.example/path?source=room",
+    reason: "Requested by Teammate through Codex.",
+    requestedAt: "2026-07-16T00:00:00.000Z",
+    status: "pending" as const
+  };
+  const approved = {
+    ...pending,
+    id: "approved-browser",
+    url: "https://approved.example/",
+    status: "approved" as const
+  };
+  const view = render(
+    <BrowserAccessPanel
+      hidden={false}
+      activeBrowserUrl={null}
+      browserTabs={[]}
+      browserRequests={[approved, pending]}
+      browserMessage="Teammate requested browser access."
+      activeBrowserTabId={null}
+      browserUrl="https://default.example/"
+      canHostBrowser
+      onBrowserUrlChange={() => undefined}
+      onOpenBrowserNow={() => undefined}
+      onApproveBrowserRequest={(request) => events.push(`approve:${request.id}`)}
+      onDenyBrowserRequest={(requestId) => events.push(`deny:${requestId}`)}
+      onOpenApprovedBrowserRequest={(request) => events.push(`open:${request.id}`)}
+      onSelectBrowserTab={() => undefined}
+      onCloseBrowserTab={() => undefined}
+    />
+  );
+
+  assert.ok(view.getByText(pending.url));
+  assert.equal(view.getAllByText(pending.reason).length, 2);
+  assert.ok(view.getAllByText(/Requested by Teammate/).length >= 1);
+  fireEvent.click(view.getByRole("button", { name: /Approve browser access to https:\/\/review\.example/ }));
+  fireEvent.click(view.getByRole("button", { name: /Deny browser access to https:\/\/review\.example/ }));
+  fireEvent.click(view.getByRole("button", { name: /Open approved browser page at https:\/\/approved\.example/ }));
+  assert.deepEqual(events, ["approve:pending-browser", "deny:pending-browser", "open:approved-browser"]);
 });
 
 test("Codex account view renders native capabilities and dispatches account actions", () => {

@@ -76,7 +76,7 @@ test("browser actions read the current room URL when invoked", async () => {
   assert.equal(roomBrowser?.activeUrl, "http://docs.example.com/current");
 });
 
-test("browser actions approve requests added after action creation", () => {
+test("browser approval does not navigate until the host opens the approved request", async () => {
   const published: Array<{ requestId: string; status: string }> = [];
   const actions = createBrowserActions(
     createOptions({
@@ -90,8 +90,14 @@ test("browser actions approve requests added after action creation", () => {
 
   actions.approveBrowserRequest(request);
 
-  assert.equal(useAppStore.getState().browserByRoom[room.id]?.requests?.[0]?.status, "approved");
+  const approvedRequest = useAppStore.getState().browserByRoom[room.id]?.requests?.[0];
+  assert.equal(approvedRequest?.status, "approved");
+  assert.equal(useAppStore.getState().browserByRoom[room.id]?.activeUrl, undefined);
   assert.deepEqual(published, [{ requestId: request.id, status: "approved" }]);
+
+  await actions.openApprovedBrowserRequest(approvedRequest!);
+
+  assert.equal(useAppStore.getState().browserByRoom[room.id]?.activeUrl, request.url);
 });
 
 test("disconnected browser requests use the current store draft", async () => {
