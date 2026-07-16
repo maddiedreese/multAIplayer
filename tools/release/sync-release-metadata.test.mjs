@@ -79,6 +79,30 @@ test("release-please bootstrap remains fixed when the prospective manifest versi
   );
 });
 
+test("release-please manifest version must be strict SemVer", () => {
+  const bootstrapSha = "a".repeat(40);
+  const config = {
+    "bootstrap-sha": bootstrapSha,
+    packages: {
+      ".": {
+        "include-component-in-tag": false,
+        draft: true,
+        "force-tag-creation": true,
+        "extra-files": [
+          { path: "apps/desktop/package.json", jsonpath: "$.version" },
+          { path: "apps/desktop/src-tauri/Cargo.toml", jsonpath: "$.package.version" }
+        ]
+      }
+    }
+  };
+  for (const version of ["01.2.3", "1.2.3-..", "1.2.3-alpha..1"]) {
+    assert.throws(
+      () => assertReleasePleaseBootstrap(config, { ".": version }, (sha) => ({ commit: sha, isAncestor: true })),
+      /strict SemVer/
+    );
+  }
+});
+
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }

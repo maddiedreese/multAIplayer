@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { discoverWorkspacePackagePaths } from "../tools/release/sync-release-metadata.mjs";
+import { parseSemver } from "../tools/release/check-updater-channel-order.mjs";
 
 const dependencySections = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 
@@ -63,11 +64,8 @@ export function assertReleasePleaseBootstrap(config, manifest, inspectBootstrapC
     "release-please extra-files must contain only irreducible desktop/native version entry points"
   );
   const version = manifest["."];
-  assert.match(
-    version ?? "",
-    /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/,
-    "release-please manifest must define the root version"
-  );
+  assert.equal(typeof version, "string", "release-please manifest must define the root version");
+  parseSemver(version);
   const bootstrapSha = config["bootstrap-sha"];
   assert.match(bootstrapSha ?? "", /^[0-9a-f]{40}$/, "release-please must pin a bootstrap commit");
   const bootstrap = inspectBootstrapCommit(bootstrapSha);

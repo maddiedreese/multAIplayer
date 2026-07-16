@@ -2,7 +2,7 @@
 
 Supported macOS releases are built from an immutable tag reachable from `main`,
 Developer ID-signed, notarized, and published with SHA-256 checksums. Automatic
-updates have two independent application checks: multAIplayer verifies signed
+updates have two sequential application checks: multAIplayer verifies signed
 metadata that binds the version, archive URL, archive signature, and release
 notes, then Tauri verifies the downloaded archive before installation.
 
