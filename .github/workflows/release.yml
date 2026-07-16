@@ -72,8 +72,9 @@ jobs:
         if: steps.release.outputs.prs_created == 'true' && steps.credential.outputs.uses_custom_token == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
         run: |
+          RELEASE_BRANCH="$(jq --exit-status --raw-output '.headBranchName | select(type == "string" and length > 0)' <<< "$RELEASE_PR")"
           gh workflow run ci.yml --ref "$RELEASE_BRANCH"
           gh workflow run journeys.yml --ref "$RELEASE_BRANCH" --field required_only=true
       - name: Dispatch the signed release build when using the built-in token
