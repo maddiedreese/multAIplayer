@@ -6,8 +6,7 @@ import { buildRoomMemberRows } from "../presentation/roster/rosterDisplayRows";
 
 interface UseRoomMemberRowsOptions {
   presenceByRoom: Record<string, Record<string, RoomPresence>>;
-  selectedRoom: ClientRoomRecord;
-  selectedRoomId: string;
+  selectedRoom: ClientRoomRecord | null;
   localUser: LocalHostUser;
   localDeviceId: string;
   localPublicKeyFingerprint?: string;
@@ -17,14 +16,14 @@ interface UseRoomMemberRowsOptions {
 export function useRoomMemberRows({
   presenceByRoom,
   selectedRoom,
-  selectedRoomId,
   localUser,
   localDeviceId,
   localPublicKeyFingerprint,
   trustedDeviceKeys
 }: UseRoomMemberRowsOptions) {
+  if (!selectedRoom) return [];
   return buildRoomMemberRows({
-    presence: presenceByRoom[selectedRoom.id ?? selectedRoomId] ?? {},
+    presence: presenceByRoom[selectedRoom.id] ?? {},
     room: selectedRoom,
     localUser,
     localDeviceId,

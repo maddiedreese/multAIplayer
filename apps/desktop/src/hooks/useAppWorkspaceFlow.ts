@@ -151,7 +151,7 @@ export function useAppWorkspaceFlow({
       hydration: {
         hasSelectedRoom,
         selectedRoomId,
-        selectedRoomTeamId: selectedRoom.teamId,
+        selectedRoomTeamId: selectedRoom?.teamId ?? "",
         forgottenRoomIds,
         replaceHistorySettings: storeAction("setHistorySettings"),
         hydrateLocalRoomHistoryForRoom,

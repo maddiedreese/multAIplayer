@@ -1,48 +1,5 @@
-import {
-  defaultBrowserAllowedOrigins,
-  defaultBrowserProfilePersistent,
-  defaultCodexModel,
-  defaultCodexModelPolicy,
-  defaultCodexReasoningEffort,
-  defaultCodexReasoningEffortPolicy,
-  defaultCodexRawReasoningEnabled,
-  defaultCodexSandboxLevel,
-  defaultCodexSpeed,
-  defaultCodexServiceTierPolicy,
-  defaultRoomMode,
-  type ApprovalDelegationPolicy,
-  type ApprovalPolicy,
-  type RoomMode,
-  type ClientRoomRecord
-} from "@multaiplayer/protocol";
+import type { ApprovalDelegationPolicy, ApprovalPolicy, RoomMode } from "@multaiplayer/protocol";
 import type { BrowserStatus } from "./types";
-
-export const emptyRoom: ClientRoomRecord = {
-  id: "__empty-room",
-  teamId: "__empty-team",
-  name: "No room selected",
-  projectPath: "",
-  host: "No host",
-  hostStatus: "offline",
-  approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
-  mode: defaultRoomMode,
-  codexModel: defaultCodexModel,
-  codexModelPolicy: defaultCodexModelPolicy,
-  codexReasoningEffort: defaultCodexReasoningEffort,
-  codexReasoningEffortPolicy: defaultCodexReasoningEffortPolicy,
-  codexRawReasoningEnabled: defaultCodexRawReasoningEnabled,
-  codexSpeed: defaultCodexSpeed,
-  codexServiceTierPolicy: defaultCodexServiceTierPolicy,
-  codexSandboxLevel: defaultCodexSandboxLevel,
-  browserAllowedOrigins: defaultBrowserAllowedOrigins,
-  browserProfilePersistent: defaultBrowserProfilePersistent,
-  configRevision: 0,
-  configEpoch: 0,
-  configPending: true,
-  unread: 0
-};
 
 export const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",

@@ -22,15 +22,22 @@ import { useRoomAccess } from "./useRoomAccess";
 import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
 import type { RoomInspectorSources } from "./roomInspectorCompositionTypes";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 export type { RoomInspectorCapabilities, RoomInspectorSources } from "./roomInspectorCompositionTypes";
 
-export function useRoomInspectorComposition({ sources }: { sources: RoomInspectorSources }) {
+export function useRoomInspectorComposition({
+  sources,
+  selectedRoom
+}: {
+  sources: RoomInspectorSources;
+  selectedRoom: ClientRoomRecord;
+}) {
   const capabilities = useMemo(() => buildRoomInspectorCapabilities(sources), [sources]);
   const view = useAppStore(useShallow(selectRoomInspectorView));
   const {
     currentUser,
     authConfig,
-    selectedRoom,
+    selectedRoom: _storeSelectedRoom,
     hasSelectedRoom,
     selectedTeamId,
     selectedTeam,

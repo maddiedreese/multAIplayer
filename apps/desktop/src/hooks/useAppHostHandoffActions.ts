@@ -37,7 +37,7 @@ export function useAppHostHandoffActions({
   workspaceRecords: WorkspaceRecordActions;
   roomSettingsActor: RoomSettingsActor;
 }) {
-  const { hasSelectedRoom, selectedRoom, messages, gitStatus } = selected;
+  const { selectedRoom, messages, gitStatus } = selected;
   const {
     setHostBusyForRoom,
     setHostMessageForRoom,
@@ -51,10 +51,11 @@ export function useAppHostHandoffActions({
   } = roomActions;
   const relayStatus = useAppStore((state) => state.relayStatus);
   const terminals = useAppStore((state) => state.terminals);
-  const browserRequests = useAppStore((state) => state.browserByRoom[selectedRoom.id]?.requests);
+  const browserRequests = useAppStore((state) =>
+    selectedRoom ? state.browserByRoom[selectedRoom.id]?.requests : undefined
+  );
 
   return useHostHandoffActions({
-    hasSelectedRoom,
     selectedRoom,
     selectedRoomIdRef: appRefs.selectedRoomIdRef,
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,

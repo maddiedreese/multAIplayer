@@ -17,15 +17,19 @@ import { useAppStore } from "../src/store/appStore";
 
 test.beforeEach(() => useAppStore.getState().resetAppStore());
 
-test("container selectors consistently resolve the selected room and safe defaults", () => {
+test("container selectors represent an empty workspace without fabricating a room", () => {
   const state = useAppStore.getState();
   const inspector = selectRoomInspectorView(state);
   const main = selectRoomMainColumnView(state);
   const drawer = selectSidebarDrawerView(state);
   const navigation = selectSidebarNavigationView(state);
 
-  assert.equal(inspector.selectedRoom.id, main.selectedRoom.id);
-  assert.equal(drawer.selectedRoom.id, main.selectedRoom.id);
+  assert.equal(inspector.selectedRoom, null);
+  assert.equal(main.selectedRoom, null);
+  assert.equal(drawer.selectedRoom, null);
+  assert.equal(inspector.hasSelectedRoom, false);
+  assert.equal(main.hasSelectedRoom, false);
+  assert.equal(drawer.hasSelectedRoom, false);
   assert.equal(inspector.inspectorTab, "files");
   assert.deepEqual(main.messages, []);
   assert.equal(navigation.rooms, state.rooms);

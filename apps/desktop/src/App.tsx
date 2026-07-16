@@ -28,7 +28,7 @@ import { useAppRoomRuntime } from "./hooks/useAppRoomRuntime";
 import { createAppRoomPanelActions } from "./hooks/appRoomPanelActions";
 import { AppShellView } from "./components/AppShellView";
 import { CodexServerRequestDialog } from "./components/CodexServerRequestDialog";
-import { defaultBrowserReason, defaultBrowserUrl, emptyRoom, maxTerminalActivityLines } from "./appDefaults";
+import { defaultBrowserReason, defaultBrowserUrl, maxTerminalActivityLines } from "./appDefaults";
 import { NativeAppRequired } from "./components/NativeAppRequired";
 import { CodexAccountProvider } from "./hooks/useCodexAccount";
 import { OnboardingAssistant } from "./components/OnboardingAssistant";
@@ -90,7 +90,6 @@ function NativeApp() {
   const selectedContext = useAppSelectedRoomContext({
     githubAuth,
     localIdentity,
-    fallbackRoom: emptyRoom,
     defaultBrowserUrl,
     defaultBrowserReason
   });

@@ -161,10 +161,63 @@ test("room mutations preserve unread state and repair selection atomically", () 
   assert.equal(useAppStore.getState().rooms[0]?.unread, 7);
   store.replaceRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
   assert.equal(useAppStore.getState().selectedRoomId, roomB.id);
+  assert.equal(useAppStore.getState().selectedTeam, teamB.id);
   assert.deepEqual(
     useAppStore.getState().rooms.map((room) => room.id),
     [roomB.id]
   );
+});
+
+test("room collection replacement repairs a cross-team fallback atomically", () => {
+  const store = useAppStore.getState();
+  store.initializeWorkspaceUi({
+    teams: [teamA, teamB],
+    rooms: [roomA, roomB],
+    projectPath: "/tmp",
+    roomId: roomA.id
+  });
+
+  store.replaceRooms([roomB]);
+
+  const state = useAppStore.getState();
+  assert.equal(state.selectedRoomId, roomB.id);
+  assert.equal(state.selectedTeam, teamB.id);
+});
+
+test("room upsert deletion repairs a cross-team fallback atomically", () => {
+  const store = useAppStore.getState();
+  store.initializeWorkspaceUi({
+    teams: [teamA, teamB],
+    rooms: [roomA, roomB],
+    projectPath: "/tmp",
+    roomId: roomA.id
+  });
+
+  store.upsertRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
+
+  const state = useAppStore.getState();
+  assert.equal(state.selectedRoomId, roomB.id);
+  assert.equal(state.selectedTeam, teamB.id);
+});
+
+test("room selection moves from none to hydrated data and back to none when the final room leaves", () => {
+  const store = useAppStore.getState();
+  assert.equal(store.selectedRoomId, "");
+  assert.deepEqual(store.rooms, []);
+
+  store.replaceRooms([roomA]);
+  let state = useAppStore.getState();
+  assert.equal(state.selectedRoomId, roomA.id);
+  assert.equal(
+    state.rooms.find((room) => room.id === state.selectedRoomId),
+    roomA
+  );
+
+  state.replaceRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
+  state = useAppStore.getState();
+  assert.equal(state.selectedRoomId, "");
+  assert.equal(state.selectedTeam, teamA.id);
+  assert.deepEqual(state.rooms, []);
 });
 
 test("workspace selection helpers preserve explicit and team-relative navigation semantics", () => {

@@ -7,7 +7,6 @@ import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibil
 interface UseSelectedRoomContextOptions {
   rooms: ClientRoomRecord[];
   selectedRoomId: string;
-  fallbackRoom: ClientRoomRecord;
   inspectorTabsByRoom: Record<string, InspectorTab>;
   secretWarningsVisibleByRoom: Record<string, boolean>;
   terminals: TerminalSnapshot[];
@@ -16,21 +15,19 @@ interface UseSelectedRoomContextOptions {
 export function useSelectedRoomContext({
   rooms,
   selectedRoomId,
-  fallbackRoom,
   inspectorTabsByRoom,
   secretWarningsVisibleByRoom,
   terminals
 }: UseSelectedRoomContextOptions) {
-  const hasSelectedRoom = rooms.some((room) => room.id === selectedRoomId);
-  const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? rooms[0] ?? fallbackRoom;
-  const inspectorTab = inspectorTabsByRoom[selectedRoom.id] ?? "files";
+  const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? null;
+  const hasSelectedRoom = selectedRoom != null;
+  const inspectorTab = selectedRoom ? (inspectorTabsByRoom[selectedRoom.id] ?? "files") : "files";
   const secretWarningVisible =
-    hasSelectedRoom &&
-    (secretWarningsVisibleByRoom[selectedRoom.id ?? selectedRoomId] ??
-      !hasAcknowledgedRoomVisibilityWarning(selectedRoom.id ?? selectedRoomId));
+    selectedRoom != null &&
+    (secretWarningsVisibleByRoom[selectedRoom.id] ?? !hasAcknowledgedRoomVisibilityWarning(selectedRoom.id));
   const roomTerminals = useMemo(
-    () => terminals.filter((terminal) => terminal.roomId === selectedRoom.id),
-    [terminals, selectedRoom.id]
+    () => (selectedRoom ? terminals.filter((terminal) => terminal.roomId === selectedRoom.id) : []),
+    [terminals, selectedRoom]
   );
 
   return {

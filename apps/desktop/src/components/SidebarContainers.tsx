@@ -1,5 +1,5 @@
 import React, { useMemo, type ComponentProps } from "react";
-import { codexModelOptions, defaultCodexModel } from "@multaiplayer/protocol";
+import { codexModelOptions, defaultCodexModel, type ClientRoomRecord } from "@multaiplayer/protocol";
 import { AppSidebarDrawer } from "./AppSidebarDrawer";
 import { DesktopSidebar } from "./DesktopSidebar";
 import { SetupChecklist } from "./SetupChecklist";
@@ -29,6 +29,25 @@ import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
 import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
 
 type DrawerSettingsProps = ComponentProps<typeof AppSidebarDrawer>["settings"];
+
+function sidebarRoomDisplay(room: ClientRoomRecord | null) {
+  if (!room) {
+    return {
+      id: "",
+      name: "No room selected",
+      projectPath: "",
+      codexModel: defaultCodexModel,
+      approvalLabel: "No room selected"
+    };
+  }
+  return {
+    id: room.id,
+    name: room.name,
+    projectPath: room.projectPath,
+    codexModel: room.codexModel ?? defaultCodexModel,
+    approvalLabel: approvalPolicyLabels[room.approvalPolicy]
+  };
+}
 
 export interface SidebarNavigationCapabilities {
   signIn: () => void;
@@ -291,13 +310,13 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
     historyMessage,
     teamHistoryMessage
   );
-  const selectedCodexModel = selectedRoom.codexModel ?? defaultCodexModel;
+  const roomDisplay = sidebarRoomDisplay(selectedRoom);
 
   return (
     <AppSidebarDrawer
       activePanel={activeSidebarPanel}
       profileTitle={localUser.name}
-      settingsTitle={selectedRoom.name}
+      settingsTitle={roomDisplay.name}
       profile={{
         currentUser,
         authConfig,
@@ -310,8 +329,8 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         relaySessionPersistence: formatSessionPersistence(authConfig?.sessionPersistence),
         archivePanel: (
           <RoomArchivePanel
-            selectedRoomId={selectedRoom.id}
-            selectedRoomName={selectedRoom.name}
+            selectedRoomId={roomDisplay.id}
+            selectedRoomName={roomDisplay.name}
             hasSelectedRoom={hasSelectedRoom}
           />
         ),
@@ -326,9 +345,9 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         codexSummary: codexProbe?.available
           ? formatCodexCompatibilitySummary(codexProbe.version)
           : (codexProbe?.error ?? "Not connected"),
-        projectPath: selectedRoom.projectPath,
-        modelLabel: formatCodexModel(selectedCodexModel),
-        approvalLabel: approvalPolicyLabels[selectedRoom.approvalPolicy],
+        projectPath: roomDisplay.projectPath,
+        modelLabel: formatCodexModel(roomDisplay.codexModel),
+        approvalLabel: roomDisplay.approvalLabel,
         roomKeysLabel: mlsStateStorageLabel(),
         posture: access.roomPosture,
         chooseProjectDisabled:
@@ -357,8 +376,8 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         message: settingsMessage,
         archivePanel: (
           <RoomArchivePanel
-            selectedRoomId={selectedRoom.id}
-            selectedRoomName={selectedRoom.name}
+            selectedRoomId={roomDisplay.id}
+            selectedRoomName={roomDisplay.name}
             hasSelectedRoom={hasSelectedRoom}
           />
         ),
@@ -367,7 +386,9 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         onRelayWsDraftChange: setRelayWsDraft,
         onResetRelay: resetRelayConfiguration,
         onSaveRelay: saveRelayConfiguration,
-        onNotificationsMutedChange: (muted) => setRoomNotificationsMuted(selectedRoom.id, muted),
+        onNotificationsMutedChange: (muted) => {
+          if (selectedRoom) setRoomNotificationsMuted(selectedRoom.id, muted);
+        },
         onHistoryEnabledChange: (enabled) => capabilities.updateLocalHistorySettings({ ...historySettings, enabled }),
         onHistoryRetentionDaysChange: (retentionDays) =>
           capabilities.updateLocalHistorySettings({ ...historySettings, retentionDays }),

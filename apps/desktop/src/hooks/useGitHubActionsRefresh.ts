@@ -20,8 +20,7 @@ interface LocalUser {
 }
 
 interface UseGitHubActionsRefreshOptions {
-  hasSelectedRoom: boolean;
-  selectedRoom: ClientRoomRecord;
+  selectedRoom: ClientRoomRecord | null;
   roomsRef: MutableRefObject<ClientRoomRecord[]>;
   actionsBusyRef: MutableRefObject<Record<string, boolean>>;
   gitWorkflowDraftsRef: MutableRefObject<Record<string, Partial<GitWorkflowDraft>>>;
@@ -39,7 +38,6 @@ interface UseGitHubActionsRefreshOptions {
 }
 
 export function useGitHubActionsRefresh({
-  hasSelectedRoom,
   selectedRoom,
   roomsRef,
   actionsBusyRef,
@@ -57,7 +55,7 @@ export function useGitHubActionsRefresh({
   const recordGitHubActionsRefreshForRoom = useAppStore((state) => state.recordGitHubActionsRefreshForRoom);
 
   async function refreshGitHubActions(roomArg?: ClientRoomRecord, targetArg?: GitHubActionsTarget) {
-    const room = roomArg ?? (hasSelectedRoom ? selectedRoom : null);
+    const room = roomArg ?? selectedRoom;
     if (!room) {
       return;
     }

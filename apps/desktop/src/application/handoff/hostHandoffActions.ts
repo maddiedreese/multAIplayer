@@ -47,7 +47,6 @@ export type HostHandoffStateActions = Pick<
  */
 export function createHostHandoffActions(
   {
-    hasSelectedRoom,
     selectedRoom,
     selectedRoomIdRef,
     isSelectedRoomLocked,
@@ -150,7 +149,7 @@ export function createHostHandoffActions(
     });
   }
   async function setRoomHost(hostStatus: ClientRoomRecord["hostStatus"]) {
-    if (!hasSelectedRoom) {
+    if (!selectedRoom) {
       setSelectedHostMessage("Create or join a room before changing the host.");
       return;
     }
@@ -202,7 +201,7 @@ export function createHostHandoffActions(
     }
   }
   async function acceptHostHandoff(handoff: HostHandoffRecord) {
-    if (!hasSelectedRoom) {
+    if (!selectedRoom) {
       setSelectedHostMessage("Create or join a room before accepting a host handoff.");
       return;
     }
@@ -239,6 +238,7 @@ export function createHostHandoffActions(
     }
   }
   async function applyAcceptedHostPatch(handoff: HostHandoffRecord) {
+    if (!selectedRoom) return;
     const roomId = selectedRoom.id;
     if (reportRoomHostMutationInFlight(roomId)) return;
     setHostBusyForRoom(roomId, true);
@@ -323,9 +323,9 @@ export function createHostHandoffActions(
     const repoRef = remoteInfo.originUrl ? parseGitHubRemoteUrl(remoteInfo.originUrl) : null;
     const store = useAppStore.getState();
     const roomGitStatus =
-      room.id === selectedRoom.id ? gitStatus : (store.gitWorkflowRuntimeByRoom[room.id]?.workflow?.status ?? null);
+      room.id === selectedRoom?.id ? gitStatus : (store.gitWorkflowRuntimeByRoom[room.id]?.workflow?.status ?? null);
     const roomBrowserRequests =
-      room.id === selectedRoom.id ? browserRequests : (store.browserByRoom[room.id]?.requests ?? []);
+      room.id === selectedRoom?.id ? browserRequests : (store.browserByRoom[room.id]?.requests ?? []);
     const patchResult = roomGitStatus?.files.length
       ? await createGitPatch(room.projectPath).catch(() => {
           reportExpectedFailure("Git patch was unavailable for host handoff context");
@@ -360,6 +360,7 @@ export function createHostHandoffActions(
     };
   }
   async function requestHostAuthority(handoff: HostHandoffRecord) {
+    if (!selectedRoom) throw new Error("Select a room before requesting host authority.");
     await resolveHandoffProject(handoff, selectedRoom.projectPath);
     freshHandoff(selectedRoom.id, handoff, ["available"], false);
     const group = await mlsGroupState(selectedRoom.id);
@@ -403,6 +404,7 @@ export function createHostHandoffActions(
     setHostMessageForRoom(selectedRoom.id, "Host authority request sent. The active host must explicitly approve it.");
   }
   async function approveHostCandidate(handoff: HostHandoffRecord) {
+    if (!selectedRoom) throw new Error("Select a room before approving host authority.");
     if (!handoff.candidateUserId || !handoff.candidateDeviceId || handoff.candidateLeaf === undefined)
       throw new Error("Host candidate identity is incomplete.");
     const group = await mlsGroupState(selectedRoom.id);

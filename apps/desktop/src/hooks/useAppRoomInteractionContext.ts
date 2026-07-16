@@ -41,7 +41,6 @@ export function useAppRoomInteractionContext({
     revokedTeamIds,
     historySettings,
     roomPresence,
-    selectedRoomId,
     deviceIdentity,
     trustedDeviceKeys
   } = useAppStore(
@@ -50,8 +49,7 @@ export function useAppRoomInteractionContext({
       revokedRoomIds: state.revokedRoomIds,
       revokedTeamIds: state.revokedTeamIds,
       historySettings: state.historySettings,
-      roomPresence: state.historyPresenceByRoom[selectedRoom.id]?.presence,
-      selectedRoomId: state.selectedRoomId,
+      roomPresence: selectedRoom ? state.historyPresenceByRoom[selectedRoom.id]?.presence : undefined,
       deviceIdentity: state.deviceIdentity,
       trustedDeviceKeys: state.trustedDeviceKeys
     }))
@@ -71,7 +69,7 @@ export function useAppRoomInteractionContext({
       setTerminalErrorForRoom
     },
     notices: {
-      roomId: selectedRoom.id,
+      roomId: selectedRoom?.id ?? "",
       hostMessage,
       chatMessage
     },
@@ -94,12 +92,11 @@ export function useAppRoomInteractionContext({
       authConfig: githubAuth.authConfig,
       currentUser: githubAuth.currentUser,
       gitWorkflowDraft,
-      projectPath: selectedRoom.projectPath
+      projectPath: selectedRoom?.projectPath ?? ""
     },
     memberRows: {
-      presenceByRoom: roomPresence ? { [selectedRoom.id]: roomPresence } : {},
+      presenceByRoom: roomPresence && selectedRoom ? { [selectedRoom.id]: roomPresence } : {},
       selectedRoom,
-      selectedRoomId,
       localUser: localIdentity.localUser,
       localDeviceId: localIdentity.deviceId,
       ...(deviceIdentity?.publicKeyFingerprint

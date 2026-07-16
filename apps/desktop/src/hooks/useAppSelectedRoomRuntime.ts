@@ -28,22 +28,20 @@ export function useAppSelectedRoomRuntime({
     roomTerminals,
     selectedTerminalId
   } = selected;
-  const roomId = selectedRoom.id;
-  const { selectedRoomId, roomSettings, codexRuntime, localPreview, terminalRuntime, invite, gitRuntime } = useAppStore(
+  const roomId = selectedRoom?.id ?? null;
+  const { roomSettings, codexRuntime, localPreview, terminalRuntime, invite, gitRuntime } = useAppStore(
     useShallow((state) => ({
-      selectedRoomId: state.selectedRoomId,
-      roomSettings: state.roomSettingsByRoom[roomId],
-      codexRuntime: state.codexRuntimeByRoom[roomId],
-      localPreview: state.localPreviewByRoom[roomId],
-      terminalRuntime: state.terminalRuntimeByRoom[roomId],
-      invite: state.inviteByRoom[roomId],
-      gitRuntime: state.gitWorkflowRuntimeByRoom[roomId]
+      roomSettings: roomId ? state.roomSettingsByRoom[roomId] : undefined,
+      codexRuntime: roomId ? state.codexRuntimeByRoom[roomId] : undefined,
+      localPreview: roomId ? state.localPreviewByRoom[roomId] : undefined,
+      terminalRuntime: roomId ? state.terminalRuntimeByRoom[roomId] : undefined,
+      invite: roomId ? state.inviteByRoom[roomId] : undefined,
+      gitRuntime: roomId ? state.gitWorkflowRuntimeByRoom[roomId] : undefined
     }))
   );
 
   return useSelectedRoomRuntime({
     selectedRoom,
-    selectedRoomId,
     localUser: localIdentity.localUser,
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
     messages,
@@ -59,7 +57,7 @@ export function useAppSelectedRoomRuntime({
 }
 
 function codexRuntimeMaps(
-  roomId: string,
+  roomId: string | null,
   runtime: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"][string] | undefined
 ) {
   return {
@@ -76,7 +74,7 @@ function codexRuntimeMaps(
 }
 
 function supportingRuntimeMaps(
-  roomId: string,
+  roomId: string | null,
   sources: Pick<ReturnType<typeof useAppStore.getState>, never> & {
     terminalRuntime: ReturnType<typeof useAppStore.getState>["terminalRuntimeByRoom"][string] | undefined;
     localPreview: ReturnType<typeof useAppStore.getState>["localPreviewByRoom"][string] | undefined;
@@ -98,6 +96,6 @@ function supportingRuntimeMaps(
   };
 }
 
-function activeMap<T>(roomId: string, value: T | null | undefined): Record<string, T> {
-  return value == null ? {} : { [roomId]: value };
+function activeMap<T>(roomId: string | null, value: T | null | undefined): Record<string, T> {
+  return roomId == null || value == null ? {} : { [roomId]: value };
 }

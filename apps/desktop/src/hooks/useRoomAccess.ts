@@ -14,7 +14,7 @@ import {
 
 interface UseRoomAccessOptions {
   hasSelectedRoom: boolean;
-  selectedRoom: ClientRoomRecord;
+  selectedRoom: ClientRoomRecord | null;
   localUser: LocalHostUser;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
@@ -32,6 +32,31 @@ export function useRoomAccess({
   revokedTeamIds,
   historySettings
 }: UseRoomAccessOptions) {
+  if (!selectedRoom) {
+    return {
+      isActiveHost: false,
+      isSelectedRoomForgotten: false,
+      isSelectedRoomRevoked: false,
+      isSelectedRoomArchived: false,
+      isSelectedRoomLocked: true,
+      canReadLocalWorkspace: false,
+      canRequestWorkspace: false,
+      canRequestBrowser: false,
+      canHostBrowser: false,
+      canCopyRoomInvite: false,
+      localWorkspaceMessage: "Select a room to use its workspace.",
+      roomPosture: {
+        hostAccess: "No room selected",
+        workspaceAccess: "No room selected",
+        history: historySettings.enabled ? `Encrypted, ${historySettings.retentionDays} days` : "Disabled",
+        browserProfile: "No room selected"
+      },
+      browserAccessMessage: "Select a room to use its browser.",
+      workspaceRequestMessage: "Select a room to request workspace access.",
+      hostGateMessage: "Select a room before using host controls.",
+      roomSettingsGateMessage: "Select a room before changing room settings."
+    };
+  }
   const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
   const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
   const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
