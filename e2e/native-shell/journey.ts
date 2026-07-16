@@ -425,7 +425,6 @@ async function main() {
     MULTAIPLAYER_RELAY_DEBUG: "true",
     MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: frontendUrl,
-    MULTAIPLAYER_RELAY_STORAGE: "sqlite",
     MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorBinary
   };
   let relay: RelayHarness | undefined;

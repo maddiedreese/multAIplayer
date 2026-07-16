@@ -8,7 +8,7 @@ import { createRelayPersistence } from "../../src/persistence.js";
 import { SqliteRelayPersistence } from "../../src/sqlite-persistence.js";
 
 test("SQLite initializes normalized MLS and KeyPackage tables", async () => {
-  const relay = await startRelayWithWorkspace({ MULTAIPLAYER_RELAY_STORAGE: "sqlite" });
+  const relay = await startRelayWithWorkspace();
   try {
     await relay.close({ preserveData: true });
     const db = new Database(relay.dataPath, { readonly: true });
