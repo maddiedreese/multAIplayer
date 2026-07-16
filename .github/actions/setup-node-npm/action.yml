@@ -1,0 +1,26 @@
+name: Set up repository Node and npm
+description: Installs the repository Node major and exact package-manager version.
+
+inputs:
+  node-version:
+    description: Node.js version accepted by the repository.
+    default: "22"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+    - name: Install and verify the locked npm version
+      shell: bash
+      run: |
+        expected="$(node -p "require('./package.json').packageManager.split('@').at(-1)")"
+        npm install --global "npm@$expected" --ignore-scripts
+        actual="$(npm --version)"
+        test "$actual" = "$expected" || {
+          echo "Expected npm $expected, found $actual." >&2
+          exit 1
+        }

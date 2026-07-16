@@ -21,10 +21,28 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-      - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install checksum-pinned Gitleaks 8.30.1
+        run: |
+          archive="$RUNNER_TEMP/gitleaks.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$archive"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+      - name: Scan full history with the narrow fixture allowlist
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner .
+      - name: Prove representative credentials are not allowlisted
+        run: |
+          fixture="$RUNNER_TEMP/gitleaks-positive-control"
+          mkdir -p "$fixture"
+          printf 'token = "ghp_%s"\n' '9876543210zyxwvutsrqponm' > "$fixture/credential.txt"
+          if "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner "$fixture"; then
+            echo "Gitleaks positive control unexpectedly passed." >&2
+            exit 1
+          fi
+          echo "Gitleaks rejected the representative credential positive control."
 
   semgrep:
     name: Semgrep community rules
@@ -49,6 +67,11 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Build relay image
         run: docker build --tag multaiplayer-relay:scan --file apps/relay/Dockerfile .
+      - name: Verify minimal relay runtime contents
+        run: >-
+          docker run --rm --entrypoint node multaiplayer-relay:scan
+          tools/release/relay-runtime-dependency-closure.mjs
+          verify node_modules relay-runtime-dependencies.json
       - name: Scan relay image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -59,16 +82,22 @@ jobs:
           trivyignores: .trivyignore.yaml
 
   reproducibility-contract:
-    name: Reproducible-build contract and relay proof
+    name: Signed-updater contract and normalized relay runtime equivalence
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Verify documented locked build inputs
-        run: node tools/release/verify-reproducible-builds.mjs
-      - name: Rebuild and compare relay containers
-        run: node tools/release/verify-relay-container-reproducibility.mjs
+      - name: Install pinned Rust toolchain and native updater test dependencies
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
+          sudo apt-get update
+          sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev
+      - name: Execute signed-updater authentication contract tests
+        run: npm run verify:updater-contract
+      - name: Prove normalized relay runtime equivalence across independent builds
+        run: npm run verify:relay-runtime-equivalence
 
   npm-and-license-policy:
     name: npm advisories and license policy
@@ -77,11 +106,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 22
-          cache: npm
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
       - name: Install locked dependencies
         run: npm ci
       - name: Audit dependencies and enforce licenses
@@ -133,11 +159,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 22
-          cache: npm
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
       - name: Install repository dependencies
         run: npm ci
       - name: Generate latest Codex app-server contract

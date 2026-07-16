@@ -149,6 +149,8 @@ async function waitForServer(child) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (child.exitCode !== null) throw new Error(`Vite exited before becoming ready.\n${outputText}`);
     try {
+      // The screenshot server is a temporary Vite process bound to 127.0.0.1 for this local harness only.
+      // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
       const response = await fetch(baseUrl);
       if (response.ok) return;
     } catch {

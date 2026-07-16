@@ -358,4 +358,4 @@ Use the [release operations migration procedure](../CONTRIBUTING.md#hosted-to-se
 - issue fresh invites so each device joins the new relay-side rooms;
 - confirm new encrypted chat, attachments, Codex host approval, and local history readability before treating the migration as complete.
 
-Encrypted export/import is planned as a future belt-and-suspenders backup and exit path. Until it ships, keep the original devices and their local encrypted history intact during migration.
+The encrypted room archive is a portable, read-only copy of display history already available on one device. It does not contain MLS authority, membership, credentials, exporter secrets, or live room state, so it cannot migrate a room to another relay. Keep the original devices and their encrypted archives until the replacement rooms are verified; see [Encrypted room archives](room-archives.md).

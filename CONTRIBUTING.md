@@ -15,8 +15,9 @@ Use the Dev Container for the shortest reproducible setup. For a local checkout,
 install Node.js 22 or newer (`nvm use` uses the same version family as CI), then:
 
 ```sh
-npm install
-node scripts/doctor.mjs
+npm install --global npm@11.16.0 --ignore-scripts
+npm ci
+npm run doctor
 npm run dev
 ```
 
@@ -43,8 +44,7 @@ npm run verify
 The optional staged-file hook runs Prettier and ESLint. Enable it per clone with
 `npm run hooks:install`; CI remains authoritative. Use a cohesive Conventional
 Commit subject (`feat:`, `fix:`, `docs:`, or `chore:`), and split unrelated work.
-The pull request template records the checks and any security or stabilization
-impact.
+The pull request template records the checks and any security or release impact.
 
 ## Where changes belong
 
@@ -155,17 +155,7 @@ and with the focused build check.
 
 This section is not required reading for an ordinary contribution. Operators
 should also use [Self-hosting](docs/self-hosting.md); release reviewers should use
-[Reproducing release builds](docs/reproducible-builds.md). The
-[external review preparation packet](docs/design/external-review-packet.md) is
-planning material for a future independent engagement, not a merge gate.
-
-### Stabilization
-
-The repository is feature-frozen from **2026-07-15 through 2026-07-22 inclusive**.
-During that window, merge only fixes, deletion/simplification, documentation
-corrections, dependency/security updates, test repairs, and release operations.
-A user-visible feature resets the seven-consecutive-day clock. Future release PRs
-declare the same minimum window and record any reset.
+[Reproducing release builds](docs/reproducible-builds.md).
 
 ### Continuous-integration policy
 
@@ -179,7 +169,7 @@ broad for executable product changes: timing failures are fixed at their
 polling/state boundary rather than worked around by narrowing triggers or blind
 reruns.
 
-Mutation testing, parser fuzzing, extended supply-chain scans, reproducibility comparisons, soak/restore drills, and the scheduled macOS two-client run are advisory or scheduled evidence. The relay mutation policy preserves the measured `authz.ts` 100%/zero-survivor baseline and the existing 60% score/survivor ceilings for session, WebSocket-admission, and room-route decisions, with an explicit 80% target. Each weekly shard fails visibly on tooling errors or regression below its checked-in baseline. The first run each month emits a reviewable candidate that advances score floors in five-point steps and never increases a survivor ceiling; maintainers review and commit justified advances rather than letting automation rewrite policy silently. Investigate regressions; do not turn them into a Tuesday bugfix blocker without deleting or demoting an existing blocking check. No new blocking check may be added without removing or demoting another one.
+Mutation testing, parser fuzzing, extended supply-chain scans, reproducibility comparisons, soak/restore drills, and the scheduled macOS two-client run are advisory or scheduled evidence. The relay mutation policy preserves the measured `authz.ts` 100%/zero-survivor baseline and the existing 60% score/survivor ceilings for session, WebSocket-admission, and room-route decisions, with an explicit 80% target. Each weekly shard fails visibly on tooling errors or regression below its checked-in baseline. The first run each month emits a reviewable candidate that advances score floors in five-point steps and never increases a survivor ceiling; maintainers review and commit justified advances rather than letting automation rewrite policy silently. Investigate regressions and promote a check to blocking only when it reliably enforces a release-critical property at a cost appropriate for every pull request.
 
 The deterministic security journey fails if its Rust production boundary or
 the tested relay lifecycle is unavailable. It retains the executed test report
@@ -194,11 +184,46 @@ and container updates weekly; handle security advisories immediately in focused
 PRs. A temporary exception must name the advisory, reachability, owner, expiry,
 and removal condition.
 
-Release artifacts come only from a validated tag through `release.yml`. Run
-`npm run release:preflight` and require the signed/notarized app, authenticated
-metadata and updater archive, cold/warm universal-link checks, checksums, SBOM,
-provenance, Sigstore evidence, reproducibility evidence, and two-device acceptance
-journey. Missing required evidence leaves the release unsupported.
+Release artifacts come only from a validated tag through `release.yml`. The
+workflow keeps the GitHub Release in draft state until the blocking native
+two-client journey, signed/notarized build, authenticated metadata and updater
+archive, checksums, artifact SBOM, provenance, Sigstore evidence, and release-asset
+contract all pass. The protected `public-alpha-release` environment gates the
+publishing deployment. GitHub records deployment status, timestamps, and reviewer
+identity when required reviewers are configured; it does not durably capture the
+contents of the cold/warm universal-link, accessibility, or two-device exploratory
+checklists. The maintainer completes those manual checks against the tagged build
+before approving the protected environment; approval is the publication decision,
+not evidence that GitHub executed or archived the checklist. Leave the release in
+draft state if any required manual check is incomplete or fails, and do not make
+the website call that build supported.
+
+If publication succeeds but updater-channel advancement fails, open the original
+release workflow run and choose **Re-run failed jobs**. That preserves the tagged
+build and retries only the failed channel job plus its dependents. Do not dispatch
+a new full workflow for an already-public tag: the workflow rejects that before
+rebuilding or emitting new transparency records. If GitHub reported the publish
+job as failed after it actually made the release public, re-running failed jobs
+authenticates the retained build subset and the complete canonical public asset
+set, skips signing and mutation, and then permits the channel retry.
+
+The root `packageManager` field is authoritative. CI and release workflows use
+the repository composite setup action to install that exact npm version. The root
+`allowScripts` policy exact-pins the install scripts required by native SQLite and
+the frontend build, explicitly denies unused downloaded browser drivers and
+optional file watchers, and `.npmrc` fails on any newly introduced unreviewed
+install script. Do not bypass it with a blanket allow-all or ignore-scripts policy
+for a normal install. Run `npm ci` and then `npm run doctor` to verify the
+toolchain. `--ignore-scripts` is used only for metadata-only lockfile or
+package-manager installation operations that do not execute repository code.
+
+Pull requests are squash-merged. Their title becomes the sole commit title and
+must use Conventional Commit form so Release Please receives one unambiguous
+change record. Before merging a release PR, review the generated section as
+customer-facing copy and run `node tools/release/check-release-notes.mjs`; remove
+duplicate merge-history entries and internal implementation noise rather than
+publishing raw automation output. Repository settings should disable merge commits
+and rebase merges, use the PR title for squash commits, and delete merged branches.
 
 The updater key fingerprint, manual verification, and release-channel mechanics
 are maintained in [Reproducing release builds](docs/reproducible-builds.md). Keep

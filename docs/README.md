@@ -32,13 +32,16 @@ boundary; add or supersede a decision when the boundary itself changes.
   native-command inventory, with automated registration-drift detection.
 - [Reproducing release builds](reproducible-builds.md) covers artifact and updater
   verification.
+- [Hosted infrastructure and source boundaries](hosted-infrastructure.md) records
+  which public and operator-managed repositories deploy the website, relay, and
+  release channel.
 - [Security policy](../SECURITY.md) explains private vulnerability reporting.
 
 ## Design and historical context
 
-Material in [`docs/design`](design/README.md) is non-normative context: future
-review preparation, superseded decisions, and condensed change history. It is
-not generated from CI, required reading for contributors, or a merge gate.
+Material in [`docs/design`](design/README.md) is non-normative context:
+superseded decisions, retrospective rationale, and condensed change history. It
+is not generated from CI, required reading for contributors, or a merge gate.
 
 ## Source-of-truth rules
 

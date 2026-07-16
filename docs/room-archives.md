@@ -5,7 +5,7 @@ Encrypted room archives provide a portable, passphrase-protected exit path for t
 ## Format and limits
 
 - File extension: `.multai.age` (binary age format).
-- Encryption: exact-pinned Rust `age` 0.11.1 user-passphrase mode. The passphrase is 12–1024 bytes and is never persisted.
+- Encryption: exact-pinned Rust `age` 0.12.1 user-passphrase mode. The passphrase is 12–1024 bytes and is never persisted.
 - Payload: version 1 JSON containing an export timestamp, bounded room/team display names, an explicit omission manifest, normalized history, and a SHA-256 digest of that body inside the authenticated ciphertext.
 - Maximum encrypted file: 16 MiB. Maximum decrypted JSON: 12 MiB. JSON is additionally bounded to 16 levels, 100,000 nodes, 20,000 entries per array, 128 fields per object, and 2 MiB per string.
 - Library: at most 100 imports per device. The encrypted file is stored owner-only in the native app-data archive directory. The plaintext sidecar has only a random id, import time, encrypted byte length, and version.

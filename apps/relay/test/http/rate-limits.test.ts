@@ -268,5 +268,9 @@ test("trusted sessions keep individual caps while sharing a higher bounded netwo
     "a valid-session rotation must not bypass the bounded shared-network bucket"
   );
   assert.equal(records.get("read:session:valid-a")?.tokens, 0, "each trusted session keeps the strict base cap");
-  assert.equal(records.get("read:trusted-network:203.0.113.60")?.tokens, 0);
+  const sharedNetworkTokens = records.get("read:trusted-network:203.0.113.60")?.tokens;
+  assert.ok(
+    sharedNetworkTokens !== undefined && sharedNetworkTokens >= 0 && sharedNetworkTokens < 1,
+    "continuous refill remains below the next admissible request"
+  );
 });
