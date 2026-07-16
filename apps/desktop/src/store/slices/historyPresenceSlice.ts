@@ -13,6 +13,8 @@ export type PresenceByRoom = Record<string, Record<string, RoomPresence>>;
 export interface HistoryPresenceRoomState {
   searchMessages?: ChatMessage[];
   historyMessage?: string;
+  historyHydrationStatus?: "loading" | "ready" | "failed";
+  historyHydrationAttempt?: number;
   inspectorTab?: InspectorTab;
   presence?: Record<string, RoomPresence>;
 }
@@ -105,6 +107,11 @@ export interface HistoryPresenceSlice {
   setHistorySearchResultsByRoom: (messagesByRoom: HistorySearchMessagesByRoom) => void;
   clearHistorySearchResults: () => void;
   setHistoryMessageForRoom: (roomId: string, message: string | null) => void;
+  setHistoryHydrationStatusForRoom: (
+    roomId: string,
+    status: HistoryPresenceRoomState["historyHydrationStatus"]
+  ) => void;
+  retryHistoryHydrationForRoom: (roomId: string) => void;
   setTeamHistoryMessageForTeam: (teamId: string, message: string | null) => void;
   setInspectorTabForRoom: (roomId: string, tab: InspectorTab) => void;
   clearPresenceByRoom: () => void;
@@ -160,6 +167,26 @@ export const createHistoryPresenceSlice: StateCreator<AppStoreState, [], [], His
           return message ? { ...rest, historyMessage: message } : rest;
         })
       )
+    }));
+  },
+  setHistoryHydrationStatusForRoom: (roomId, status) => {
+    set((state) => ({
+      historyPresenceByRoom: updateHistoryPresenceForRoom(state.historyPresenceByRoom, roomId, (roomState) => {
+        const { historyHydrationStatus: _status, ...rest } = roomState;
+        return status ? { ...rest, historyHydrationStatus: status } : rest;
+      })
+    }));
+  },
+  retryHistoryHydrationForRoom: (roomId) => {
+    set((state) => ({
+      historyPresenceByRoom: updateHistoryPresenceForRoom(state.historyPresenceByRoom, roomId, (roomState) => {
+        const { historyMessage: _message, ...rest } = roomState;
+        return {
+          ...rest,
+          historyHydrationStatus: "loading",
+          historyHydrationAttempt: (roomState.historyHydrationAttempt ?? 0) + 1
+        };
+      })
     }));
   },
   setTeamHistoryMessageForTeam: (teamId, message) => {

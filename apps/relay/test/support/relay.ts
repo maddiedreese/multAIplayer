@@ -693,6 +693,33 @@ export function waitForError(socket: WebSocket): Promise<string> {
   });
 }
 
+export function waitForErrorDetails(
+  socket: WebSocket
+): Promise<{ message: string; code?: string; teamId?: string; roomId?: string }> {
+  return new Promise((resolveError, rejectError) => {
+    const timer = setTimeout(() => rejectError(new Error("Timed out waiting for relay error")), 5_000);
+    socket.on("message", (raw) => {
+      const message = JSON.parse(raw.toString()) as {
+        type: string;
+        message?: string;
+        code?: string;
+        teamId?: string;
+        roomId?: string;
+      };
+      if (message.type === "error" && message.message) {
+        clearTimeout(timer);
+        resolveError({
+          message: message.message,
+          ...(message.code ? { code: message.code } : {}),
+          ...(message.teamId ? { teamId: message.teamId } : {}),
+          ...(message.roomId ? { roomId: message.roomId } : {})
+        });
+      }
+    });
+    socket.once("error", rejectError);
+  });
+}
+
 export function testEnvelope(
   overrides: Partial<{
     id: string;

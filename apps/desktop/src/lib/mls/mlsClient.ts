@@ -1,5 +1,6 @@
 import { invokeNative, isNativeCommandErrorCode } from "../platform/nativeCommandError";
 import { reportExpectedFailure } from "../core/nonFatalReporting";
+import { waitForRoomLocalDataCleanup } from "../core/roomLocalDataCleanup";
 
 export interface MlsIdentityPublic {
   githubUserId: string;
@@ -138,6 +139,7 @@ export function isMlsRequiresRejoin(error: unknown): boolean {
 }
 
 export async function joinMlsWelcome(roomId: string, welcome: string): Promise<number> {
+  await waitForRoomLocalDataCleanup(roomId);
   return invokeNative("mls_join_welcome", { request: { roomId, welcome } });
 }
 
@@ -286,6 +288,7 @@ export async function acceptMlsInviteResponse(
   responseMac: string,
   welcome?: string
 ): Promise<{ status: "approved" | "denied"; epoch?: number }> {
+  await waitForRoomLocalDataCleanup(originalBinding.roomId);
   return invokeNative("mls_invite_response_accept", {
     request: { capabilityUrlValue, originalBinding, responseBinding, responseMac, ...(welcome ? { welcome } : {}) }
   });
@@ -314,6 +317,7 @@ export async function acceptPendingMlsInviteResponse(
   responseMac: string,
   welcome?: string
 ): Promise<{ status: "approved" | "denied"; epoch?: number }> {
+  await waitForRoomLocalDataCleanup(responseBinding.roomId);
   return invokeNative("mls_pending_invite_response_accept", {
     request: { requestId, responseBinding, responseMac, ...(welcome ? { welcome } : {}) }
   });

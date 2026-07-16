@@ -97,7 +97,6 @@ export function useAppRelaySync({
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
         roomsRef: appRefs.roomsRef,
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         markIncomingChatUnread: (...args) => useAppStore.getState().markIncomingChatUnread(...args),
         handleRelayError: workspaceRecords.handleRelayError,
         upsertRoom: workspaceRecords.upsertRoom,

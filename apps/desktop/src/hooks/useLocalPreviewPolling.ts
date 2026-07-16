@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { readLocalPreviewTunnelStatus } from "../lib/platform/localBackend";
 import type { LocalPreviewRecord } from "../types";
+import { reportNonFatal } from "../lib/core/nonFatalReporting";
 
 interface LatestRef<T> {
   current: T;
@@ -40,18 +41,19 @@ export function useLocalPreviewPolling({
                   updatedAt: new Date().toISOString()
                 },
                 room
-              );
+              ).catch((error) => reportNonFatal("publish local preview health update", error));
             })
             .catch((error) => {
               void publishLocalPreviewEvent(
                 {
                   ...preview,
                   status: "error",
-                  message: `Cloudflare Quick Tunnel is no longer running on this device: ${String(error)}`,
+                  message: "Cloudflare Quick Tunnel is no longer running on this device.",
                   updatedAt: new Date().toISOString()
                 },
                 room
-              );
+              ).catch((publishError) => reportNonFatal("publish local preview failure", publishError));
+              reportNonFatal("check local preview tunnel health", error);
             });
         }
       }

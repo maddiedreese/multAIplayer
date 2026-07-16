@@ -23,14 +23,23 @@ export function useRoomGitStatusRefresh({
       useAppStore.getState().setGitStatusForRoom(selectedRoomId, null);
       return;
     }
+    let cancelled = false;
     useAppStore.getState().setGitStatusForRoom(selectedRoomId, null);
     getGitStatus(selectedRoomProjectPath)
-      .then((status) => useAppStore.getState().setGitStatusForRoom(selectedRoomId, status))
-      .catch((error) => {
-        useAppStore.getState().setGitStatusForRoom(selectedRoomId, {
-          branch: "unknown",
-          files: [{ path: String(error), status: "error", added: 0, removed: 0 }]
-        });
+      .then((status) => {
+        if (!cancelled) useAppStore.getState().setGitStatusForRoom(selectedRoomId, status);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const state = useAppStore.getState();
+        state.setGitStatusForRoom(selectedRoomId, null);
+        state.setGitWorkflowMessageForRoom(
+          selectedRoomId,
+          "Git status could not be loaded. Check that the attached project is a readable Git workspace."
+        );
       });
+    return () => {
+      cancelled = true;
+    };
   }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId, selectedRoomProjectPath]);
 }

@@ -1,11 +1,15 @@
 import React from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { defaultCodexModel } from "@multaiplayer/protocol";
 import { defaultProjectPath, type CodexActivityEvent } from "./lib/platform/localBackend";
 import { isTauriRuntime } from "./lib/platform/localBackend/runtime";
 import { registerRoomNotificationClickFocus } from "./lib/room/roomNotifications";
 import { reportNonFatal } from "./lib/core/nonFatalReporting";
 import { createWorkspaceRecordActions } from "./application/workspace/workspaceRecordActions";
+import { flushEncryptedHistorySaves, forgetRoomLocalData } from "./lib/history/localHistory";
+import { installLocalHistoryCloseDrain } from "./lib/history/localHistoryCloseDrain";
+import { prepareCurrentEligibleHistorySnapshots } from "./application/history/localHistorySnapshot";
 import { useAppStore } from "./store/appStore";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
@@ -42,6 +46,32 @@ export function App() {
 
 function NativeApp() {
   React.useEffect(() => useAppStore.getState().loadTrustedDeviceKeysOnce(), []);
+  React.useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void installLocalHistoryCloseDrain({
+      appWindow: getCurrentWindow(),
+      prepare: () => prepareCurrentEligibleHistorySnapshots(useAppStore.getState()),
+      flush: () => flushEncryptedHistorySaves(),
+      reportFailure: (message) => useAppStore.getState().setWorkspaceStatusError(message)
+    })
+      .then((stop) => {
+        if (disposed) stop();
+        else unlisten = stop;
+      })
+      .catch((error) => {
+        reportNonFatal("install encrypted local-history close drain", error);
+        useAppStore
+          .getState()
+          .setWorkspaceStatusError(
+            "The app could not install its local-history shutdown safeguard. Restart before editing."
+          );
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
   const relayHttpUrl = useAppStore((state) => state.appConfig.relayHttpUrl);
   const selectedRoomId = useAppStore((state) => state.selectedRoomId);
   const appRefs = useAppRefs();
@@ -86,6 +116,7 @@ function NativeApp() {
     replaceRoomRecord: (room) => useAppStore.getState().replaceRoomRecord(room),
     resetCodexApprovalForRoom,
     revokeWorkspaceAccess: (teamId, roomId) => useAppStore.getState().revokeWorkspaceAccess(teamId, roomId),
+    forgetRevokedRoomLocalData: forgetRoomLocalData,
     setInviteLinkForRoom,
     setInviteMessageForRoom,
     setChatMessageForRoom,
@@ -189,14 +220,16 @@ function NativeApp() {
     workspaceFlow
   });
   const updateProjectPathWithOnboarding = async () => {
-    const before = useAppStore.getState().rooms.find((room) => room.id === useAppStore.getState().selectedRoomId);
+    const roomId = useAppStore.getState().selectedRoomId;
+    const before = useAppStore.getState().rooms.find((room) => room.id === roomId);
     await roomRuntime.updateProjectPath();
     const state = useAppStore.getState();
-    const after = state.rooms.find((room) => room.id === state.selectedRoomId);
+    const after = state.rooms.find((room) => room.id === roomId);
     if (
       before &&
       after &&
       before.projectPath !== after.projectPath &&
+      state.selectedRoomId === roomId &&
       state.onboarding.markers.membership?.roomId === after.id
     ) {
       state.applyOnboardingEvent({ type: "project_attached", roomId: after.id });

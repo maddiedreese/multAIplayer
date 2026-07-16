@@ -16,7 +16,6 @@ export function useAppRefs() {
   const initial = useAppStore.getState();
   const relayRef = useRef<RelayClient | null>(null);
   const seenEnvelopeIds = useRef(new Set<string>());
-  const historyLoadedRoomIds = useRef(new Set<string>());
   const roomsRef = useRef(initial.rooms);
   const selectedRoomIdRef = useRef(initial.selectedRoomId);
   const selectedTeamIdRef = useRef(initial.selectedTeam);
@@ -61,7 +60,6 @@ export function useAppRefs() {
   return {
     relayRef,
     seenEnvelopeIds,
-    historyLoadedRoomIds,
     roomsRef,
     selectedRoomIdRef,
     selectedTeamIdRef,

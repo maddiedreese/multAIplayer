@@ -20,7 +20,6 @@ export function useAppInviteActions({
     selectedRoomIdRef: appRefs.selectedRoomIdRef,
     relayRef: appRefs.relayRef,
     seenEnvelopeIds: appRefs.seenEnvelopeIds,
-    historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
     reportMembershipCommitInFlight: roomInteraction.reportMembershipCommitInFlight,
     upsertTeam: workspaceRecords.upsertTeam,
     upsertRoom: workspaceRecords.upsertRoom,

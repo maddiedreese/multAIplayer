@@ -76,6 +76,16 @@ export function sanitizeLocalRoomReadState(value: unknown): LocalRoomReadState |
   };
 }
 
+export function isCurrentLocalRoomReadState(value: unknown): value is LocalRoomReadState {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<LocalRoomReadState>;
+  return (
+    Number.isInteger(record.unread) &&
+    Number(record.unread) >= 0 &&
+    (record.lastReadMessageId === undefined || typeof record.lastReadMessageId === "string")
+  );
+}
+
 function sanitizeUnread(value: unknown): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(999, Math.round(Number(value)))) : 0;
 }

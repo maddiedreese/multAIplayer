@@ -138,8 +138,7 @@ export function useAppWorkspaceFlow({
         settingsBusyRef: appRefs.settingsBusyRef,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
         replaceHistorySettings: storeAction("setHistorySettings"),
-        replaceRoom: workspaceRecords.replaceRoom,
-        historyLoadedRoomIds: appRefs.historyLoadedRoomIds
+        replaceRoom: workspaceRecords.replaceRoom
       },
       files: {
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
@@ -154,7 +153,6 @@ export function useAppWorkspaceFlow({
         selectedRoomId,
         selectedRoomTeamId: selectedRoom.teamId,
         forgottenRoomIds,
-        historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         replaceHistorySettings: storeAction("setHistorySettings"),
         hydrateLocalRoomHistoryForRoom,
         hydrateRoomReadState: storeAction("hydrateRoomReadState")

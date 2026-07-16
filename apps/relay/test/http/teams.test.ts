@@ -7,6 +7,7 @@ import {
   startRelay,
   waitForClose,
   waitForError,
+  waitForErrorDetails,
   waitForJoined,
   waitForTeamUpdated,
   waitForWorkspaceSubscribed
@@ -146,14 +147,17 @@ test("relay revokes live room access and stale invites when a team member is rem
     );
     await waitForJoined(peerSocket);
 
-    const removalError = waitForError(peerSocket);
+    const removalError = waitForErrorDetails(peerSocket);
     const removalClose = waitForClose(peerSocket);
     const removeResponse = await fetch(`${relay.baseUrl}/teams/team-core/members/github%3Apeer`, {
       method: "DELETE",
       headers: { cookie: ownerCookie }
     });
     assert.equal(removeResponse.status, 200);
-    assert.match(await removalError, /membership was removed/);
+    const scopedRemoval = await removalError;
+    assert.match(scopedRemoval.message, /membership was removed/);
+    assert.equal(scopedRemoval.code, "membership_removed");
+    assert.equal(scopedRemoval.teamId, "team-core");
     assert.equal((await removalClose).code, 1008);
 
     const peerWorkspace = await fetch(`${relay.baseUrl}/teams`, {

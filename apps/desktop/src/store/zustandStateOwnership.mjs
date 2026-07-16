@@ -56,7 +56,8 @@ export const allowedZustandDependencies = {
     "roomChatSlice",
     "roomSettingsSlice",
     "terminalSlice",
-    "workspaceDataSlice"
+    "workspaceDataSlice",
+    "workspaceUiSlice"
   ]),
   workspaceDataSlice: new Set(["codexHostHandoffSlice"])
 };

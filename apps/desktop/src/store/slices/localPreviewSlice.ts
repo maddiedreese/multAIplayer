@@ -44,7 +44,7 @@ export function projectLocalPreviewPanelMaps(localPreviewByRoom: LocalPreviewByR
   };
 }
 
-const emptyLocalPreviewDialog: LocalPreviewDialogState = {
+export const emptyLocalPreviewDialog: LocalPreviewDialogState = {
   open: false,
   phase: "select",
   roomId: "",

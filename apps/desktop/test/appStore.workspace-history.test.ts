@@ -90,6 +90,13 @@ test("desktop store seeds initial workspace data only when maps are empty", () =
 test("desktop store hydrates local room history through one room-scoped action", () => {
   const store = useAppStore.getState();
 
+  store.appendRoomMessage("room-a", {
+    id: "message-live",
+    author: "Maddie",
+    role: "human",
+    body: "Arrived while history was loading.",
+    time: "10:18"
+  });
   store.appendRoomMessage("room-b", {
     id: "message-b",
     author: "Jordan",
@@ -296,7 +303,10 @@ test("desktop store hydrates local room history through one room-scoped action",
   });
 
   const state = useAppStore.getState();
-  assert.equal(state.messagesByRoom["room-a"]?.[0]?.body, "Restore this room.");
+  assert.deepEqual(
+    state.messagesByRoom["room-a"]?.map((message) => message.id),
+    ["message-a", "message-live"]
+  );
   assert.equal(state.chatEditsByRoom["room-a"]?.[0]?.body, "Restore this edited room.");
   assert.equal(state.chatDeletesByRoom["room-a"]?.[0]?.messageId, "message-old");
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "Keep this room alone.");
@@ -336,7 +346,7 @@ test("desktop store hydrates local room history through one room-scoped action",
   assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph?.activeThreadId, "thread-a");
 });
 
-test("desktop store clears stale Codex handoff history when hydrating an empty room payload", () => {
+test("desktop store preserves live Codex state that arrives while an empty history payload loads", () => {
   const store = useAppStore.getState();
 
   store.appendCodexEvent("room-a", {
@@ -382,9 +392,76 @@ test("desktop store clears stale Codex handoff history when hydrating an empty r
   });
 
   const state = useAppStore.getState();
-  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.events, []);
-  assert.deepEqual(state.codexRuntimeByRoom["room-a"]?.hostHandoffs, []);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph, undefined);
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.events?.[0]?.turnId, "turn-stale");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.hostHandoffs?.[0]?.id, "handoff-stale");
+  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph?.activeThreadId, "thread-stale");
+});
+
+test("history hydration preserves monotonic stored state over stale live replay", () => {
+  const store = useAppStore.getState();
+  store.upsertCodexActivity("room-a", {
+    eventType: "codex.activity",
+    activityId: "activity-a",
+    turnId: "turn-a",
+    itemId: "item-a",
+    kind: "command",
+    status: "started",
+    title: "Running",
+    startedAt: "2026-07-06T00:00:00.000Z",
+    updatedAt: "2026-07-06T00:01:00.000Z",
+    host: "Maddie",
+    hostUserId: "github:maddie"
+  });
+  store.appendBrowserRequest("room-a", {
+    id: "browser-a",
+    requester: "Maddie",
+    requesterUserId: "github:maddie",
+    url: "https://example.com",
+    reason: "Inspect",
+    requestedAt: "2026-07-06T00:00:00.000Z",
+    status: "pending"
+  });
+  store.hydrateLocalRoomHistoryForRoom("room-a", {
+    version: 3,
+    messages: [],
+    terminalRequests: [],
+    fileSaveRequests: [],
+    browserRequests: [
+      {
+        id: "browser-a",
+        requester: "Maddie",
+        requesterUserId: "github:maddie",
+        url: "https://example.com",
+        reason: "Inspect",
+        requestedAt: "2026-07-06T00:00:00.000Z",
+        status: "approved"
+      }
+    ],
+    inviteRequests: [],
+    codexEvents: [],
+    codexActivities: [
+      {
+        eventType: "codex.activity",
+        activityId: "activity-a",
+        turnId: "turn-a",
+        itemId: "item-a",
+        kind: "command",
+        status: "completed",
+        title: "Completed",
+        startedAt: "2026-07-06T00:00:00.000Z",
+        updatedAt: "2026-07-06T00:02:00.000Z",
+        host: "Maddie",
+        hostUserId: "github:maddie"
+      }
+    ],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: []
+  });
+  assert.equal(useAppStore.getState().codexRuntimeByRoom["room-a"]?.activities?.[0]?.status, "completed");
+  assert.equal(useAppStore.getState().browserByRoom["room-a"]?.requests?.[0]?.status, "approved");
 });
 
 test("desktop store exposes team member actions", () => {

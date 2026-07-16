@@ -15,7 +15,10 @@ interface CreateRelayRoomSocketManagerOptions {
   isTeamMember: (teamId: string, userId: string) => boolean;
   addTeamMember: (teamId: string, userId: string, role?: TeamRole) => void;
   scheduleStoreSave: () => void;
-  send: (socket: WebSocket, message: { type: "error"; message: string }) => void;
+  send: (
+    socket: WebSocket,
+    message: { type: "error"; message: string; code?: "membership_removed"; teamId?: string; roomId?: string }
+  ) => void;
   broadcast: (key: RoomKey, message: { type: "presence"; status: "online" | "offline" } & PresenceRecord) => void;
 }
 
@@ -147,7 +150,9 @@ export function createRelayRoomSocketManager({
 
       send(session.socket, {
         type: "error",
-        message: "Your team membership was removed. Rejoin with a fresh invite before continuing."
+        message: "Your team membership was removed. Rejoin with a fresh invite before continuing.",
+        code: "membership_removed",
+        teamId
       });
       leaveRoom(session);
       leaveTeams(session);

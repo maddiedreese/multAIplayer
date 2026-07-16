@@ -23,6 +23,12 @@ export function selectRoomInspectorView(state: AppStoreState) {
   const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
   const selectedTeamId = state.selectedTeam;
   const presenceState = state.historyPresenceByRoom[selectedRoom.id];
+  const {
+    presence,
+    inspectorTab = "files",
+    historyMessage = null,
+    historyHydrationStatus = null
+  } = presenceState ?? {};
   return {
     currentUser: state.currentUser,
     authConfig: state.authConfig,
@@ -39,9 +45,10 @@ export function selectRoomInspectorView(state: AppStoreState) {
     terminal: state.terminalRuntimeByRoom[selectedRoom.id] ?? emptyTerminal,
     terminals: state.terminals,
     teamRoster: state.teamRosterByTeam[selectedTeamId],
-    presence: presenceState?.presence,
-    inspectorTab: presenceState?.inspectorTab ?? "files",
-    historyMessage: presenceState?.historyMessage ?? null,
+    presence,
+    inspectorTab,
+    historyMessage,
+    historyHydrationStatus,
     teamHistoryMessage: state.teamHistoryByTeam[selectedTeamId || "__no-team"]?.message ?? null,
     sensitiveAttachmentReviewKey: state.sensitiveAttachmentReviewKey,
     deviceIdentity: state.deviceIdentity,

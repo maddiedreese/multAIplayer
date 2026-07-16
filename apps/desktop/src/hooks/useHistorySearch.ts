@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { loadEncryptedHistory, loadHistorySettings } from "../lib/history/localHistory";
-import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
+import { normalizeRetainedLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
 import { useAppStore } from "../store/appStore";
 import { historySearchEntriesToMessagesByRoom } from "../store/slices/historyPresenceSlice";
 import { reportNonFatal } from "../lib/core/nonFatalReporting";
@@ -50,7 +50,7 @@ export function useHistorySearch({
         const storedHistory = await loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(room.id);
         if (!storedHistory) return [room.id, []] as const;
         const settings = loadHistorySettings(room.id);
-        const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
+        const payload = normalizeRetainedLocalRoomHistory(storedHistory, settings.retentionDays);
         return [room.id, payload.messages] as const;
       })
     )

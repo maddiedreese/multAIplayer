@@ -4,6 +4,7 @@ import test, { beforeEach } from "node:test";
 const calls: Array<{ command: string; args: unknown }> = [];
 let latest: string | null = null;
 let retentionFailure: Error | null = null;
+let saveGate: Promise<void> | null = null;
 
 function encode(value: unknown): string {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64");
@@ -29,6 +30,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
       calls.push({ command, args });
       if (command === "mls_history_load_latest") return latest;
       if (command === "mls_history_save") {
+        if (saveGate) await saveGate;
         latest = args.request?.plaintext ?? null;
         return 7;
       }
@@ -46,11 +48,14 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
 });
 
 const history = await import("../src/lib/history/localHistory");
+const { currentEligibleHistorySnapshots } = await import("../src/application/history/localHistorySnapshot");
+const { useAppStore } = await import("../src/store/appStore");
 
 beforeEach(() => {
   calls.length = 0;
   latest = null;
   retentionFailure = null;
+  saveGate = null;
   localStorage.clear();
 });
 
@@ -89,6 +94,52 @@ test("forgetting a room removes history and the durable MLS-only room config", a
   assert.equal(history.hasHistorySettings("room-a"), false);
 });
 
+test("clearing history cannot be undone by an active or queued snapshot", async () => {
+  let releaseSave!: () => void;
+  saveGate = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  history.seedNewRoomHistorySettings("room-a", { enabled: true, retentionDays: 30 });
+  const unexpectedError = (error: unknown) => assert.fail(String(error));
+
+  history.queueEncryptedHistorySave("room-a", { revision: 1 }, unexpectedError);
+  history.queueEncryptedHistorySave("room-a", { revision: 2 }, unexpectedError);
+  const clearing = history.clearEncryptedHistory("room-a");
+  history.queueEncryptedHistorySave("room-a", { revision: 3 }, unexpectedError);
+  releaseSave();
+
+  await clearing;
+  await history.flushEncryptedHistorySaves("room-a");
+  assert.equal(latest, null);
+  assert.deepEqual(
+    calls.map((call) => call.command),
+    ["mls_history_save", "mls_history_delete_all"]
+  );
+});
+
+test("forgetting room data cannot be undone by a queued snapshot", async () => {
+  let releaseSave!: () => void;
+  saveGate = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  history.seedNewRoomHistorySettings("room-a", { enabled: true, retentionDays: 30 });
+  const unexpectedError = (error: unknown) => assert.fail(String(error));
+
+  history.queueEncryptedHistorySave("room-a", { revision: 1 }, unexpectedError);
+  history.queueEncryptedHistorySave("room-a", { revision: 2 }, unexpectedError);
+  const forgetting = history.forgetRoomLocalData("room-a");
+  releaseSave();
+
+  await forgetting;
+  await history.flushEncryptedHistorySaves("room-a");
+  assert.equal(latest, null);
+  assert.equal(history.hasHistorySettings("room-a"), false);
+  assert.deepEqual(
+    calls.map((call) => call.command),
+    ["mls_history_save", "mls_room_local_data_delete"]
+  );
+});
+
 test("history settings remain non-secret and sanitized", async () => {
   assert.deepEqual(await history.saveHistorySettings("room-a", { enabled: true, retentionDays: 900 }), {
     enabled: true,
@@ -125,4 +176,47 @@ test("history retention failure does not publish a false local setting", async (
     /native store unavailable/
   );
   assert.deepEqual(history.loadHistorySettings("room-a"), { enabled: true, retentionDays: 30 });
+});
+
+test("close snapshot construction includes current state from every hydrated eligible room", () => {
+  const room = (id: string) => ({
+    id,
+    teamId: "team-a",
+    name: id,
+    projectPath: `/tmp/${id}`,
+    host: "Maddie",
+    hostUserId: "github:maddie",
+    hostStatus: "active" as const,
+    approvalPolicy: "ask_every_turn" as const,
+    approvalDelegationPolicy: "host_only" as const,
+    trustedApproverUserIds: [],
+    mode: { chat: true, code: true, workspace: true, browser: true },
+    codexModel: "gpt-5.4",
+    browserAllowedOrigins: [],
+    browserProfilePersistent: true,
+    unread: 0
+  });
+  const store = useAppStore.getState();
+  store.resetAppStore();
+  store.initializeWorkspaceUi({
+    teams: [],
+    rooms: [room("room-a"), room("room-b")],
+    projectPath: "/tmp/room-a",
+    roomId: "room-a"
+  });
+  store.setHistoryHydrationStatusForRoom("room-a", "ready");
+  store.setHistoryHydrationStatusForRoom("room-b", "ready");
+  store.appendRoomMessage("room-a", { id: "a", author: "A", role: "human", body: "A", time: new Date().toISOString() });
+  store.appendRoomMessage("room-b", { id: "b", author: "B", role: "human", body: "B", time: new Date().toISOString() });
+  history.seedNewRoomHistorySettings("room-a", { enabled: true, retentionDays: 30 });
+  history.seedNewRoomHistorySettings("room-b", { enabled: true, retentionDays: 30 });
+  const snapshots = currentEligibleHistorySnapshots(useAppStore.getState());
+  assert.deepEqual(
+    snapshots.map(([roomId]) => roomId),
+    ["room-a", "room-b"]
+  );
+  assert.deepEqual(
+    snapshots.map(([, payload]) => payload.messages[0]?.id),
+    ["a", "b"]
+  );
 });

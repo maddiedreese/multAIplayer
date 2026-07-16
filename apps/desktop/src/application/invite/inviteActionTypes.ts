@@ -6,7 +6,6 @@ export interface UseInviteActionsOptions {
   selectedRoomIdRef: MutableRefObject<string>;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
-  historyLoadedRoomIds: MutableRefObject<Set<string>>;
   reportMembershipCommitInFlight: (roomId: string) => boolean;
   upsertTeam: (team: TeamRecord) => void;
   upsertRoom: (room: ClientRoomRecord) => void;
