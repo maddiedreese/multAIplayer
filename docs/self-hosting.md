@@ -2,7 +2,7 @@
 
 This is an operator configuration guide. The [threat model](threat-model.md) is the sole normative source for security claims, trust assumptions, and residual risks.
 
-The relay is intended to be self-hostable. In v1 it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
+The relay is intended to be self-hostable. In the current alpha it routes encrypted room events and manages presence; it does not call OpenAI or store plaintext chat transcripts.
 
 Teams moving from the hosted relay to their own relay should use the [hosted-to-self-hosted migration procedure](../CONTRIBUTING.md#hosted-to-self-hosted-migration). The short version is: deploy and verify a self-hosted relay, build the desktop with its self-host relay origins allowed and relay editing enabled, change each desktop app's Settings drawer to those URLs, recreate team/room membership with fresh KeyPackage invites, and preserve each device's native MLS state and encrypted local history for continuity.
 
@@ -18,7 +18,7 @@ Supported alpha self-hosting requirements:
 
 ## Desktop onboarding, authentication, and invite links
 
-The self-hosted relay must configure GitHub Device Flow for authenticated create/join onboarding. GitHub identifies the relay member; ChatGPT authorizes only the local Codex process and is never configured on the relay. Invitees may join after relay/GitHub readiness without Codex, ChatGPT authorization, or a project folder. A creator must complete the local host-readiness checks before creating the first room.
+The self-hosted desktop must be compiled with its GitHub Device Flow client id and exact relay origin for authenticated create/join onboarding; the relay verifies the resulting access token and does not own the Device Flow client. GitHub identifies the relay member; ChatGPT authorizes only the local Codex process and is never configured on the relay. Invitees may join after relay/GitHub readiness without Codex, ChatGPT authorization, or a project folder. A creator must complete the local host-readiness checks before creating the first room.
 
 Provider verification URLs are not general self-host configuration. The desktop accepts the exact GitHub device page and a small allowlist of official OpenAI HTTPS hosts, and Rust repeats those checks before opening the system browser. GitHub Enterprise or another identity provider therefore requires an explicit reviewed code/configuration change rather than passing an arbitrary OAuth URL through the relay.
 
@@ -42,7 +42,7 @@ For a hosted or internet-facing relay, run the production relay doctor against t
 node scripts/doctor.mjs --production-relay
 ```
 
-This check fails if GitHub OAuth is missing, credentialed origins are unset or are not exact HTTP(S) origins or the exact `tauri://localhost` desktop origin, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, relay storage points at `/tmp`, or untrusted proxy headers are accepted. Session identifiers are hashed before persistence by the relay rather than controlled by a deployment secret. The doctor is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or the mandatory trusted edge and IP-level controls for an internet-facing deployment.
+This check fails if credentialed origins are unset or are not exact HTTP(S) origins or the exact `tauri://localhost` desktop origin, auth is explicitly disabled, debug endpoints are enabled, in-process rate limits are disabled, or relay storage points at `/tmp`. It warns when forwarded proxy headers are trusted because it cannot prove that the relay is isolated behind an edge that overwrites client-supplied forwarding headers. Session identifiers are hashed before persistence by the relay rather than controlled by a deployment secret. The doctor is a deployment sanity check, not a substitute for TLS, backups, log review, process supervision, or the mandatory trusted edge and IP-level controls for an internet-facing deployment.
 
 ## Docker Relay
 
@@ -243,7 +243,7 @@ Debug endpoints are disabled in every environment unless explicitly enabled, and
 MULTAIPLAYER_RELAY_DEBUG=true
 ```
 
-The relay's GitHub OAuth and PR/Actions upstream requests have a ten-second deadline. Timeout and network failures return bounded gateway errors instead of occupying handlers indefinitely. JSON and SQLite store files (including SQLite sidecars) use owner-only permissions (`0600`). A missing dedicated data directory is created as `0700`; an existing operator-supplied parent directory is not re-permissioned.
+The relay's GitHub identity-verification request and the native desktop's PR/Actions upstream requests have a ten-second deadline. Timeout and network failures return bounded gateway errors instead of occupying handlers indefinitely. JSON and SQLite store files (including SQLite sidecars) use owner-only permissions (`0600`). A missing dedicated data directory is created as `0700`; an existing operator-supplied parent directory is not re-permissioned.
 
 Production relays emit structured JSON request logs by default. Local development can opt in:
 
@@ -285,7 +285,7 @@ When enabled, reading workspace metadata, creating teams, creating rooms, creati
 
 Authenticated workspace reads are membership-scoped. A signed-in user only receives teams and rooms where they are a known team member. Room-level mutations and attachment blob reads also require membership. Invite metadata remains readable by invite id so a joiner can verify that the relay metadata matches the invite fragment; the desktop then presents that invite id during WebSocket join to be admitted as a team member.
 
-Authentication is enabled by default in every environment, even if GitHub OAuth has not been configured yet.
+Authentication is enabled by default in every environment, even before a native desktop has completed GitHub sign-in.
 
 Session cookies are `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever `NODE_ENV=production`. An authenticated production deployment therefore requires HTTPS/WSS; browsers and compliant clients will not return that cookie over plain HTTP. For a deliberately unauthenticated private LAN development relay, set `MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH=true` explicitly and treat it as development-only. That opt-out does not make production GitHub sign-in work over HTTP, and the production-relay doctor intentionally rejects auth-disabled deployments.
 

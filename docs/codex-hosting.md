@@ -10,7 +10,7 @@ Instead, a room has one active host. The host is a desktop user who has local ac
 - the local project folder attached to the room;
 - room-scoped terminal sessions;
 - the room browser surface;
-- local Git and optional GitHub OAuth through the relay.
+- local Git and optional native GitHub OAuth.
 
 People chat normally in the room. When someone clicks Codex or types `@Codex`, the app prepares a proposed Codex turn from the room context. The active host reviews and approves that turn. If approved, the host's local desktop app sends the prepared input to the host's local Codex app-server and streams the result back into the room as encrypted room events.
 
@@ -61,7 +61,7 @@ The relay does see operational metadata needed to route the room:
 - invite ids and expiry metadata;
 - opaque MLS message sizes, ids, timestamps, epoch hints, and sender/device routing labels;
 - plaintext attachment routing and descriptive metadata such as filename, MIME type, declared size, room id, epoch, and expiry; attachment contents remain exporter-encrypted;
-- GitHub OAuth session identity metadata when sign-in is enabled.
+- authenticated GitHub identity and relay-session metadata when sign-in is enabled.
 
 GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are encoded for room members as RFC 9420 MLS snapshots via `mls-rs`; the threat model owns the security and audit claims for that path.
 

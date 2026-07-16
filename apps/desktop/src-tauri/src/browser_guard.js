@@ -26,6 +26,13 @@
     event.preventDefault();
     event.stopImmediatePropagation();
   };
+  const blockFileSelection = (event) => {
+    if (!isFileInput(event.target)) return;
+    try {
+      event.target.value = "";
+    } catch (_) {}
+    block(event);
+  };
 
   window.addEventListener(
     "click",
@@ -34,18 +41,11 @@
     },
     true
   );
-  window.addEventListener(
-    "change",
-    (event) => {
-      if (isFileInput(event.target)) {
-        try {
-          event.target.value = "";
-        } catch (_) {}
-        block(event);
-      }
-    },
-    true
-  );
+  // Browsers dispatch `input` before `change` after a file picker returns.
+  // Clear and stop both at capture time so page handlers cannot observe the
+  // selected FileList through the earlier event.
+  window.addEventListener("input", blockFileSelection, true);
+  window.addEventListener("change", blockFileSelection, true);
   window.addEventListener("drop", block, true);
   window.addEventListener("dragover", block, true);
 })();

@@ -47,8 +47,8 @@ test("room browser guard cancels file input, drag, and drop events", () => {
   assert.equal(input.dispatchEvent(click), false);
   assert.equal(click.defaultPrevented, true);
 
-  for (const name of ["change", "dragover", "drop"] as const) {
-    const target = name === "change" ? input : dom.window;
+  for (const name of ["input", "change", "dragover", "drop"] as const) {
+    const target = name === "input" || name === "change" ? input : dom.window;
     const event = new dom.window.Event(name, { bubbles: true, cancelable: true });
     assert.equal(target.dispatchEvent(event), false);
     assert.equal(event.defaultPrevented, true);
