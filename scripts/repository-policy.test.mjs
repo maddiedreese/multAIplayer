@@ -190,6 +190,16 @@ test("release-note check rejects normalized duplicates", () => {
   assert.notEqual(result.status, 0);
 });
 
+test("required verification owns release-note curation after metadata preparation", () => {
+  const rootPackage = JSON.parse(readFileSync("package.json", "utf8"));
+  const workflow = readFileSync(".github/workflows/release.yml", "utf8");
+  const syncStart = workflow.indexOf("      - name: Synchronize generated lock metadata");
+  const syncEnd = workflow.indexOf("      - name:", syncStart + 8);
+  assert.match(rootPackage.scripts.verify, /npm run check:release-notes/);
+  assert.ok(syncStart > 0 && syncEnd > syncStart);
+  assert.doesNotMatch(workflow.slice(syncStart, syncEnd), /check-release-notes/);
+});
+
 test("release asset validator enforces the public build contract", () => {
   const directory = mkdtempSync(join(tmpdir(), "multaiplayer-assets-"));
   const contract = JSON.parse(readFileSync("docs/release-assets.v1.json", "utf8"));

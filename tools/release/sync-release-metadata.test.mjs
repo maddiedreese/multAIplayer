@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { assertReleasePleaseBootstrap } from "../../scripts/check-release-versions.mjs";
 import {
   discoverWorkspacePackagePaths,
   synchronizeCargoLockVersion,
@@ -55,6 +56,64 @@ test("Cargo manifest and lock synchronizers change only the native package versi
     '[[package]]\nname = "dependency"\nversion = "9.0.0"\n\n[[package]]\nname = "multaiplayer"\nversion = "0.2.0-alpha.1"\n'
   );
 });
+
+test("release-please bootstrap remains anchored while the manifest advances prospectively", () => {
+  const bootstrapSha = "a".repeat(40);
+  assert.doesNotThrow(() =>
+    assertReleasePleaseBootstrap(releasePleaseFixture(bootstrapSha), { ".": "0.2.0-alpha.0" }, (sha) => {
+      assert.equal(sha, bootstrapSha);
+      return { commit: sha, isAncestor: true, tags: ["v0.1.0-alpha.0"] };
+    })
+  );
+});
+
+test("release-please bootstrap rejects a mismatched, non-ancestor, or untagged commit", () => {
+  const bootstrapSha = "b".repeat(40);
+  assert.throws(
+    () =>
+      assertReleasePleaseBootstrap(releasePleaseFixture(bootstrapSha), { ".": "0.2.0-alpha.0" }, () => ({
+        commit: "c".repeat(40),
+        isAncestor: true,
+        tags: ["v0.1.0-alpha.0"]
+      })),
+    /resolve exactly as a commit/
+  );
+  assert.throws(
+    () =>
+      assertReleasePleaseBootstrap(releasePleaseFixture(bootstrapSha), { ".": "0.2.0-alpha.0" }, () => ({
+        commit: bootstrapSha,
+        isAncestor: false,
+        tags: ["v0.1.0-alpha.0"]
+      })),
+    /must be an ancestor of HEAD/
+  );
+  assert.throws(
+    () =>
+      assertReleasePleaseBootstrap(releasePleaseFixture(bootstrapSha), { ".": "0.2.0-alpha.0" }, () => ({
+        commit: bootstrapSha,
+        isAncestor: true,
+        tags: []
+      })),
+    /anchored by an existing version tag/
+  );
+});
+
+function releasePleaseFixture(bootstrapSha) {
+  return {
+    "bootstrap-sha": bootstrapSha,
+    packages: {
+      ".": {
+        "include-component-in-tag": false,
+        draft: true,
+        "force-tag-creation": true,
+        "extra-files": [
+          { path: "apps/desktop/package.json", jsonpath: "$.version" },
+          { path: "apps/desktop/src-tauri/Cargo.toml", jsonpath: "$.package.version" }
+        ]
+      }
+    }
+  };
+}
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));

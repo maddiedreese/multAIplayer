@@ -60,7 +60,6 @@ jobs:
         run: |
           npm run sync:release-versions
           npm run check:release-versions
-          node tools/release/check-release-notes.mjs
           if git diff --quiet; then
             exit 0
           fi
