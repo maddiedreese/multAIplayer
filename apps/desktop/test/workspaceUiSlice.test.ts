@@ -15,7 +15,6 @@ const roomA: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   browserProfilePersistent: true,
   unread: 2

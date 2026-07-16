@@ -424,7 +424,6 @@ export const RoomSettingsPlaintextPayload = z.object({
   setting: z.enum([
     "roomName",
     "approvalPolicy",
-    "roomMode",
     "codexModel",
     "codexReasoningEffort",
     "codexRawReasoningEnabled",

@@ -54,9 +54,7 @@ function currentRoom(overrides: Partial<RoomRecord> & Pick<RoomRecord, "id" | "t
     host: "No host",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: false },
     browserProfilePersistent: false,
-    unread: 0,
     ...overrides
   };
 }
@@ -403,7 +401,6 @@ test("expiry and pruning use the injected clock", () => {
     name: "Archived",
     host: "No host",
     hostStatus: "offline",
-    unread: 0,
     archivedAt: new Date(fixedNow - 1).toISOString()
   });
   store.setMlsBacklog("team-core:room-archived", [
@@ -831,9 +828,7 @@ test("startup accepts a complete current offline room without synthesizing autho
         hostUserId: "github:creator",
         hostStatus: "offline",
         approvalPolicy: "ask_every_turn",
-        mode: { chat: true, code: true, workspace: true, browser: true },
-        browserProfilePersistent: true,
-        unread: 0
+        browserProfilePersistent: true
       }
     ],
     teamMembers: [
@@ -881,8 +876,7 @@ test("startup rejects incomplete or legacy-shaped critical team and room rows", 
             name: "Room",
             host: "No host",
             hostStatus: "offline",
-            approvalPolicy: "ask_every_turn",
-            unread: 0
+            approvalPolicy: "ask_every_turn"
           }
         ]
       }),

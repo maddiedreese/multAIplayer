@@ -110,17 +110,3 @@ export const codexSandboxLevelOptions = [
 
 export type CodexSpeed = (typeof codexSpeedOptions)[number]["id"];
 export type CodexSandboxLevel = (typeof codexSandboxLevelOptions)[number]["id"];
-
-export interface RoomMode {
-  chat: boolean;
-  code: boolean;
-  workspace: boolean;
-  browser: boolean;
-}
-
-export const defaultRoomMode: RoomMode = {
-  chat: true,
-  code: true,
-  workspace: true,
-  browser: true
-};

@@ -209,10 +209,7 @@ function seededStore() {
     activeHostDeviceId: "device-host",
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: false },
-    browserAllowedOrigins: [],
     browserProfilePersistent: false,
-    unread: 0,
     acceptedMlsEpoch: 1
   });
   store.setTeamMembers(

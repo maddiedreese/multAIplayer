@@ -116,7 +116,6 @@ function roomRecord(id: string, teamId: string, deletedAt?: string) {
     host: "Maddie",
     hostStatus: "offline" as const,
     approvalPolicy: "ask_every_turn" as const,
-    mode: { chat: true, code: true, workspace: true, browser: true },
     browserProfilePersistent: false,
     ...(deletedAt ? { deletedAt } : {})
   };

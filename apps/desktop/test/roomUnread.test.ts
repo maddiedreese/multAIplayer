@@ -7,10 +7,9 @@ import {
   localRoomReadStateForHistory,
   markRoomRead,
   markRoomUnreadForIncomingChat,
-  replaceRoomPreservingUnread,
-  sanitizeLocalRoomReadState,
-  upsertRoomPreservingUnread
+  sanitizeLocalRoomReadState
 } from "../src/lib/history/roomUnread";
+import { ensureRoomDefaults } from "../src/lib/room/roomDefaults";
 
 const room: ClientRoomRecord = {
   id: "room-a",
@@ -21,7 +20,6 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: false },
   codexModel: "gpt-5.4",
   browserProfilePersistent: true,
   unread: 2
@@ -42,24 +40,10 @@ test("markRoomUnreadForIncomingChat increments inactive rooms only", () => {
   assert.equal(markRoomUnreadForIncomingChat(rooms, "room-a", "room-b", "local-device", "local-device")[0].unread, 0);
 });
 
-test("upsertRoomPreservingUnread keeps local unread on room updates", () => {
-  const updated = upsertRoomPreservingUnread([room], { ...room, name: "Renamed", unread: 0 });
-
-  assert.equal(updated[0].name, "Renamed");
-  assert.equal(updated[0].unread, 2);
-});
-
-test("replaceRoomPreservingUnread keeps local unread on existing room replacement", () => {
-  const updated = replaceRoomPreservingUnread([room], { ...room, name: "Renamed", unread: 0 });
-
-  assert.equal(updated[0].name, "Renamed");
-  assert.equal(updated[0].unread, 2);
-});
-
-test("replaceRoomPreservingUnread does not append missing rooms", () => {
-  const updated = replaceRoomPreservingUnread([room], { ...room, id: "room-b", name: "Beta", unread: 0 });
-
-  assert.deepEqual(updated, [room]);
+test("relay room projection initializes and preserves device-local unread state", () => {
+  const { unread: _unread, ...relayRoom } = room;
+  assert.equal(ensureRoomDefaults(relayRoom).unread, 0);
+  assert.equal(ensureRoomDefaults({ ...relayRoom, name: "Renamed" }, room).unread, 2);
 });
 
 test("applyLocalRoomReadState restores encrypted local unread state", () => {

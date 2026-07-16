@@ -12,7 +12,6 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddiedreese",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   browserProfilePersistent: true,
   unread: 0
@@ -22,11 +21,9 @@ test("room invites require the active host", () => {
   assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), false);
 });
 
-test("room invites remain unavailable during host handoff", () => {
-  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }), true);
-  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), false);
+test("offline rooms cannot create invites", () => {
   assert.equal(
-    canCreateRoomInvite({ ...room, hostStatus: "handoff" }, { id: "github:maddiedreese", name: "Maddie" }),
+    canCreateRoomInvite({ ...room, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }),
     false
   );
 });

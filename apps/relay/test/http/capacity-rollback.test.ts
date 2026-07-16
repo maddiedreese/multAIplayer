@@ -136,7 +136,6 @@ test("room creation rolls back its durable quota when capacity rejects the room"
     requesterFromRequest: () => ({ id: session.user.id, name: session.user.login }),
     isRoomHost: () => false,
     isApprovalPolicy: (value): value is "ask_every_turn" => value === "ask_every_turn",
-    isRoomMode: () => true,
     normalizeMetadataText: boundedText,
     normalizeOptionalMetadataText: boundedText,
     displayNameForUser: () => "Capacity",
@@ -179,9 +178,7 @@ test("attachment upload rolls back its byte quota when real retained bytes exhau
     host: "Capacity",
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: true },
-    browserProfilePersistent: false,
-    unread: 0
+    browserProfilePersistent: false
   });
   store.discardDurableMutations();
   const app = express();

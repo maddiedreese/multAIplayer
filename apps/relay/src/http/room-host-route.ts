@@ -39,8 +39,8 @@ export function registerRoomHostRoute(options: RegisterRoomRoutesOptions) {
         "invalid_request",
         "Host identity metadata is invalid or exceeds its protocol limit."
       );
-    if (!isHostStatus(requestedStatus))
-      return void sendRelayError(res, 400, "invalid_request", "Host status is invalid.");
+    if (requestedStatus !== "active")
+      return void sendRelayError(res, 400, "invalid_request", "Host status must be active for initial bootstrap.");
     const isInitialBootstrap = isInitialHostBootstrap({
       body: req.body,
       room,
@@ -85,10 +85,6 @@ function invalidRequestedHost(
   deviceId: string | null
 ) {
   return !host || !userId || (body?.hostDeviceId !== undefined && !deviceId);
-}
-
-function isHostStatus(value: unknown): value is "active" | "handoff" | "offline" {
-  return value === "active" || value === "handoff" || value === "offline";
 }
 
 function isInitialHostBootstrap(options: {

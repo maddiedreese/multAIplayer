@@ -3,7 +3,6 @@ import {
   defaultCodexModel,
   defaultCodexReasoningEffort,
   defaultCodexSpeed,
-  defaultRoomMode,
   type ClientRoomRecord,
   type TeamRecord
 } from "@multaiplayer/protocol";
@@ -13,7 +12,6 @@ export const seededTeams: TeamRecord[] = [{ id: "team-core", name: "Core Team", 
 
 const roomDefaults = {
   approvalPolicy: "ask_every_turn" as const,
-  mode: defaultRoomMode,
   codexModel: defaultCodexModel,
   codexReasoningEffort: defaultCodexReasoningEffort,
   codexSpeed: defaultCodexSpeed,
@@ -41,7 +39,7 @@ export const seededRooms: ClientRoomRecord[] = [
     projectPath: "/test/workspace",
     host: "Other User",
     hostUserId: "github:other-user",
-    hostStatus: "handoff",
+    hostStatus: "active",
     unread: 2
   }
 ];

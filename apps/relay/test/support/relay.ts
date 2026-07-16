@@ -221,9 +221,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       hostStatus: "active",
       acceptedMlsEpoch: 0,
       approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: true },
-      browserProfilePersistent: true,
-      unread: 0
+      browserProfilePersistent: true
     },
     {
       id: "room-relay",
@@ -235,9 +233,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       hostStatus: "active",
       acceptedMlsEpoch: 0,
       approvalPolicy: "ask_every_turn",
-      mode: { chat: true, code: true, workspace: true, browser: false },
-      browserProfilePersistent: true,
-      unread: 0
+      browserProfilePersistent: true
     }
   ];
   while (rooms.length < roomCount) {
@@ -277,7 +273,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
 
 export async function patchHostStatus(
   baseUrl: string,
-  body: { host: string; hostUserId: string; hostStatus: "active" | "handoff" | "offline" }
+  body: { host: string; hostUserId: string; hostStatus: "active" }
 ): Promise<number> {
   const response = await fetch(`${baseUrl}/rooms/room-desktop/host`, {
     method: "PATCH",

@@ -207,7 +207,7 @@ function validatePublishAuthority(
 
 function isActiveHostMessage(room: RoomRecord, message: MlsRelayMessage): boolean {
   return (
-    room.hostStatus !== "offline" &&
+    room.hostStatus === "active" &&
     room.hostUserId === message.senderUserId &&
     room.activeHostDeviceId === message.senderDeviceId
   );

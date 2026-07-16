@@ -29,7 +29,6 @@ import { queueForHandoff, resolveHandoffProject } from "./hostHandoffProject";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { ChatMessage, HostHandoffRecord } from "../../types";
 import type { UseHostHandoffActionsOptions } from "./hostHandoffActionTypes";
-import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { publishRoomConfigSnapshot } from "../mls/roomConfigSnapshot";
 import { publishHostHandoffAccepted } from "./hostHandoffAcceptedPublisher";
 
@@ -148,7 +147,7 @@ export function createHostHandoffActions(
       incrementRevision
     });
   }
-  async function setRoomHost(hostStatus: ClientRoomRecord["hostStatus"]) {
+  async function setRoomHost(action: "active" | "handoff") {
     if (!selectedRoom) {
       setSelectedHostMessage("Create or join a room before changing the host.");
       return;
@@ -157,7 +156,7 @@ export function createHostHandoffActions(
       setSelectedHostMessage(roomLockMessage(selectedRoom, isSelectedRoomRevoked));
       return;
     }
-    if (hostStatus !== "active" && !isActiveHost) {
+    if (action !== "active" && !isActiveHost) {
       setSelectedHostMessage(hostGateMessage);
       return;
     }
@@ -166,19 +165,17 @@ export function createHostHandoffActions(
     setHostBusyForRoom(roomId, true);
     setHostMessageForRoom(roomId, null);
     try {
-      if (hostStatus === "handoff") {
+      if (action === "handoff") {
         await publishHostHandoff(selectedRoom);
         freshRoomHostState(selectedRoom, "Host handoff", true);
         setHostMessageForRoom(roomId, `${selectedRoom.name} is accepting verified host candidates.`);
         return;
       }
-      if (hostStatus !== "active")
-        throw new Error("MLS host authority can only change through a signed host-transfer Commit.");
       const host = localUser.name;
       const hostUserId = localUser.id;
       if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroupWithHistorySettings(roomId);
       freshRoomHostState(selectedRoom, "Host claim");
-      const room = ensureRoomDefaults(await updateRoomHost(roomId, host, hostUserId, "active", deviceId), selectedRoom);
+      const room = await updateRoomHost(roomId, host, hostUserId, deviceId);
       // The websocket may install the exact HTTP response before this await
       // resumes. Accept either the reviewed pre-claim tuple or that returned
       // tuple, but reject every third-party/intermediate authority state.

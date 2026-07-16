@@ -28,7 +28,6 @@ const room: ClientRoomRecord = {
   hostUserId: "github:1",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   browserProfilePersistent: true,
   unread: 0
@@ -73,7 +72,7 @@ test("buildCodexApprovalSnapshot includes the just-sent invoke message", () => {
   );
 });
 
-test("buildCodexTurnSummary respects room mode and approved browser context", () => {
+test("buildCodexTurnSummary includes workspace and approved browser context", () => {
   const summary = buildCodexTurnSummary(
     messages,
     room,
@@ -151,18 +150,6 @@ test("buildCodexApprovalSnapshot uses the workspace context permission option", 
   assert.equal(snapshot.summary.workspacePath, null);
   assert.equal(snapshot.summary.git, null);
   assert.deepEqual(snapshot.summary.terminals, []);
-});
-
-test("buildCodexTurnSummary ignores compatibility room mode bits", () => {
-  const summary = buildCodexTurnSummary(
-    messages,
-    { ...room, mode: { ...room.mode, workspace: false, browser: false } },
-    [],
-    [{ url: "https://github.com/maddiedreese/multAIplayer", status: "approved" }]
-  );
-
-  assert.equal(summary.workspacePath, room.projectPath);
-  assert.deepEqual(summary.browserAccess, ["https://github.com"]);
 });
 
 test("buildCodexTurnSummary bounds git status context", () => {

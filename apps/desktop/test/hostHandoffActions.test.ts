@@ -103,9 +103,8 @@ const room: ClientRoomRecord = {
   host: "Host",
   hostUserId: "github:host",
   activeHostDeviceId: "device-host",
-  hostStatus: "handoff",
+  hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.5",
   browserProfilePersistent: true,
   unread: 0

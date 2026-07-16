@@ -7,6 +7,7 @@ import type {
   KeyPackageRecord,
   KeyPackageUpload,
   ClientRoomRecord,
+  RoomRecord,
   TeamMemberRecord,
   TeamRecord,
   TeamRole
@@ -79,7 +80,20 @@ export interface DirectedInviteRequest {
 
 export async function loadWorkspace(): Promise<WorkspaceSnapshot> {
   const response = await fetch(`${getRelayHttpUrl()}/teams`, { credentials: "include" });
-  return readJsonResponse<WorkspaceSnapshot>(response, "Failed to load workspace");
+  const snapshot = await readJsonResponse<{ teams: TeamRecord[]; rooms: RoomRecord[] }>(
+    response,
+    "Failed to load workspace"
+  );
+  const currentRooms = useAppStore.getState().rooms;
+  return {
+    teams: snapshot.teams,
+    rooms: snapshot.rooms.map((room) =>
+      ensureRoomDefaults(
+        room,
+        currentRooms.find((current) => current.id === room.id)
+      )
+    )
+  };
 }
 
 export async function createTeam(name: string): Promise<TeamRecord> {
@@ -103,7 +117,17 @@ export async function updateTeamLifecycle(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action })
   });
-  return readJsonResponse<{ team: TeamRecord; rooms: ClientRoomRecord[] }>(response, "Failed to update team");
+  const body = await readJsonResponse<{ team: TeamRecord; rooms: RoomRecord[] }>(response, "Failed to update team");
+  const currentRooms = useAppStore.getState().rooms;
+  return {
+    team: body.team,
+    rooms: body.rooms.map((room) =>
+      ensureRoomDefaults(
+        room,
+        currentRooms.find((current) => current.id === room.id)
+      )
+    )
+  };
 }
 
 export async function loadTeamMembers(teamId: string): Promise<TeamMemberRecord[]> {
@@ -243,7 +267,7 @@ export async function createRoom(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ teamId, name, ...relaySettings })
   });
-  const body = await readJsonResponse<{ room: ClientRoomRecord }>(response, "Failed to create room");
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to create room");
   return ensureRoomDefaults({
     ...body.room,
     projectPath,
@@ -265,17 +289,17 @@ export async function updateRoomHost(
   roomId: string,
   host: string,
   hostUserId: string,
-  hostStatus: ClientRoomRecord["hostStatus"],
   hostDeviceId?: string
 ): Promise<ClientRoomRecord> {
   const response = await fetch(`${getRelayHttpUrl()}/rooms/${encodeURIComponent(roomId)}/host`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "content-type": "application/json", ...(hostStatus === "active" ? deviceSessionHeaders() : {}) },
-    body: JSON.stringify({ host, hostUserId, hostStatus, ...(hostStatus === "active" ? { hostDeviceId } : {}) })
+    headers: { "content-type": "application/json", ...deviceSessionHeaders() },
+    body: JSON.stringify({ host, hostUserId, hostStatus: "active", hostDeviceId })
   });
-  const body = await readJsonResponse<{ room: ClientRoomRecord }>(response, "Failed to update room host");
-  return body.room as ClientRoomRecord;
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room host");
+  const previous = useAppStore.getState().rooms.find((room) => room.id === roomId);
+  return ensureRoomDefaults(body.room, previous);
 }
 
 export async function updateRoomSettings(
@@ -283,7 +307,6 @@ export async function updateRoomSettings(
   settings: {
     name?: string;
     approvalPolicy?: ClientRoomRecord["approvalPolicy"];
-    mode?: ClientRoomRecord["mode"];
     codexModel?: string;
     codexModelPolicy?: ClientRoomRecord["codexModelPolicy"];
     codexReasoningEffort?: ClientRoomRecord["codexReasoningEffort"];
@@ -332,7 +355,7 @@ export async function updateRoomSettings(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(relaySettings)
   });
-  const body = await readJsonResponse<{ room: ClientRoomRecord }>(response, "Failed to update room settings");
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room settings");
   return ensureRoomDefaults(
     {
       ...body.room,
@@ -356,8 +379,9 @@ export async function updateRoomLifecycle(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action, ...requester })
   });
-  const body = await readJsonResponse<{ room: ClientRoomRecord }>(response, "Failed to update room");
-  return body.room as ClientRoomRecord;
+  const body = await readJsonResponse<{ room: RoomRecord }>(response, "Failed to update room");
+  const previous = useAppStore.getState().rooms.find((room) => room.id === roomId);
+  return ensureRoomDefaults(body.room, previous);
 }
 
 export async function createInvite(teamId: string, roomId: string): Promise<InviteRecord> {
@@ -375,7 +399,12 @@ export async function lookupInvite(inviteId: string): Promise<InviteLookupResult
   const response = await fetch(`${getRelayHttpUrl()}/invites/${encodeURIComponent(inviteId)}`, {
     credentials: "include"
   });
-  return readJsonResponse<InviteLookupResult>(response, "Failed to load invite metadata");
+  const body = await readJsonResponse<Omit<InviteLookupResult, "room"> & { room: RoomRecord }>(
+    response,
+    "Failed to load invite metadata"
+  );
+  const previous = useAppStore.getState().rooms.find((room) => room.id === body.room.id);
+  return { ...body, room: ensureRoomDefaults(body.room, previous) };
 }
 
 export async function revokeRoomInvites(teamId: string, roomId: string): Promise<number> {

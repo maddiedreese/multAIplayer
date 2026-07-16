@@ -99,8 +99,8 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
           })
         })
       ).status,
-      409,
-      "bootstrap is one-shot and active-to-offline transitions are forbidden"
+      400,
+      "non-active bootstrap status is invalid"
     );
     const hostSocket = new WebSocket(relay.wsUrl, { headers: { cookie: host.cookie } });
     await onceOpen(hostSocket);

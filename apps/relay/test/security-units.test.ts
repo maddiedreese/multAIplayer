@@ -5,7 +5,6 @@ import {
   isApprovalPolicy,
   isJsonStringifiableWithin,
   isMlsMessageWithinLimits,
-  isRoomMode,
   maxCiphertextCharactersForBlob,
   normalizeCodexCatalogSelectionPolicy,
   normalizeCodexModel,
@@ -169,9 +168,6 @@ test("scalar and policy normalizers fail closed", () => {
   assert.equal(maxCiphertextCharactersForBlob(0), 1430);
   assert.equal(isApprovalPolicy("ask_every_turn"), true);
   assert.equal(isApprovalPolicy("bad"), false);
-  assert.equal(isRoomMode({ chat: true, code: false, workspace: true, browser: false }), true);
-  assert.equal(isRoomMode(null), false);
-  assert.equal(isRoomMode({ chat: true }), false);
   assert.equal(normalizeRoomProjectPath(" /repo ", 20), "/repo");
   assert.equal(normalizeRoomProjectPath("\n", 20), null);
   assert.equal(normalizeCodexModel("gpt-custom/1", 30), "gpt-custom/1");

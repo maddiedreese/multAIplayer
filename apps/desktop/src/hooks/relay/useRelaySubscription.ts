@@ -323,7 +323,8 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           return;
         }
         if (message.type === "room.updated") {
-          current.upsertRoom(ensureRoomDefaults(message.room));
+          const previous = current.roomsRef.current.find((room) => room.id === message.room.id);
+          current.upsertRoom(ensureRoomDefaults(message.room, previous));
           return;
         }
         if (message.type === "team.updated") {

@@ -47,13 +47,6 @@ export const DeviceRecord = z.object({
   lastSeenAt: z.string().datetime()
 });
 
-export const RoomModeSchema = z.object({
-  chat: z.boolean(),
-  code: z.boolean(),
-  workspace: z.boolean(),
-  browser: z.boolean()
-});
-
 export const RoomRecord = z
   .object({
     id: RoomId,
@@ -63,11 +56,9 @@ export const RoomRecord = z
     host: z.string().min(1).max(maxDisplayNameChars),
     hostUserId: UserId.optional(),
     activeHostDeviceId: DeviceId.optional(),
-    hostStatus: z.enum(["active", "offline", "handoff"]),
+    hostStatus: z.enum(["active", "offline"]),
     approvalPolicy: z.enum(["ask_every_turn", "never_host"]),
-    mode: RoomModeSchema,
     browserProfilePersistent: z.boolean(),
-    unread: z.number().int().nonnegative(),
     archivedAt: z.string().datetime().optional(),
     deletedAt: z.string().datetime().optional()
   })
@@ -92,8 +83,11 @@ export const RoomConfig = z.object({
   configPending: z.boolean()
 });
 
-/** Desktop projection of public relay metadata plus the latest authenticated MLS configuration. */
-export const ClientRoomRecord = RoomRecord.safeExtend(RoomConfig.shape);
+/** Desktop projection of public relay metadata plus local read state and authenticated MLS configuration. */
+export const ClientRoomRecord = RoomRecord.safeExtend({
+  ...RoomConfig.shape,
+  unread: z.number().int().nonnegative()
+});
 
 export const InviteRecord = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
@@ -177,7 +171,6 @@ export type TeamRole = z.infer<typeof TeamRole>;
 export type TeamRecord = z.infer<typeof TeamRecord>;
 export type TeamMemberRecord = z.infer<typeof TeamMemberRecord>;
 export type DeviceRecord = z.infer<typeof DeviceRecord>;
-export type RoomModeSchema = z.infer<typeof RoomModeSchema>;
 export type RoomRecord = z.infer<typeof RoomRecord>;
 export type RoomConfig = z.infer<typeof RoomConfig>;
 export type ClientRoomRecord = z.infer<typeof ClientRoomRecord>;

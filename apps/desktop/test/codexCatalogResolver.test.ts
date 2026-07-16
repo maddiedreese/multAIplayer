@@ -17,7 +17,6 @@ const room: ClientRoomRecord = {
   host: "Host",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: false },
   codexModel: "pinned-model",
   codexModelPolicy: "pinned",
   codexReasoningEffort: "high",
