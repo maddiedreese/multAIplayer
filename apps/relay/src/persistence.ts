@@ -7,12 +7,14 @@ export { RelayPersistenceMigrationError, RelayStaleEpochError } from "./sqlite-p
 export function createRelayPersistence(options: {
   dataPath: string;
   legacyJsonImportPath?: string | null;
+  sqliteWalAutoCheckpointPages?: number;
   recordSqliteWriteDuration?: (durationMs: number) => void;
 }): RelayPersistence {
   return new SqliteRelayPersistence(
     options.dataPath,
     options.legacyJsonImportPath ?? null,
     undefined,
-    options.recordSqliteWriteDuration
+    options.recordSqliteWriteDuration,
+    options.sqliteWalAutoCheckpointPages
   );
 }

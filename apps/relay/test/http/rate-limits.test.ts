@@ -2,7 +2,7 @@ import { test } from "node:test";
 import { assert, startRelay } from "../support/relay.js";
 import { createRelayRequestGuards } from "../../src/http/middleware.js";
 import { createRelayMetrics } from "../../src/observability.js";
-import type { RateLimitRecord } from "../../src/state.js";
+import type { TokenBucketRecord } from "../../src/state.js";
 
 test("relay rate limits repeated HTTP reads and mutations", async () => {
   const readLimitedRelay = await startRelay({
@@ -112,10 +112,35 @@ test("trusted proxy rate limits prefer the provider-authenticated real IP header
   }
 });
 
-test("rate-limit identifiers prune at the earliest expiry without scanning on every request", () => {
-  class CountingMap extends Map<string, RateLimitRecord> {
+test("token buckets refill continuously and do not permit a fixed-window boundary burst", () => {
+  const records = new Map<string, TokenBucketRecord>();
+  const guards = createRelayRequestGuards({
+    rateLimitsEnabled: true,
+    rateLimitWindowMs: 100,
+    rateLimitCaps: { auth: 2, read: 2, mutation: 2, attachment: 2, websocket: 2, websocketConnect: 2 },
+    rateLimitStore: records,
+    trustProxyHeaders: false,
+    metrics: createRelayMetrics(),
+    normalizeSessionId: (value) => (typeof value === "string" ? value : "")
+  });
+  const originalNow = Date.now;
+  try {
+    Date.now = () => 99;
+    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
+    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
+    Date.now = () => 100;
+    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, false);
+    Date.now = () => 149;
+    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test("rate-limit identifiers prune after two idle refill windows without scanning on every request", () => {
+  class CountingMap extends Map<string, TokenBucketRecord> {
     entryScans = 0;
-    override entries(): MapIterator<[string, RateLimitRecord]> {
+    override entries(): MapIterator<[string, TokenBucketRecord]> {
       this.entryScans += 1;
       return super.entries();
     }
@@ -124,8 +149,8 @@ test("rate-limit identifiers prune at the earliest expiry without scanning on ev
     }
   }
   const records = new CountingMap([
-    ["read:session:expired", { count: 1, resetAt: 999 }],
-    ["read:session:live", { count: 1, resetAt: 1_100 }]
+    ["read:session:expired", { tokens: 0, updatedAt: 700, lastSeenAt: 799 }],
+    ["read:session:live", { tokens: 0, updatedAt: 900, lastSeenAt: 900 }]
   ]);
   const guards = createRelayRequestGuards({
     rateLimitsEnabled: true,

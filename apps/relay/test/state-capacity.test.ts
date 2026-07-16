@@ -18,3 +18,18 @@ test("replacing durable entries does not consume additional capacity", () => {
   store.invites.set("invite-a", {} as never);
   assert.doesNotThrow(() => store.invites.set("invite-a", { replacement: true } as never));
 });
+
+test("one team's durable-entry ceiling preserves global capacity for another team", () => {
+  const store = createRelayStore(100, 3);
+  store.setTeam({ id: "team-a", name: "A", members: 1 });
+  store.setTeamMembers(
+    "team-a",
+    new Map([["user-a", { teamId: "team-a", userId: "user-a", role: "owner", joinedAt: new Date().toISOString() }]])
+  );
+
+  assert.throws(
+    () => store.setRoom({ id: "room-a", teamId: "team-a" } as never),
+    (error: unknown) => error instanceof RelayStoreCapacityError && error.teamId === "team-a"
+  );
+  assert.doesNotThrow(() => store.setTeam({ id: "team-b", name: "B", members: 0 }));
+});

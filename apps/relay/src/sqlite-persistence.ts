@@ -25,7 +25,8 @@ export class SqliteRelayPersistence implements RelayPersistence {
     private readonly dataPath: string,
     private readonly legacyJsonImportPath: string | null,
     private readonly renameLegacyFile: typeof rename = rename,
-    private readonly recordWriteDuration: (durationMs: number) => void = () => undefined
+    private readonly recordWriteDuration: (durationMs: number) => void = () => undefined,
+    private readonly sqliteWalAutoCheckpointPages = 1_000
   ) {}
 
   async load(): Promise<unknown | null> {
@@ -145,7 +146,7 @@ export class SqliteRelayPersistence implements RelayPersistence {
     ]);
   }
   private getDb(): Database.Database {
-    return (this.db ??= openRelayDatabase(this.dataPath));
+    return (this.db ??= openRelayDatabase(this.dataPath, this.sqliteWalAutoCheckpointPages));
   }
   private timedWrite<T>(write: () => T): T {
     const startedAt = performance.now();

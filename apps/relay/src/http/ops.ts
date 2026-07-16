@@ -5,6 +5,7 @@ import type { Express } from "express";
 import type { AttachmentBlobRecord } from "@multaiplayer/protocol";
 import type { ClientSession } from "../state.js";
 import { relayMetricsToPrometheus, type RelayMetrics } from "../observability.js";
+import { attachmentBlobStorageBytes } from "./attachments.js";
 
 interface RegisterOpsRoutesOptions {
   app: Express;
@@ -113,7 +114,7 @@ function liveAttachmentBlobGauges(
   for (const blob of attachmentBlobs) {
     if (isExpiredAttachmentBlob(blob)) continue;
     liveAttachmentBlobCount += 1;
-    liveAttachmentBlobBytes += blob.size;
+    liveAttachmentBlobBytes += attachmentBlobStorageBytes(blob);
   }
   return { liveAttachmentBlobCount, liveAttachmentBlobBytes };
 }

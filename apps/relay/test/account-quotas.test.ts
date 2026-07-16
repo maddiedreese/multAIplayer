@@ -277,8 +277,8 @@ test("attachment upload byte windows survive a SQLite relay restart", async () =
     MULTAIPLAYER_RELAY_STORAGE: "sqlite",
     MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
     MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "40",
-    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "100",
-    MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "64"
+    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "200",
+    MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "100"
   };
   const relay = await startRelayWithWorkspace(env);
   let restarted: Awaited<ReturnType<typeof startRelayWithWorkspace>> | null = null;
@@ -340,7 +340,8 @@ test("attachment persistence failure rolls back both blob and byte reservation",
     store,
     attachmentBlobMaxBytes: 64,
     attachmentBlobLiveQuotaBytes: 128,
-    attachmentBlobUploadBytesPerWindow: 64,
+    attachmentBlobTeamLiveQuotaBytes: 256,
+    attachmentBlobUploadBytesPerWindow: 128,
     attachmentBlobUploadWindowMs: 60_000,
     attachmentBlobTtlDays: 30,
     maxAttachmentBlobNameChars: 512,

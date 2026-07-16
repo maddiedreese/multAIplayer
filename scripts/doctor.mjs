@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
+import { existsSync, statfsSync } from "node:fs";
 import { platform } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   assessCodexVersion,
@@ -163,17 +163,23 @@ function readProductionRelayConfig() {
     requireAuth: envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true),
     debug: envBoolean("MULTAIPLAYER_RELAY_DEBUG", false),
     rateLimits: envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true),
+    structuredLogs: envBoolean("MULTAIPLAYER_RELAY_STRUCTURED_LOGS", true),
+    exitOnPersistencePoison: envBoolean("MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON", true),
     trustProxyHeaders: envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false),
     trustedProxyConfigured: envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false),
     storage: envValue("MULTAIPLAYER_RELAY_STORAGE") || "sqlite",
     dataPath: envValue("MULTAIPLAYER_RELAY_DATA_PATH"),
+    minimumDiskHeadroomBytes: envInteger("MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES", 1_000_000_000),
     mlsValidatorPath: envValue("MULTAIPLAYER_MLS_VALIDATOR_PATH"),
     attachmentBlobMaxBytes: envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000),
     attachmentBlobLiveQuotaBytes: envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES", 250_000_000),
+    attachmentBlobTeamLiveQuotaBytes: envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_TEAM_LIVE_QUOTA_BYTES", 1_000_000_000),
     attachmentBlobUploadBytes: envInteger("MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW", 100_000_000),
     websocketConnectionCap: envInteger("MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER", 20),
     websocketConnectRateLimit: envInteger("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT", 120),
-    totalRoomCap: envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500)
+    totalRoomCap: envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500),
+    maxDurableEntries: envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES", 250_000),
+    maxDurableEntriesPerTeam: envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM", 25_000)
   };
 }
 
@@ -221,7 +227,7 @@ function checkDeletionLedger(config) {
 }
 
 function checkCoreRelayConfig(config) {
-  const { allowedOrigins, requireAuth, debug, rateLimits, storage } = config;
+  const { allowedOrigins, requireAuth, debug, rateLimits, structuredLogs, exitOnPersistencePoison, storage } = config;
   const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
   checks.push({
     ok: Boolean(allowedOrigins) && allowedOriginErrors.length === 0,
@@ -248,6 +254,14 @@ function checkCoreRelayConfig(config) {
     detail: rateLimits ? "rate limits enabled" : "must not be false for a hosted production relay"
   });
   checks.push({
+    ok: structuredLogs && exitOnPersistencePoison,
+    label: "production persistence poison recovery",
+    detail:
+      structuredLogs && exitOnPersistencePoison
+        ? "structured poison alert event enabled and process exits for supervised restart"
+        : "requires structured logs and MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON=true"
+  });
+  checks.push({
     ok: storage === "sqlite",
     label: "production MULTAIPLAYER_RELAY_STORAGE",
     detail:
@@ -260,7 +274,7 @@ function checkCoreRelayConfig(config) {
 }
 
 function checkRelayPathsAndProxy(config) {
-  const { dataPath, mlsValidatorPath, trustProxyHeaders, trustedProxyConfigured } = config;
+  const { dataPath, minimumDiskHeadroomBytes, mlsValidatorPath, trustProxyHeaders, trustedProxyConfigured } = config;
   checks.push({
     ok: Boolean(dataPath) && !dataPath.startsWith("/tmp/"),
     label: "production MULTAIPLAYER_RELAY_DATA_PATH",
@@ -269,6 +283,21 @@ function checkRelayPathsAndProxy(config) {
         ? "must not point at /tmp for a hosted production relay"
         : "configured"
       : "required: set a persistent relay store path or mounted volume"
+  });
+  let availableBytes = 0;
+  try {
+    const filesystem = statfsSync(dirname(dataPath));
+    availableBytes = Number(filesystem.bavail) * Number(filesystem.bsize);
+  } catch {
+    // The failed check below explains that the configured volume could not be measured.
+  }
+  checks.push({
+    ok: minimumDiskHeadroomBytes >= 100_000_000 && availableBytes >= minimumDiskHeadroomBytes,
+    label: "production SQLite filesystem headroom",
+    detail:
+      availableBytes >= minimumDiskHeadroomBytes
+        ? `${availableBytes} bytes available; minimum ${minimumDiskHeadroomBytes}`
+        : `requires at least ${minimumDiskHeadroomBytes} available bytes on the configured data filesystem`
   });
   const validatorProbe = mlsValidatorPath ? spawnSync(mlsValidatorPath, [], { input: "", timeout: 2_000 }) : null;
   checks.push({
@@ -295,10 +324,13 @@ function checkRelayAbuseLimits(config) {
   const {
     attachmentBlobMaxBytes,
     attachmentBlobLiveQuotaBytes,
+    attachmentBlobTeamLiveQuotaBytes,
     attachmentBlobUploadBytes,
     websocketConnectionCap,
     websocketConnectRateLimit,
-    totalRoomCap
+    totalRoomCap,
+    maxDurableEntries,
+    maxDurableEntriesPerTeam
   } = config;
   checks.push({
     ok: attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000,
@@ -307,6 +339,15 @@ function checkRelayAbuseLimits(config) {
       attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000
         ? `configured at ${attachmentBlobMaxBytes} bytes`
         : "must be between 1 and 50000000 bytes"
+  });
+  checks.push({
+    ok:
+      attachmentBlobTeamLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobTeamLiveQuotaBytes <= 10_000_000_000,
+    label: "production MULTAIPLAYER_ATTACHMENT_BLOB_TEAM_LIVE_QUOTA_BYTES",
+    detail:
+      attachmentBlobTeamLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobTeamLiveQuotaBytes <= 10_000_000_000
+        ? `configured at ${attachmentBlobTeamLiveQuotaBytes} bytes`
+        : "must be at least the blob max and no more than 10000000000 bytes"
   });
   checks.push({
     ok: attachmentBlobLiveQuotaBytes >= attachmentBlobMaxBytes && attachmentBlobLiveQuotaBytes <= 10_000_000_000,
@@ -345,6 +386,14 @@ function checkRelayAbuseLimits(config) {
     label: "production MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER",
     detail:
       totalRoomCap > 0 && totalRoomCap <= 100_000 ? `configured at ${totalRoomCap}` : "must be between 1 and 100000"
+  });
+  checks.push({
+    ok: maxDurableEntries >= 1_000 && maxDurableEntriesPerTeam >= 100 && maxDurableEntriesPerTeam < maxDurableEntries,
+    label: "production per-team durable-entry fairness",
+    detail:
+      maxDurableEntriesPerTeam < maxDurableEntries
+        ? `per-team ceiling ${maxDurableEntriesPerTeam}; global ceiling ${maxDurableEntries}`
+        : "per-team ceiling must be lower than the global durable-entry ceiling"
   });
 }
 
