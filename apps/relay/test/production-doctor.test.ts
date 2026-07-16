@@ -17,8 +17,22 @@ const ledgerEnvironmentNames = [
   "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE"
 ] as const;
 
-function runDoctor(extraEnv: NodeJS.ProcessEnv): string {
-  const env = { ...process.env, NODE_ENV: "production", ...extraEnv };
+const validProductionEnvironment: NodeJS.ProcessEnv = {
+  MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://app.example.test",
+  MULTAIPLAYER_RELAY_DATA_PATH: `${repositoryRoot}/doctor-test.sqlite`,
+  MULTAIPLAYER_RELAY_DEBUG: "false",
+  MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON: "true",
+  MULTAIPLAYER_RELAY_RATE_LIMITS: "true",
+  MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+  MULTAIPLAYER_RELAY_STRUCTURED_LOGS: "true",
+  MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "false",
+  MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "false",
+  MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+  MULTAIPLAYER_MLS_VALIDATOR_PATH: process.execPath
+};
+
+function runDoctor(extraEnv: NodeJS.ProcessEnv): { status: number | null; output: string } {
+  const env = { ...process.env, NODE_ENV: "production", ...validProductionEnvironment, ...extraEnv };
   for (const name of ledgerEnvironmentNames) {
     if (!(name in extraEnv)) delete env[name];
   }
@@ -27,19 +41,21 @@ function runDoctor(extraEnv: NodeJS.ProcessEnv): string {
     env,
     encoding: "utf8"
   });
-  return `${result.stdout}\n${result.stderr}`;
+  return { status: result.status, output: `${result.stdout}\n${result.stderr}` };
 }
 
 test("production doctor accepts primary-only deletion without external ledger credentials", () => {
-  const output = runDoctor({ MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only" });
+  const { status, output } = runDoctor({ MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only" });
+  assert.equal(status, 0, output);
   assert.match(output, /\[ok\] production account deletion protection: primary-only deletion configured/);
   assert.doesNotMatch(output, /\[fail\] production external deletion ledger/);
 
-  const fileLedgerOutput = runDoctor({
+  const fileLedgerResult = runDoctor({
     MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
     MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH: "/tmp/deletion-ledger.json"
   });
-  assert.match(fileLedgerOutput, /\[fail\] production account deletion protection/);
+  assert.notEqual(fileLedgerResult.status, 0);
+  assert.match(fileLedgerResult.output, /\[fail\] production account deletion protection/);
 });
 
 test("production doctor requires distinct S3 transport and HMAC keys in restore-safe mode", () => {
@@ -54,13 +70,13 @@ test("production doctor requires distinct S3 transport and HMAC keys in restore-
     MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY: "independent-hmac-key-with-at-least-32-characters",
     MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE: "path"
   };
-  assert.match(
-    runDoctor(restoreSafeEnvironment),
-    /\[ok\] production external deletion ledger: S3-compatible ledger configured/
-  );
-  const output = runDoctor({
+  const validResult = runDoctor(restoreSafeEnvironment);
+  assert.equal(validResult.status, 0, validResult.output);
+  assert.match(validResult.output, /\[ok\] production external deletion ledger: S3-compatible ledger configured/);
+  const invalidResult = runDoctor({
     ...restoreSafeEnvironment,
     MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY: reusedKey
   });
-  assert.match(output, /\[fail\] production external deletion ledger/);
+  assert.notEqual(invalidResult.status, 0);
+  assert.match(invalidResult.output, /\[fail\] production external deletion ledger/);
 });
