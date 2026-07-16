@@ -18,13 +18,23 @@ const baseHandoff: HostHandoffPlaintextPayload = {
   id: "handoff-1",
   fromHost: "Maddie",
   fromUserId: "github:maddie",
+  reason: "manual",
   projectPath: " /tmp/multaiplayer ",
   codexModel: " gpt-5.4-thinking ",
+  codexModelPolicy: "pinned",
+  codexReasoningEffort: "medium",
+  codexReasoningEffortPolicy: "pinned",
+  codexRawReasoningEnabled: false,
+  codexSpeed: "standard",
+  codexServiceTierPolicy: "pinned",
+  codexSandboxLevel: "workspace_write",
   approvalPolicy: "ask_every_turn",
   messagesSinceLastCodex: 3,
+  queuedCodexTurns: [],
   attachmentNames: ["README.md"],
   terminals: ["tests"],
-  createdAt: new Date().toISOString()
+  createdAt: new Date().toISOString(),
+  status: "available"
 };
 
 test("createHandoffSettingsPatch trims and returns inherited room settings", () => {

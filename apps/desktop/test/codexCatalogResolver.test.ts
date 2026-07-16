@@ -18,9 +18,17 @@ const room: ClientRoomRecord = {
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   mode: { chat: true, code: true, workspace: true, browser: false },
-  codexModel: "legacy-model",
+  codexModel: "pinned-model",
+  codexModelPolicy: "pinned",
   codexReasoningEffort: "high",
+  codexReasoningEffortPolicy: "pinned",
+  codexRawReasoningEnabled: false,
   codexSpeed: "fast",
+  codexServiceTierPolicy: "pinned",
+  codexSandboxLevel: "workspace_write",
+  configRevision: 1,
+  configEpoch: 0,
+  configPending: false,
   browserAllowedOrigins: [],
   browserProfilePersistent: true,
   unread: 0
@@ -65,9 +73,9 @@ test("auto policies resolve all run inputs from the host-local model catalog", (
   assert.deepEqual(resolved.warnings, []);
 });
 
-test("legacy rooms remain pinned and unsupported pinned choices fall back safely", () => {
+test("explicit pinned room settings preserve the saved model and fall back safely", () => {
   const resolved = resolveCodexRunSettings(room, probe);
-  assert.equal(resolved.model, "legacy-model");
+  assert.equal(resolved.model, "pinned-model");
   assert.equal(resolved.reasoningEffort, "high");
   assert.equal(resolved.speed, "fast");
   assert.equal(resolved.modelPolicy, "pinned");

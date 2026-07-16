@@ -2,11 +2,13 @@ import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
+  defaultCodexModelPolicy,
   defaultCodexReasoningEffort,
+  defaultCodexReasoningEffortPolicy,
   defaultCodexRawReasoningEnabled,
   defaultCodexSandboxLevel,
   defaultCodexSpeed,
-  legacyCodexCatalogSelectionPolicy,
+  defaultCodexServiceTierPolicy,
   type ClientRoomRecord,
   type RoomConfig,
   type RoomRecord
@@ -48,10 +50,10 @@ function roomMlsConfig(config: Partial<RoomConfig> | undefined): Omit<RoomConfig
 function codexCatalogConfig(config: Partial<RoomConfig> | undefined) {
   return {
     codexModel: config?.codexModel || defaultCodexModel,
-    codexModelPolicy: config?.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexModelPolicy: config?.codexModelPolicy ?? defaultCodexModelPolicy,
     codexReasoningEffort: config?.codexReasoningEffort ?? defaultCodexReasoningEffort,
-    codexReasoningEffortPolicy: config?.codexReasoningEffortPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexReasoningEffortPolicy: config?.codexReasoningEffortPolicy ?? defaultCodexReasoningEffortPolicy,
     codexSpeed: config?.codexSpeed ?? defaultCodexSpeed,
-    codexServiceTierPolicy: config?.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy
+    codexServiceTierPolicy: config?.codexServiceTierPolicy ?? defaultCodexServiceTierPolicy
   };
 }

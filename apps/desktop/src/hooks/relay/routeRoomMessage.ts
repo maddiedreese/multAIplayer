@@ -133,14 +133,14 @@ function hostHandoffRecord(payload: DecodedHostHandoff): RoutedHostHandoff {
     id: payload.id,
     fromHost: payload.fromHost,
     fromUserId: payload.fromUserId,
-    ...(payload.reason ? { reason: payload.reason } : {}),
+    reason: payload.reason,
     projectPath: payload.projectPath,
     ...hostHandoffGitFields(payload),
     codexModel: payload.codexModel,
     ...hostHandoffCodexFields(payload),
     approvalPolicy: payload.approvalPolicy,
     messagesSinceLastCodex: payload.messagesSinceLastCodex,
-    ...(payload.queuedCodexTurns ? { queuedCodexTurns: payload.queuedCodexTurns } : {}),
+    queuedCodexTurns: payload.queuedCodexTurns,
     attachmentNames: payload.attachmentNames,
     terminals: payload.terminals,
     ...(payload.continuationSummary ? { continuationSummary: payload.continuationSummary } : {}),
@@ -164,15 +164,13 @@ function hostHandoffGitFields(payload: DecodedHostHandoff): HostHandoffGitFields
 
 function hostHandoffCodexFields(payload: DecodedHostHandoff): HostHandoffCodexFields {
   return {
-    ...(payload.codexModelPolicy ? { codexModelPolicy: payload.codexModelPolicy } : {}),
-    ...(payload.codexReasoningEffort ? { codexReasoningEffort: payload.codexReasoningEffort } : {}),
-    ...(payload.codexReasoningEffortPolicy ? { codexReasoningEffortPolicy: payload.codexReasoningEffortPolicy } : {}),
-    ...(payload.codexRawReasoningEnabled === undefined
-      ? {}
-      : { codexRawReasoningEnabled: payload.codexRawReasoningEnabled }),
-    ...(payload.codexSpeed ? { codexSpeed: payload.codexSpeed } : {}),
-    ...(payload.codexServiceTierPolicy ? { codexServiceTierPolicy: payload.codexServiceTierPolicy } : {}),
-    ...(payload.codexSandboxLevel ? { codexSandboxLevel: payload.codexSandboxLevel } : {})
+    codexModelPolicy: payload.codexModelPolicy,
+    codexReasoningEffort: payload.codexReasoningEffort,
+    codexReasoningEffortPolicy: payload.codexReasoningEffortPolicy,
+    codexRawReasoningEnabled: payload.codexRawReasoningEnabled,
+    codexSpeed: payload.codexSpeed,
+    codexServiceTierPolicy: payload.codexServiceTierPolicy,
+    codexSandboxLevel: payload.codexSandboxLevel
   };
 }
 

@@ -10,7 +10,6 @@ export const defaultCodexSandboxLevel = "workspace_write";
 export const defaultCodexModelPolicy: CodexCatalogSelectionPolicy = "auto";
 export const defaultCodexReasoningEffortPolicy: CodexCatalogSelectionPolicy = "auto";
 export const defaultCodexServiceTierPolicy: CodexCatalogSelectionPolicy = "auto";
-export const legacyCodexCatalogSelectionPolicy: CodexCatalogSelectionPolicy = "pinned";
 export const defaultBrowserAllowedOrigins = ["https://github.com"];
 export const defaultBrowserProfilePersistent = true;
 

@@ -21,7 +21,7 @@ Host-controlled room settings express shared intent, but they do not delegate th
 - UI affordances are not the security boundary; action helpers and native/relay routing must repeat the host and room checks.
 - Encrypted room events may make proposals and outcomes visible without granting execution rights.
 - Host handoff transfers future decision authority and continuity, not credentials or an already-approved blanket capability.
-- Approval policies may reduce repeated prompts for the host, but they cannot authorize another member to answer for the host.
+- Room settings cannot authorize another member to answer for the host.
 - Direct room membership remains powerful because members can request host actions; product copy and threat modeling must state that clearly.
 
 ## Revisit when

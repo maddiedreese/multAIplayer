@@ -6,7 +6,6 @@ import {
 } from "@multaiplayer/protocol";
 import { normalizeChatMessage } from "../../lib/chat/chatSanitizer";
 import { plaintextUserMatchesEnvelope } from "../../application/mls/mlsApplicationMessage";
-import { isLegacyDebugChatMessage } from "../../lib/history/localRoomHistoryPayload";
 import { sendRoomMessageNotification } from "../../lib/room/roomNotifications";
 import type { AppStoreState } from "../../store/appStore";
 import type { ChatMessage } from "../../types";
@@ -30,7 +29,7 @@ export async function routeChatMessage(
     )
       return true;
     const message = normalizeChatMessage(parsed.data) as ChatMessage | null;
-    if (!message || isLegacyDebugChatMessage(message)) return true;
+    if (!message) return true;
     context.markIncomingChatUnread(
       roomId,
       context.selectedRoomIdRef.current,
