@@ -74,9 +74,12 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ inputs.commit || github.sha }}
-      - name: Install repository Rust toolchain and native updater test dependencies
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
+      - name: Set up repository Rust toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Install native updater test dependencies
         run: |
-          rustup show active-toolchain
           sudo apt-get update
           sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev
       - name: Execute signed-updater authentication contract tests
