@@ -1,5 +1,4 @@
 import {
-  defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexModelPolicy,
@@ -13,7 +12,6 @@ import {
   type RoomConfig,
   type RoomRecord
 } from "@multaiplayer/protocol";
-import { normalizeBrowserAllowedOrigins } from "../browser/browserPolicy";
 
 export function ensureRoomDefaults(
   room: RoomRecord & Partial<RoomConfig>,
@@ -26,9 +24,6 @@ export function ensureRoomDefaults(
     ...room,
     ...roomMlsConfig(config),
     configPending: hasMlsConfig ? (room.configPending ?? false) : (previous?.configPending ?? true),
-    browserAllowedOrigins:
-      normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ??
-      defaultBrowserAllowedOrigins,
     browserProfilePersistent:
       typeof room.browserProfilePersistent === "boolean"
         ? room.browserProfilePersistent

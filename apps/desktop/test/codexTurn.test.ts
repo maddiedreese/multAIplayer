@@ -30,7 +30,6 @@ const room: ClientRoomRecord = {
   approvalPolicy: "ask_every_turn",
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
-  browserAllowedOrigins: ["https://github.com"],
   browserProfilePersistent: true,
   unread: 0
 };
@@ -462,45 +461,6 @@ test("buildCodexApprovalSnapshot flags deceptive unicode and encoded blobs", () 
     snapshot.riskFlags.some((flag) => flag.risk === "Large encoded blob"),
     true
   );
-});
-
-test("buildCodexApprovalSnapshot flags URLs outside approved browser domains in messages and attachments", () => {
-  const snapshot = buildCodexApprovalSnapshot(
-    room,
-    [
-      { author: "Codex", role: "codex", body: "previous turn", time: "9:01 AM" },
-      {
-        author: "Maddie",
-        role: "human",
-        body: "compare https://github.com/maddiedreese/multAIplayer with https://evil.example/prompt",
-        time: "9:02 AM",
-        attachments: [
-          {
-            id: "att-url",
-            name: "links.md",
-            type: "markdown",
-            size: 64,
-            content: "safe: https://github.com/org/repo unsafe: http://outside.test/log"
-          }
-        ]
-      }
-    ],
-    undefined,
-    [],
-    [],
-    null
-  );
-
-  const labels = snapshot.riskFlags.map((flag) => flag.label);
-  assert.equal(
-    labels.some((label) => /message 1 \(@Maddie\).*url outside approved browser domains/i.test(label)),
-    true
-  );
-  assert.equal(
-    labels.some((label) => /attachment links\.md.*url outside approved browser domains/i.test(label)),
-    true
-  );
-  assert.equal(snapshot.riskFlags.filter((flag) => flag.risk === "URL outside approved browser domains").length, 2);
 });
 
 test("attachment summary distinguishes inline content from encrypted blob references", () => {

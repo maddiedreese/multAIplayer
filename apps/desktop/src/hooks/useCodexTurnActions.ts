@@ -177,7 +177,7 @@ export function useCodexTurnActions({
     const input = buildCodexTurnInput(turnMessages, projectPath, model, turnSummary, {
       fullRoomContext: Boolean(continuationHandoff)
     });
-    const riskFlags = detectCodexTurnRiskFlags(turnMessages, room, browserRequests, gitStatus, {
+    const riskFlags = detectCodexTurnRiskFlags(turnMessages, gitStatus, {
       includeWorkspaceContext: roomCanReadLocalWorkspace
     });
     const consumedMessageIds = messagesSinceLastCodex(turnMessages)

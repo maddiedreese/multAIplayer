@@ -55,7 +55,6 @@ function currentRoom(overrides: Partial<RoomRecord> & Pick<RoomRecord, "id" | "t
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
     mode: { chat: true, code: true, workspace: true, browser: false },
-    browserAllowedOrigins: [],
     browserProfilePersistent: false,
     unread: 0,
     ...overrides
@@ -833,7 +832,6 @@ test("startup accepts a complete current offline room without synthesizing autho
         hostStatus: "offline",
         approvalPolicy: "ask_every_turn",
         mode: { chat: true, code: true, workspace: true, browser: true },
-        browserAllowedOrigins: ["https://github.com"],
         browserProfilePersistent: true,
         unread: 0
       }

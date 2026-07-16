@@ -222,7 +222,6 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       acceptedMlsEpoch: 0,
       approvalPolicy: "ask_every_turn",
       mode: { chat: true, code: true, workspace: true, browser: true },
-      browserAllowedOrigins: ["https://github.com"],
       browserProfilePersistent: true,
       unread: 0
     },
@@ -237,7 +236,6 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       acceptedMlsEpoch: 0,
       approvalPolicy: "ask_every_turn",
       mode: { chat: true, code: true, workspace: true, browser: false },
-      browserAllowedOrigins: ["https://github.com"],
       browserProfilePersistent: true,
       unread: 0
     }
@@ -525,7 +523,6 @@ export function waitForRoomUpdated(socket: WebSocket): Promise<{
   name: string;
   codexModel: string;
   approvalPolicy: string;
-  browserAllowedOrigins: string[];
   browserProfilePersistent: boolean;
 }> {
   return new Promise((resolveUpdate, rejectUpdate) => {
@@ -539,7 +536,6 @@ export function waitForRoomUpdated(socket: WebSocket): Promise<{
           name: string;
           codexModel: string;
           approvalPolicy: string;
-          browserAllowedOrigins: string[];
           browserProfilePersistent: boolean;
         };
       };

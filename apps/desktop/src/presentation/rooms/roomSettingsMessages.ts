@@ -7,7 +7,6 @@ import {
   formatCodexSpeed,
   formatMessageTime
 } from "../../lib/formatting/appFormatters";
-import { formatBrowserAccessLabel } from "../../lib/browser/browserUi";
 
 interface RoomSettingsMessageLabels {
   approvalPolicyLabels: Record<ApprovalPolicy, string>;
@@ -51,8 +50,6 @@ export function buildRoomSettingsMessageBody(
       return `${event.changedBy} changed Codex sandbox from ${formatCodexSandboxLevel(event.previousValue)} to ${formatCodexSandboxLevel(event.nextValue)}.`;
     case "projectPath":
       return `${event.changedBy} changed the project folder from ${event.previousValue} to ${event.nextValue}.`;
-    case "browserAllowedOrigins":
-      return `${event.changedBy} changed legacy browser origin metadata from ${formatOriginList(event.previousValue)} to ${formatOriginList(event.nextValue)}.`;
     case "browserProfilePersistent":
       return `${event.changedBy} changed browser profile mode from ${formatBrowserProfilePersistence(event.previousValue)} to ${formatBrowserProfilePersistence(event.nextValue)}.`;
   }
@@ -66,15 +63,6 @@ function formatRoomModeChange(value: string, labels: RoomSettingsMessageLabels):
   const [mode, state] = value.split(":");
   const label = labels.roomModeLabels[mode as keyof RoomMode] ?? mode;
   return `${state === "enabled" ? "enabled" : "disabled"} ${label} mode`;
-}
-
-function formatOriginList(value: string): string {
-  const origins = value
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  if (!origins.length) return "no sites";
-  return origins.map(formatBrowserAccessLabel).join(", ");
 }
 
 function formatBrowserProfilePersistence(value: string): string {

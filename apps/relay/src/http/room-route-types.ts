@@ -21,7 +21,6 @@ export interface RegisterRoomRoutesOptions {
   isRoomMode: (value: unknown) => value is RoomRecord["mode"];
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   normalizeOptionalMetadataText: (value: unknown, maxChars: number) => string | null;
-  normalizeBrowserAllowedOrigins: (value: unknown) => string[] | null;
   displayNameForUser: (user: AuthSession["user"]) => string;
   maxDeviceIdChars: number;
   maxHostNameChars: number;

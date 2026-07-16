@@ -7,7 +7,6 @@ import {
   isMlsMessageWithinLimits,
   isRoomMode,
   maxCiphertextCharactersForBlob,
-  normalizeBrowserAllowedOrigins,
   normalizeCodexCatalogSelectionPolicy,
   normalizeCodexModel,
   normalizeCodexReasoningEffort,
@@ -187,10 +186,4 @@ test("scalar and policy normalizers fail closed", () => {
   assert.equal(normalizeCodexSpeedOrDefault("bad"), "standard");
   assert.equal(normalizeTeamRole("admin"), "admin");
   assert.equal(normalizeTeamRole("bad"), "member");
-  assert.deepEqual(normalizeBrowserAllowedOrigins(["https://example.com", "https://example.com/"]), [
-    "https://example.com"
-  ]);
-  for (const x of ["bad", Array(21).fill("https://x.com"), [3], ["ftp://x.com"], ["https://x.com/path"], ["bad url"]])
-    assert.equal(normalizeBrowserAllowedOrigins(x), null);
-  assert.deepEqual(normalizeBrowserAllowedOrigins([" "]), []);
 });

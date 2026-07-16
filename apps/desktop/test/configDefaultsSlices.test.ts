@@ -101,7 +101,6 @@ test("team defaults load into one coherent store snapshot", () => {
   saveTeamRoomDefaults("team-config", {
     approvalPolicy: "never_host",
     codexModel: "gpt-5.4-thinking",
-    browserAllowedOrigins: ["https://example.com"],
     browserProfilePersistent: false,
     inviteApprovalGate: false
   });

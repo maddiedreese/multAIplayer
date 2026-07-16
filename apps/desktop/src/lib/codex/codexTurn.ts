@@ -83,7 +83,7 @@ export function buildCodexApprovalSnapshot<Message extends CodexChatMessage>(
     roomId: room.id,
     messages: turnMessages,
     summary: buildCodexTurnSummary(turnMessages, room, terminals, browserRequests, gitStatus, options),
-    riskFlags: detectCodexTurnRiskFlags(turnMessages, room, browserRequests, gitStatus, options)
+    riskFlags: detectCodexTurnRiskFlags(turnMessages, gitStatus, options)
   };
 }
 
@@ -243,30 +243,21 @@ export function formatAttachmentForCodex(attachment: CodexChatAttachment): strin
 
 export function detectCodexTurnRiskFlags(
   messages: CodexChatMessage[],
-  room: ClientRoomRecord,
-  browserRequests: CodexBrowserRequestContext[] = [],
   gitStatus?: CodexGitStatusContext | null,
   options: CodexTurnContextOptions = {}
 ): CodexTurnRiskFlag[] {
   const flags: CodexTurnRiskFlag[] = [];
   const includeWorkspaceContext = options.includeWorkspaceContext ?? true;
   const contextMessages = messagesSinceLastCodex(messages);
-  const approvedOrigins = new Set((room.browserAllowedOrigins ?? []).map((origin) => origin.toLowerCase()));
   contextMessages.forEach((message, index) => {
     const messageSource = `message ${index + 1} (@${message.author})`;
-    addTextRiskFlags(flags, message.body, messageSource, approvedOrigins);
+    addTextRiskFlags(flags, message.body, messageSource);
     for (const attachment of message.attachments ?? []) {
       const attachmentSource = `attachment ${attachment.name}`;
       addNamedRisks(flags, attachmentSource, detectSecretRisks(attachment.content ?? "", attachment.name));
-      addTextRiskFlags(flags, attachment.content ?? "", attachmentSource, approvedOrigins);
+      addTextRiskFlags(flags, attachment.content ?? "", attachmentSource);
     }
   });
-  for (const request of browserRequests.filter((item) => item.status === "approved")) {
-    const origin = formatBrowserAccessLabel(request.url).toLowerCase();
-    if (origin && approvedOrigins.size > 0 && !approvedOrigins.has(origin)) {
-      flags.push(createRiskFlag(`browser ${request.url}`, "URL outside approved browser domains"));
-    }
-  }
   if (includeWorkspaceContext && gitStatus) {
     for (const file of gitStatus.files.slice(0, maxCodexGitFiles)) {
       addNamedRisks(flags, `git status ${file.path}`, detectSecretRisks("", file.path));
@@ -374,12 +365,7 @@ function sliceTailAtLineBoundary(input: string, maxChars: number): string {
   return boundary >= 0 ? slice.slice(boundary + 1) : slice;
 }
 
-function addTextRiskFlags(
-  flags: CodexTurnRiskFlag[],
-  text: string,
-  source: string,
-  approvedOrigins = new Set<string>()
-) {
+function addTextRiskFlags(flags: CodexTurnRiskFlag[], text: string, source: string) {
   if (!text) return;
   addNamedRisks(flags, source, detectSecretRisks(text));
   if (
@@ -405,12 +391,6 @@ function addTextRiskFlags(
   const nonAscii = Array.from(text).filter((char) => char.charCodeAt(0) > 127).length;
   if (text.length >= 80 && nonAscii / text.length > 0.35) {
     flags.push(createRiskFlag(source, "Homoglyph-heavy text"));
-  }
-  for (const url of extractWebUrls(text)) {
-    const origin = formatBrowserAccessLabel(url).toLowerCase();
-    if (origin && approvedOrigins.size > 0 && !approvedOrigins.has(origin)) {
-      flags.push(createRiskFlag(source, "URL outside approved browser domains"));
-    }
   }
 }
 
@@ -444,16 +424,6 @@ function formatBrowserAccessLabel(url: string): string {
     reportExpectedFailure("browser access label parser rejected malformed input");
     return url;
   }
-}
-
-function extractWebUrls(text: string): string[] {
-  const urls: string[] = [];
-  const pattern = /\bhttps?:\/\/[^\s<>"'`)\]]+/gi;
-  for (const match of text.matchAll(pattern)) {
-    const candidate = match[0].replace(/[.,;:!?]+$/g, "");
-    if (candidate) urls.push(candidate);
-  }
-  return urls;
 }
 
 function formatBytes(bytes: number): string {

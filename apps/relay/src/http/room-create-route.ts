@@ -1,11 +1,6 @@
 import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import { nanoid } from "nanoid";
-import {
-  defaultBrowserAllowedOrigins,
-  defaultBrowserProfilePersistent,
-  defaultRoomMode,
-  type RoomRecord
-} from "@multaiplayer/protocol";
+import { defaultBrowserProfilePersistent, defaultRoomMode, type RoomRecord } from "@multaiplayer/protocol";
 import { allowTotalRoomQuota } from "./room-validation.js";
 import {
   acquireDurableQuotaTransaction,
@@ -113,7 +108,6 @@ async function persistRoomCreation(
       hostStatus: "offline",
       approvalPolicy: input.approvalPolicy,
       mode: defaultRoomMode,
-      browserAllowedOrigins: input.browserAllowedOrigins,
       browserProfilePersistent: input.browserProfilePersistent,
       unread: 0
     };
@@ -190,20 +184,9 @@ function parseRoomCreationInput(options: RegisterRoomRoutesOptions, body: unknow
 }
 
 function parseBrowserPreferences(options: RegisterRoomRoutesOptions, record: Record<string, unknown>, res: Response) {
-  let browserAllowedOrigins = defaultBrowserAllowedOrigins;
-  if (record.browserAllowedOrigins !== undefined) {
-    const parsed = options.normalizeBrowserAllowedOrigins(record.browserAllowedOrigins);
-    if (parsed === null)
-      return sendInvalidRoomField(
-        res,
-        "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com"
-      );
-    browserAllowedOrigins = parsed;
-  }
   if (record.browserProfilePersistent !== undefined && typeof record.browserProfilePersistent !== "boolean")
     return sendInvalidRoomField(res, "browserProfilePersistent must be a boolean");
   return {
-    browserAllowedOrigins,
     browserProfilePersistent: record.browserProfilePersistent ?? defaultBrowserProfilePersistent
   };
 }

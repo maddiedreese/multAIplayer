@@ -139,7 +139,6 @@ test("room creation rolls back its durable quota when capacity rejects the room"
     isRoomMode: () => true,
     normalizeMetadataText: boundedText,
     normalizeOptionalMetadataText: boundedText,
-    normalizeBrowserAllowedOrigins: () => [],
     displayNameForUser: () => "Capacity",
     maxDeviceIdChars: 160,
     maxHostNameChars: 120,
@@ -181,7 +180,6 @@ test("attachment upload rolls back its byte quota when real retained bytes exhau
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
     mode: { chat: true, code: true, workspace: true, browser: true },
-    browserAllowedOrigins: [],
     browserProfilePersistent: false,
     unread: 0
   });

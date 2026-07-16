@@ -190,7 +190,6 @@ test("close snapshot construction includes current state from every hydrated eli
     approvalPolicy: "ask_every_turn" as const,
     mode: { chat: true, code: true, workspace: true, browser: true },
     codexModel: "gpt-5.4",
-    browserAllowedOrigins: [],
     browserProfilePersistent: true,
     unread: 0
   });

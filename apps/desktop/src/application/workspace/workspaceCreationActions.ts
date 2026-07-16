@@ -89,7 +89,6 @@ export function createWorkspaceCreationActions({
         {
           approvalPolicy: teamDefaults.approvalPolicy,
           codexModel: teamDefaults.codexModel,
-          browserAllowedOrigins: teamDefaults.browserAllowedOrigins,
           browserProfilePersistent: teamDefaults.browserProfilePersistent
         },
         {
