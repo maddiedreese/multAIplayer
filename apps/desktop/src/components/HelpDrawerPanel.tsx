@@ -47,8 +47,9 @@ export function HelpDrawerPanel({
       <section className="drawer-section">
         <strong>Accounts work differently</strong>
         <p>
-          GitHub identifies workspace members and enables repository workflows. ChatGPT authorizes the local Codex
-          process that performs work. They are separate accounts.
+          GitHub identity is used for workspace membership. The same alpha sign-in separately requests the broad
+          <code>repo</code> permission for optional pull-request and Actions API workflows, including private
+          repositories. ChatGPT authorizes the local Codex process. These are separate authority domains.
         </p>
       </section>
 

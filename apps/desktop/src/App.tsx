@@ -48,7 +48,7 @@ export function App() {
 }
 
 function NativeApp() {
-  React.useEffect(() => useAppStore.getState().loadTrustedDeviceKeysOnce(), []);
+  React.useEffect(() => useAppStore.getState().loadDeviceFingerprintComparisonsOnce(), []);
   React.useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;

@@ -39,7 +39,7 @@ Object.defineProperty(globalThis, "window", {
   value: {}
 });
 
-const { loadOrCreateDeviceIdentity, resetDeviceIdentity } = await import("../src/lib/identity/deviceIdentity");
+const { loadOrCreateDeviceIdentity } = await import("../src/lib/identity/deviceIdentity");
 
 test.beforeEach(() => {
   localStorage.clear();
@@ -48,8 +48,4 @@ test.beforeEach(() => {
 test("browser runtime cannot create or load a device identity", async () => {
   await assert.rejects(loadOrCreateDeviceIdentity(), /only in the native desktop app/);
   assert.equal(localStorage.getItem("multaiplayer:device-identity:v1"), null);
-});
-
-test("browser runtime cannot reset a native device identity", async () => {
-  await assert.rejects(resetDeviceIdentity(), /only in the native desktop app/);
 });

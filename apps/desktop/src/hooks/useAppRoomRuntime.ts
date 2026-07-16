@@ -153,11 +153,7 @@ export function useAppRoomRuntime({
         publishLocalPreviewEvent: relaySync.publishLocalPreviewEvent
       },
       account: {
-        signOutGitHub: githubAuth.signOutGitHub,
-        replaceDeviceIdentity: (identity) => useAppStore.getState().replaceDeviceIdentity(identity),
-        setDeviceIdentityStatusMessage: (message) => useAppStore.getState().setDeviceIdentityStatusMessage(message),
-        untrustDeviceForRoom: (targetRoomId, deviceId) =>
-          useAppStore.getState().untrustDeviceForRoom(targetRoomId, deviceId)
+        signOutGitHub: githubAuth.signOutGitHub
       },
       githubActions: {
         selectedRoom,

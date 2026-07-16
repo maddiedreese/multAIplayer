@@ -20,7 +20,7 @@ export interface RoomMemberDisplay {
   avatarUrl?: string;
   publicKeyFingerprint?: string;
   status: "online" | "offline";
-  trusted: boolean;
+  fingerprintComparedLocally: boolean;
   isHost: boolean;
   deviceLabel: string;
 }
@@ -70,7 +70,7 @@ export function TeamRosterPanel({
                 <small title={member.userId}>{member.userId}</small>
               </div>
               <div className="member-badges">
-                <b className={member.role === "owner" ? "trusted" : member.role === "admin" ? "verified" : ""}>
+                <b className={member.role === "owner" ? "owner" : member.role === "admin" ? "verified" : ""}>
                   {roleLabel}
                 </b>
                 {canPromote && (
@@ -114,15 +114,15 @@ export function RoomMembersPanel({
   localDeviceId,
   message,
   onCopyFingerprint,
-  onTrust,
-  onUntrust
+  onMarkCompared,
+  onClearComparison
 }: {
   members: RoomMemberDisplay[];
   localDeviceId: string;
   message: string | null;
   onCopyFingerprint: (member: RoomMemberDisplay) => void;
-  onTrust: (member: RoomMemberDisplay) => void;
-  onUntrust: (member: RoomMemberDisplay) => void;
+  onMarkCompared: (member: RoomMemberDisplay) => void;
+  onClearComparison: (member: RoomMemberDisplay) => void;
 }) {
   return (
     <section className="panel members-panel">
@@ -140,18 +140,37 @@ export function RoomMembersPanel({
             </div>
             <div className="member-badges">
               {member.isHost && <b>Host</b>}
-              <b className={member.publicKeyFingerprint ? (member.trusted ? "trusted" : "verified") : "warning"}>
-                {member.publicKeyFingerprint ? (member.trusted ? "local trust" : "keyed") : "pending"}
+              <b
+                className={
+                  member.publicKeyFingerprint
+                    ? member.fingerprintComparedLocally
+                      ? "compared"
+                      : "verified"
+                    : "warning"
+                }
+              >
+                {member.publicKeyFingerprint
+                  ? member.fingerprintComparedLocally
+                    ? "compared locally"
+                    : "keyed"
+                  : "pending"}
               </b>
               {member.publicKeyFingerprint && member.deviceId !== localDeviceId && (
                 <>
                   <button onClick={() => onCopyFingerprint(member)} title="Copy full device fingerprint">
                     <Copy size={12} />
                   </button>
-                  {member.trusted ? (
-                    <button onClick={() => onUntrust(member)}>Untrust</button>
+                  {member.fingerprintComparedLocally ? (
+                    <button
+                      onClick={() => onClearComparison(member)}
+                      title="Clear this device's advisory comparison note"
+                    >
+                      Clear comparison
+                    </button>
                   ) : (
-                    <button onClick={() => onTrust(member)}>Trust</button>
+                    <button onClick={() => onMarkCompared(member)} title="Record an advisory out-of-band comparison">
+                      Mark compared
+                    </button>
                   )}
                 </>
               )}

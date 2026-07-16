@@ -1,4 +1,5 @@
 import { initializeMlsIdentity, type MlsIdentityPublic } from "../mls/mlsClient";
+import { isTauriRuntime } from "../platform/localBackend/runtime";
 
 export interface DeviceIdentity extends MlsIdentityPublic {
   publicKeyFingerprint: string;
@@ -14,11 +15,6 @@ export async function loadOrCreateDeviceIdentity(githubUserId: string, deviceId:
   return nativeIdentityPromise;
 }
 
-export async function resetDeviceIdentity(): Promise<void> {
-  if (!isTauriRuntime()) throw new Error("Device identities are available only in the native desktop app");
-  throw new Error("MLS identity reset requires leaving and rejoining every room and is not available in this alpha.");
-}
-
 function normalizeIdentity(identity: MlsIdentityPublic): DeviceIdentity {
   if (
     identity.ciphersuite !== 2 ||
@@ -32,8 +28,4 @@ function normalizeIdentity(identity: MlsIdentityPublic): DeviceIdentity {
     ...identity,
     publicKeyFingerprint: identity.signatureKeyFingerprint
   };
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }

@@ -5,7 +5,7 @@ import {
   guidedActivityKind,
   mainColumnLocalUser,
   replyTargetDisplay
-} from "../src/hooks/roomMainColumnCompositionValues";
+} from "../src/hooks/activeRoomMainColumnValues";
 import type { ChatMessage } from "../src/types";
 
 const message: ChatMessage = {

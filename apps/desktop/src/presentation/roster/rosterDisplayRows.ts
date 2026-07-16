@@ -1,7 +1,7 @@
 import type { ClientRoomRecord, TeamMemberRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { SignedInUser } from "../../lib/identity/authClient";
-import type { TrustedDeviceKey } from "../../lib/identity/deviceTrust";
-import { isDeviceKeyTrusted } from "../../lib/identity/deviceTrust";
+import type { DeviceFingerprintComparisonRecord } from "../../lib/identity/deviceFingerprintComparisons";
+import { isDeviceFingerprintCompared } from "../../lib/identity/deviceFingerprintComparisons";
 import {
   formatMemberDeviceLabel,
   formatTeamMemberInitial,
@@ -49,14 +49,14 @@ export function buildRoomMemberRows({
   localUser,
   localDeviceId,
   localPublicKeyFingerprint,
-  trustedDeviceKeys
+  deviceFingerprintComparisons
 }: {
   presence: Record<string, RoomPresence>;
   room: ClientRoomRecord;
   localUser: { id: string; name: string; avatarUrl?: string };
   localDeviceId: string;
   localPublicKeyFingerprint?: string;
-  trustedDeviceKeys: TrustedDeviceKey[];
+  deviceFingerprintComparisons: DeviceFingerprintComparisonRecord[];
 }): RoomMemberDisplay[] {
   const roomMembers = Object.values(presence)
     .filter((member) => member.status === "online")
@@ -75,12 +75,17 @@ export function buildRoomMemberRows({
       ];
 
   return visibleRoomMembers.map((member) => {
-    const trusted = isDeviceKeyTrusted(trustedDeviceKeys, room.id, member.deviceId, member.publicKeyFingerprint);
+    const fingerprintComparedLocally = isDeviceFingerprintCompared(
+      deviceFingerprintComparisons,
+      room.id,
+      member.deviceId,
+      member.publicKeyFingerprint
+    );
     return {
       ...member,
-      trusted,
+      fingerprintComparedLocally,
       isHost: isRoomHostMember(member, room),
-      deviceLabel: formatMemberDeviceLabel(member, localDeviceId, trusted)
+      deviceLabel: formatMemberDeviceLabel(member, localDeviceId, fingerprintComparedLocally)
     };
   });
 }

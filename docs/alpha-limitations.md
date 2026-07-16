@@ -20,7 +20,7 @@ claims, audit status, metadata exposure, and residual risks.
 
 ## Accounts, hosting, and storage
 
-- GitHub identifies members and authorizes relay and repository workflows.
+- GitHub identity authorizes hosted-relay membership. The current alpha requests the separate broad `repo` permission in the same grant for optional repository workflows; identity-only sign-in followed by later permission escalation is not implemented.
   ChatGPT separately authorizes Codex on the active host. Joining a room does not
   require a Codex login until that device becomes the host.
 - The free alpha relay has no uptime, recovery, or support guarantee. Keep normal

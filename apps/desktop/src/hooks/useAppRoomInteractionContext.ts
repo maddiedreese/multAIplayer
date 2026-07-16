@@ -42,7 +42,7 @@ export function useAppRoomInteractionContext({
     historySettings,
     roomPresence,
     deviceIdentity,
-    trustedDeviceKeys
+    deviceFingerprintComparisons
   } = useAppStore(
     useShallow((state) => ({
       forgottenRoomIds: state.forgottenRoomIds,
@@ -51,7 +51,7 @@ export function useAppRoomInteractionContext({
       historySettings: state.historySettings,
       roomPresence: selectedRoom ? state.historyPresenceByRoom[selectedRoom.id]?.presence : undefined,
       deviceIdentity: state.deviceIdentity,
-      trustedDeviceKeys: state.trustedDeviceKeys
+      deviceFingerprintComparisons: state.deviceFingerprintComparisons
     }))
   );
 
@@ -102,7 +102,7 @@ export function useAppRoomInteractionContext({
       ...(deviceIdentity?.publicKeyFingerprint
         ? { localPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint }
         : {}),
-      trustedDeviceKeys
+      deviceFingerprintComparisons
     }
   });
 }

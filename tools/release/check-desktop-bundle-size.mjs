@@ -4,8 +4,10 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const dist = join(root, "apps/desktop/dist");
-const maximumTotalBytes = 7 * 1024 * 1024;
-const maximumAssetBytes = 3 * 1024 * 1024;
+// Monaco's complete TypeScript/JavaScript language service is intentionally shipped
+// offline with the desktop app. Its minified worker is roughly 8 MiB by itself.
+const maximumTotalBytes = 18 * 1024 * 1024;
+const maximumAssetBytes = 9 * 1024 * 1024;
 
 async function inventory(directory) {
   const entries = await readdir(directory, { withFileTypes: true });

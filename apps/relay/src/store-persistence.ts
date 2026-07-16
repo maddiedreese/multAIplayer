@@ -18,21 +18,35 @@ export interface RelayStorePersistenceCoordinator {
   closeRelayStore(): Promise<void>;
 }
 
+type StoredRelayMutation = ReturnType<RelayStoreCodec["drainStoredRelayMutations"]>[number];
+type PersistenceHealth = "healthy" | "poisoned";
+
+interface PendingMutationBatch {
+  /** The exact mutation snapshot handed to one SQLite unit of work. */
+  readonly changes: StoredRelayMutation[];
+}
+
+type PersistenceFailureDisposition = "expected_conflict" | "poison";
+
+function classifyPersistenceFailure(error: unknown): PersistenceFailureDisposition {
+  return error instanceof RelayStaleEpochError ? "expected_conflict" : "poison";
+}
+
 export function createRelayStorePersistenceCoordinator(options: {
   dataPath: string;
   persistence: RelayPersistence;
   storeCodec: RelayStoreCodec;
   onPoison?: () => void;
 }): RelayStorePersistenceCoordinator {
-  let pendingChanges: ReturnType<RelayStoreCodec["drainStoredRelayMutations"]> = [];
-  let poisoned = false;
+  let pendingChanges: StoredRelayMutation[] = [];
+  let health: PersistenceHealth = "healthy";
 
   function isHealthy() {
-    return !poisoned;
+    return health === "healthy";
   }
 
   function ensureHealthy() {
-    if (poisoned) throw new RelayPersistenceUnavailableError();
+    if (health === "poisoned") throw new RelayPersistenceUnavailableError();
   }
 
   function persistenceWrite<T>(write: () => T): T {
@@ -40,9 +54,9 @@ export function createRelayStorePersistenceCoordinator(options: {
     try {
       return write();
     } catch (error) {
-      if (error instanceof RelayStaleEpochError) throw error;
-      if (!poisoned) {
-        poisoned = true;
+      if (classifyPersistenceFailure(error) === "expected_conflict") throw error;
+      if (health === "healthy") {
+        health = "poisoned";
         logRelayEvent("error", "relay_store_persistence_poisoned");
         options.onPoison?.();
       }
@@ -50,21 +64,30 @@ export function createRelayStorePersistenceCoordinator(options: {
     }
   }
 
-  function collectPendingChanges() {
-    const latest = new Map<string, (typeof pendingChanges)[number]>();
+  function collectPendingChanges(): PendingMutationBatch | null {
+    const latest = new Map<string, StoredRelayMutation>();
     for (const change of [...pendingChanges, ...options.storeCodec.drainStoredRelayMutations()]) {
       latest.set(`${change.entity}\0${change.key}`, change);
     }
     pendingChanges = Array.from(latest.values());
+    return pendingChanges.length === 0 ? null : { changes: pendingChanges };
+  }
+
+  /**
+   * A drained batch remains pending until the database unit of work returns.
+   * Expected optimistic conflicts may therefore be retried; unexpected write
+   * failures poison the coordinator and no later request may attempt a retry.
+   */
+  function acknowledgeMutationBatch(batch: PendingMutationBatch): void {
+    if (pendingChanges === batch.changes) pendingChanges = [];
   }
 
   function savePendingChanges(): void {
     ensureHealthy();
-    collectPendingChanges();
-    if (pendingChanges.length === 0) return;
-    const changes = pendingChanges;
-    persistenceWrite(() => options.persistence.saveChanges(changes));
-    if (pendingChanges === changes) pendingChanges = [];
+    const batch = collectPendingChanges();
+    if (!batch) return;
+    persistenceWrite(() => options.persistence.saveChanges(batch.changes));
+    acknowledgeMutationBatch(batch);
   }
 
   async function loadRelayStore() {
@@ -104,26 +127,23 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveKeyPackages() {
-    collectPendingChanges();
-    const changes = pendingChanges;
-    persistenceWrite(() => options.persistence.saveKeyPackages(changes));
-    if (pendingChanges === changes) pendingChanges = [];
+    const batch = collectPendingChanges();
+    persistenceWrite(() => options.persistence.saveKeyPackages(batch?.changes ?? []));
+    if (batch) acknowledgeMutationBatch(batch);
     return Promise.resolve();
   }
 
   function saveMlsMessage(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
-    collectPendingChanges();
-    const changes = pendingChanges;
-    persistenceWrite(() => options.persistence.saveMlsMessage(roomKey, message, prunedIds, changes));
-    if (pendingChanges === changes) pendingChanges = [];
+    const batch = collectPendingChanges();
+    persistenceWrite(() => options.persistence.saveMlsMessage(roomKey, message, prunedIds, batch?.changes ?? []));
+    if (batch) acknowledgeMutationBatch(batch);
     return Promise.resolve();
   }
 
   function saveMlsCommit(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
-    collectPendingChanges();
-    const changes = pendingChanges;
-    persistenceWrite(() => options.persistence.saveMlsCommit(roomKey, message, prunedIds, changes));
-    if (pendingChanges === changes) pendingChanges = [];
+    const batch = collectPendingChanges();
+    persistenceWrite(() => options.persistence.saveMlsCommit(roomKey, message, prunedIds, batch?.changes ?? []));
+    if (batch) acknowledgeMutationBatch(batch);
     return Promise.resolve();
   }
 

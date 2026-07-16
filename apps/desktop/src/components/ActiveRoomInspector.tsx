@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
 import { codexModelOptions, codexSandboxLevelOptions, defaultCodexModel } from "@multaiplayer/protocol";
-import { BrowserAccessPanel } from "../components/BrowserAccessPanel";
-import { RoomInspectorPanel } from "../components/RoomInspectorPanel";
-import { RoomInspectorWorkPanel } from "../components/RoomInspectorWorkPanel";
+import { BrowserAccessPanel } from "./BrowserAccessPanel";
+import { RoomInspectorPanel } from "./RoomInspectorPanel";
+import { RoomInspectorWorkPanel } from "./RoomInspectorWorkPanel";
 import { canStageRoomChatAttachment } from "../lib/chat/chatPolicy";
 import { formatBytes, formatCodexModel, formatTimestamp } from "../lib/formatting/appFormatters";
 import { resolveFilePreviewTab } from "../lib/files/filePreview";
@@ -11,15 +11,15 @@ import { defaultProjectPath } from "../lib/platform/localBackend";
 import { buildRoomMemberRows, buildTeamMemberRows } from "../presentation/roster/rosterDisplayRows";
 import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
 import { buildRoomInspectorModelProjection } from "../presentation/rooms/roomInspectorModelProjection";
-import { useFileTerminalDisplay } from "./useFileTerminalDisplay";
-import { useGitHubWorkflowState } from "./useGitHubWorkflowState";
-import { useLocalIdentity } from "./useLocalIdentity";
-import { useRoomAccess } from "./useRoomAccess";
+import { useFileTerminalDisplay } from "../hooks/useFileTerminalDisplay";
+import { useGitHubWorkflowState } from "../hooks/useGitHubWorkflowState";
+import { useLocalIdentity } from "../hooks/useLocalIdentity";
+import { useRoomAccess } from "../hooks/useRoomAccess";
 import { approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import { useAppStore, type AppStoreState } from "../store/appStore";
-import type { RoomInspectorSources } from "./roomInspectorCompositionTypes";
+import type { RoomInspectorSources } from "../hooks/roomInspectorCapabilities";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-export type { RoomInspectorSources } from "./roomInspectorCompositionTypes";
+export type { RoomInspectorSources } from "../hooks/roomInspectorCapabilities";
 
 const emptyBrowser = {} as NonNullable<AppStoreState["browserByRoom"][string]>;
 const emptyCodexRuntime = {} as NonNullable<AppStoreState["codexRuntimeByRoom"][string]>;
@@ -29,7 +29,7 @@ const emptyInvite = {} as NonNullable<AppStoreState["inviteByRoom"][string]>;
 const emptyRoomSettings = {} as NonNullable<AppStoreState["roomSettingsByRoom"][string]>;
 const emptyTerminal = {} as NonNullable<AppStoreState["terminalRuntimeByRoom"][string]>;
 
-export function useRoomInspectorComposition({
+export function ActiveRoomInspector({
   sources,
   selectedRoom
 }: {
@@ -63,7 +63,7 @@ export function useRoomInspectorComposition({
   const sensitiveAttachmentReviewKey = useAppStore((state) => state.sensitiveAttachmentReviewKey);
   const deviceIdentity = useAppStore((state) => state.deviceIdentity);
   const deviceIdentityMessage = useAppStore((state) => state.deviceIdentityMessage);
-  const trustedDeviceKeys = useAppStore((state) => state.trustedDeviceKeys);
+  const deviceFingerprintComparisons = useAppStore((state) => state.deviceFingerprintComparisons);
   const forgottenRoomIds = useAppStore((state) => state.forgottenRoomIds);
   const revokedRoomIds = useAppStore((state) => state.revokedRoomIds);
   const revokedTeamIds = useAppStore((state) => state.revokedTeamIds);
@@ -151,9 +151,9 @@ export function useRoomInspectorComposition({
         ...(deviceIdentity?.publicKeyFingerprint
           ? { localPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint }
           : {}),
-        trustedDeviceKeys
+        deviceFingerprintComparisons
       }),
-    [deviceId, deviceIdentity?.publicKeyFingerprint, localUser, presence, selectedRoom, trustedDeviceKeys]
+    [deviceFingerprintComparisons, deviceId, deviceIdentity?.publicKeyFingerprint, localUser, presence, selectedRoom]
   );
   const gitStatus = valueOr(gitRuntime.workflow?.status, null);
   const settingsBusy = Boolean(roomSettings.settingsBusy);
@@ -242,9 +242,10 @@ export function useRoomInspectorComposition({
         members: roomMemberRows,
         localDeviceId: deviceId,
         message: deviceIdentityMessage,
-        onCopyFingerprint: (member) => sources.workspaceFlow.copyRoomMemberDeviceFingerprint(member, member.trusted),
-        onTrust: sources.workspaceFlow.trustRoomMemberDevice,
-        onUntrust: sources.workspaceFlow.untrustRoomMemberDevice
+        onCopyFingerprint: (member) =>
+          sources.workspaceFlow.copyRoomMemberDeviceFingerprint(member, member.fingerprintComparedLocally),
+        onMarkCompared: sources.workspaceFlow.markRoomMemberFingerprintCompared,
+        onClearComparison: sources.workspaceFlow.clearRoomMemberFingerprintComparison
       },
       hostHandoff: composeHostHandoffProps(),
       encryptedInvite: composeEncryptedInviteProps(),

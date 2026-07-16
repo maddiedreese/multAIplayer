@@ -10,34 +10,35 @@ import { registerOpsRoutes } from "./ops.js";
 import { registerRoomRoutes } from "./rooms.js";
 import { registerTeamRoutes } from "./teams.js";
 
-type OpsRouteDependencies = Parameters<typeof registerOpsRoutes>[0];
+/**
+ * Route registrars intentionally receive independent, route-sized option bags.
+ * This keeps adding a dependency to one route family from silently making it
+ * available to every other HTTP handler.
+ */
+export interface RelayRouteRegistrations {
+  github: Parameters<typeof registerGitHubRoutes>[0];
+  debug: Parameters<typeof registerDebugRoutes>[0];
+  attachments: Parameters<typeof registerAttachmentRoutes>[0];
+  invites: Parameters<typeof registerInviteRoutes>[0];
+  inviteDelivery: Parameters<typeof registerInviteDeliveryRoutes>[0];
+  keyPackages: Parameters<typeof registerKeyPackageRoutes>[0];
+  teams: Parameters<typeof registerTeamRoutes>[0];
+  devices: Parameters<typeof registerDeviceRoutes>[0];
+  deviceAuth: Parameters<typeof registerDeviceAuthRoutes>[0];
+  operations: Parameters<typeof registerOpsRoutes>[0];
+  rooms: Parameters<typeof registerRoomRoutes>[0];
+}
 
-type RelayRouteDependencies = Parameters<typeof registerAttachmentRoutes>[0] &
-  Parameters<typeof registerDebugRoutes>[0] &
-  Parameters<typeof registerDeviceRoutes>[0] &
-  Parameters<typeof registerGitHubRoutes>[0] &
-  Parameters<typeof registerInviteRoutes>[0] &
-  Parameters<typeof registerInviteDeliveryRoutes>[0] &
-  Parameters<typeof registerKeyPackageRoutes>[0] &
-  Omit<OpsRouteDependencies, "attachmentBlobs"> &
-  Parameters<typeof registerRoomRoutes>[0] &
-  Parameters<typeof registerTeamRoutes>[0] & {
-    opsAttachmentBlobs: OpsRouteDependencies["attachmentBlobs"];
-  };
-
-export function registerRelayRoutes(dependencies: RelayRouteDependencies) {
-  registerGitHubRoutes(dependencies);
-  registerDebugRoutes(dependencies);
-  registerAttachmentRoutes(dependencies);
-  registerInviteRoutes(dependencies);
-  registerInviteDeliveryRoutes(dependencies);
-  registerKeyPackageRoutes(dependencies);
-  registerTeamRoutes(dependencies);
-  registerDeviceRoutes(dependencies);
-  registerDeviceAuthRoutes(dependencies);
-  registerOpsRoutes({
-    ...dependencies,
-    attachmentBlobs: dependencies.opsAttachmentBlobs ?? []
-  });
-  registerRoomRoutes(dependencies);
+export function registerRelayRoutes(routes: RelayRouteRegistrations) {
+  registerGitHubRoutes(routes.github);
+  registerDebugRoutes(routes.debug);
+  registerAttachmentRoutes(routes.attachments);
+  registerInviteRoutes(routes.invites);
+  registerInviteDeliveryRoutes(routes.inviteDelivery);
+  registerKeyPackageRoutes(routes.keyPackages);
+  registerTeamRoutes(routes.teams);
+  registerDeviceRoutes(routes.devices);
+  registerDeviceAuthRoutes(routes.deviceAuth);
+  registerOpsRoutes(routes.operations);
+  registerRoomRoutes(routes.rooms);
 }

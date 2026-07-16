@@ -1,4 +1,4 @@
-import { useRoomMainColumnComposition, type RoomMainColumnSources } from "../hooks/useRoomMainColumnComposition";
+import { ActiveRoomMainColumn, type RoomMainColumnSources } from "./ActiveRoomMainColumn";
 import { useAppStore } from "../store/appStore";
 
 export type { RoomMainColumnSources };
@@ -12,15 +12,5 @@ export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSo
       </main>
     );
   }
-  return <ActiveRoomMainColumnContainer sources={sources} selectedRoom={selectedRoom} />;
-}
-
-function ActiveRoomMainColumnContainer({
-  sources,
-  selectedRoom
-}: {
-  sources: RoomMainColumnSources;
-  selectedRoom: NonNullable<ReturnType<typeof useAppStore.getState>["rooms"][number]>;
-}) {
-  return useRoomMainColumnComposition({ sources, selectedRoom });
+  return <ActiveRoomMainColumn sources={sources} selectedRoom={selectedRoom} />;
 }

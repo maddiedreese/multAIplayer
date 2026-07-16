@@ -91,17 +91,12 @@ test.beforeEach(() => {
 test("account sign-out actions preserve preview cleanup ordering without React", async () => {
   const calls: string[] = [];
   const actions = createAccountActions({
-    selectedRoomId: room.id,
-    deviceId: "device-1",
     stopOwnedLocalPreviews: async (reason) => {
       calls.push(`preview:${reason}`);
     },
     signOutGitHub: async () => {
       calls.push("github");
-    },
-    replaceDeviceIdentity: () => undefined,
-    setDeviceIdentityStatusMessage: () => undefined,
-    untrustDeviceForRoom: () => undefined
+    }
   });
 
   await actions.signOut();
@@ -248,8 +243,8 @@ test("member actions update the current Zustand roster without React", async () 
       localUser: { id: "github:maddie", name: "Maddie" },
       currentUser: null,
       setDeviceIdentityMessage: () => undefined,
-      trustDeviceForRoom: () => undefined,
-      untrustDeviceForRoom: () => undefined,
+      recordDeviceFingerprintComparisonForRoom: () => undefined,
+      removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
       rotateRoomKeyForDevices: async () => undefined,
@@ -286,8 +281,8 @@ test("member removal aborts before relay revocation unless every active room is 
   try {
     const actions = createMemberActions({
       setDeviceIdentityMessage: () => undefined,
-      trustDeviceForRoom: () => undefined,
-      untrustDeviceForRoom: () => undefined,
+      recordDeviceFingerprintComparisonForRoom: () => undefined,
+      removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
       rotateRoomKeyForDevices: async () => undefined,
@@ -329,8 +324,8 @@ test("member removal reports relay-revoked but incomplete cryptographic transiti
     let commitAttempts = 0;
     const actions = createMemberActions({
       setDeviceIdentityMessage: () => undefined,
-      trustDeviceForRoom: () => undefined,
-      untrustDeviceForRoom: () => undefined,
+      recordDeviceFingerprintComparisonForRoom: () => undefined,
+      removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
       removeMembersFromMlsGroup: async () => {

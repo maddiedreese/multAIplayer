@@ -1,5 +1,5 @@
 import { ChevronDown, Copy, FileText, Globe2, MonitorUp, Terminal, UsersRound, X } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import React, { useEffect, useState, type ReactNode } from "react";
 import type { InspectorTab } from "../lib/core/uiTypes";
 import { closeRoomBrowserSurface } from "../lib/browser/browserSurfaceEvents";
 

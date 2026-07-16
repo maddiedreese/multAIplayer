@@ -1,12 +1,11 @@
 import type { ChatAttachment, ChatMessage, CodexActivity, CodexRoomEvent } from "../types";
 import { messagesSinceLastCodex } from "../lib/codex/codexTurn";
-import type { useAppStore } from "../store/appStore";
+import type { AppStoreState } from "../store/appStore";
 import type { GuidedActivityKind } from "../components/GuidedFirstTurn";
 
 const noPendingAttachments: ChatAttachment[] = [];
 const noSelectedMessageIds: string[] = [];
 const noCodexEvents: CodexRoomEvent[] = [];
-type MainColumnStore = ReturnType<typeof useAppStore.getState>;
 
 export function mainColumnLocalUser(user: { id: string; name?: string; login: string } | null, localDeviceId: string) {
   return {
@@ -16,8 +15,8 @@ export function mainColumnLocalUser(user: { id: string; name?: string; login: st
 }
 
 export function deriveMainColumnValues(
-  chat: MainColumnStore["roomChatByRoom"][string] | undefined,
-  codex: MainColumnStore["codexRuntimeByRoom"][string] | undefined,
+  chat: AppStoreState["roomChatByRoom"][string] | undefined,
+  codex: AppStoreState["codexRuntimeByRoom"][string] | undefined,
   messages: ChatMessage[]
 ) {
   const activeApproval = codex?.pendingApproval ?? null;

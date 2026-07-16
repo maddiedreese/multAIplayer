@@ -6,7 +6,7 @@ import {
   defaultCodexSpeed
 } from "@multaiplayer/protocol";
 import { resolveFilePreviewTab } from "../lib/files/filePreview";
-import { resolveGitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
+import { defaultGitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
 import { embeddedAttachmentBytes } from "../lib/formatting/appFormatters";
 import type { BrowserByRoom } from "../store/slices/browserSlice";
 import type { CodexRuntimeByRoom } from "../store/slices/codexHostHandoffSlice";
@@ -20,73 +20,77 @@ import type { ChatAttachment, ChatMessage, MarkdownCopyFallback } from "../types
 
 interface UseSelectedRoomValuesOptions {
   selectedRoom: ClientRoomRecord | null;
-  selectedTeam: string;
   selectedMessageIds: string[];
   markdownSelectionMode: boolean;
-  roomSettingsByRoom: RoomSettingsByRoom;
-  messagesByRoom: Record<string, ChatMessage[]>;
-  roomChatByRoom: RoomChatByRoom;
-  codexRuntimeByRoom: CodexRuntimeByRoom;
-  browserByRoom: BrowserByRoom;
-  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom;
-  terminalRuntimeByRoom: TerminalRuntimeByRoom;
-  filePanelByRoom: FilePanelByRoom;
-  inviteByRoom: InviteByRoom;
-  historyMessagesByRoom: Record<string, string | null>;
-  teamHistoryMessagesByTeam: Record<string, string | null>;
+  roomSettings: RoomSettingsByRoom[string] | undefined;
+  messages: ChatMessage[] | undefined;
+  roomChat: RoomChatByRoom[string] | undefined;
+  codexRuntime: CodexRuntimeByRoom[string] | undefined;
+  browser: BrowserByRoom[string] | undefined;
+  gitRuntime: GitWorkflowRuntimeByRoom[string] | undefined;
+  terminalRuntime: TerminalRuntimeByRoom[string] | undefined;
+  filePanel: FilePanelByRoom[string] | undefined;
+  invite: InviteByRoom[string] | undefined;
+  historyMessage: string | null | undefined;
+  teamHistoryMessage: string | null | undefined;
   defaultBrowserUrl: string;
   defaultBrowserReason: string;
 }
 
 export function useSelectedRoomValues({
   selectedRoom,
-  selectedTeam,
   selectedMessageIds,
   markdownSelectionMode,
-  roomSettingsByRoom,
-  messagesByRoom,
-  roomChatByRoom,
-  codexRuntimeByRoom,
-  browserByRoom,
-  gitWorkflowRuntimeByRoom,
-  terminalRuntimeByRoom,
-  filePanelByRoom,
-  inviteByRoom,
-  historyMessagesByRoom,
-  teamHistoryMessagesByTeam,
+  roomSettings: roomSettingsInput,
+  messages: messagesInput,
+  roomChat: roomChatInput,
+  codexRuntime: codexRuntimeInput,
+  browser: browserInput,
+  gitRuntime: gitRuntimeInput,
+  terminalRuntime: terminalRuntimeInput,
+  filePanel: filePanelInput,
+  invite: inviteInput,
+  historyMessage: historyMessageInput,
+  teamHistoryMessage: teamHistoryMessageInput,
   defaultBrowserUrl,
   defaultBrowserReason
 }: UseSelectedRoomValuesOptions) {
-  const roomSelection = selectedRoomMetadata(selectedRoom);
-  const roomId = roomSelection.roomId;
-  const { selectedCodexModel, selectedCodexReasoningEffort, selectedCodexSpeed, selectedCodexSandboxLevel } =
-    selectCodexDefaults(selectedRoom);
-  const sources = selectRoomValueSources(
-    {
-      messagesByRoom,
-      roomSettingsByRoom,
-      roomChatByRoom,
-      codexRuntimeByRoom,
-      browserByRoom,
-      gitWorkflowRuntimeByRoom,
-      terminalRuntimeByRoom,
-      filePanelByRoom,
-      inviteByRoom
-    },
-    roomId
-  );
-  const { messages, roomSettings, roomChat, codexRuntime, browser, gitRuntime, terminalRuntime, filePanel, invite } =
-    sources;
+  const {
+    selectedCodexModel,
+    selectedCodexReasoningEffort,
+    selectedCodexSpeed,
+    selectedCodexSandboxLevel,
+    selectedProjectPath
+  } = selectRoomDefaults(selectedRoom);
+  const {
+    roomSettings,
+    messages,
+    roomChat,
+    codexRuntime,
+    browser,
+    gitRuntime,
+    terminalRuntime,
+    filePanel,
+    invite,
+    historyMessage,
+    teamHistoryMessage
+  } = withSelectedRoomDefaults({
+    roomSettings: roomSettingsInput,
+    messages: messagesInput,
+    roomChat: roomChatInput,
+    codexRuntime: codexRuntimeInput,
+    browser: browserInput,
+    gitRuntime: gitRuntimeInput,
+    terminalRuntime: terminalRuntimeInput,
+    filePanel: filePanelInput,
+    invite: inviteInput,
+    historyMessage: historyMessageInput,
+    teamHistoryMessage: teamHistoryMessageInput
+  });
   const replyToMessageId = roomChat.replyToMessageId ?? null;
   const gitWorkflow = gitRuntime.workflow ?? {};
   const githubActions = gitRuntime.actions ?? {};
   const selectedDiff = filePanel.selectedDiff ?? null;
-  const { historyMessage, teamHistoryMessage } = selectHistoryMessages(
-    historyMessagesByRoom,
-    teamHistoryMessagesByTeam,
-    roomId,
-    selectedTeam
-  );
   const pendingAttachments: ChatAttachment[] = roomChat.pendingAttachments ?? [];
   const markdownCopyFallback: MarkdownCopyFallback | null = filePanel.markdownCopyFallback ?? null;
 
@@ -97,7 +101,7 @@ export function useSelectedRoomValues({
     selectedCodexSandboxLevel,
     replyToMessageId,
     customCodexModel: roomSettings.customCodexModel ?? selectedCodexModel,
-    projectPathDraft: roomSettings.projectPathDraft ?? roomSelection.projectPath,
+    projectPathDraft: roomSettings.projectPathDraft ?? selectedProjectPath,
     messages,
     draft: roomChat.draft ?? "",
     selectedMessages: markdownSelectionMode
@@ -107,7 +111,7 @@ export function useSelectedRoomValues({
     roomGoal: codexRuntime.goal ?? null,
     pendingAttachmentBytes: embeddedAttachmentBytes(pendingAttachments),
     ...selectBrowserValues(browser, defaultBrowserUrl, defaultBrowserReason),
-    ...selectGitValues(gitWorkflow, githubActions, roomId),
+    ...selectGitValues(gitWorkflow, githubActions),
     ...selectTerminalValues(terminalRuntime),
     ...selectFilePanelValues(filePanel, selectedDiff),
     inviteLink: invite.link ?? "",
@@ -123,57 +127,44 @@ export function useSelectedRoomValues({
   };
 }
 
-function selectedRoomMetadata(room: ClientRoomRecord | null) {
-  if (!room) return { roomId: "", projectPath: "" };
-  return { roomId: room.id, projectPath: room.projectPath };
-}
-
-function selectRoomValueSources(
-  sources: Pick<
+function withSelectedRoomDefaults(
+  values: Pick<
     UseSelectedRoomValuesOptions,
-    | "messagesByRoom"
-    | "roomSettingsByRoom"
-    | "roomChatByRoom"
-    | "codexRuntimeByRoom"
-    | "browserByRoom"
-    | "gitWorkflowRuntimeByRoom"
-    | "terminalRuntimeByRoom"
-    | "filePanelByRoom"
-    | "inviteByRoom"
-  >,
-  roomId: string
+    | "roomSettings"
+    | "messages"
+    | "roomChat"
+    | "codexRuntime"
+    | "browser"
+    | "gitRuntime"
+    | "terminalRuntime"
+    | "filePanel"
+    | "invite"
+    | "historyMessage"
+    | "teamHistoryMessage"
+  >
 ) {
   return {
-    messages: sources.messagesByRoom[roomId] ?? [],
-    roomSettings: sources.roomSettingsByRoom[roomId] ?? {},
-    roomChat: sources.roomChatByRoom[roomId] ?? {},
-    codexRuntime: sources.codexRuntimeByRoom[roomId] ?? {},
-    browser: sources.browserByRoom[roomId] ?? {},
-    gitRuntime: sources.gitWorkflowRuntimeByRoom[roomId] ?? {},
-    terminalRuntime: sources.terminalRuntimeByRoom[roomId] ?? {},
-    filePanel: sources.filePanelByRoom[roomId] ?? {},
-    invite: sources.inviteByRoom[roomId] ?? {}
+    roomSettings: values.roomSettings ?? {},
+    messages: values.messages ?? [],
+    roomChat: values.roomChat ?? {},
+    codexRuntime: values.codexRuntime ?? {},
+    browser: values.browser ?? {},
+    gitRuntime: values.gitRuntime ?? {},
+    terminalRuntime: values.terminalRuntime ?? {},
+    filePanel: values.filePanel ?? {},
+    invite: values.invite ?? {},
+    historyMessage: values.historyMessage ?? null,
+    teamHistoryMessage: values.teamHistoryMessage ?? null
   };
 }
 
-function selectCodexDefaults(room: ClientRoomRecord | null) {
+function selectRoomDefaults(room: ClientRoomRecord | null) {
   return {
     selectedCodexModel: room?.codexModel ?? defaultCodexModel,
     selectedCodexReasoningEffort: room?.codexReasoningEffort ?? defaultCodexReasoningEffort,
     selectedCodexSpeed: room?.codexSpeed ?? defaultCodexSpeed,
-    selectedCodexSandboxLevel: room?.codexSandboxLevel ?? defaultCodexSandboxLevel
-  };
-}
-
-function selectHistoryMessages(
-  messagesByRoom: Record<string, string | null>,
-  messagesByTeam: Record<string, string | null>,
-  roomId: string,
-  teamId: string
-) {
-  return {
-    historyMessage: messagesByRoom[roomId] ?? null,
-    teamHistoryMessage: messagesByTeam[teamId || "__no-team"] ?? null
+    selectedCodexSandboxLevel: room?.codexSandboxLevel ?? defaultCodexSandboxLevel,
+    selectedProjectPath: room?.projectPath ?? ""
   };
 }
 
@@ -190,12 +181,11 @@ function selectBrowserValues(browser: BrowserByRoom[string], defaultUrl: string,
 
 function selectGitValues(
   gitWorkflow: NonNullable<GitWorkflowRuntimeByRoom[string]["workflow"]>,
-  githubActions: NonNullable<GitWorkflowRuntimeByRoom[string]["actions"]>,
-  roomId: string
+  githubActions: NonNullable<GitWorkflowRuntimeByRoom[string]["actions"]>
 ) {
   return {
     gitStatus: gitWorkflow.status ?? null,
-    gitWorkflowDraft: resolveGitWorkflowDraft({ [roomId]: gitWorkflow.draft ?? {} }, roomId),
+    gitWorkflowDraft: { ...defaultGitWorkflowDraft, ...(gitWorkflow.draft ?? {}) },
     gitWorkflowBusy: gitWorkflow.busy ?? false,
     gitWorkflowMessage: gitWorkflow.message ?? null,
     actionRuns: githubActions.runs ?? [],

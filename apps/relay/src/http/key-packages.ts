@@ -1,19 +1,13 @@
 import { sendRelayError } from "./errors.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Express, Response } from "express";
-import {
-  KeyPackageUpload,
-  pinnedMlsCiphersuite,
-  type InviteRecord,
-  type InviteJoinRequestRecord,
-  type KeyPackageRecord,
-  type RoomRecord
-} from "@multaiplayer/protocol";
+import { KeyPackageUpload, pinnedMlsCiphersuite, type KeyPackageRecord, type RoomRecord } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
 import type { KeyPackageValidator } from "../mls/key-package-validator.js";
 import { isCanonicalPaddedBase64 } from "../opaque.js";
 import { hasDeviceSession } from "./device-auth.js";
 import { commitValidatedKeyPackages, type KeyPackageUploadCommitResult } from "./key-package-upload-transaction.js";
+import { consumeKeyPackageForInvite } from "./key-package-consumption-transaction.js";
 
 const maxBatchSize = 20;
 const maxLivePackagesPerDevice = 50;
@@ -128,52 +122,44 @@ export function registerKeyPackageRoutes({
     if (!isActiveRoomHost(room, session.user.id, hostDeviceId)) {
       return void sendRelayError(res, 403, "forbidden", "Only the active host device may consume KeyPackages.");
     }
-    const invite = store.getInvite(String(body.inviteId ?? ""));
-    if (!inviteMatchesRoom(invite, room)) {
-      return void sendRelayError(res, 403, "forbidden", "A valid room invite approval is required.");
-    }
     const keyPackageId = String(body.keyPackageId ?? "");
     const keyPackageHash = String(body.keyPackageHash ?? "");
-    const request = findMatchingInviteRequest(store, invite.id, {
+    const result = await consumeKeyPackageForInvite({
+      store,
+      teamId: room.teamId,
+      roomId: room.id,
+      expectedHostUserId: session.user.id,
+      expectedHostDeviceId: hostDeviceId,
+      inviteId: String(body.inviteId ?? ""),
       userId: String(req.params.userId),
       deviceId: String(req.params.deviceId),
       keyPackageId,
-      keyPackageHash
+      keyPackageHash,
+      persist: saveRelayStore
     });
-    if (!request)
+    if (result.status === "authorization_changed")
+      return void sendRelayError(res, 403, "forbidden", "Active host authority changed before KeyPackage consumption.");
+    if (result.status === "invite_mismatch")
+      return void sendRelayError(res, 403, "forbidden", "A valid room invite approval is required.");
+    if (result.status === "request_mismatch")
       return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
-    const item = store.keyPackages.get(keyPackageId);
-    if (!item) {
-      if (inviteAlreadyConsumed(invite, String(req.params.userId), String(req.params.deviceId), keyPackageHash)) {
-        return void res.json({
-          alreadyConsumed: true,
-          keyPackageId,
-          keyPackageHash,
-          userId: String(req.params.userId),
-          deviceId: String(req.params.deviceId)
-        });
-      }
+    if (result.status === "key_package_unavailable")
       return void sendRelayError(res, 404, "key_package_unavailable", "No KeyPackage is available.");
-    }
-    if (!keyPackageMatchesRequest(item, String(req.params.userId), String(req.params.deviceId), keyPackageHash))
+    if (result.status === "key_package_mismatch")
       return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
-    // In-memory deletion is serialized by the JS event loop. SQLite persistence
-    // receives the deletion in the same immediate save cycle.
-    store.deleteKeyPackage(item.id);
-    store.setInvite({
-      ...invite,
-      approvedUserId: item.userId,
-      approvedDeviceId: item.deviceId,
-      keyPackageHash: item.keyPackageHash
-    });
-    try {
-      await saveRelayStore();
-    } catch {
-      store.setKeyPackage(item);
-      store.setInvite(invite);
+    if (result.status === "persistence_unavailable") {
       return void sendRelayError(res, 503, "persistence_unavailable", "Could not consume KeyPackage durably.");
     }
-    res.json({ keyPackage: item });
+    if (result.status === "already_consumed") {
+      return void res.json({
+        alreadyConsumed: true,
+        keyPackageId,
+        keyPackageHash,
+        userId: String(req.params.userId),
+        deviceId: String(req.params.deviceId)
+      });
+    }
+    res.json({ keyPackage: result.keyPackage });
   });
 }
 
@@ -297,40 +283,6 @@ function keyPackageUploadError(
 
 function isActiveRoomHost(room: RoomRecord, userId: string, deviceId: string): boolean {
   return room.hostStatus === "active" && room.hostUserId === userId && room.activeHostDeviceId === deviceId;
-}
-
-function inviteMatchesRoom(invite: InviteRecord | undefined, room: RoomRecord): invite is InviteRecord {
-  return Boolean(invite && invite.roomId === room.id && invite.teamId === room.teamId);
-}
-
-function findMatchingInviteRequest(
-  store: RelayStore,
-  inviteId: string,
-  expected: { userId: string; deviceId: string; keyPackageId: string; keyPackageHash: string }
-): InviteJoinRequestRecord | undefined {
-  return Array.from(store.inviteRequests.values()).find(
-    (candidate) =>
-      candidate.inviteId === inviteId &&
-      candidate.requesterUserId === expected.userId &&
-      candidate.requesterDeviceId === expected.deviceId &&
-      candidate.keyPackageId === expected.keyPackageId &&
-      candidate.keyPackageHash === expected.keyPackageHash
-  );
-}
-
-function inviteAlreadyConsumed(
-  invite: InviteRecord,
-  userId: string,
-  deviceId: string,
-  keyPackageHash: string
-): boolean {
-  return (
-    invite.approvedUserId === userId && invite.approvedDeviceId === deviceId && invite.keyPackageHash === keyPackageHash
-  );
-}
-
-function keyPackageMatchesRequest(item: KeyPackageRecord, userId: string, deviceId: string, hash: string): boolean {
-  return item.userId === userId && item.deviceId === deviceId && item.keyPackageHash === hash;
 }
 
 function rejectAccountKeyPackageQuota(

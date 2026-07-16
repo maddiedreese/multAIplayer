@@ -45,7 +45,7 @@ function sidebarRoomDisplay(room: ClientRoomRecord | null) {
 
 export interface SidebarSources {
   githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn" | "clearDeletedHostedAccount">;
-  roomRuntime: Pick<ReturnType<typeof useRoomRuntimeContext>, "signOut" | "rotateDeviceIdentity" | "chooseProjectPath">;
+  roomRuntime: Pick<ReturnType<typeof useRoomRuntimeContext>, "signOut" | "chooseProjectPath">;
   workspaceFlow: Pick<
     ReturnType<typeof useWorkspaceFlowContext>,
     | "addTeam"
@@ -304,7 +304,6 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
             hasSelectedRoom={hasSelectedRoom}
           />
         ),
-        onRotateDeviceIdentity: sources.roomRuntime.rotateDeviceIdentity,
         onHostedAccountDeleted: sources.githubAuth.clearDeletedHostedAccount,
         onSignIn: sources.githubAuth.beginGitHubSignIn,
         onSignOut: sources.roomRuntime.signOut

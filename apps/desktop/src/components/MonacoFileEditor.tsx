@@ -108,16 +108,33 @@ export function MonacoFileEditor({
 }
 
 async function installMonaco(): Promise<typeof Monaco> {
-  const [monaco, { default: EditorWorker }, { default: JsonWorker }] = await Promise.all([
+  const [
+    monaco,
+    { default: EditorWorker },
+    { default: JsonWorker },
+    { default: CssWorker },
+    { default: HtmlWorker },
+    { default: TypeScriptWorker }
+  ] = await Promise.all([
     import("monaco-editor/esm/vs/editor/editor.api.js"),
     import("monaco-editor/esm/vs/editor/editor.worker?worker"),
     import("monaco-editor/esm/vs/language/json/json.worker?worker"),
+    import("monaco-editor/esm/vs/language/css/css.worker?worker"),
+    import("monaco-editor/esm/vs/language/html/html.worker?worker"),
+    import("monaco-editor/esm/vs/language/typescript/ts.worker?worker"),
     import("monaco-editor/esm/vs/base/browser/domSanitize.js"),
     import("monaco-editor/esm/vs/language/json/monaco.contribution.js"),
+    import("monaco-editor/esm/vs/language/css/monaco.contribution.js"),
+    import("monaco-editor/esm/vs/language/html/monaco.contribution.js"),
+    import("monaco-editor/esm/vs/language/typescript/monaco.contribution.js"),
     import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js"),
     import("monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js"),
     import("monaco-editor/esm/vs/basic-languages/css/css.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/scss/scss.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/less/less.contribution.js"),
     import("monaco-editor/esm/vs/basic-languages/html/html.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/handlebars/handlebars.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/razor/razor.contribution.js"),
     import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"),
     import("monaco-editor/esm/vs/basic-languages/rust/rust.contribution.js"),
     import("monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js")
@@ -125,12 +142,33 @@ async function installMonaco(): Promise<typeof Monaco> {
 
   self.MonacoEnvironment = {
     getWorker(_workerId: string, label: string) {
-      if (label === "json") return new JsonWorker();
-      return new EditorWorker();
+      switch (workerKindForLabel(label)) {
+        case "json":
+          return new JsonWorker();
+        case "css":
+          return new CssWorker();
+        case "html":
+          return new HtmlWorker();
+        case "typescript":
+          return new TypeScriptWorker();
+        case "editor":
+          return new EditorWorker();
+      }
     }
   };
 
   return monaco as unknown as typeof Monaco;
+}
+
+export type MonacoWorkerKind = "editor" | "json" | "css" | "html" | "typescript";
+
+/** Maps Monaco language-service labels to the worker bundle that implements them. */
+export function workerKindForLabel(label: string): MonacoWorkerKind {
+  if (label === "json") return "json";
+  if (label === "css" || label === "scss" || label === "less") return "css";
+  if (label === "html" || label === "handlebars" || label === "razor") return "html";
+  if (label === "typescript" || label === "javascript") return "typescript";
+  return "editor";
 }
 
 export function languageForPath(path: string): string | undefined {
@@ -148,8 +186,14 @@ const languageByExtension: Readonly<Record<string, string>> = {
   ts: "typescript",
   tsx: "typescript",
   css: "css",
+  less: "less",
+  scss: "scss",
   html: "html",
   htm: "html",
+  handlebars: "handlebars",
+  hbs: "handlebars",
+  cshtml: "razor",
+  razor: "razor",
   json: "json",
   jsonc: "json",
   md: "markdown",

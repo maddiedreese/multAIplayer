@@ -34,6 +34,24 @@ export interface SignedInUser {
   avatarUrl?: string;
 }
 
+export interface GitHubOAuthPurposeSummary {
+  identity: string;
+  repositoryWorkflows: string;
+}
+
+/** Keeps the identity requirement distinct from the broader optional repo API grant. */
+export function summarizeGitHubOAuthPurposes(scopes: readonly string[]): GitHubOAuthPurposeSummary {
+  const requested = new Set(scopes);
+  return {
+    identity: requested.has("read:user") ? "read:user — workspace identity" : "Workspace identity scope unavailable",
+    repositoryWorkflows: requested.has("repo")
+      ? "repo — public and private repository workflows"
+      : requested.has("public_repo")
+        ? "public_repo — public repository workflows only"
+        : "No repository workflow scope"
+  };
+}
+
 export async function getAuthConfig(): Promise<GitHubAuthConfig> {
   const response = await fetch(`${getRelayHttpUrl()}/auth/config`, { credentials: "include" });
   return readJsonResponse(response, "Failed to load relay authentication configuration");

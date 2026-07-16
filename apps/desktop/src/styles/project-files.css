@@ -47,7 +47,8 @@
   color: #595959;
 }
 
-.member-badges b.trusted {
+.member-badges b.owner,
+.member-badges b.compared {
   border-color: #c1c1c1;
   background: #f2f2f2;
   color: #444444;

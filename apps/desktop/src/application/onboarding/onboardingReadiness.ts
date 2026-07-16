@@ -108,7 +108,12 @@ function projectGitHub(intent: OnboardingIntent, github: OnboardingReadinessInpu
     );
   }
   if (github.user) {
-    return row("github", "GitHub", "ready", "Signed in for workspace identity, invitations, and repository workflows.");
+    return row(
+      "github",
+      "GitHub",
+      "ready",
+      "Signed in for workspace identity. The separate repository permission enables optional GitHub workflows."
+    );
   }
   if (!github.config?.configured) {
     return required
