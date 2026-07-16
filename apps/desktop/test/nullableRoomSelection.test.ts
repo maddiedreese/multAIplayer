@@ -17,7 +17,6 @@ test("room publishers do not mutate local state or touch the relay without a sel
     deviceId: "device-local",
     localUser: { id: "github:local", name: "Local User" },
     approvalPolicyLabels: {},
-    approvalDelegationPolicyLabels: {},
     roomModeLabels: {},
     appendLocalPreviewEvent: (roomId) => localMutations.push(`preview:${roomId}`),
     appendGitWorkflowEvent: (roomId) => localMutations.push(`git:${roomId}`),
