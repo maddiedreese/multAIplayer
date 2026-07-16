@@ -173,6 +173,7 @@ function readProductionRelayConfig() {
     deletionLedgerAccessKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID"),
     deletionLedgerSecretKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY"),
     deletionLedgerHmacKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"),
+    deletionProtection: envValue("MULTAIPLAYER_RELAY_DELETION_PROTECTION"),
     deletionLedgerUrlStyle: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE"),
     deletionLedgerProtectionSeconds: envInteger("MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS", 7_776_000),
     allowedOrigins: envValue("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS"),
@@ -212,9 +213,37 @@ function checkDeletionLedger(config) {
     deletionLedgerAccessKey,
     deletionLedgerSecretKey,
     deletionLedgerHmacKey,
+    deletionProtection,
     deletionLedgerUrlStyle,
     deletionLedgerProtectionSeconds
   } = config;
+  const ledgerUnset =
+    !deletionLedgerEndpoint &&
+    !deletionLedgerBucket &&
+    !deletionLedgerRegion &&
+    !deletionLedgerAccessKey &&
+    !deletionLedgerSecretKey &&
+    !deletionLedgerHmacKey &&
+    !deletionLedgerUrlStyle;
+  const effectiveProtection = deletionProtection || (ledgerUnset ? "primary_only" : "restore_safe");
+  if (effectiveProtection === "primary_only") {
+    checks.push({
+      ok: ledgerUnset,
+      label: "production account deletion protection",
+      detail: ledgerUnset
+        ? "primary-only deletion configured; do not restore backups containing deleted identities"
+        : "primary_only must not configure external deletion ledger credentials"
+    });
+    return;
+  }
+  if (effectiveProtection !== "restore_safe") {
+    checks.push({
+      ok: false,
+      label: "production account deletion protection",
+      detail: "must be primary_only or restore_safe"
+    });
+    return;
+  }
   const deletionLedgerEndpointIsHttps = (() => {
     try {
       return new URL(deletionLedgerEndpoint).protocol === "https:";
@@ -230,6 +259,7 @@ function checkDeletionLedger(config) {
       Boolean(deletionLedgerAccessKey) &&
       deletionLedgerSecretKey.length >= 32 &&
       deletionLedgerHmacKey.length >= 32 &&
+      deletionLedgerSecretKey !== deletionLedgerHmacKey &&
       ["path", "virtual-host"].includes(deletionLedgerUrlStyle) &&
       deletionLedgerProtectionSeconds >= 7_776_000,
     label: "production external deletion ledger",
@@ -240,6 +270,7 @@ function checkDeletionLedger(config) {
       deletionLedgerAccessKey &&
       deletionLedgerSecretKey.length >= 32 &&
       deletionLedgerHmacKey.length >= 32 &&
+      deletionLedgerSecretKey !== deletionLedgerHmacKey &&
       ["path", "virtual-host"].includes(deletionLedgerUrlStyle) &&
       deletionLedgerProtectionSeconds >= 7_776_000
         ? "S3-compatible ledger configured with a protection horizon of at least 90 days"

@@ -212,9 +212,13 @@ export class S3DeletionLedger implements DeletionLedger {
           `Deletion ledger exceeds the ${maxDeletionLedgerEntries}-entry startup reconciliation bound; archive expired entries before restarting.`
         );
       }
-      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-      if (continuationToken === "")
+      if (
+        response.IsTruncated &&
+        (typeof response.NextContinuationToken !== "string" || response.NextContinuationToken.trim().length === 0)
+      ) {
         throw new Error("Deletion ledger returned a truncated page without a continuation token.");
+      }
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
       if (continuationToken && seenTokens.has(continuationToken)) {
         throw new Error("Deletion ledger returned a repeated continuation token.");
       }

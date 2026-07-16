@@ -138,6 +138,32 @@ test("production fail-stop exits for supervisor restart unless explicitly overri
   }
 });
 
+test("S3 deletion ledger requires independent transport and HMAC keys", () => {
+  const names = [
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"
+  ] as const;
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  const reusedKey = "test-reused-key-with-at-least-32-characters";
+  try {
+    delete process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH;
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = "https://ledger.example.test";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET = "relay";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION = "us-test-1";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID = "test-access-key";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY = reusedKey;
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = reusedKey;
+    assert.throws(() => loadRelayConfig(), /HMAC key must differ from the S3 secret access key/);
+  } finally {
+    for (const name of names) restoreEnv(name, previous.get(name));
+  }
+});
+
 test("production rejects the development filesystem deletion ledger", () => {
   const previous = {
     nodeEnv: process.env.NODE_ENV,

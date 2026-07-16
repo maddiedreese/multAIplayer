@@ -301,6 +301,9 @@ function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
   if (configured !== 6 || secretAccessKey.length < 32 || hmacKey.length < 32) {
     throw new Error("Deletion ledger configuration is incomplete or uses a key shorter than 32 characters.");
   }
+  if (secretAccessKey === hmacKey) {
+    throw new Error("Deletion ledger HMAC key must differ from the S3 secret access key.");
+  }
   if (urlStyle !== "path" && urlStyle !== "virtual-host") {
     throw new Error("Deletion ledger S3 URL style must be path or virtual-host.");
   }

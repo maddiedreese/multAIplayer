@@ -67,10 +67,37 @@ test("reconciliation fails closed when an older restore resurrects active owners
   const userId = "github:owner";
   store.teams.set("team", { id: "team", name: "Team", members: 1, createdAt: "2026-01-01T00:00:00.000Z" });
   store.teamMembers.set("team", new Map([[userId, { userId, role: "owner", joinedAt: "2026-01-01T00:00:00.000Z" }]]));
+  const subject = ledgerFor(userId).subjectFor(userId);
   await assert.rejects(
     () => reconcileDeletionLedger({ ledger: ledgerFor(userId), store, persist: async () => undefined }),
-    DeletionReconciliationBlockedError
+    (error: unknown) => {
+      assert.ok(error instanceof DeletionReconciliationBlockedError);
+      assert.equal(error.subject, subject);
+      assert.match(error.message, new RegExp(subject));
+      return true;
+    }
   );
+});
+
+test("reconciliation discovers an identity represented only by a durable quota row", async () => {
+  const store = createRelayStore();
+  const userId = "github:quota-only-restore";
+  store.accountQuotaRecords.set(`daily_team_creations:${userId}`, {
+    key: `daily_team_creations:${userId}`,
+    userId,
+    quota: "daily_team_creations",
+    used: 1,
+    resetAt: Date.now() + 60_000
+  });
+
+  const result = await reconcileDeletionLedger({
+    ledger: ledgerFor(userId),
+    store,
+    persist: async () => undefined
+  });
+
+  assert.equal(result.identitiesDeleted, 1);
+  assert.equal(store.accountQuotaRecords.size, 0);
 });
 
 test("offline resolution deletes only resources owned by the exact reported subject", async () => {

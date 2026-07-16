@@ -124,6 +124,33 @@ test("S3 ledger refuses an unbounded startup scan before fetching object bodies"
   assert.equal(gets, 0);
 });
 
+test("S3 ledger fails closed on a truncated page without a continuation token before reading objects", async () => {
+  let gets = 0;
+  const client = {
+    async send(command: unknown): Promise<unknown> {
+      if (command instanceof ListObjectsV2Command) {
+        return { IsTruncated: true, Contents: [{ Key: "deletions/unread.json" }] };
+      }
+      if (command instanceof GetObjectCommand) gets += 1;
+      return {};
+    }
+  };
+  const ledger = new S3DeletionLedger({
+    endpoint: "https://storage.example.test",
+    bucket: "relay-ledger",
+    region: "auto",
+    accessKeyId: "test-access-key",
+    secretAccessKey: "test-secret-access-key-with-at-least-32-characters",
+    hmacKey: key,
+    prefix: "deletions",
+    protectionSeconds: 7_776_000,
+    urlStyle: "path",
+    client
+  });
+  await assert.rejects(() => ledger.list(), /truncated page without a continuation token/);
+  assert.equal(gets, 0);
+});
+
 test("S3 ledger reads a bounded object batch concurrently", async () => {
   let activeReads = 0;
   let maximumActiveReads = 0;
