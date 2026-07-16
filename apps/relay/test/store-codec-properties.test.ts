@@ -747,15 +747,41 @@ function assertNestedKeyAbsent(value: unknown, forbidden: string): void {
   for (const child of Object.values(value)) assertNestedKeyAbsent(child, forbidden);
 }
 
-test("invalid persistence-only rows are dropped independently of valid siblings", () => {
+test("malformed current account restrictions fail startup while expired restrictions are discarded", () => {
+  const malformed = codec();
+  assert.throws(
+    () =>
+      malformed.codec.applyStoredRelayState({
+        version: 1,
+        accountRestrictions: [
+          { userId: "github:restricted", reasonCode: "NOT_ALLOWED", createdAt: "2026-07-11T11:00:00.000Z" }
+        ]
+      }),
+    /account-restriction row failed validation/
+  );
+
+  const expired = codec();
+  assert.doesNotThrow(() =>
+    expired.codec.applyStoredRelayState({
+      version: 1,
+      accountRestrictions: [
+        {
+          userId: "github:expired",
+          reasonCode: "abuse",
+          createdAt: "2026-07-10T11:00:00.000Z",
+          expiresAt: new Date(fixedNow).toISOString()
+        }
+      ]
+    })
+  );
+  assert.equal(expired.store.accountRestrictions.size, 0);
+});
+
+test("invalid non-authoritative persistence rows are dropped independently of valid siblings", () => {
   const { store, codec: relayCodec } = codec();
   relayCodec.applyStoredRelayState({
     version: 1,
-    accountRestrictions: [
-      { userId: "github:valid", reasonCode: "abuse", createdAt: "2026-07-11T11:00:00.000Z" },
-      { userId: "github:bad\u0000", reasonCode: "abuse", createdAt: "2026-07-11T11:00:00.000Z" },
-      { userId: "github:bad", reasonCode: "NOT_ALLOWED", createdAt: "2026-07-11T11:00:00.000Z" }
-    ],
+    accountRestrictions: [{ userId: "github:valid", reasonCode: "abuse", createdAt: "2026-07-11T11:00:00.000Z" }],
     accountQuotaRecords: [
       {
         key: "daily_team_creations:github:valid",

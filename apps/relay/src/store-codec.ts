@@ -27,6 +27,7 @@ import { createRelayStoreNormalizers } from "./store-codec-normalizers.js";
 import {
   applyStoredAccountQuotaRecords,
   normalizeAccountRestriction,
+  isExpiredStoredAccountRestriction,
   normalizeDeletionLedgerEntry
 } from "./store-codec-normalizers.js";
 
@@ -124,12 +125,15 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     value: unknown,
     normalize: (candidate: unknown) => T | null,
     apply: (normalized: T) => void,
-    criticalEntity?: string
+    criticalEntity?: string,
+    intentionallyDiscardable?: (candidate: unknown) => boolean
   ): void {
     for (const candidate of storedArray(value)) {
       const normalized = normalize(candidate);
       if (normalized) apply(normalized);
-      else if (criticalEntity) throw new Error(`Stored relay ${criticalEntity} row failed validation.`);
+      else if (criticalEntity && !intentionallyDiscardable?.(candidate)) {
+        throw new Error(`Stored relay ${criticalEntity} row failed validation.`);
+      }
     }
   }
 
@@ -181,7 +185,9 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     applyStoredRows(
       stored.accountRestrictions,
       (item) => normalizeAccountRestriction(item, now(), options.maxUserIdChars),
-      (restriction) => store.accountRestrictions.set(restriction.userId, restriction)
+      (restriction) => store.accountRestrictions.set(restriction.userId, restriction),
+      "account-restriction",
+      (candidate) => isExpiredStoredAccountRestriction(candidate, now())
     );
     applyStoredAccountQuotaRecords(store, stored.accountQuotaRecords, now());
     applyStoredRows(stored.appliedDeletionLedgerEntries, normalizeDeletionLedgerEntry, (entry) => {

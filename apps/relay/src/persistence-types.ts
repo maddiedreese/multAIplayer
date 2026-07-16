@@ -23,6 +23,5 @@ export interface RelayPersistence {
     prunedMessageIds: string[],
     changes: StoredRelayMutation[]
   ): void;
-  quarantine(reason: string): Promise<void>;
   close(): void;
 }

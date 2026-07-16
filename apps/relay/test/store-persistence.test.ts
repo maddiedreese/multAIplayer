@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { RelayStaleEpochError } from "../src/persistence.js";
+import { SqliteRelayPersistence } from "../src/sqlite-persistence.js";
 import { createRelayStorePersistenceCoordinator, RelayPersistenceLoadError } from "../src/store-persistence.js";
 
 test("relay persistence flushes durable mutations and closes", async () => {
@@ -17,7 +21,6 @@ test("relay persistence flushes durable mutations and closes", async () => {
     saveMlsBacklog: () => true,
     saveMlsMessage: () => true,
     saveMlsCommit: () => {},
-    quarantine: async () => {},
     close: () => {
       closed = true;
     }
@@ -61,7 +64,6 @@ test("row persistence never serializes the whole relay store", async () => {
     saveMlsBacklog: () => true,
     saveMlsMessage: () => true,
     saveMlsCommit: () => {},
-    quarantine: async () => {},
     close: () => {}
   };
   const codec = {
@@ -117,7 +119,6 @@ test("scheduled mutation failures poison persistence until restart and still clo
     saveMlsBacklog: () => true,
     saveMlsMessage: () => true,
     saveMlsCommit: () => {},
-    quarantine: async () => {},
     close: () => {
       closed = true;
     }
@@ -157,7 +158,6 @@ test("an expected competing MLS commit does not poison persistence", async () =>
     saveMlsCommit: () => {
       throw new RelayStaleEpochError();
     },
-    quarantine: async () => {},
     close: () => {}
   };
   const codec = {
@@ -192,33 +192,37 @@ test("an expected competing MLS commit does not poison persistence", async () =>
   assert.equal(coordinator.isHealthy(), true);
 });
 
-test("unsupported stored versions are quarantined and never replaced with an empty relay", async () => {
-  const quarantines: string[] = [];
-  const coordinator = createRelayStorePersistenceCoordinator({
-    dataPath: "unused",
-    persistence: {
-      load: async () => ({ version: 2 }),
-      save: async () => {},
-      saveChanges: () => true,
-      saveKeyPackages: () => {},
-      saveMlsBacklog: () => true,
-      saveMlsMessage: () => true,
-      saveMlsCommit: () => {},
-      quarantine: async (reason) => void quarantines.push(reason),
-      close: () => {}
-    },
-    storeCodec: inertCodec()
-  });
-  await assert.rejects(coordinator.loadRelayStore(), RelayPersistenceLoadError);
-  assert.deepEqual(quarantines, ["unsupported-version"]);
+test("unsupported stored versions remain fail-closed across supervised restarts", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "relay-persistent-load-failure-"));
+  const dataPath = join(directory, "relay.sqlite");
+  const initial = new SqliteRelayPersistence(dataPath);
+  try {
+    await initial.save({ version: 2, savedAt: new Date().toISOString(), teams: [], rooms: [], mlsBacklog: [] });
+    initial.close();
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const persistence = new SqliteRelayPersistence(dataPath);
+      const coordinator = createRelayStorePersistenceCoordinator({
+        dataPath,
+        persistence,
+        storeCodec: inertCodec()
+      });
+      await assert.rejects(coordinator.loadRelayStore(), RelayPersistenceLoadError);
+      persistence.close();
+    }
+  } finally {
+    initial.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
-test("unreadable stored state is quarantined and fails startup", async () => {
-  const quarantines: string[] = [];
+test("unreadable stored state fails startup without mutating its recovery source", async () => {
+  let loadCalls = 0;
   const coordinator = createRelayStorePersistenceCoordinator({
     dataPath: "unused",
     persistence: {
       load: async () => {
+        loadCalls += 1;
         throw new Error("corrupt database");
       },
       save: async () => {},
@@ -227,13 +231,12 @@ test("unreadable stored state is quarantined and fails startup", async () => {
       saveMlsBacklog: () => true,
       saveMlsMessage: () => true,
       saveMlsCommit: () => {},
-      quarantine: async (reason) => void quarantines.push(reason),
       close: () => {}
     },
     storeCodec: inertCodec()
   });
   await assert.rejects(coordinator.loadRelayStore(), RelayPersistenceLoadError);
-  assert.deepEqual(quarantines, ["unreadable"]);
+  assert.equal(loadCalls, 1);
 });
 
 test("capacity reclamation persists prune mutations before admitting new payloads", async () => {
@@ -252,7 +255,6 @@ test("capacity reclamation persists prune mutations before admitting new payload
       saveMlsBacklog: () => true,
       saveMlsMessage: () => true,
       saveMlsCommit: () => {},
-      quarantine: async () => {},
       close: () => {}
     },
     storeCodec: {

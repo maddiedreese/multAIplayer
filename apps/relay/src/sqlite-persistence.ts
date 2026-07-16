@@ -1,8 +1,7 @@
 import Database from "better-sqlite3";
-import { chmod, mkdir, rename, stat } from "node:fs/promises";
+import { chmod, mkdir, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { type MlsRelayMessage } from "@multaiplayer/protocol";
-import { logRelayEvent } from "./observability.js";
 import type { RelayPersistence, StoredRelayMutation } from "./persistence-types.js";
 import { openRelayDatabase } from "./sqlite-schema.js";
 import {
@@ -68,14 +67,6 @@ export class SqliteRelayPersistence implements RelayPersistence {
       })()
     );
   }
-  async quarantine(reason: string): Promise<void> {
-    this.close();
-    await Promise.all([
-      quarantinePath(this.dataPath, reason),
-      quarantinePath(`${this.dataPath}-wal`, reason),
-      quarantinePath(`${this.dataPath}-shm`, reason)
-    ]);
-  }
   private getDb(): Database.Database {
     return (this.db ??= openRelayDatabase(this.dataPath, this.sqliteWalAutoCheckpointPages));
   }
@@ -104,15 +95,5 @@ async function ensureDataDirectory(path: string): Promise<void> {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     await mkdir(path, { recursive: true, mode: 0o700 });
     await chmod(path, 0o700);
-  }
-}
-
-async function quarantinePath(path: string, reason: string) {
-  const backupPath = `${path}.corrupt-${reason}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-  try {
-    await rename(path, backupPath);
-    logRelayEvent("warn", "unreadable_store_quarantined");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") logRelayEvent("error", "store_quarantine_failed");
   }
 }

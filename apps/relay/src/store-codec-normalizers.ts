@@ -437,6 +437,11 @@ export function normalizeAccountRestriction(
   };
 }
 
+export function isExpiredStoredAccountRestriction(value: unknown, now: number): boolean {
+  const parsed = StoredAccountRestriction.safeParse(value);
+  return parsed.success && parsed.data.expiresAt !== undefined && Date.parse(parsed.data.expiresAt) <= now;
+}
+
 export function normalizeAccountQuotaRecord(value: unknown, now: number): AccountQuotaRecord | null {
   const parsed = parseStoredRecord(StoredAccountQuotaRecord, value);
   return parsed && parsed.resetAt > now ? parsed : null;

@@ -72,11 +72,8 @@ export function createRelayStorePersistenceCoordinator(options: {
       const stored = await options.persistence.load();
       if (stored === null) return;
       if (!isRecord(stored) || stored.version !== 1) {
-        logRelayEvent("warn", "unsupported_store_version_quarantined");
-        await options.persistence.quarantine("unsupported-version");
-        throw new RelayPersistenceLoadError(
-          "Relay store version is unsupported; quarantined evidence requires operator recovery."
-        );
+        logRelayEvent("warn", "unsupported_store_version");
+        throw new RelayPersistenceLoadError("Relay store version is unsupported; operator recovery is required.");
       }
       options.storeCodec.applyStoredRelayState(stored);
       options.storeCodec.discardStoredRelayMutations();
@@ -90,9 +87,8 @@ export function createRelayStorePersistenceCoordinator(options: {
       )
         throw error;
       logRelayEvent("warn", "relay_store_load_failed");
-      await options.persistence.quarantine("unreadable");
       throw new RelayPersistenceLoadError(
-        "Relay store could not be read and was quarantined; refusing to start with replacement state.",
+        "Relay store could not be read; refusing to start with replacement state.",
         error
       );
     }
