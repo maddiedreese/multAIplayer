@@ -42,7 +42,7 @@ export function loadDeviceFingerprintComparisons(): DeviceFingerprintComparisonR
 
   const legacy = localStorage.getItem(legacyDeviceFingerprintComparisonsStorageKey);
   if (!legacy) return [];
-  const migrated = parseStoredDeviceFingerprintComparisons(
+  const migrated = parseLegacyDeviceFingerprintComparisons(
     legacy,
     "discard corrupt legacy device-fingerprint comparison storage"
   );
@@ -67,6 +67,25 @@ function parseStoredDeviceFingerprintComparisons(
     if (!Array.isArray(parsed)) throw new Error("fingerprint comparisons must be an array");
     return dedupeDeviceFingerprintComparisons(
       parsed.map(normalizeDeviceFingerprintComparison).filter(Boolean) as DeviceFingerprintComparisonRecord[]
+    ).slice(-maxDeviceFingerprintComparisons);
+  } catch {
+    reportNonFatal(failureOperation);
+    return null;
+  }
+}
+
+function parseLegacyDeviceFingerprintComparisons(
+  stored: string,
+  failureOperation: string
+): DeviceFingerprintComparisonRecord[] | null {
+  try {
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) throw new Error("legacy fingerprint comparisons must be an array");
+    const comparedAt = new Date().toISOString();
+    return dedupeDeviceFingerprintComparisons(
+      parsed
+        .map((value) => normalizeLegacyDeviceFingerprintComparison(value, comparedAt))
+        .filter(Boolean) as DeviceFingerprintComparisonRecord[]
     ).slice(-maxDeviceFingerprintComparisons);
   } catch {
     reportNonFatal(failureOperation);
@@ -155,12 +174,26 @@ function dedupeDeviceFingerprintComparisons(
 
 function normalizeDeviceFingerprintComparison(value: unknown): DeviceFingerprintComparisonRecord | null {
   if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<DeviceFingerprintComparisonRecord> & { trustedAt?: unknown };
+  const candidate = value as Partial<DeviceFingerprintComparisonRecord>;
   const key = normalizeComparisonKey(candidate.roomId, candidate.deviceId, candidate.fingerprint);
-  const storedComparedAt = candidate.comparedAt ?? candidate.trustedAt;
+  const storedComparedAt = candidate.comparedAt;
   if (!key || typeof storedComparedAt !== "string") return null;
   const comparedAt = storedComparedAt.trim();
   if (!comparedAt || Number.isNaN(Date.parse(comparedAt))) return null;
+  return {
+    ...key,
+    comparedAt
+  };
+}
+
+function normalizeLegacyDeviceFingerprintComparison(
+  value: unknown,
+  comparedAt: string
+): DeviceFingerprintComparisonRecord | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<DeviceFingerprintComparisonRecord>;
+  const key = normalizeComparisonKey(candidate.roomId, candidate.deviceId, candidate.fingerprint);
+  if (!key) return null;
   return {
     ...key,
     comparedAt

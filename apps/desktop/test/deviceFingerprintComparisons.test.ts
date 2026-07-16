@@ -132,23 +132,15 @@ test("loadDeviceFingerprintComparisons migrates the legacy trust-named key once"
     ])
   );
 
-  assert.deepEqual(loadDeviceFingerprintComparisons(), [
-    {
-      roomId: "room-a",
-      deviceId: "device-a",
-      fingerprint: fingerprintA,
-      comparedAt: "2026-07-04T12:00:00.000Z"
-    }
-  ]);
+  const migrated = loadDeviceFingerprintComparisons();
+  assert.equal(migrated.length, 1);
+  assert.equal(migrated[0]?.roomId, "room-a");
+  assert.equal(migrated[0]?.deviceId, "device-a");
+  assert.equal(migrated[0]?.fingerprint, fingerprintA);
+  assert.equal(Number.isNaN(Date.parse(migrated[0]?.comparedAt ?? "")), false);
+  assert.notEqual(migrated[0]?.comparedAt, "2026-07-04T12:00:00.000Z");
   assert.equal(localStorage.getItem(legacyComparisonStorageKey), null);
-  assert.deepEqual(JSON.parse(localStorage.getItem(comparisonStorageKey)!), [
-    {
-      roomId: "room-a",
-      deviceId: "device-a",
-      fingerprint: fingerprintA,
-      comparedAt: "2026-07-04T12:00:00.000Z"
-    }
-  ]);
+  assert.deepEqual(JSON.parse(localStorage.getItem(comparisonStorageKey)!), migrated);
 });
 
 test("the current comparison key is authoritative and clears a stale legacy key", () => {
