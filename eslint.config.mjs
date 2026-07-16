@@ -45,6 +45,13 @@ export default tseslint.config(
     }
   },
   {
+    files: typescriptFiles,
+    ignores: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "**/test/**", "**/tests/**", "e2e/**"],
+    rules: {
+      "max-lines": ["error", { max: 600, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
     files: ["apps/desktop/**/*.{ts,tsx}"],
     languageOptions: {
       globals: {
@@ -65,7 +72,6 @@ export default tseslint.config(
       "desktop/no-flat-lib-module": "error",
       "desktop/zustand-slice-boundaries": "error",
       "desktop/zustand-reducer-only": "error",
-      "max-lines": ["warn", { max: 400, skipBlankLines: true, skipComments: true }],
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"
     }
