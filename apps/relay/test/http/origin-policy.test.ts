@@ -158,3 +158,68 @@ test("an empty Origin header is invalid rather than a native-client omission", a
     await relay.close();
   }
 });
+
+test("cookie-authenticated browser mutations require an allowed Origin", async () => {
+  const relay = await startRelay({
+    NODE_ENV: "production",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com"
+  });
+  try {
+    const missingOrigin = await fetch(`${relay.baseUrl}/auth/logout`, {
+      method: "POST",
+      headers: {
+        cookie: "multaiplayer_session=browser-session",
+        "sec-fetch-site": "cross-site"
+      }
+    });
+    assert.equal(missingOrigin.status, 403);
+    assert.deepEqual(await missingOrigin.json(), {
+      error: "Browser mutations require an allowed Origin.",
+      code: "forbidden"
+    });
+
+    const allowedOrigin = await fetch(`${relay.baseUrl}/auth/logout`, {
+      method: "POST",
+      headers: {
+        cookie: "multaiplayer_session=browser-session",
+        origin: "https://multaiplayer.com",
+        "sec-fetch-site": "cross-site"
+      }
+    });
+    assert.equal(allowedOrigin.status, 200);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("cookie-authenticated native mutations may omit browser-only request headers", async () => {
+  const relay = await startRelay({
+    NODE_ENV: "production",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com"
+  });
+  try {
+    const response = await fetch(`${relay.baseUrl}/auth/logout`, {
+      method: "POST",
+      headers: { cookie: "multaiplayer_session=native-session" }
+    });
+    assert.equal(response.status, 200);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("CSRF protection does not turn unauthenticated mutation endpoints into an Origin oracle", async () => {
+  const relay = await startRelay({
+    NODE_ENV: "production",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com"
+  });
+  try {
+    const response = await fetch(`${relay.baseUrl}/auth/logout`, {
+      method: "POST",
+      headers: { "sec-fetch-site": "cross-site" }
+    });
+    assert.equal(response.status, 200);
+  } finally {
+    await relay.close();
+  }
+});

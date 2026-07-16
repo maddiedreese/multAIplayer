@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3ServiceException } from "@aws-sdk/client-s3";
 import { FileDeletionLedger, maxDeletionLedgerEntries, S3DeletionLedger } from "../src/auth/deletion-ledger.js";
 
 const key = "test-deletion-ledger-hmac-key-with-more-than-32-characters";
@@ -21,6 +21,38 @@ test("file ledger appends authenticated pseudonymous tombstones for repeated cle
     assert.equal((await readdir(directory)).length, 2);
     assert.doesNotMatch(await readFile(join(directory, `${first.id}.json`), "utf8"), /github|12345/);
     assert.equal(ledger.isProtected("github:12345"), true);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("file ledger retries exclusive-create collisions without trusting or reopening the existing path", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "deletion-ledger-"));
+  const now = () => new Date("2026-07-14T12:00:00.000Z");
+  const colliding = new FileDeletionLedger(directory, key, 86_400, now, () => "collision-id");
+  try {
+    const existing = await colliding.record("github:55");
+    const randomIds = ["collision-id", "fresh-random-id"];
+    const retrying = new FileDeletionLedger(directory, key, 86_400, now, () => randomIds.shift() ?? "unexpected-id");
+    const created = await retrying.record("github:55");
+
+    assert.notEqual(created.id, existing.id);
+    assert.match(created.id, /\.fresh-random-id$/);
+    assert.equal((await readdir(directory)).length, 2);
+    assert.equal(JSON.parse(await readFile(join(directory, `${existing.id}.json`), "utf8")).id, existing.id);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("file ledger fails closed after bounded repeated exclusive-create collisions", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "deletion-ledger-"));
+  const now = () => new Date("2026-07-14T12:00:00.000Z");
+  const ledger = new FileDeletionLedger(directory, key, 86_400, now, () => "repeated-collision-id");
+  try {
+    await ledger.record("github:55");
+    await assert.rejects(() => ledger.record("github:55"), /could not allocate a unique entry after 16 attempts/);
+    assert.equal((await readdir(directory)).length, 1);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -88,6 +120,49 @@ test("S3 ledger delegates object transport to the maintained client and authenti
   assert.match(put.input.Key ?? "", /^relay-deletions\/v1\/[a-f0-9]{64}\.[0-9]+\.fixed-random-id\.json$/);
   assert.equal(put.input.IfNoneMatch, "*");
   assert.doesNotMatch(String(put.input.Body), /github:77/);
+});
+
+test("S3 ledger retries conditional-create collisions without reading or trusting the existing object", async () => {
+  const puts: PutObjectCommand[] = [];
+  let gets = 0;
+  const client = {
+    async send(command: unknown): Promise<unknown> {
+      if (command instanceof PutObjectCommand) {
+        puts.push(command);
+        if (puts.length === 1) {
+          throw new S3ServiceException({
+            name: "PreconditionFailed",
+            $fault: "client",
+            $metadata: { httpStatusCode: 412 }
+          });
+        }
+        return {};
+      }
+      if (command instanceof GetObjectCommand) gets += 1;
+      throw new Error("Unexpected command");
+    }
+  };
+  const randomIds = ["collision-id", "fresh-random-id"];
+  const ledger = new S3DeletionLedger({
+    endpoint: "https://storage.example.test",
+    bucket: "relay-ledger",
+    region: "auto",
+    accessKeyId: "test-access-key",
+    secretAccessKey: "test-secret-key",
+    hmacKey: key,
+    prefix: "deletions",
+    protectionSeconds: 86_400,
+    urlStyle: "path",
+    client,
+    now: () => new Date("2026-07-14T12:00:00.000Z"),
+    randomId: () => randomIds.shift() ?? "unexpected-id"
+  });
+
+  const created = await ledger.record("github:55");
+  assert.equal(puts.length, 2);
+  assert.notEqual(puts[0]?.input.Key, puts[1]?.input.Key);
+  assert.match(created.id, /\.fresh-random-id$/);
+  assert.equal(gets, 0);
 });
 
 test("S3 ledger refuses an unbounded startup scan before fetching object bodies", async () => {

@@ -1,0 +1,10 @@
+name: "Production JavaScript and TypeScript"
+
+paths-ignore:
+  - "e2e/**"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"

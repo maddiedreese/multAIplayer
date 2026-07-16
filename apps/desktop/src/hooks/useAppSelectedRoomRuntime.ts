@@ -1,7 +1,7 @@
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import { useSelectedRoomRuntime } from "./useSelectedRoomRuntime";
+import { useSelectedRoomRuntime, type SelectedRoomRuntimeValues } from "./useSelectedRoomRuntime";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -51,51 +51,75 @@ export function useAppSelectedRoomRuntime({
     browserRequests,
     roomTerminals,
     selectedTerminalId,
-    ...codexRuntimeMaps(roomId, codexRuntime),
-    ...supportingRuntimeMaps(roomId, { terminalRuntime, localPreview, invite, gitRuntime, roomSettings })
+    ...selectedCodexRuntimeValues(codexRuntime),
+    ...selectedLocalRuntimeValues({ terminalRuntime, localPreview, invite }),
+    ...selectedWorkflowRuntimeValues({ invite, gitRuntime, roomSettings })
   });
 }
 
-function codexRuntimeMaps(
-  roomId: string | null,
-  runtime: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"][string] | undefined
-) {
+type AppStoreState = ReturnType<typeof useAppStore.getState>;
+
+function selectedCodexRuntimeValues(
+  runtime: AppStoreState["codexRuntimeByRoom"][string] | undefined
+): Pick<
+  SelectedRoomRuntimeValues,
+  | "activeCodexApproval"
+  | "queuedCodexApprovals"
+  | "approvalVisible"
+  | "hostHandoffs"
+  | "codexEvents"
+  | "codexActivities"
+  | "selectedCodexThreadId"
+  | "codexThreadGraph"
+  | "codexRunning"
+> {
   return {
-    pendingCodexApprovalsByRoom: activeMap(roomId, runtime?.pendingApproval),
-    queuedCodexApprovalsByRoom: activeMap(roomId, runtime?.queuedApprovals),
-    approvalVisibleByRoom: activeMap(roomId, runtime?.approvalVisible),
-    hostHandoffsByRoom: activeMap(roomId, runtime?.hostHandoffs),
-    codexEventsByRoom: activeMap(roomId, runtime?.events),
-    codexActivitiesByRoom: activeMap(roomId, runtime?.activities),
-    codexThreadIdsByRoom: activeMap(roomId, runtime?.threadGraph?.activeThreadId),
-    codexThreadGraphsByRoom: activeMap(roomId, runtime?.threadGraph),
-    codexRunningByRoom: activeMap(roomId, runtime?.running)
+    activeCodexApproval: runtime?.pendingApproval ?? null,
+    queuedCodexApprovals: runtime?.queuedApprovals ?? [],
+    approvalVisible: runtime?.approvalVisible ?? false,
+    hostHandoffs: runtime?.hostHandoffs ?? [],
+    codexEvents: runtime?.events ?? [],
+    codexActivities: runtime?.activities ?? [],
+    selectedCodexThreadId: runtime?.threadGraph?.activeThreadId ?? null,
+    codexThreadGraph: runtime?.threadGraph ?? { activeThreadId: null, nodesById: {} },
+    codexRunning: runtime?.running ?? false
   };
 }
 
-function supportingRuntimeMaps(
-  roomId: string | null,
-  sources: Pick<ReturnType<typeof useAppStore.getState>, never> & {
-    terminalRuntime: ReturnType<typeof useAppStore.getState>["terminalRuntimeByRoom"][string] | undefined;
-    localPreview: ReturnType<typeof useAppStore.getState>["localPreviewByRoom"][string] | undefined;
-    invite: ReturnType<typeof useAppStore.getState>["inviteByRoom"][string] | undefined;
-    gitRuntime: ReturnType<typeof useAppStore.getState>["gitWorkflowRuntimeByRoom"][string] | undefined;
-    roomSettings: ReturnType<typeof useAppStore.getState>["roomSettingsByRoom"][string] | undefined;
-  }
-) {
+function selectedLocalRuntimeValues({
+  terminalRuntime,
+  localPreview,
+  invite
+}: {
+  terminalRuntime: AppStoreState["terminalRuntimeByRoom"][string] | undefined;
+  localPreview: AppStoreState["localPreviewByRoom"][string] | undefined;
+  invite: AppStoreState["inviteByRoom"][string] | undefined;
+}): Pick<SelectedRoomRuntimeValues, "terminalRequests" | "localPreviews" | "localPreviewBusy" | "inviteRequests"> {
   return {
-    terminalRequestsByRoom: activeMap(roomId, sources.terminalRuntime?.requests),
-    localPreviewsByRoom: activeMap(roomId, sources.localPreview?.previews),
-    localPreviewBusyByRoom: activeMap(roomId, sources.localPreview?.busy),
-    inviteRequestsByRoom: activeMap(roomId, sources.invite?.requests),
-    gitWorkflowEventsByRoom: activeMap(roomId, sources.gitRuntime?.workflow?.events),
-    githubActionsEventsByRoom: activeMap(roomId, sources.gitRuntime?.actions?.events),
-    hostBusyByRoom: activeMap(roomId, sources.roomSettings?.hostBusy),
-    settingsBusyByRoom: activeMap(roomId, sources.roomSettings?.settingsBusy),
-    membershipCommitBusyByRoom: activeMap(roomId, sources.invite?.membershipCommitBusy)
+    terminalRequests: terminalRuntime?.requests ?? [],
+    localPreviews: localPreview?.previews ?? [],
+    localPreviewBusy: localPreview?.busy ?? false,
+    inviteRequests: invite?.requests ?? []
   };
 }
 
-function activeMap<T>(roomId: string | null, value: T | null | undefined): Record<string, T> {
-  return roomId == null || value == null ? {} : { [roomId]: value };
+function selectedWorkflowRuntimeValues({
+  invite,
+  gitRuntime,
+  roomSettings
+}: {
+  invite: AppStoreState["inviteByRoom"][string] | undefined;
+  gitRuntime: AppStoreState["gitWorkflowRuntimeByRoom"][string] | undefined;
+  roomSettings: AppStoreState["roomSettingsByRoom"][string] | undefined;
+}): Pick<
+  SelectedRoomRuntimeValues,
+  "gitWorkflowEvents" | "githubActionsEvents" | "hostBusy" | "settingsBusy" | "membershipCommitBusy"
+> {
+  return {
+    gitWorkflowEvents: gitRuntime?.workflow?.events ?? [],
+    githubActionsEvents: gitRuntime?.actions?.events ?? [],
+    hostBusy: roomSettings?.hostBusy ?? false,
+    settingsBusy: roomSettings?.settingsBusy ?? false,
+    membershipCommitBusy: invite?.membershipCommitBusy ?? false
+  };
 }

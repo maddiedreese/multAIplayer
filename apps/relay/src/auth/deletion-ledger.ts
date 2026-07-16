@@ -46,6 +46,7 @@ export interface S3DeletionLedgerOptions {
 
 export const maxDeletionLedgerEntries = 10_000;
 const deletionLedgerReadConcurrency = 16;
+const deletionLedgerCreateAttempts = 16;
 
 export class FileDeletionLedger implements DeletionLedger {
   private readonly protectedSubjects = new Set<string>();
@@ -66,34 +67,37 @@ export class FileDeletionLedger implements DeletionLedger {
 
   async record(userId: string): Promise<DeletionLedgerEntry> {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    const entry = createDeletionLedgerEntry(
-      this.hmacKey,
-      userId,
-      this.now().toISOString(),
-      this.protectionSeconds,
-      this.randomId()
-    );
-    const path = join(this.directory, `${entry.id}.json`);
-    try {
-      const file = await open(path, "wx", 0o600);
+    const requestedAt = this.now().toISOString();
+    for (let attempt = 0; attempt < deletionLedgerCreateAttempts; attempt += 1) {
+      const entry = createDeletionLedgerEntry(
+        this.hmacKey,
+        userId,
+        requestedAt,
+        this.protectionSeconds,
+        this.randomId()
+      );
+      let file: Awaited<ReturnType<typeof open>>;
+      try {
+        file = await open(join(this.directory, `${entry.id}.json`), "wx", 0o600);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
+        throw error;
+      }
+
       try {
         await file.writeFile(JSON.stringify(entry));
         await file.sync();
       } finally {
         await file.close();
       }
-      const directoryHandle = await open(this.directory, "r");
-      try {
-        await directoryHandle.sync();
-      } finally {
-        await directoryHandle.close();
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+
+      await syncDirectory(this.directory);
+      this.protectedSubjects.add(entry.subject);
+      return entry;
     }
-    const stored = parseDeletionLedgerEntry(this.hmacKey, await readFile(path, "utf8"), entry.id);
-    this.protectedSubjects.add(stored.subject);
-    return stored;
+    throw new Error(
+      `Deletion ledger could not allocate a unique entry after ${deletionLedgerCreateAttempts} attempts.`
+    );
   }
 
   async list(): Promise<DeletionLedgerEntry[]> {
@@ -166,32 +170,34 @@ export class S3DeletionLedger implements DeletionLedger {
 
   async record(userId: string): Promise<DeletionLedgerEntry> {
     const requestedAt = this.now().toISOString();
-    const entry = createDeletionLedgerEntry(
-      this.options.hmacKey,
-      userId,
-      requestedAt,
-      this.options.protectionSeconds,
-      this.randomId()
-    );
-    const { id } = entry;
-    try {
-      await this.client.send(
-        new PutObjectCommand({
-          Bucket: this.options.bucket,
-          Key: this.objectKey(id),
-          Body: JSON.stringify(entry),
-          ContentType: "application/json",
-          IfNoneMatch: "*"
-        })
+    for (let attempt = 0; attempt < deletionLedgerCreateAttempts; attempt += 1) {
+      const entry = createDeletionLedgerEntry(
+        this.options.hmacKey,
+        userId,
+        requestedAt,
+        this.options.protectionSeconds,
+        this.randomId()
       );
-    } catch (error) {
-      if (!(error instanceof S3ServiceException) || error.$metadata.httpStatusCode !== 412) throw error;
-      const stored = await this.readEntry(this.objectKey(id), id);
-      this.protectedSubjects.add(stored.subject);
-      return stored;
+      try {
+        await this.client.send(
+          new PutObjectCommand({
+            Bucket: this.options.bucket,
+            Key: this.objectKey(entry.id),
+            Body: JSON.stringify(entry),
+            ContentType: "application/json",
+            IfNoneMatch: "*"
+          })
+        );
+      } catch (error) {
+        if (error instanceof S3ServiceException && error.$metadata.httpStatusCode === 412) continue;
+        throw error;
+      }
+      this.protectedSubjects.add(entry.subject);
+      return entry;
     }
-    this.protectedSubjects.add(entry.subject);
-    return entry;
+    throw new Error(
+      `Deletion ledger could not allocate a unique entry after ${deletionLedgerCreateAttempts} attempts.`
+    );
   }
 
   async list(): Promise<DeletionLedgerEntry[]> {
@@ -273,6 +279,15 @@ export class S3DeletionLedger implements DeletionLedger {
     const response = await this.client.send(new GetObjectCommand({ Bucket: this.options.bucket, Key: key }));
     if (!response.Body) throw new Error("Deletion ledger object has no body.");
     return parseDeletionLedgerEntry(this.options.hmacKey, await response.Body.transformToString(), id);
+  }
+}
+
+async function syncDirectory(directory: string): Promise<void> {
+  const directoryHandle = await open(directory, "r");
+  try {
+    await directoryHandle.sync();
+  } finally {
+    await directoryHandle.close();
   }
 }
 

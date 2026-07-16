@@ -1,3 +1,5 @@
+import { normalizeSafeBranchName } from "@multaiplayer/git";
+
 export interface GitHubUser {
   id: string;
   login: string;
@@ -44,29 +46,10 @@ export function normalizeGitHubRepoRef(owner: string, repo: string): GitHubRepoR
 }
 
 export function normalizeGitHubBranchName(branch: string): string {
-  const normalized = branch.trim();
-  if (!normalized) throw new Error("GitHub branch is required.");
-  if (
-    normalized.startsWith("-") ||
-    normalized === "@" ||
-    normalized.includes("..") ||
-    /\s/.test(normalized) ||
-    normalized.includes("~") ||
-    normalized.includes("^") ||
-    normalized.includes(":") ||
-    normalized.includes("?") ||
-    normalized.includes("*") ||
-    normalized.includes("[") ||
-    normalized.includes("\\") ||
-    normalized.includes("//") ||
-    normalized.endsWith("/") ||
-    normalized.endsWith(".") ||
-    normalized.includes("@{") ||
-    normalized.split("/").some((part) => !part || part.startsWith(".") || part.endsWith(".lock"))
-  ) {
-    throw new Error(`Unsafe GitHub branch name: ${branch}`);
-  }
-  return normalized;
+  return normalizeSafeBranchName(branch, {
+    required: "GitHub branch is required.",
+    unsafe: (original) => `Unsafe GitHub branch name: ${original}`
+  });
 }
 
 export function normalizePullRequestDraft(draft: PullRequestDraft): PullRequestDraft {

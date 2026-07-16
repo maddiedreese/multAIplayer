@@ -1,6 +1,6 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { invokeNative } from "../nativeCommandError";
-import { isTauriRuntime } from "./runtime";
+import { isTauriRuntime, requireNativeRuntime } from "./runtime";
 
 export interface RoomArchiveBody {
   version: 1;
@@ -40,7 +40,7 @@ export interface OpenedRoomArchive {
 }
 
 export async function chooseRoomArchiveExportPath(roomName: string): Promise<string | null> {
-  if (!isTauriRuntime()) return null;
+  if (!isTauriRuntime()) return requireNativeRuntime("Room archive export");
   const safeName = roomName.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-|-$/g, "") || "room";
   const selected = await save({
     defaultPath: `${safeName}.multai.age`,
@@ -50,7 +50,7 @@ export async function chooseRoomArchiveExportPath(roomName: string): Promise<str
 }
 
 export async function chooseRoomArchiveImportPath(): Promise<string | null> {
-  if (!isTauriRuntime()) return null;
+  if (!isTauriRuntime()) return requireNativeRuntime("Room archive import");
   const selected = await open({
     multiple: false,
     directory: false,
@@ -72,7 +72,7 @@ export async function importRoomArchive(path: string, passphrase: string): Promi
 }
 
 export async function listRoomArchives(): Promise<RoomArchiveLibraryEntry[]> {
-  if (!isTauriRuntime()) return [];
+  if (!isTauriRuntime()) return requireNativeRuntime("Room archives");
   return invokeNative("room_archive_list");
 }
 

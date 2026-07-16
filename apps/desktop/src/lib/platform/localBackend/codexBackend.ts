@@ -1,7 +1,7 @@
 import { invokeNative } from "../nativeCommandError";
 import { defaultCodexModel } from "@multaiplayer/protocol";
 
-import { isTauriRuntime } from "./runtime";
+import { isTauriRuntime, requireNativeRuntime } from "./runtime";
 import type {
   CodexGoal,
   CodexGoalStatus,
@@ -14,7 +14,7 @@ import type {
 } from "./types";
 
 export async function listCodexThreads(roomId: string, cwd: string, limit = 100): Promise<CodexThreadNode[]> {
-  if (!isTauriRuntime()) return [];
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex threads");
   return invokeNative<CodexThreadNode[]>("list_codex_threads", { request: { roomId, cwd, limit } });
 }
 
@@ -24,17 +24,7 @@ export async function forkCodexThread(
   cwd: string,
   lastTurnId?: string
 ): Promise<CodexThreadNode> {
-  if (!isTauriRuntime()) {
-    const now = Math.floor(Date.now() / 1000);
-    return {
-      id: `${threadId}-fork`,
-      parentThreadId: threadId,
-      title: "Forked Codex thread",
-      status: "idle",
-      createdAt: now,
-      updatedAt: now
-    };
-  }
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex thread forks");
   return invokeNative<CodexThreadNode>("fork_codex_thread", {
     request: { roomId, threadId, cwd, ...(lastTurnId ? { lastTurnId } : {}) }
   });
@@ -47,57 +37,29 @@ export async function setCodexGoal(
   status?: CodexGoalStatus,
   tokenBudget?: number | null
 ): Promise<CodexGoal> {
-  if (isTauriRuntime()) {
-    return invokeNative<CodexGoal>("set_codex_goal", {
-      request: { roomId, threadId, objective, status, tokenBudget }
-    });
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  return {
-    objective: objective ?? "Preview Codex goal",
-    status: status ?? "active",
-    threadId,
-    createdAt: now,
-    updatedAt: now,
-    timeUsedSeconds: 0,
-    tokensUsed: 0,
-    tokenBudget: tokenBudget ?? null
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex goals");
+  return invokeNative<CodexGoal>("set_codex_goal", {
+    request: { roomId, threadId, objective, status, tokenBudget }
+  });
 }
 
 export async function getCodexGoal(roomId: string, threadId: string): Promise<CodexGoal | null> {
-  if (isTauriRuntime()) {
-    return invokeNative<CodexGoal | null>("get_codex_goal", {
-      request: { roomId, threadId }
-    });
-  }
-
-  void roomId;
-  void threadId;
-  return null;
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex goals");
+  return invokeNative<CodexGoal | null>("get_codex_goal", {
+    request: { roomId, threadId }
+  });
 }
 
 export async function clearCodexGoal(roomId: string, threadId: string): Promise<void> {
-  if (isTauriRuntime()) {
-    await invokeNative("clear_codex_goal", {
-      request: { roomId, threadId }
-    });
-  }
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex goals");
+  await invokeNative("clear_codex_goal", {
+    request: { roomId, threadId }
+  });
 }
 
 export async function probeCodex(): Promise<CodexProbe> {
-  if (isTauriRuntime()) {
-    return invokeNative<CodexProbe>("probe_codex");
-  }
-
-  return {
-    available: false,
-    version: null,
-    error: "Preview mode",
-    models: [],
-    modelError: null
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex detection");
+  return invokeNative<CodexProbe>("probe_codex");
 }
 
 export async function runCodexTurn(
@@ -115,68 +77,46 @@ export async function runCodexTurn(
   provenance: { proposedBy: string; contextSummary: string } | null = null,
   shareRawReasoning = false
 ): Promise<CodexTurnResult> {
-  if (isTauriRuntime()) {
-    return invokeNative<CodexTurnResult>("run_codex_turn", {
-      request: {
-        roomId,
-        clientTurnId,
-        cwd,
-        input,
-        model,
-        reasoningEffort,
-        speed,
-        serviceTier,
-        sandboxLevel,
-        previousThreadId,
-        timeoutSeconds,
-        proposedBy: provenance?.proposedBy ?? null,
-        contextSummary: provenance?.contextSummary ?? null,
-        shareRawReasoning
-      }
-    });
-  }
-
-  return {
-    threadId: previousThreadId ?? "preview-thread",
-    status: "preview",
-    transcript:
-      "Preview mode: in the native app, this approval starts a local Codex app-server turn using the selected project and chat delta.",
-    events: [
-      "preview:initialize",
-      previousThreadId ? "preview:thread/resume" : "preview:thread/start",
-      "preview:turn/start",
-      "preview:turn/completed"
-    ],
-    generatedImages: [],
-    stderr: ""
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex turns");
+  return invokeNative<CodexTurnResult>("run_codex_turn", {
+    request: {
+      roomId,
+      clientTurnId,
+      cwd,
+      input,
+      model,
+      reasoningEffort,
+      speed,
+      serviceTier,
+      sandboxLevel,
+      previousThreadId,
+      timeoutSeconds,
+      proposedBy: provenance?.proposedBy ?? null,
+      contextSummary: provenance?.contextSummary ?? null,
+      shareRawReasoning
+    }
+  });
 }
 
 export async function steerCodexTurn(roomId: string, input: string): Promise<CodexSteerResult> {
-  if (isTauriRuntime()) {
-    return invokeNative<CodexSteerResult>("steer_codex_turn", { request: { roomId, input } });
-  }
-  return {
-    threadId: "preview-thread",
-    turnId: "preview-active-turn",
-    clientTurnId: "preview-client-turn"
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex steering");
+  return invokeNative<CodexSteerResult>("steer_codex_turn", { request: { roomId, input } });
 }
 
 export async function shutdownCodexRoom(roomId: string): Promise<number> {
-  if (!isTauriRuntime()) return 0;
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex rooms");
   return invokeNative<number>("shutdown_codex_room", {
     request: { roomId }
   });
 }
 
 export async function listCodexServerRequests(): Promise<CodexServerRequest[]> {
-  if (!isTauriRuntime()) return [];
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex server requests");
   return invokeNative<CodexServerRequest[]>("list_codex_server_requests");
 }
 
 export async function respondCodexServerRequest(requestKey: string, response: CodexServerResponse): Promise<void> {
-  if (!isTauriRuntime()) return;
+  if (!isTauriRuntime()) return requireNativeRuntime("Codex server requests");
   await invokeNative("respond_codex_server_request", {
     request: { requestKey, response }
   });

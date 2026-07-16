@@ -178,7 +178,12 @@ appropriate for every pull request.
 Dependencies remain exact-pinned. Dependabot batches routine npm, Cargo, Actions,
 and container updates weekly; handle security advisories immediately in focused
 PRs. A temporary exception must name the advisory, reachability, owner, expiry,
-and removal condition.
+and removal condition. `.trivyignore.yaml` carries an expiry on every container
+finding; `deny.toml` carries one fail-closed review deadline for its Rust
+exceptions because Cargo-deny has no per-ignore expiry field. Both deadlines are
+enforced by `npm run check:security-exceptions` in local verification and the
+exact-source supply-chain workflow. Renewing a date without rechecking upstream
+availability and current reachability does not satisfy this policy.
 
 Release artifacts come only from a validated tag through `release.yml`. The
 workflow keeps the GitHub Release in draft state until the blocking native

@@ -5,6 +5,10 @@ targets = []
 [advisories]
 version = 2
 yanked = "deny"
+# Owner: repository maintainers. Cargo-deny has no per-ignore expiry field, so
+# the repository check fails on this date until every exception is reviewed,
+# removed, or deliberately renewed with current reachability evidence.
+# exceptions-expire-at: 2026-08-01
 ignore = [
   # GTK3 bindings are Linux-only transitive Tauri/Wry dependencies. Linux is
   # compatibility-only; macOS is the supported release. No safe Tauri upgrade

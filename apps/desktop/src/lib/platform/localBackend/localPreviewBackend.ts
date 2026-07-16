@@ -1,6 +1,6 @@
 import { invokeNative } from "../nativeCommandError";
 
-import { isTauriRuntime } from "./runtime";
+import { isTauriRuntime, requireNativeRuntime } from "./runtime";
 import type {
   CloudflaredProbe,
   LocalPreviewDetectedServer,
@@ -10,67 +10,28 @@ import type {
 } from "./types";
 
 export async function detectLocalPreviewServers(): Promise<LocalPreviewDetectedServer[]> {
-  if (isTauriRuntime()) {
-    return invokeNative<LocalPreviewDetectedServer[]>("detect_local_preview_servers");
-  }
-
-  return [
-    { url: "http://localhost:5173/", host: "localhost", port: 5173 },
-    { url: "http://127.0.0.1:3000/", host: "127.0.0.1", port: 3000 }
-  ];
+  if (!isTauriRuntime()) return requireNativeRuntime("Local preview detection");
+  return invokeNative<LocalPreviewDetectedServer[]>("detect_local_preview_servers");
 }
 
 export async function probeCloudflared(): Promise<CloudflaredProbe> {
-  if (isTauriRuntime()) {
-    return invokeNative<CloudflaredProbe>("probe_cloudflared");
-  }
-
-  return {
-    available: false,
-    version: null,
-    error: "Preview mode: install cloudflared in the native app to start Quick Tunnels."
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Cloudflared detection");
+  return invokeNative<CloudflaredProbe>("probe_cloudflared");
 }
 
 export async function startLocalPreviewTunnel(id: string, localUrl: string): Promise<LocalPreviewStartResult> {
-  if (isTauriRuntime()) {
-    return invokeNative<LocalPreviewStartResult>("local_preview_start", {
-      request: { id, localUrl }
-    });
-  }
-
-  return {
-    id,
-    localUrl,
-    publicUrl: "https://example.trycloudflare.com",
-    startupLog: "Preview mode: native app starts cloudflared."
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Local preview tunnels");
+  return invokeNative<LocalPreviewStartResult>("local_preview_start", {
+    request: { id, localUrl }
+  });
 }
 
 export async function stopLocalPreviewTunnel(id: string): Promise<LocalPreviewStopResult> {
-  if (isTauriRuntime()) {
-    return invokeNative<LocalPreviewStopResult>("local_preview_stop", { id });
-  }
-
-  return {
-    id,
-    localUrl: "http://localhost:5173/",
-    publicUrl: "https://example.trycloudflare.com",
-    stopped: true
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Local preview tunnels");
+  return invokeNative<LocalPreviewStopResult>("local_preview_stop", { id });
 }
 
 export async function readLocalPreviewTunnelStatus(id: string): Promise<LocalPreviewStatusResult> {
-  if (isTauriRuntime()) {
-    return invokeNative<LocalPreviewStatusResult>("local_preview_status", { id });
-  }
-
-  return {
-    id,
-    localUrl: "http://localhost:5173/",
-    publicUrl: "https://example.trycloudflare.com",
-    running: true,
-    localReachable: true,
-    exitStatus: null
-  };
+  if (!isTauriRuntime()) return requireNativeRuntime("Local preview tunnels");
+  return invokeNative<LocalPreviewStatusResult>("local_preview_status", { id });
 }

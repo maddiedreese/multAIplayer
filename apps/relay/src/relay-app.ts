@@ -116,6 +116,7 @@ export async function createRelayApp(
   app.use(originPolicy.enforceAllowedOrigin);
   app.use(cors(originPolicy.corsOptions));
   app.use(cookieParser());
+  app.use(originPolicy.enforceCookieMutationCsrf);
   app.use(requestLoggingMiddleware(structuredLogsEnabled));
   app.use(typedRelayErrorMiddleware);
 
@@ -249,6 +250,8 @@ export async function createRelayApp(
       return session ? `session:${session.sessionIdHash}` : null;
     }
   });
+  // This application-level guard intentionally precedes every auth and API
+  // router registered below. Route-local handlers must not be mounted above it.
   app.use(relayRequestGuards.rateLimitMiddleware);
   const ordinaryJsonBodyLimitBytes = Math.min(jsonBodyLimitBytes, 2_000_000);
   app.use("/attachment-blobs", createContentLengthGuard(jsonBodyLimitBytes));

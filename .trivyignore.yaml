@@ -1,4 +1,7 @@
 vulnerabilities:
+  # Owner: repository maintainers. Every entry must retain an explicit expiry;
+  # tools/security/check-exception-expiry.mjs makes expiry a CI failure rather
+  # than relying on a comment or a scanner-version-specific default.
   # Current node:24-bookworm-slim has no newer digest. The Node-bundled Undici
   # client is not used for WebSocket connections by the relay; recheck at every
   # Node digest update and remove as soon as Node 24 bundles Undici >= 6.27.0.

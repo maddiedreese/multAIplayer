@@ -32,6 +32,11 @@ export interface GitStatusSummary {
 export const maxGitBranchNameChars = 200;
 export const maxCommitMessageChars = 500;
 
+export interface SafeBranchNameMessages {
+  required: string;
+  unsafe: (original: string) => string;
+}
+
 export function createBranchApproval(cwd: string, branch: string): GitActionApproval {
   assertSafeBranchName(branch);
   return {
@@ -106,8 +111,16 @@ export function formatGitWorkflowApprovalPreview(plan: GitWorkflowApprovalPlan):
 }
 
 export function assertSafeBranchName(branch: string): string {
+  return normalizeSafeBranchName(branch, {
+    required: "Branch name is required",
+    unsafe: (original) => `Unsafe branch name: ${original}`
+  });
+}
+
+/** Shared Git ref validation for local Git and GitHub workflow boundaries. */
+export function normalizeSafeBranchName(branch: string, messages: SafeBranchNameMessages): string {
   const normalized = branch.trim();
-  if (!normalized) throw new Error("Branch name is required");
+  if (!normalized) throw new Error(messages.required);
   if (
     normalized.length > maxGitBranchNameChars ||
     normalized.startsWith("-") ||
@@ -127,7 +140,7 @@ export function assertSafeBranchName(branch: string): string {
     normalized.includes("@{") ||
     normalized.split("/").some((part) => !part || part.startsWith(".") || part.endsWith(".lock"))
   ) {
-    throw new Error(`Unsafe branch name: ${branch}`);
+    throw new Error(messages.unsafe(branch));
   }
   return normalized;
 }

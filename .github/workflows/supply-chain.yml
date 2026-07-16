@@ -18,6 +18,18 @@ permissions:
   security-events: write
 
 jobs:
+  exception-policy:
+    name: Temporary security-exception expiry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+      - name: Reject expired scanner and advisory exceptions
+        run: node tools/security/check-exception-expiry.mjs
+
   secrets:
     name: Gitleaks history scan
     runs-on: ubuntu-latest
@@ -122,23 +134,6 @@ jobs:
         run: |
           cargo deny --manifest-path apps/desktop/src-tauri/Cargo.toml check advisories sources
           cargo deny --manifest-path apps/desktop/src-tauri/crates/mls-core/fuzz/Cargo.toml check advisories sources
-
-  codeql:
-    name: JavaScript and TypeScript CodeQL
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-        with:
-          ref: ${{ inputs.commit || github.sha }}
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
-        with:
-          languages: javascript-typescript
-          queries: security-extended
-      - name: Analyze
-        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
 
   codex-contract:
     name: Latest app-server compatibility

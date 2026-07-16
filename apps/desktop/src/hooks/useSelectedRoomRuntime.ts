@@ -28,7 +28,28 @@ import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
 import type { LocalHostUser } from "../lib/access/roomHost";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
-interface UseSelectedRoomRuntimeOptions {
+export interface SelectedRoomRuntimeValues {
+  activeCodexApproval: PendingCodexApproval | null;
+  queuedCodexApprovals: QueuedCodexTurn[];
+  approvalVisible: boolean;
+  hostHandoffs: HostHandoffRecord[];
+  terminalRequests: TerminalCommandRequest[];
+  localPreviews: LocalPreviewRecord[];
+  localPreviewBusy: boolean;
+  inviteRequests: InviteJoinRequest[];
+  codexEvents: CodexRoomEvent[];
+  codexActivities: CodexActivity[];
+  gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
+  githubActionsEvents: GitHubActionsEventPlaintextPayload[];
+  selectedCodexThreadId: string | null;
+  codexThreadGraph: CodexThreadGraph;
+  codexRunning: boolean;
+  hostBusy: boolean;
+  settingsBusy: boolean;
+  membershipCommitBusy: boolean;
+}
+
+interface UseSelectedRoomRuntimeOptions extends SelectedRoomRuntimeValues {
   selectedRoom: ClientRoomRecord | null;
   localUser: LocalHostUser;
   isSelectedRoomLocked: boolean;
@@ -39,24 +60,6 @@ interface UseSelectedRoomRuntimeOptions {
   browserRequests: BrowserAccessRequest[];
   roomTerminals: TerminalSnapshot[];
   selectedTerminalId: string | null;
-  pendingCodexApprovalsByRoom: Record<string, PendingCodexApproval | null>;
-  queuedCodexApprovalsByRoom: Record<string, QueuedCodexTurn[]>;
-  approvalVisibleByRoom: Record<string, boolean>;
-  hostHandoffsByRoom: Record<string, HostHandoffRecord[]>;
-  terminalRequestsByRoom: Record<string, TerminalCommandRequest[]>;
-  localPreviewsByRoom: Record<string, LocalPreviewRecord[]>;
-  localPreviewBusyByRoom: Record<string, boolean>;
-  inviteRequestsByRoom: Record<string, InviteJoinRequest[]>;
-  codexEventsByRoom: Record<string, CodexRoomEvent[]>;
-  codexActivitiesByRoom: Record<string, CodexActivity[]>;
-  gitWorkflowEventsByRoom: Record<string, GitWorkflowEventPlaintextPayload[]>;
-  githubActionsEventsByRoom: Record<string, GitHubActionsEventPlaintextPayload[]>;
-  codexThreadIdsByRoom: Record<string, string | null>;
-  codexThreadGraphsByRoom: Record<string, CodexThreadGraph>;
-  codexRunningByRoom: Record<string, boolean>;
-  hostBusyByRoom: Record<string, boolean>;
-  settingsBusyByRoom: Record<string, boolean>;
-  membershipCommitBusyByRoom: Record<string, boolean>;
 }
 
 export function useSelectedRoomRuntime({
@@ -70,69 +73,25 @@ export function useSelectedRoomRuntime({
   browserRequests,
   roomTerminals,
   selectedTerminalId,
-  pendingCodexApprovalsByRoom,
-  queuedCodexApprovalsByRoom,
-  approvalVisibleByRoom,
-  hostHandoffsByRoom,
-  terminalRequestsByRoom,
-  localPreviewsByRoom,
-  localPreviewBusyByRoom,
-  inviteRequestsByRoom,
-  codexEventsByRoom,
-  codexActivitiesByRoom,
-  gitWorkflowEventsByRoom,
-  githubActionsEventsByRoom,
-  codexThreadIdsByRoom,
-  codexThreadGraphsByRoom,
-  codexRunningByRoom,
-  hostBusyByRoom,
-  settingsBusyByRoom,
-  membershipCommitBusyByRoom
+  activeCodexApproval,
+  queuedCodexApprovals,
+  approvalVisible,
+  hostHandoffs,
+  terminalRequests,
+  localPreviews,
+  localPreviewBusy,
+  inviteRequests,
+  codexEvents,
+  codexActivities,
+  gitWorkflowEvents,
+  githubActionsEvents,
+  selectedCodexThreadId,
+  codexThreadGraph,
+  codexRunning,
+  hostBusy,
+  settingsBusy,
+  membershipCommitBusy
 }: UseSelectedRoomRuntimeOptions) {
-  const roomId = selectedRoom?.id ?? null;
-  const runtime = selectRoomRuntimeCollections(
-    {
-      pendingCodexApprovalsByRoom,
-      queuedCodexApprovalsByRoom,
-      approvalVisibleByRoom,
-      hostHandoffsByRoom,
-      terminalRequestsByRoom,
-      localPreviewsByRoom,
-      localPreviewBusyByRoom,
-      inviteRequestsByRoom,
-      codexEventsByRoom,
-      codexActivitiesByRoom,
-      gitWorkflowEventsByRoom,
-      githubActionsEventsByRoom,
-      codexThreadIdsByRoom,
-      codexThreadGraphsByRoom,
-      codexRunningByRoom,
-      hostBusyByRoom,
-      settingsBusyByRoom,
-      membershipCommitBusyByRoom
-    },
-    roomId
-  );
-  const {
-    activeCodexApproval,
-    queuedCodexApprovals,
-    approvalVisible,
-    hostHandoffs,
-    terminalRequests,
-    localPreviews,
-    localPreviewBusy,
-    inviteRequests,
-    codexEvents,
-    codexActivities,
-    gitWorkflowEvents,
-    githubActionsEvents,
-    selectedCodexThreadId,
-    codexThreadGraph,
-    codexRunning,
-    hostBusy,
-    settingsBusy,
-    membershipCommitBusy
-  } = runtime;
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const selectedTerminalCanControl = selectedRoom
@@ -199,74 +158,6 @@ export function useSelectedRoomRuntime({
     membershipCommitBusy,
     hostStatusLabel,
     roomCanUseChat
-  };
-}
-
-function selectRoomRuntimeCollections(
-  sources: Pick<
-    UseSelectedRoomRuntimeOptions,
-    | "pendingCodexApprovalsByRoom"
-    | "queuedCodexApprovalsByRoom"
-    | "approvalVisibleByRoom"
-    | "hostHandoffsByRoom"
-    | "terminalRequestsByRoom"
-    | "localPreviewsByRoom"
-    | "localPreviewBusyByRoom"
-    | "inviteRequestsByRoom"
-    | "codexEventsByRoom"
-    | "codexActivitiesByRoom"
-    | "gitWorkflowEventsByRoom"
-    | "githubActionsEventsByRoom"
-    | "codexThreadIdsByRoom"
-    | "codexThreadGraphsByRoom"
-    | "codexRunningByRoom"
-    | "hostBusyByRoom"
-    | "settingsBusyByRoom"
-    | "membershipCommitBusyByRoom"
-  >,
-  roomId: string | null
-) {
-  if (!roomId) {
-    return {
-      activeCodexApproval: null,
-      queuedCodexApprovals: [],
-      approvalVisible: false,
-      hostHandoffs: [],
-      terminalRequests: [],
-      localPreviews: [],
-      localPreviewBusy: false,
-      inviteRequests: [],
-      codexEvents: [],
-      codexActivities: [],
-      gitWorkflowEvents: [],
-      githubActionsEvents: [],
-      selectedCodexThreadId: null,
-      codexThreadGraph: { activeThreadId: null, nodesById: {} },
-      codexRunning: false,
-      hostBusy: false,
-      settingsBusy: false,
-      membershipCommitBusy: false
-    };
-  }
-  return {
-    activeCodexApproval: sources.pendingCodexApprovalsByRoom[roomId] ?? null,
-    queuedCodexApprovals: sources.queuedCodexApprovalsByRoom[roomId] ?? [],
-    approvalVisible: sources.approvalVisibleByRoom[roomId] ?? false,
-    hostHandoffs: sources.hostHandoffsByRoom[roomId] ?? [],
-    terminalRequests: sources.terminalRequestsByRoom[roomId] ?? [],
-    localPreviews: sources.localPreviewsByRoom[roomId] ?? [],
-    localPreviewBusy: sources.localPreviewBusyByRoom[roomId] ?? false,
-    inviteRequests: sources.inviteRequestsByRoom[roomId] ?? [],
-    codexEvents: sources.codexEventsByRoom[roomId] ?? [],
-    codexActivities: sources.codexActivitiesByRoom[roomId] ?? [],
-    gitWorkflowEvents: sources.gitWorkflowEventsByRoom[roomId] ?? [],
-    githubActionsEvents: sources.githubActionsEventsByRoom[roomId] ?? [],
-    selectedCodexThreadId: sources.codexThreadIdsByRoom[roomId] ?? null,
-    codexThreadGraph: sources.codexThreadGraphsByRoom[roomId] ?? { activeThreadId: null, nodesById: {} },
-    codexRunning: sources.codexRunningByRoom[roomId] ?? false,
-    hostBusy: sources.hostBusyByRoom[roomId] ?? false,
-    settingsBusy: sources.settingsBusyByRoom[roomId] ?? false,
-    membershipCommitBusy: sources.membershipCommitBusyByRoom[roomId] ?? false
   };
 }
 

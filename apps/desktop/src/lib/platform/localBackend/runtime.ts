@@ -8,6 +8,10 @@ export function isTauriRuntime(): boolean {
   return typeof internals?.invoke === "function";
 }
 
+export function requireNativeRuntime(feature: string): never {
+  throw new Error(`${feature} requires the native desktop app.`);
+}
+
 async function authorizeShellExecution(request: {
   roomId: string;
   cwd: string;
@@ -24,29 +28,20 @@ export async function runShellCommand(
   command: string,
   requesterLabel: string
 ): Promise<CommandResult> {
-  if (isTauriRuntime()) {
-    const authorizationToken = await authorizeShellExecution({
-      roomId,
-      cwd,
-      command,
-      kind: "remote_request",
-      requesterLabel
-    });
-    return invokeNative<CommandResult>("run_shell_command", {
-      request: { roomId, cwd, command, authorizationToken }
-    });
-  }
-
-  return {
+  if (!isTauriRuntime()) return requireNativeRuntime("Shell commands");
+  const authorizationToken = await authorizeShellExecution({
+    roomId,
     cwd,
     command,
-    status: 0,
-    stdout: `$ ${command}\nPreview mode: open the Tauri app to run host commands.\n`,
-    stderr: ""
-  };
+    kind: "remote_request",
+    requesterLabel
+  });
+  return invokeNative<CommandResult>("run_shell_command", {
+    request: { roomId, cwd, command, authorizationToken }
+  });
 }
 
 export async function clearShellExecutionGrants(roomId: string): Promise<number> {
-  if (!isTauriRuntime()) return 0;
+  if (!isTauriRuntime()) return requireNativeRuntime("Shell authorization");
   return invokeNative<number>("clear_shell_execution_grants", { roomId });
 }

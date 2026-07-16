@@ -95,7 +95,7 @@ export function useAppRoomInteractionContext({
       projectPath: selectedRoom?.projectPath ?? ""
     },
     memberRows: {
-      presenceByRoom: roomPresence && selectedRoom ? { [selectedRoom.id]: roomPresence } : {},
+      presence: roomPresence,
       selectedRoom,
       localUser: localIdentity.localUser,
       localDeviceId: localIdentity.deviceId,
