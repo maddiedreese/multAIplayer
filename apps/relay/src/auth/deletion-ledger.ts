@@ -136,7 +136,7 @@ export class FileDeletionLedger implements DeletionLedger {
 }
 
 /**
- * An append-only deletion ledger backed by an S3-compatible bucket. Objects are
+ * A write-once deletion ledger backed by an S3-compatible bucket. Objects are
  * immutable and contain no GitHub id, login, access token, or record inventory.
  */
 export class S3DeletionLedger implements DeletionLedger {

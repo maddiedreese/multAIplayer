@@ -92,9 +92,8 @@ export async function createRelayApp(
     shutdown: shutdownConfig
   } = relayConfig;
   const relayMetrics = createRelayMetrics();
-  // Tests may inject an in-process ledger explicitly. The production entry
-  // point never supplies this option, so no environment variable can weaken
-  // the production requirement for an external S3-compatible ledger.
+  // Tests may inject an in-process ledger explicitly. Runtime deletion
+  // protection otherwise comes only from the validated relay configuration.
   const deletionLedger =
     options.deletionLedgerForTests ??
     (relayConfig.deletionLedger

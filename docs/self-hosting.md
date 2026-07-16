@@ -132,7 +132,7 @@ If an existing relay database is unreadable, has missing or unsupported version 
 The alpha store contains:
 
 - teams and room records;
-- known team member ids used for metadata counts;
+- known team member ids used for membership authorization, roles, and counts;
 - device MLS signature and HPKE public keys and fingerprints;
 - invite metadata;
 - public single-use MLS KeyPackages;
@@ -326,7 +326,7 @@ Hosted operators can deny an abusive GitHub identity without deleting shared enc
 
 Deletion removes the identity from shared membership and host metadata, but it does not delete shared team or room records or rewrite MLS ciphertext and its sender/routing metadata, encrypted attachments, or accepted-message receipts. Those records remain available to collaborators and follow their ordinary configured retention because rewriting them would break shared encrypted history, downloads, replay/idempotency protection, or MLS state. Deleting relay data does not erase encrypted data already stored on a user's Macs, revoke the OAuth grant at GitHub, or selectively purge an operator's existing backups. Users remove local history with the app's per-room local controls and may revoke the OAuth grant in GitHub settings.
 
-Set `MULTAIPLAYER_RELAY_DELETION_PROTECTION=primary_only` when the deployment has no backup capable of restoring deleted SQLite rows. Account deletion remains available, but the operator must not later restore an older copy containing the identity. Use `restore_safe` whenever such backups exist. Restore-safe production requires an S3-compatible bucket outside the primary volume and every restorable backup set; its append-only authenticated objects contain only a keyed pseudonym and lifecycle timestamps, never a raw GitHub id, login, token, or record inventory.
+Set `MULTAIPLAYER_RELAY_DELETION_PROTECTION=primary_only` when the deployment has no backup capable of restoring deleted SQLite rows. Account deletion remains available, but the operator must not later restore an older copy containing the identity. Use `restore_safe` whenever such backups exist. Restore-safe production requires an S3-compatible bucket outside the primary volume and every restorable backup set; its immutable authenticated objects are retained through the protection horizon and contain only a keyed pseudonym and lifecycle timestamps, never a raw GitHub id, login, token, or record inventory.
 
 Configure restore-safe S3 with `MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT`, `_BUCKET`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_URL_STYLE` (`path` or `virtual-host`), optional `_PREFIX`, a separate `MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY`, and `MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS`. The horizon must exceed the longest restorable backup retention; the official service uses 90 days around an 89-day snapshot window. Incomplete, unreachable, malformed, or over-10,000-entry ledgers fail startup before the server listens.
 
