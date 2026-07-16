@@ -65,13 +65,16 @@ test("activity timeline retains only the newest bounded room items", () => {
   assert.equal(activities[0]?.itemId, "item-10");
 });
 
-test("local-history round trips omit absent optional state", () => {
+test("current local-history includes its required read state", () => {
   const empty = emptyLocalRoomHistoryPayload();
-  assert.equal(Object.hasOwn(empty, "readState"), false);
+  assert.deepEqual(empty.readState, { unread: 0 });
 
-  const roundTripped = normalizeLocalRoomHistory(JSON.parse(JSON.stringify({ ...empty, readState: undefined })));
-  assert.equal(Object.hasOwn(roundTripped, "readState"), false);
-  assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(roundTripped)), "readState"), false);
+  const roundTripped = normalizeLocalRoomHistory(JSON.parse(JSON.stringify(empty)));
+  assert.deepEqual(roundTripped.readState, { unread: 0 });
+  assert.throws(
+    () => normalizeLocalRoomHistory(JSON.parse(JSON.stringify({ ...empty, readState: undefined }))),
+    InvalidLocalRoomHistoryError
+  );
 });
 
 test("local-history normalization rejects non-objects and unknown schema versions", () => {
@@ -85,6 +88,11 @@ test("local-history normalization rejects non-objects and unknown schema version
 
 test("current local-history schema fails closed on malformed required containers and entries", () => {
   const current = emptyLocalRoomHistoryPayload();
+  for (const field of ["chatEdits", "chatDeletes", "readState", "codexActivities", "queuedCodexTurns"]) {
+    const incomplete = { ...current } as Record<string, unknown>;
+    delete incomplete[field];
+    assert.throws(() => normalizeRetainedLocalRoomHistory(incomplete, 30), InvalidLocalRoomHistoryError);
+  }
   assert.throws(
     () => normalizeRetainedLocalRoomHistory({ ...current, messages: "not-an-array" }, 30),
     InvalidLocalRoomHistoryError
@@ -123,6 +131,27 @@ test("canonical history retains the newest bounded messages and round trips thro
     normalizeLocalRoomHistory(JSON.parse(JSON.stringify(normalized))).messages.length,
     maxLocalHistoryItemsPerContainer
   );
+});
+
+test("local history preserves messages that match former demo copy", () => {
+  const createdAt = new Date().toISOString();
+  const body = "Ciphertext-only debug check.";
+  const normalized = normalizeLocalRoomHistory({
+    ...emptyLocalRoomHistoryPayload(),
+    messages: [
+      {
+        id: "message-demo-copy",
+        author: "Maddie",
+        authorUserId: "github:maddie",
+        role: "human",
+        body,
+        time: createdAt,
+        createdAt
+      }
+    ]
+  });
+
+  assert.equal(normalized.messages[0]?.body, body);
 });
 
 test("activity timeline renders safe lifecycle metadata", () => {

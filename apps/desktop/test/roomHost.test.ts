@@ -33,10 +33,10 @@ test("isLocalUserActiveHostForRoom prefers stable host user id", () => {
   assert.equal(isLocalUserActiveHostForRoom(activeRoom, { id: "github:someone-else", name: "Maddie" }), false);
 });
 
-test("isLocalUserActiveHostForRoom falls back to host name for legacy rooms", () => {
-  const legacyRoom = { ...activeRoom, hostUserId: undefined };
-  assert.equal(isLocalUserActiveHostForRoom(legacyRoom, { id: "github:someone", name: "Maddie" }), true);
-  assert.equal(isLocalUserActiveHostForRoom(legacyRoom, { id: "github:maddiedreese", name: "Someone" }), false);
+test("isLocalUserActiveHostForRoom rejects active rooms without a stable host identity", () => {
+  const invalidRoom = { ...activeRoom, hostUserId: undefined };
+  assert.equal(isLocalUserActiveHostForRoom(invalidRoom, { id: "github:someone", name: "Maddie" }), false);
+  assert.equal(isLocalUserActiveHostForRoom(invalidRoom, { id: "github:maddiedreese", name: "Maddie" }), false);
 });
 
 test("isLocalUserActiveHostForRoom rejects inactive host states", () => {

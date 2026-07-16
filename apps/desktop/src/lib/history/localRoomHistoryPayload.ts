@@ -49,6 +49,7 @@ export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
     messages: [],
     chatEdits: [],
     chatDeletes: [],
+    readState: { unread: 0 },
     terminalRequests: [],
     fileSaveRequests: [],
     browserRequests: [],
@@ -86,7 +87,7 @@ function normalizeHistoryContainers(value: Record<string, unknown>): LocalRoomHi
     messages: normalizeChatHistoryMessages(historyArray(value, "messages")),
     chatEdits: historyArray(value, "chatEdits").filter(isChatEditPlaintextPayload),
     chatDeletes: historyArray(value, "chatDeletes").filter(isChatDeletePlaintextPayload),
-    ...(readState ? { readState } : {}),
+    readState: readState ?? { unread: 0 },
     terminalRequests: historyArray(value, "terminalRequests").filter(isTerminalCommandRequest),
     fileSaveRequests: historyArray(value, "fileSaveRequests").filter(isWorkspaceFileSaveRequest),
     browserRequests: historyArray(value, "browserRequests").filter(isBrowserAccessRequest),
@@ -136,27 +137,24 @@ function historyArray(value: Record<string, unknown>, key: string): unknown[] {
 function assertCurrentLocalHistoryShape(value: Record<string, unknown>): void {
   const requiredArrays: Array<[string, (item: unknown) => boolean]> = [
     ["messages", isChatMessage],
+    ["chatEdits", isChatEditPlaintextPayload],
+    ["chatDeletes", isChatDeletePlaintextPayload],
     ["terminalRequests", isTerminalCommandRequest],
     ["fileSaveRequests", isWorkspaceFileSaveRequest],
     ["browserRequests", isBrowserAccessRequest],
     ["inviteRequests", isInviteJoinRequest],
     ["codexEvents", (item) => CodexEventPlaintextPayloadSchema.safeParse(item).success],
+    ["codexActivities", isCodexActivityPlaintextPayload],
     ["gitWorkflowEvents", (item) => GitWorkflowEventPlaintextPayloadSchema.safeParse(item).success],
     ["githubActionsEvents", (item) => GitHubActionsEventPlaintextPayloadSchema.safeParse(item).success],
     ["localPreviews", isLocalPreviewPlaintextPayload],
     ["terminalSnapshots", isTerminalSnapshot],
-    ["hostHandoffs", isHostHandoffRecord]
-  ];
-  const optionalArrays: Array<[string, (item: unknown) => boolean]> = [
-    ["chatEdits", isChatEditPlaintextPayload],
-    ["chatDeletes", isChatDeletePlaintextPayload],
-    ["codexActivities", isCodexActivityPlaintextPayload],
+    ["hostHandoffs", isHostHandoffRecord],
     ["queuedCodexTurns", isQueuedCodexTurn]
   ];
   for (const [key, validate] of requiredArrays) assertHistoryArray(value, key, validate, true);
-  for (const [key, validate] of optionalArrays) assertHistoryArray(value, key, validate, false);
   if (value.roomGoal !== undefined && !isRoomGoal(value.roomGoal)) throw new InvalidLocalRoomHistoryError();
-  if (value.readState !== undefined && !isCurrentLocalRoomReadState(value.readState)) {
+  if (!isCurrentLocalRoomReadState(value.readState)) {
     throw new InvalidLocalRoomHistoryError();
   }
   if (value.codexThreadGraph !== undefined && !isCurrentCodexThreadGraph(value.codexThreadGraph)) {
@@ -359,22 +357,7 @@ function isGitHubActionsEventPlaintextPayloadLenient(value: unknown): value is G
 function normalizeChatHistoryMessages(value: unknown[]): ChatMessage[] {
   return value
     .map((message) => normalizeChatMessage(message) as ChatMessage | null)
-    .filter((message): message is ChatMessage => Boolean(message && !isLegacyDebugChatMessage(message)));
-}
-
-export function isLegacyDebugChatMessage(message: ChatMessage): boolean {
-  const normalizedBody = message.body.trim().toLowerCase();
-  return (
-    normalizedBody === "relay-backed encrypted hello from the room." ||
-    normalizedBody === "ciphertext-only debug check." ||
-    normalizedBody === "let's make the first pass feel like a coding room, not a generic chat wrapper." ||
-    normalizedBody === "agree. the right rail should show files and diffs while codex is working." ||
-    normalizedBody ===
-      "@codex can you wire the approval sheet to show chat delta, attachments, browser access, terminals, and workspace?" ||
-    normalizedBody ===
-      "i can do that. i will use the current chat delta, selected project folder, and the dev-server terminal. i will not use browser access unless approved." ||
-    normalizedBody === "next turn should also include copy-as-markdown and the secret warning."
-  );
+    .filter((message): message is ChatMessage => Boolean(message));
 }
 
 function isChatReaction(value: unknown): value is ChatReaction {

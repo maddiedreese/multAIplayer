@@ -6,14 +6,12 @@ export interface HostHandoffDisplay {
   status: "available" | "requested" | "accepted";
   candidateDeviceId?: string | undefined;
   fromHost: string;
-  reason?: "manual" | "usage_limit" | undefined;
+  reason: "manual" | "usage_limit";
   messagesSinceLastCodex: number;
-  queuedCodexTurns?:
-    | Array<{
-        turnId: string;
-        requestedBy: string;
-      }>
-    | undefined;
+  queuedCodexTurns: Array<{
+    turnId: string;
+    requestedBy: string;
+  }>;
   attachmentNames: string[];
   terminals: string[];
   projectPath: string;
@@ -92,7 +90,7 @@ function HostHandoffRow<T extends HostHandoffDisplay>({
         </strong>
         <span>{hostHandoffDetail(handoff)}</span>
         <small>
-          {handoff.messagesSinceLastCodex} messages · {handoff.queuedCodexTurns?.length ?? 0} queued ·{" "}
+          {handoff.messagesSinceLastCodex} messages · {handoff.queuedCodexTurns.length} queued ·{" "}
           {handoff.attachmentNames.length} attachments · {handoff.terminals.length} terminals ·{" "}
           {formatModel(handoff.codexModel)}
         </small>

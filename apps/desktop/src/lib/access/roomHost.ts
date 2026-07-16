@@ -6,7 +6,7 @@ export interface LocalHostUser {
 }
 
 export function isLocalUserActiveHostForRoom(room: ClientRoomRecord, user: LocalHostUser): boolean {
-  return room.hostStatus === "active" && (room.hostUserId ? room.hostUserId === user.id : room.host === user.name);
+  return room.hostStatus === "active" && Boolean(room.hostUserId) && room.hostUserId === user.id;
 }
 
 export function findEnvelopeRoom(rooms: ClientRoomRecord[], roomId: string): ClientRoomRecord | null {

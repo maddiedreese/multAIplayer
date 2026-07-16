@@ -55,23 +55,28 @@ export const RoomModeSchema = z.object({
   browser: z.boolean()
 });
 
-export const RoomRecord = z.object({
-  id: RoomId,
-  teamId: TeamId,
-  acceptedMlsEpoch: z.number().int().nonnegative().optional(),
-  name: z.string().min(1).max(maxRoomNameChars),
-  host: z.string().min(1).max(maxDisplayNameChars),
-  hostUserId: UserId.optional(),
-  activeHostDeviceId: DeviceId.optional(),
-  hostStatus: z.enum(["active", "offline", "handoff"]),
-  approvalPolicy: z.enum(["ask_every_turn", "never_host"]),
-  mode: RoomModeSchema,
-  browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
-  browserProfilePersistent: z.boolean(),
-  unread: z.number().int().nonnegative(),
-  archivedAt: z.string().datetime().optional(),
-  deletedAt: z.string().datetime().optional()
-});
+export const RoomRecord = z
+  .object({
+    id: RoomId,
+    teamId: TeamId,
+    acceptedMlsEpoch: z.number().int().nonnegative().optional(),
+    name: z.string().min(1).max(maxRoomNameChars),
+    host: z.string().min(1).max(maxDisplayNameChars),
+    hostUserId: UserId.optional(),
+    activeHostDeviceId: DeviceId.optional(),
+    hostStatus: z.enum(["active", "offline", "handoff"]),
+    approvalPolicy: z.enum(["ask_every_turn", "never_host"]),
+    mode: RoomModeSchema,
+    browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
+    browserProfilePersistent: z.boolean(),
+    unread: z.number().int().nonnegative(),
+    archivedAt: z.string().datetime().optional(),
+    deletedAt: z.string().datetime().optional()
+  })
+  .refine((room) => room.hostStatus !== "active" || Boolean(room.hostUserId), {
+    message: "An active room requires a stable host user id",
+    path: ["hostUserId"]
+  });
 
 /** Member-only room configuration. This shape must never be accepted or persisted by the relay. */
 export const RoomConfig = z.object({
@@ -90,7 +95,7 @@ export const RoomConfig = z.object({
 });
 
 /** Desktop projection of public relay metadata plus the latest authenticated MLS configuration. */
-export const ClientRoomRecord = RoomRecord.merge(RoomConfig);
+export const ClientRoomRecord = RoomRecord.safeExtend(RoomConfig.shape);
 
 export const InviteRecord = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),

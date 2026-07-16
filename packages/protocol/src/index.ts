@@ -88,7 +88,6 @@ export {
   defaultCodexSandboxLevel,
   defaultCodexServiceTierPolicy,
   defaultCodexSpeed,
-  legacyCodexCatalogSelectionPolicy,
   defaultRoomMode
 } from "./defaults-options.js";
 export type {

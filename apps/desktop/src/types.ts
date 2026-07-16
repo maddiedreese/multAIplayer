@@ -194,22 +194,21 @@ export interface NoSecretRoomInvite {
 export interface LocalRoomHistoryPayload {
   version: 3;
   messages: ChatMessage[];
-  chatEdits?: ChatEditPlaintextPayload[];
-  chatDeletes?: ChatDeletePlaintextPayload[];
-  readState?: LocalRoomReadState;
+  chatEdits: ChatEditPlaintextPayload[];
+  chatDeletes: ChatDeletePlaintextPayload[];
+  readState: LocalRoomReadState;
   terminalRequests: TerminalCommandRequest[];
   fileSaveRequests: WorkspaceFileSaveRequest[];
   browserRequests: BrowserAccessRequest[];
   inviteRequests: InviteJoinRequest[];
   codexEvents: CodexRoomEvent[];
-  /** Added additively in v3; absent legacy payloads migrate to an empty timeline. */
-  codexActivities?: CodexActivity[];
+  codexActivities: CodexActivity[];
   gitWorkflowEvents: GitWorkflowEventPlaintextPayload[];
   githubActionsEvents: GitHubActionsEventPlaintextPayload[];
   localPreviews: LocalPreviewRecord[];
   terminalSnapshots: TerminalSnapshot[];
   hostHandoffs: HostHandoffRecord[];
-  queuedCodexTurns?: QueuedCodexTurn[];
+  queuedCodexTurns: QueuedCodexTurn[];
   roomGoal?: RoomGoal;
   codexThreadGraph?: CodexThreadGraph;
 }

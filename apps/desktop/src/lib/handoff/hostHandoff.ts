@@ -1,12 +1,4 @@
-import {
-  defaultCodexReasoningEffort,
-  defaultCodexSandboxLevel,
-  defaultCodexSpeed,
-  legacyCodexCatalogSelectionPolicy,
-  type ApprovalPolicy,
-  type HostHandoffPlaintextPayload,
-  type ClientRoomRecord
-} from "@multaiplayer/protocol";
+import { type ApprovalPolicy, type HostHandoffPlaintextPayload, type ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   normalizeCodexModel,
   normalizeCodexReasoningEffort,
@@ -53,21 +45,19 @@ export function createHandoffSettingsPatch(handoff: HostHandoffPlaintextPayload)
   if (!projectPath) throw new Error("Host handoff is missing a supported project path.");
   const codexModel = normalizeCodexModel(handoff.codexModel);
   if (!codexModel) throw new Error("Host handoff is missing a supported Codex model.");
-  const codexSandboxLevel = normalizeCodexSandboxLevel(handoff.codexSandboxLevel ?? defaultCodexSandboxLevel);
+  const codexSandboxLevel = normalizeCodexSandboxLevel(handoff.codexSandboxLevel);
   if (!codexSandboxLevel) throw new Error("Host handoff is missing a supported Codex sandbox level.");
-  const codexReasoningEffort = normalizeCodexReasoningEffort(
-    handoff.codexReasoningEffort ?? defaultCodexReasoningEffort
-  );
+  const codexReasoningEffort = normalizeCodexReasoningEffort(handoff.codexReasoningEffort);
   if (!codexReasoningEffort) throw new Error("Host handoff is missing a supported Codex reasoning effort.");
-  const codexSpeed = normalizeCodexSpeed(handoff.codexSpeed ?? defaultCodexSpeed);
+  const codexSpeed = normalizeCodexSpeed(handoff.codexSpeed);
   if (!codexSpeed) throw new Error("Host handoff is missing a supported Codex speed.");
   const catalogSettings = {
-    codexModelPolicy: handoff.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy,
+    codexModelPolicy: handoff.codexModelPolicy,
     codexReasoningEffort,
-    codexReasoningEffortPolicy: handoff.codexReasoningEffortPolicy ?? legacyCodexCatalogSelectionPolicy,
-    codexRawReasoningEnabled: handoff.codexRawReasoningEnabled ?? false,
+    codexReasoningEffortPolicy: handoff.codexReasoningEffortPolicy,
+    codexRawReasoningEnabled: handoff.codexRawReasoningEnabled,
     codexSpeed,
-    codexServiceTierPolicy: handoff.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy
+    codexServiceTierPolicy: handoff.codexServiceTierPolicy
   };
   if (!approvalPolicies.includes(handoff.approvalPolicy as ApprovalPolicy)) {
     throw new Error(`Host handoff approval policy is not supported: ${handoff.approvalPolicy}`);
