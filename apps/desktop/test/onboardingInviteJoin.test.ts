@@ -67,13 +67,36 @@ test("scrub failure fails closed without sending the bearer capability", async (
     }
   });
   const outcome = await adapter.joinFromUrl(
-    { pathname: "/", search: "", hash: "#invite=invite_123&multaiplayerJoin=protected-fragment" },
+    {
+      pathname: "/",
+      search: "",
+      hash: "#invite=invite_123&multaiplayerJoin=protected-fragment&approval=request"
+    },
     () => {
       throw new Error("history unavailable");
     }
   );
   assert.equal(requested, false);
   assert.equal(outcome.status, "temporarily_unavailable");
+});
+
+test("incomplete URL fragments never enter the join flow", async () => {
+  let requested = false;
+  let scrubbed = false;
+  const adapter = createOnboardingInviteJoinAdapter({
+    requestNoSecretInviteAccess: async () => {
+      requested = true;
+    }
+  });
+  const outcome = await adapter.joinFromUrl(
+    { pathname: "/", search: "", hash: "#multaiplayerJoin=protected-fragment&approval=request" },
+    () => {
+      scrubbed = true;
+    }
+  );
+  assert.equal(outcome.status, "no_invite");
+  assert.equal(requested, false);
+  assert.equal(scrubbed, false);
 });
 
 test("obsolete and incomplete manual invites are rejected without entering MLS", async () => {

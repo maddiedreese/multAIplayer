@@ -4,8 +4,7 @@ export const maxInviteLinkChars = 12_288;
 export type InviteUrlPayload = {
   kind: "join";
   encoded: string;
-  inviteId: string | null;
-  approvalRequested: boolean;
+  inviteId: string;
   cleanupPath: string;
 };
 
@@ -18,15 +17,23 @@ export interface InviteUrlParts {
 export function readInviteUrlPayload(location: InviteUrlParts): InviteUrlPayload | null {
   if (location.search) return null;
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const allowedKeys = new Set(["invite", "multaiplayerJoin", "approval"]);
+  if (
+    [...fragment.keys()].some((key) => !allowedKeys.has(key)) ||
+    fragment.getAll("invite").length !== 1 ||
+    fragment.getAll("multaiplayerJoin").length !== 1 ||
+    fragment.getAll("approval").length !== 1 ||
+    fragment.get("approval") !== "request"
+  ) {
+    return null;
+  }
   const inviteId = fragment.get("invite");
-  const approvalRequested = fragment.get("approval") === "request";
   const joinInvite = fragment.get("multaiplayerJoin");
-  if (joinInvite) {
+  if (joinInvite && inviteId) {
     return {
       kind: "join",
       encoded: joinInvite,
       inviteId,
-      approvalRequested,
       cleanupPath: location.pathname
     };
   }
