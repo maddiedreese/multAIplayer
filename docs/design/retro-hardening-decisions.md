@@ -2,7 +2,7 @@
 
 These compact ADRs recover durable decisions from the most significant hardening changes whose rationale previously lived primarily in pull-request and commit history. They are accepted unless a later ADR supersedes them.
 
-Protocol v2 superseded the protocol-v1 cryptography decisions in ADR-007 through ADR-010, ADR-016, ADR-019, and ADR-020. Those entries remain below as historical rationale only; current cryptographic architecture and policy follow [MLS protocol v2](mls-protocol-v2.md). Their general review lessons still apply, but their custom encodings, epoch-key delivery, preview-key handling, TypeScript crypto-module boundary, and crypto mutation policy are not current runtime behavior.
+Protocol v2 superseded the protocol-v1 cryptography decisions in ADR-007 through ADR-010, ADR-016, ADR-019, and ADR-020. Those entries remain below as historical rationale only; current cryptographic architecture and policy follow [MLS protocol v2](../decisions/mls-protocol-v2.md). Their general review lessons still apply, but their custom encodings, epoch-key delivery, preview-key handling, TypeScript crypto-module boundary, and crypto mutation policy are not current runtime behavior.
 
 ## ADR-007: Canonical authenticated records
 

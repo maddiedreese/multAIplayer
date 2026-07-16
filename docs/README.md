@@ -28,13 +28,17 @@ boundary; add or supersede a decision when the boundary itself changes.
 - [Self-hosting](self-hosting.md) is the operator runbook.
 - [Threat model](threat-model.md) is the authoritative security-claims and
   residual-risk document.
-- [External review packet](external-review-packet.md) defines the narrow review
-  scope and maps it to evidence.
 - [Tauri IPC boundary audit](tauri-ipc-boundary-audit.md) is the manually reviewed
   native-command inventory, with automated registration-drift detection.
 - [Reproducing release builds](reproducible-builds.md) covers artifact and updater
   verification.
 - [Security policy](../SECURITY.md) explains private vulnerability reporting.
+
+## Design and historical context
+
+Material in [`docs/design`](design/README.md) is non-normative context: future
+review preparation, superseded decisions, and condensed change history. It is
+not generated from CI, required reading for contributors, or a merge gate.
 
 ## Source-of-truth rules
 
@@ -47,6 +51,6 @@ To keep the documentation graph manageable:
 - user-facing behavior belongs in Using the app;
 - other pages should link to those sources instead of copying their policy.
 
-Historical detail may remain in an ADR or changelog, but it should not become a
-second current policy. When facts disagree, fix the authoritative document first
-and replace duplicates with a link.
+Historical detail belongs under `docs/design`, not in a current ADR or the
+authoritative threat model. When facts disagree, fix the authoritative document
+first and replace duplicates with a link.

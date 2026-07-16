@@ -12,7 +12,7 @@ One active host supplies the project, Codex process, tools, credentials, and app
 
 ## How are rooms encrypted, and has this been audited?
 
-The mechanism uses RFC 9420 MLS through `mls-rs`, with native-client encryption and exporter-derived protection for relevant payloads. The integration has not received an independent professional security audit. Mechanism details are in [cryptography](cryptography.md); reviewer scope and evidence are in the [external review packet](external-review-packet.md).
+The mechanism uses RFC 9420 MLS through `mls-rs`, with native-client encryption and exporter-derived protection for relevant payloads. The integration has not received an independent professional security audit. Mechanism details are in [cryptography](cryptography.md), and current security claims and limitations are in the [threat model](threat-model.md).
 
 ## What does the relay see and retain?
 

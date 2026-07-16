@@ -44,7 +44,7 @@ multAIplayer is an independent open-source project. It is **not** an official Op
 
 Rooms use RFC 9420 MLS through the Rust `mls-rs` implementation, and relevant payloads use exporter-derived encryption in the native boundary. The relay routes encrypted records but necessarily observes bounded identity, routing, size, timing, and lifecycle metadata. The active host remains responsible for local approvals, and admitted members receive meaningful shared context. Complete invite links are capabilities and must remain private. The integration is **unaudited**; automated tests, fuzzing, property checks, scheduled mutation testing, and release verification reduce regression risk but do not replace independent review. The [threat model](docs/threat-model.md) is the only normative source for intended properties, assumptions, evidence, and residual risks.
 
-Before private use, read the [alpha limitations](docs/alpha-limitations.md), [cryptography mechanism guide](docs/cryptography.md), and [external review packet](docs/external-review-packet.md). Report vulnerabilities through [SECURITY.md](SECURITY.md).
+Before private use, read the [alpha limitations](docs/alpha-limitations.md), [cryptography mechanism guide](docs/cryptography.md), and authoritative [threat model](docs/threat-model.md). Report vulnerabilities through [SECURITY.md](SECURITY.md).
 
 ## Build locally
 

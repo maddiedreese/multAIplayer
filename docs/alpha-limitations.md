@@ -39,7 +39,7 @@ claims, audit status, metadata exposure, and residual risks.
 
 - Protocol v2 uses RFC 9420 MLS through `mls-rs`, but the integration has not
   received an independent professional security audit. Start with the
-  [cryptography guide](cryptography.md) and [external review packet](external-review-packet.md).
+  [cryptography guide](cryptography.md) and authoritative [threat model](threat-model.md).
 - The relay cannot read encrypted room content, but it necessarily sees bounded
   routing, identity, timing, size, attachment-description, and lifecycle
   metadata. The threat model owns the exact inventory.

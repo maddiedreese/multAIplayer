@@ -1,12 +1,12 @@
 # Epoch crypto and the MLS migration boundary
 
-Status: superseded by [MLS protocol v2](mls-protocol-v2.md)
+Status: superseded by [MLS protocol v2](../decisions/mls-protocol-v2.md)
 
 Superseded: 2026-07-12
 
 ## Decision
 
-This record describes the removed protocol v1 boundary and remains only as historical rationale. Protocol v2 crossed the MLS-adoption tripwire and locked its implementation, ciphersuite, history-retention, and native-runtime decisions in the [MLS protocol v2 ADR](mls-protocol-v2.md). The former TypeScript crypto package, compatibility readers, public vectors, and custom epoch-key machinery were deleted rather than deprecated.
+This record describes the removed protocol v1 boundary and remains only as historical rationale. Protocol v2 crossed the MLS-adoption tripwire and locked its implementation, ciphersuite, history-retention, and native-runtime decisions in the [MLS protocol v2 ADR](../decisions/mls-protocol-v2.md). The former TypeScript crypto package, compatibility readers, public vectors, and custom epoch-key machinery were deleted rather than deprecated.
 
 The following are mandatory architecture re-evaluation tripwires:
 
