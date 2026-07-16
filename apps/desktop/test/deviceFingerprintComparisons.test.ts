@@ -44,6 +44,7 @@ const {
 } = await import("../src/lib/identity/deviceFingerprintComparisons");
 
 const legacyComparisonStorageKey = "multaiplayer:trusted-device-keys:v1";
+const comparisonStorageKey = "multaiplayer:device-fingerprint-comparisons:v1";
 const fingerprintA = `sha256:${Array(16).fill("abcd").join(":")}`;
 const fingerprintB = `sha256:${Array(16).fill("1111").join(":")}`;
 
@@ -66,6 +67,8 @@ test("recordDeviceFingerprintComparison persists room-scoped device fingerprints
     true
   );
   assert.equal(isDeviceFingerprintCompared(comparisons, "room-b", "device-a", fingerprintA), false);
+  assert.notEqual(localStorage.getItem(comparisonStorageKey), null);
+  assert.equal(localStorage.getItem(legacyComparisonStorageKey), null);
 });
 
 test("changed fingerprints are not marked compared for the same device id", () => {
@@ -109,11 +112,93 @@ test("removeDeviceFingerprintComparison removes the local comparison record", ()
   assert.deepEqual(loadDeviceFingerprintComparisons(), []);
 });
 
-test("loadDeviceFingerprintComparisons drops corrupted comparison storage", () => {
-  localStorage.setItem(legacyComparisonStorageKey, "{not-json");
+test("loadDeviceFingerprintComparisons drops corrupted current comparison storage", () => {
+  localStorage.setItem(comparisonStorageKey, "{not-json");
 
   assert.deepEqual(loadDeviceFingerprintComparisons(), []);
+  assert.equal(localStorage.getItem(comparisonStorageKey), null);
+});
+
+test("loadDeviceFingerprintComparisons migrates the legacy trust-named key once", () => {
+  localStorage.setItem(
+    legacyComparisonStorageKey,
+    JSON.stringify([
+      {
+        roomId: "room-a",
+        deviceId: "device-a",
+        fingerprint: fingerprintA,
+        trustedAt: "2026-07-04T12:00:00.000Z"
+      }
+    ])
+  );
+
+  assert.deepEqual(loadDeviceFingerprintComparisons(), [
+    {
+      roomId: "room-a",
+      deviceId: "device-a",
+      fingerprint: fingerprintA,
+      comparedAt: "2026-07-04T12:00:00.000Z"
+    }
+  ]);
   assert.equal(localStorage.getItem(legacyComparisonStorageKey), null);
+  assert.deepEqual(JSON.parse(localStorage.getItem(comparisonStorageKey)!), [
+    {
+      roomId: "room-a",
+      deviceId: "device-a",
+      fingerprint: fingerprintA,
+      comparedAt: "2026-07-04T12:00:00.000Z"
+    }
+  ]);
+});
+
+test("the current comparison key is authoritative and clears a stale legacy key", () => {
+  localStorage.setItem(
+    comparisonStorageKey,
+    JSON.stringify([
+      {
+        roomId: "room-a",
+        deviceId: "device-a",
+        fingerprint: fingerprintA,
+        comparedAt: "2026-07-04T12:00:00.000Z"
+      }
+    ])
+  );
+  localStorage.setItem(
+    legacyComparisonStorageKey,
+    JSON.stringify([
+      {
+        roomId: "room-a",
+        deviceId: "device-a",
+        fingerprint: fingerprintB,
+        trustedAt: "2026-07-04T13:00:00.000Z"
+      }
+    ])
+  );
+
+  const comparisons = loadDeviceFingerprintComparisons();
+  assert.equal(isDeviceFingerprintCompared(comparisons, "room-a", "device-a", fingerprintA), true);
+  assert.equal(isDeviceFingerprintCompared(comparisons, "room-a", "device-a", fingerprintB), false);
+  assert.equal(localStorage.getItem(legacyComparisonStorageKey), null);
+});
+
+test("a corrupt current key can recover a valid legacy comparison before deleting it", () => {
+  localStorage.setItem(comparisonStorageKey, "{not-json");
+  localStorage.setItem(
+    legacyComparisonStorageKey,
+    JSON.stringify([
+      {
+        roomId: "room-a",
+        deviceId: "device-a",
+        fingerprint: fingerprintA,
+        trustedAt: "2026-07-04T12:00:00.000Z"
+      }
+    ])
+  );
+
+  const comparisons = loadDeviceFingerprintComparisons();
+  assert.equal(isDeviceFingerprintCompared(comparisons, "room-a", "device-a", fingerprintA), true);
+  assert.equal(localStorage.getItem(legacyComparisonStorageKey), null);
+  assert.notEqual(localStorage.getItem(comparisonStorageKey), null);
 });
 
 test("buildDeviceFingerprintMarkdown produces local device-note text", () => {

@@ -20,23 +20,57 @@ export interface DeviceFingerprintMarkdownInput {
   comparedLocally: boolean;
 }
 
-// Keep the v1 key so existing local comparison notes survive the terminology correction.
+const deviceFingerprintComparisonsStorageKey = "multaiplayer:device-fingerprint-comparisons:v1";
+// Read this once for pre-alpha upgrades, then remove it. New writes must never
+// recreate the old authorization-sounding storage boundary.
 const legacyDeviceFingerprintComparisonsStorageKey = "multaiplayer:trusted-device-keys:v1";
 const maxDeviceFingerprintComparisons = 500;
 
 export function loadDeviceFingerprintComparisons(): DeviceFingerprintComparisonRecord[] {
-  const stored = localStorage.getItem(legacyDeviceFingerprintComparisonsStorageKey);
-  if (!stored) return [];
+  const stored = localStorage.getItem(deviceFingerprintComparisonsStorageKey);
+  if (stored) {
+    const current = parseStoredDeviceFingerprintComparisons(
+      stored,
+      "discard corrupt device-fingerprint comparison storage"
+    );
+    if (current) {
+      localStorage.removeItem(legacyDeviceFingerprintComparisonsStorageKey);
+      return current;
+    }
+    localStorage.removeItem(deviceFingerprintComparisonsStorageKey);
+  }
+
+  const legacy = localStorage.getItem(legacyDeviceFingerprintComparisonsStorageKey);
+  if (!legacy) return [];
+  const migrated = parseStoredDeviceFingerprintComparisons(
+    legacy,
+    "discard corrupt legacy device-fingerprint comparison storage"
+  );
+  if (!migrated) {
+    localStorage.removeItem(legacyDeviceFingerprintComparisonsStorageKey);
+    return [];
+  }
+
+  // Write-before-delete makes migration retryable if localStorage rejects the
+  // new value (for example because storage is unavailable or full).
+  localStorage.setItem(deviceFingerprintComparisonsStorageKey, JSON.stringify(migrated));
+  localStorage.removeItem(legacyDeviceFingerprintComparisonsStorageKey);
+  return migrated;
+}
+
+function parseStoredDeviceFingerprintComparisons(
+  stored: string,
+  failureOperation: string
+): DeviceFingerprintComparisonRecord[] | null {
   try {
     const parsed = JSON.parse(stored) as unknown;
     if (!Array.isArray(parsed)) throw new Error("fingerprint comparisons must be an array");
     return dedupeDeviceFingerprintComparisons(
       parsed.map(normalizeDeviceFingerprintComparison).filter(Boolean) as DeviceFingerprintComparisonRecord[]
-    );
+    ).slice(-maxDeviceFingerprintComparisons);
   } catch {
-    reportNonFatal("discard corrupt device-fingerprint comparison storage");
-    localStorage.removeItem(legacyDeviceFingerprintComparisonsStorageKey);
-    return [];
+    reportNonFatal(failureOperation);
+    return null;
   }
 }
 
@@ -104,7 +138,8 @@ function persistDeviceFingerprintComparisons(
   keys: DeviceFingerprintComparisonRecord[]
 ): DeviceFingerprintComparisonRecord[] {
   const normalized = dedupeDeviceFingerprintComparisons(keys).slice(-maxDeviceFingerprintComparisons);
-  localStorage.setItem(legacyDeviceFingerprintComparisonsStorageKey, JSON.stringify(normalized));
+  localStorage.setItem(deviceFingerprintComparisonsStorageKey, JSON.stringify(normalized));
+  localStorage.removeItem(legacyDeviceFingerprintComparisonsStorageKey);
   return normalized;
 }
 
