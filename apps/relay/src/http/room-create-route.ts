@@ -1,6 +1,6 @@
 import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import { nanoid } from "nanoid";
-import { defaultBrowserProfilePersistent, type RoomRecord } from "@multaiplayer/protocol";
+import type { RoomRecord } from "@multaiplayer/protocol";
 import { allowTotalRoomQuota } from "./room-validation.js";
 import {
   acquireDurableQuotaTransaction,
@@ -106,8 +106,7 @@ async function persistRoomCreation(
         : "No host",
       hostUserId: session?.user.id,
       hostStatus: "offline",
-      approvalPolicy: input.approvalPolicy,
-      browserProfilePersistent: input.browserProfilePersistent
+      approvalPolicy: input.approvalPolicy
     };
     store.setRoom(room);
     if (session) await saveRelayStore();
@@ -177,16 +176,7 @@ function parseRoomCreationInput(options: RegisterRoomRoutesOptions, body: unknow
   }
   const approvalPolicy = record.approvalPolicy === undefined ? "ask_every_turn" : String(record.approvalPolicy);
   if (!options.isApprovalPolicy(approvalPolicy)) return sendInvalidRoomField(res, "approvalPolicy is invalid");
-  const browser = parseBrowserPreferences(options, record, res);
-  return browser ? { name, approvalPolicy, ...browser } : null;
-}
-
-function parseBrowserPreferences(options: RegisterRoomRoutesOptions, record: Record<string, unknown>, res: Response) {
-  if (record.browserProfilePersistent !== undefined && typeof record.browserProfilePersistent !== "boolean")
-    return sendInvalidRoomField(res, "browserProfilePersistent must be a boolean");
-  return {
-    browserProfilePersistent: record.browserProfilePersistent ?? defaultBrowserProfilePersistent
-  };
+  return { name, approvalPolicy };
 }
 
 function sendInvalidRoomField(res: Response, message: string): null {

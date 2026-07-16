@@ -1,6 +1,5 @@
 import type { MutableRefObject } from "react";
 import type { BrowserRequestPlaintextPayload, MlsRelayMessage, ClientRoomRecord } from "@multaiplayer/protocol";
-import { resetBrowserProfile } from "../../lib/platform/localBackend";
 import type { RelayClient } from "../../lib/relay/relayClient";
 import {
   canActOnRoomBrowserRequest,
@@ -288,46 +287,12 @@ export function createBrowserActions({
     }
   }
 
-  async function resetRoomBrowserProfile() {
-    const room = currentSelectedRoom();
-    if (!room) {
-      setSelectedBrowserMessage("Create or join a room before resetting browser state.");
-      return;
-    }
-    if (!currentContext()?.isActiveHost) {
-      setSelectedBrowserMessage(currentContext()?.hostGateMessage ?? "Claim host before continuing.");
-      return;
-    }
-    if (!currentContext()?.canHostBrowser) {
-      setSelectedBrowserMessage(currentContext()?.browserAccessMessage ?? "Browser access is unavailable.");
-      return;
-    }
-    useAppStore.getState().setBrowserMessageForRoom(room.id, null);
-    try {
-      const result = await resetBrowserProfile(room.id, room.projectPath);
-      useAppStore.getState().resetEmbeddedBrowserForRoom(room.id, result.profilePath);
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        useAppStore
-          .getState()
-          .setBrowserMessageForRoom(
-            room.id,
-            "Reset isolated room browser state. The next approved page opens with a fresh profile."
-          );
-      }
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
-        useAppStore.getState().setBrowserMessageForRoom(room.id, String(error));
-      }
-    }
-  }
-
   return {
     requestBrowserAccess,
     approveBrowserRequest,
     denyBrowserRequest,
     openApprovedBrowserRequest,
     openRoomBrowserNow,
-    openRoomBrowserForUrl,
-    resetRoomBrowserProfile
+    openRoomBrowserForUrl
   };
 }

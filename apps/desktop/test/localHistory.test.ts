@@ -3,7 +3,7 @@ import test, { beforeEach } from "node:test";
 
 const calls: Array<{ command: string; args: unknown }> = [];
 let latest: string | null = null;
-let retentionFailure: Error | null = null;
+let retentionFailure: unknown = null;
 let saveGate: Promise<void> | null = null;
 
 function encode(value: unknown): string {
@@ -170,7 +170,7 @@ test("new-room history preferences apply after its MLS group exists", async () =
 
 test("history retention failure does not publish a false local setting", async () => {
   await history.saveHistorySettings("room-a", { enabled: true, retentionDays: 30 });
-  retentionFailure = new Error("native store unavailable");
+  retentionFailure = { code: "storage_error", message: "native store unavailable" };
   await assert.rejects(
     history.saveHistorySettings("room-a", { enabled: true, retentionDays: 90 }),
     /native store unavailable/
@@ -189,7 +189,6 @@ test("close snapshot construction includes current state from every hydrated eli
     hostStatus: "active" as const,
     approvalPolicy: "ask_every_turn" as const,
     codexModel: "gpt-5.4",
-    browserProfilePersistent: true,
     unread: 0
   });
   const store = useAppStore.getState();

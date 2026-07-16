@@ -23,10 +23,15 @@ test("the frontend accepts every code serialized by the native command contract"
   for (const code of codes) assert.equal(normalizeNativeCommandError({ code, message: "copy" }).code, code);
 });
 
-test("legacy strings remain readable during boundary migration", () => {
+test("legacy string rejections do not cross the display boundary", () => {
   const error = normalizeNativeCommandError("Existing native failure copy");
   assert.equal(error.code, "internal_error");
-  assert.equal(error.message, "Existing native failure copy");
+  assert.equal(error.message, "The native command could not be completed.");
+});
+
+test("structured display messages are bounded", () => {
+  const error = normalizeNativeCommandError({ code: "invalid_argument", message: "x".repeat(2_000) });
+  assert.equal(Array.from(error.message).length, 801);
 });
 
 test("malformed rejection objects do not render as object prose", () => {

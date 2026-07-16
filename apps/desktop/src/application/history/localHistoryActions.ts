@@ -107,7 +107,7 @@ export function createLocalHistoryActions({
     if (!context?.isActiveHost) {
       setHistoryMessageForRoom(
         roomId,
-        "Applied local history and invite defaults. Claim host to apply approval and browser defaults to this room."
+        "Applied local history and invite defaults. Claim host to apply approval defaults to this room."
       );
       return;
     }
@@ -120,9 +120,6 @@ export function createLocalHistoryActions({
         ...roomSettings
       });
       replaceRoom(room);
-      if (!roomSettings.browserProfilePersistent) {
-        useAppStore.getState().clearBrowserStatusForRoom(roomId);
-      }
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         setHistoryMessageForRoom(roomId, "Applied team defaults to this room.");
       }

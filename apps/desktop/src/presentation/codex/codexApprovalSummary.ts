@@ -1,3 +1,4 @@
+import { defaultCodexSandboxLevel } from "@multaiplayer/protocol";
 import type { ChatMessage } from "../../types";
 import { formatBytes } from "../../lib/formatting/appFormatters";
 
@@ -23,4 +24,26 @@ export function formatApprovalAttachments(messages: ChatMessage[]): string {
   return hidden > 0
     ? [`${hidden} earlier attachment${hidden === 1 ? "" : "s"}`, ...visible].join("\n")
     : visible.join("\n");
+}
+
+export function buildHighPrivilegeLabels(
+  summary:
+    | {
+        attachments: unknown[];
+        workspacePath: string | null;
+        git: unknown | null;
+        browserAccess: unknown[];
+        terminals: unknown[];
+      }
+    | undefined,
+  sandboxLevel: string | undefined
+): string[] {
+  if (!summary) return [];
+  const labels: string[] = [];
+  if ((sandboxLevel ?? defaultCodexSandboxLevel) === "danger_full_access") labels.push("full-access Codex");
+  if (summary.terminals.length > 0) labels.push("terminal context");
+  if (summary.workspacePath || summary.git) labels.push("workspace/Git context");
+  if (summary.browserAccess.length > 0) labels.push("browser context");
+  if (summary.attachments.length > 0) labels.push("attachments");
+  return labels;
 }

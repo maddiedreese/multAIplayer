@@ -11,7 +11,6 @@ interface TeamDefaultActionsOptions {
   setTeamHistorySettings: (settings: LocalHistorySettings) => void;
   setTeamDefaultApprovalPolicy: (approvalPolicy: ApprovalPolicy) => void;
   setTeamDefaultCodexModel: (codexModel: string) => void;
-  setTeamDefaultBrowserProfilePersistent: (browserProfilePersistent: boolean) => void;
   setTeamDefaultInviteApprovalGate: (inviteApprovalGate: boolean) => void;
 }
 
@@ -22,7 +21,6 @@ export function createTeamDefaultActions({
   setTeamHistorySettings,
   setTeamDefaultApprovalPolicy,
   setTeamDefaultCodexModel,
-  setTeamDefaultBrowserProfilePersistent,
   setTeamDefaultInviteApprovalGate
 }: TeamDefaultActionsOptions) {
   function updateTeamHistoryDefaults(next: LocalHistorySettings) {
@@ -44,7 +42,6 @@ export function createTeamDefaultActions({
   function applySavedDefaults(saved: ReturnType<typeof saveTeamRoomDefaults>) {
     setTeamDefaultApprovalPolicy(saved.approvalPolicy);
     setTeamDefaultCodexModel(saved.codexModel);
-    setTeamDefaultBrowserProfilePersistent(saved.browserProfilePersistent);
     setTeamDefaultInviteApprovalGate(saved.inviteApprovalGate);
   }
 

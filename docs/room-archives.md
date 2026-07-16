@@ -20,7 +20,7 @@ On import, the native layer validates the encrypted envelope and structural boun
 
 ## What is never included
 
-Archives exclude MLS group snapshots and private trees, epochs, group/exporter/history secrets, signing and HPKE private keys, device credentials, KeyPackages, Welcome messages, invite capabilities and admissions, host-handoff packages/authority, pending approvals, queued Codex turns, active goals, Codex thread/session ids, browser profiles, running terminals/process handles, project-directory authority, relay sessions, and attachment-blob ciphertext.
+Archives exclude MLS group snapshots and private trees, epochs, group/exporter/history secrets, signing and HPKE private keys, device credentials, KeyPackages, Welcome messages, invite capabilities and admissions, host-handoff packages/authority, pending approvals, queued Codex turns, active goals, Codex thread/session ids, running terminals/process handles, project-directory authority, relay sessions, and attachment-blob ciphertext.
 
 Consequently, an archive cannot:
 

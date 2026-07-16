@@ -209,7 +209,6 @@ function seededStore() {
     activeHostDeviceId: "device-host",
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    browserProfilePersistent: false,
     acceptedMlsEpoch: 1
   });
   store.setTeamMembers(

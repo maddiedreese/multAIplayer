@@ -11,7 +11,6 @@ export function shouldResetCodexApprovalForRoomUpdate(previous: ClientRoomRecord
     previous.codexModel !== next.codexModel ||
     previous.codexReasoningEffort !== next.codexReasoningEffort ||
     previous.codexSpeed !== next.codexSpeed ||
-    previous.approvalPolicy !== next.approvalPolicy ||
-    previous.browserProfilePersistent !== next.browserProfilePersistent
+    previous.approvalPolicy !== next.approvalPolicy
   );
 }

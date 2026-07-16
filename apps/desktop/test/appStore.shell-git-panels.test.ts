@@ -409,7 +409,6 @@ test("desktop store keeps browser panel state room scoped", () => {
   assert.equal(state.browserByRoom["room-b"]?.reason, "Open app preview");
   assert.equal(state.browserByRoom["room-a"]?.message, "Opened browser");
   assert.equal(state.browserByRoom["room-b"]?.message, undefined);
-  assert.equal(state.browserByRoom["room-a"]?.status?.profilePath, "Embedded in this room");
   assert.equal(state.browserByRoom["room-a"]?.activeUrl, "https://github.com");
   assert.equal(state.browserByRoom["room-a"]?.tabs?.length, 1);
   assert.equal(state.browserByRoom["room-a"]?.tabs?.[0]?.url, "https://github.com");
@@ -430,8 +429,6 @@ test("desktop store exposes room browser actions", () => {
   store.setBrowserMessageForRoom("room-a", null);
   store.openEmbeddedBrowserForRoom("room-a", "http://localhost:5173");
   store.setInspectorTabForRoom("room-a", "browser");
-  store.resetEmbeddedBrowserForRoom("room-b", "/tmp/browser-profile");
-  store.clearBrowserStatusForRoom("room-a");
 
   const state = useAppStore.getState();
   assert.equal(state.browserByRoom["room-a"]?.url, "http://localhost:5173");
@@ -439,13 +436,11 @@ test("desktop store exposes room browser actions", () => {
   assert.equal(state.browserByRoom["room-a"]?.message, undefined);
   assert.equal(state.browserByRoom["room-b"]?.url, undefined);
   assert.equal(state.browserByRoom["room-b"]?.reason, undefined);
-  assert.equal(state.browserByRoom["room-a"]?.activeUrl, undefined);
-  assert.equal(state.browserByRoom["room-a"]?.tabs, undefined);
-  assert.equal(state.browserByRoom["room-a"]?.activeTabId, undefined);
-  assert.equal(state.browserByRoom["room-a"]?.status, undefined);
+  assert.equal(state.browserByRoom["room-a"]?.activeUrl, "http://localhost:5173");
+  assert.equal(state.browserByRoom["room-a"]?.tabs?.length, 1);
+  assert.equal(state.browserByRoom["room-a"]?.activeTabId, state.browserByRoom["room-a"]?.tabs?.[0]?.id);
   assert.equal(state.historyPresenceByRoom["room-a"]?.inspectorTab, "browser");
   assert.equal(state.browserByRoom["room-b"]?.activeUrl, undefined);
-  assert.equal(state.browserByRoom["room-b"]?.status?.profilePath, "/tmp/browser-profile");
 });
 
 test("desktop store supports multiple room browser tabs", () => {

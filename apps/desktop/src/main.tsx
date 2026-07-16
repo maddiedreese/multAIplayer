@@ -4,7 +4,7 @@ import { App } from "./App";
 import { installGlobalDiagnostics } from "./lib/platform/diagnostics";
 import { isTauriRuntime } from "./lib/platform/localBackend/runtime";
 import "@xterm/xterm/css/xterm.css";
-import "./styles.css";
+import "./styles/index.css";
 
 async function bootstrap() {
   if (import.meta.env.VITE_NATIVE_E2E === "true") {

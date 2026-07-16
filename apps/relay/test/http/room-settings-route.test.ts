@@ -15,8 +15,7 @@ const room: RoomRecord = {
   host: "Maddie",
   hostUserId: "github:maddiedreese",
   hostStatus: "active",
-  approvalPolicy: "ask_every_turn",
-  browserProfilePersistent: false
+  approvalPolicy: "ask_every_turn"
 };
 
 test("room settings enforce mutation, access, host, and existence authorization", async () => {
@@ -110,8 +109,7 @@ test("room settings reject host-local fields and invalid public settings with pr
     const invalidInputs: Array<[Record<string, unknown>, string]> = [
       [{ name: "" }, "Room name is required and must be up to 160 characters"],
       [{ name: "x".repeat(161) }, "Room name is required and must be up to 160 characters"],
-      [{ approvalPolicy: "sometimes" }, "approvalPolicy is invalid"],
-      [{ browserProfilePersistent: "yes" }, "browserProfilePersistent must be a boolean"]
+      [{ approvalPolicy: "sometimes" }, "approvalPolicy is invalid"]
     ];
     for (const [input, error] of invalidInputs) {
       assert.deepEqual(await responseBody(await harness.patch(input)), {
@@ -131,16 +129,14 @@ test("room settings normalize and persist every public setting while preserving 
   try {
     const response = await harness.patch({
       name: "  Renamed room  ",
-      approvalPolicy: "never",
-      browserProfilePersistent: true
+      approvalPolicy: "never"
     });
     assert.equal(response.status, 200);
     const updated = ((await response.json()) as { room: RoomRecord }).room;
     assert.deepEqual(updated, {
       ...room,
       name: "Renamed room",
-      approvalPolicy: "never",
-      browserProfilePersistent: true
+      approvalPolicy: "never"
     });
     assert.deepEqual(harness.store.getRoom(room.id), updated);
     assert.equal(harness.saves(), 1);

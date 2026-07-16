@@ -170,8 +170,7 @@ function room(id: string) {
     activeHostDeviceId: "host-device-1",
     hostStatus: "active",
     acceptedMlsEpoch: 0,
-    approvalPolicy: "ask_every_turn",
-    browserProfilePersistent: false
+    approvalPolicy: "ask_every_turn"
   };
 }
 

@@ -130,7 +130,6 @@ export function useAppWorkspaceFlow({
         setTeamHistorySettings: storeAction("setTeamHistorySettings"),
         setTeamDefaultApprovalPolicy: storeAction("setTeamDefaultApprovalPolicy"),
         setTeamDefaultCodexModel: storeAction("setTeamDefaultCodexModel"),
-        setTeamDefaultBrowserProfilePersistent: storeAction("setTeamDefaultBrowserProfilePersistent"),
         setTeamDefaultInviteApprovalGate: storeAction("setTeamDefaultInviteApprovalGate")
       },
       localHistory: {

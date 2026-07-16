@@ -37,7 +37,6 @@ const room: ClientRoomRecord = {
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
-  browserProfilePersistent: true,
   unread: 0
 };
 
@@ -266,7 +265,7 @@ test("Native Git workflow rejection publishes failure and always releases approv
   const events: Array<Omit<GitWorkflowEventPlaintextPayload, "eventType" | "runner" | "runnerUserId" | "createdAt">> =
     [];
   nativeInvoke = async (command) => {
-    if (command === "run_git_workflow") throw new Error("native workflow unavailable");
+    if (command === "run_git_workflow") throw { code: "unavailable", message: "native workflow unavailable" };
     throw new Error(`Unexpected native command: ${command}`);
   };
 
@@ -292,7 +291,9 @@ test("Push and draft-PR failure propagates without claiming success or refreshin
         { command: "git push", status: 0, stdout: "pushed", stderr: "" }
       ];
     }
-    if (command === "github_create_pull_request") throw new Error("GitHub rejected the draft PR");
+    if (command === "github_create_pull_request") {
+      throw { code: "unavailable", message: "GitHub rejected the draft PR" };
+    }
     throw new Error(`Unexpected native command: ${command}`);
   };
 

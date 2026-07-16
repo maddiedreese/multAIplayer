@@ -1,5 +1,4 @@
 import {
-  defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexModelPolicy,
   defaultCodexReasoningEffort,
@@ -25,10 +24,6 @@ export function ensureRoomDefaults(
     ...room,
     ...roomMlsConfig(config),
     configPending: hasMlsConfig ? (room.configPending ?? false) : (previous?.configPending ?? true),
-    browserProfilePersistent:
-      typeof room.browserProfilePersistent === "boolean"
-        ? room.browserProfilePersistent
-        : defaultBrowserProfilePersistent,
     unread: previous?.unread ?? 0
   };
 }

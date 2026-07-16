@@ -54,7 +54,7 @@ Before private use, read the [alpha limitations](docs/alpha-limitations.md), [cr
 
 ## Build locally
 
-Prerequisites are Node.js 22, npm 11.16.0, Rust/Cargo, Xcode command-line tools, and Codex:
+Prerequisites are Node.js 24.x, npm 11.16.0, Rust 1.89.x/Cargo, Xcode command-line tools, and Codex:
 
 ```sh
 npm install --global npm@11.16.0 --ignore-scripts
@@ -74,7 +74,7 @@ npm test
 npm run verify
 ```
 
-Pull requests run workspace checks and product journeys when executable code changes. Scheduled workflows provide focused fuzz, supply-chain, container, and Codex-compatibility checks. Releases verify signing, notarization, authenticated updater metadata, the required release asset set, and checksums. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
+Pull requests run workspace checks and product journeys when executable code changes. Scheduled workflows provide focused fuzz, supply-chain, container, and Codex-compatibility checks. Releases rerun supply-chain checks against the exact tag before verifying signing, notarization, authenticated updater metadata, the required release asset set, and checksums. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
 
 ## Repository map
 

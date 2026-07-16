@@ -53,26 +53,22 @@ test("team room defaults persist approval policy per team", () => {
   const saved = saveTeamRoomDefaults("team-core", {
     approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
-    browserProfilePersistent: false,
     inviteApprovalGate: true
   });
 
   assert.deepEqual(saved, {
     approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
-    browserProfilePersistent: false,
     inviteApprovalGate: true
   });
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
     codexModel: "gpt-5.4-thinking",
-    browserProfilePersistent: false,
     inviteApprovalGate: true
   });
   assert.deepEqual(loadTeamRoomDefaults("team-labs"), {
     approvalPolicy: "ask_every_turn",
     codexModel: defaultCodexModel,
-    browserProfilePersistent: true,
     inviteApprovalGate: true
   });
 });
@@ -81,7 +77,6 @@ test("team room defaults sanitize unsupported approval policies", () => {
   assert.deepEqual(sanitizeTeamRoomDefaults({ approvalPolicy: "surprise" as never }), {
     approvalPolicy: "ask_every_turn",
     codexModel: defaultCodexModel,
-    browserProfilePersistent: true,
     inviteApprovalGate: true
   });
 
@@ -89,7 +84,6 @@ test("team room defaults sanitize unsupported approval policies", () => {
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
     codexModel: defaultCodexModel,
-    browserProfilePersistent: true,
     inviteApprovalGate: true
   });
 });
@@ -99,13 +93,11 @@ test("team room defaults sanitize Codex model", () => {
     sanitizeTeamRoomDefaults({
       approvalPolicy: "ask_every_turn",
       codexModel: "gpt-5.4-mini",
-      browserProfilePersistent: true,
       inviteApprovalGate: false
     }),
     {
       approvalPolicy: "ask_every_turn",
       codexModel: "gpt-5.4-mini",
-      browserProfilePersistent: true,
       inviteApprovalGate: true
     }
   );
@@ -113,22 +105,19 @@ test("team room defaults sanitize Codex model", () => {
   assert.deepEqual(sanitizeTeamRoomDefaults({ codexModel: "not a model id" }), {
     approvalPolicy: "ask_every_turn",
     codexModel: defaultCodexModel,
-    browserProfilePersistent: true,
     inviteApprovalGate: true
   });
 });
 
-test("team room defaults sanitize unsupported approval policy and browser profile settings", () => {
+test("team room defaults sanitize unsupported approval policy settings", () => {
   assert.deepEqual(
     sanitizeTeamRoomDefaults({
       approvalPolicy: "unsupported" as never,
-      codexModel: "gpt-5.4-thinking",
-      browserProfilePersistent: "yes" as never
+      codexModel: "gpt-5.4-thinking"
     }),
     {
       approvalPolicy: "ask_every_turn",
       codexModel: "gpt-5.4-thinking",
-      browserProfilePersistent: true,
       inviteApprovalGate: true
     }
   );
@@ -137,13 +126,11 @@ test("team room defaults sanitize unsupported approval policy and browser profil
     sanitizeTeamRoomDefaults({
       approvalPolicy: "unsupported" as never,
       codexModel: "gpt-5.4-mini",
-      browserProfilePersistent: false,
       inviteApprovalGate: true
     }),
     {
       approvalPolicy: "ask_every_turn",
       codexModel: "gpt-5.4-mini",
-      browserProfilePersistent: false,
       inviteApprovalGate: true
     }
   );
@@ -154,13 +141,11 @@ test("team room defaults sanitize invite policy", () => {
     sanitizeTeamRoomDefaults({
       approvalPolicy: "ask_every_turn",
       codexModel: "gpt-5.4",
-      browserProfilePersistent: true,
       inviteApprovalGate: "yes" as never
     }),
     {
       approvalPolicy: "ask_every_turn",
       codexModel: "gpt-5.4",
-      browserProfilePersistent: true,
       inviteApprovalGate: true
     }
   );
@@ -170,15 +155,13 @@ test("team defaults room settings include only host-controlled room settings", (
   const defaults = {
     approvalPolicy: "ask_every_turn" as const,
     codexModel: "gpt-5.4-thinking",
-    browserProfilePersistent: false,
     inviteApprovalGate: true
   };
   const settings = teamDefaultsRoomSettings(defaults);
 
   assert.deepEqual(settings, {
     approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4-thinking",
-    browserProfilePersistent: false
+    codexModel: "gpt-5.4-thinking"
   });
 });
 
@@ -195,7 +178,6 @@ test("team room defaults drop corrupted storage", () => {
   assert.deepEqual(loadTeamRoomDefaults("team-core"), {
     approvalPolicy: "ask_every_turn",
     codexModel: defaultCodexModel,
-    browserProfilePersistent: true,
     inviteApprovalGate: true
   });
   assert.equal(localStorage.getItem(teamRoomDefaultsKey("team-core")), null);

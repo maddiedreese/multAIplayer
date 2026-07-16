@@ -83,10 +83,7 @@ export function SafetyStep({
       </div>
       <details className="onboarding-advanced">
         <summary>Advanced settings</summary>
-        <p>
-          Model, reasoning effort, browser profile, history retention, and approval policy remain available in room
-          settings.
-        </p>
+        <p>Model, reasoning effort, history retention, and approval policy remain available in room settings.</p>
       </details>
       <StepActions onBack={onBack}>
         <button type="button" className="onboarding-primary" onClick={onContinue} disabled={busy}>

@@ -47,15 +47,9 @@ export function buildRoomSettingsMessageBody(
       return `${event.changedBy} changed Codex sandbox from ${formatCodexSandboxLevel(event.previousValue)} to ${formatCodexSandboxLevel(event.nextValue)}.`;
     case "projectPath":
       return `${event.changedBy} changed the project folder from ${event.previousValue} to ${event.nextValue}.`;
-    case "browserProfilePersistent":
-      return `${event.changedBy} changed browser profile mode from ${formatBrowserProfilePersistence(event.previousValue)} to ${formatBrowserProfilePersistence(event.nextValue)}.`;
   }
 }
 
 function formatApprovalPolicy(value: string, labels: RoomSettingsMessageLabels): string {
   return labels.approvalPolicyLabels[value as ApprovalPolicy] ?? value;
-}
-
-function formatBrowserProfilePersistence(value: string): string {
-  return value === "true" ? "persistent profile" : "refresh before each approved open";
 }

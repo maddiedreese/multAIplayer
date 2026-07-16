@@ -29,7 +29,27 @@ Object.defineProperty(dom.window, "__TAURI_INTERNALS__", {
 
 const { useAppStore } = await import("../src/store/appStore");
 const { useLocalHistoryHydration } = await import("../src/hooks/useLocalHistoryHydration");
+const { createRoomActions } = await import("../src/application/rooms/roomActions");
 const noForgottenRoomIds = new Set<string>();
+
+function createHydrationRoomActions() {
+  const busyRef = () => ({ current: {} as Record<string, boolean> });
+  return createRoomActions({
+    busy: {
+      gitWorkflowBusyRef: busyRef(),
+      actionsBusyRef: busyRef(),
+      localPreviewBusyRef: busyRef(),
+      hostBusyRef: busyRef(),
+      settingsBusyRef: busyRef(),
+      membershipCommitBusyRef: busyRef(),
+      fileBusyRef: busyRef(),
+      terminalBusyRef: busyRef()
+    },
+    maxTerminalActivityLines: 250,
+    browser: { defaultBrowserUrl: "https://browser.example", defaultBrowserReason: "Review" },
+    project: { defaultCodexModel: "gpt-default", defaultProjectPath: "/workspace/default" }
+  });
+}
 
 function currentHistory(messages: unknown[]) {
   return {
@@ -97,6 +117,28 @@ test("no selected room does not start native history hydration", async () => {
   await Promise.resolve();
   assert.deepEqual(nativeInvocations, []);
   assert.equal(useAppStore.getState().historyPresenceByRoom[""], undefined);
+  view.unmount();
+});
+
+test("room insertion hydrates once when the parent observes hydration state", async () => {
+  const view = renderHook(() => {
+    useAppStore((state) => state.historyPresenceByRoom["room-a"]);
+    const actions = createHydrationRoomActions();
+    useLocalHistoryHydration({
+      hasSelectedRoom: true,
+      selectedRoomId: "room-a",
+      selectedRoomTeamId: "team-a",
+      forgottenRoomIds: noForgottenRoomIds,
+      replaceHistorySettings: useAppStore.getState().setHistorySettings,
+      hydrateLocalRoomHistoryForRoom: actions.hydrateLocalRoomHistoryForRoom,
+      hydrateRoomReadState: useAppStore.getState().hydrateRoomReadState
+    });
+  });
+
+  await waitFor(() =>
+    assert.equal(useAppStore.getState().historyPresenceByRoom["room-a"]?.historyHydrationStatus, "ready")
+  );
+  assert.equal(nativeInvocations.filter((command) => command === "mls_history_load_latest").length, 1);
   view.unmount();
 });
 

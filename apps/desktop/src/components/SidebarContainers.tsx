@@ -1,4 +1,4 @@
-import React, { useMemo, type ComponentProps } from "react";
+import React, { useMemo } from "react";
 import { codexModelOptions, defaultCodexModel, type ClientRoomRecord } from "@multaiplayer/protocol";
 import { AppSidebarDrawer } from "./AppSidebarDrawer";
 import { DesktopSidebar } from "./DesktopSidebar";
@@ -9,16 +9,12 @@ import { formatCodexModel, formatSessionPersistence } from "../lib/formatting/ap
 import { formatCodexCompatibilitySummary } from "../lib/codex/codexCompatibility";
 import { defaultProjectPath } from "../lib/platform/localBackend";
 import { mlsStateStorageLabel } from "../application/runtime/appRuntime";
-import { selectSidebarDrawerView, selectSidebarNavigationView } from "../application/views/containerViewSelectors";
-import { buildSidebarDrawerCapabilities, buildSidebarNavigationCapabilities } from "../hooks/containerCapabilities";
-import { resolveSidebarSettingsMessage } from "../presentation/containers/containerPropBuilders";
 import { hideUnreadForLockedRooms } from "../lib/history/roomUnread";
 import { useLocalIdentity } from "../hooks/useLocalIdentity";
 import { useRoomAccess } from "../hooks/useRoomAccess";
 import { useSidebarNavigation } from "../hooks/useSidebarNavigation";
 import { approvalPolicyLabels } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
-import { useShallow } from "zustand/react/shallow";
 import { projectBrowserRequestsByRoom } from "../store/slices/browserSlice";
 import { projectCodexRuntimeMaps } from "../store/slices/codexHostHandoffSlice";
 import { projectHistorySearchMessagesByRoom } from "../store/slices/historyPresenceSlice";
@@ -27,8 +23,6 @@ import { deriveOnboardingProgress, onboardingRestartEvent } from "../lib/onboard
 import type { useGitHubAuth } from "../hooks/useGitHubAuth";
 import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
 import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
-
-type DrawerSettingsProps = ComponentProps<typeof AppSidebarDrawer>["settings"];
 
 function sidebarRoomDisplay(room: ClientRoomRecord | null) {
   if (!room) {
@@ -47,32 +41,6 @@ function sidebarRoomDisplay(room: ClientRoomRecord | null) {
     codexModel: room.codexModel ?? defaultCodexModel,
     approvalLabel: approvalPolicyLabels[room.approvalPolicy]
   };
-}
-
-export interface SidebarNavigationCapabilities {
-  signIn: () => void;
-  signOut: () => void;
-  createTeam: () => void;
-  chooseNewRoomProjectPath: () => void;
-  createRoom: () => void;
-  setTeamLifecycle: (teamId: string, action: "archive" | "restore" | "delete") => void;
-  setRoomLifecycle: (roomId: string, action: "archive" | "restore" | "delete") => void;
-}
-
-export interface SidebarDrawerCapabilities {
-  signIn: () => void;
-  signOut: () => void;
-  rotateDeviceIdentity: () => void;
-  clearDeletedHostedAccount: () => void;
-  chooseProject: () => void;
-  updateLocalHistorySettings: (settings: DrawerSettingsProps["historySettings"]) => void;
-  clearRoomHistory: () => void;
-  forgetSelectedRoomLocalData: () => void;
-  updateTeamHistoryDefaults: (settings: DrawerSettingsProps["teamHistorySettings"]) => void;
-  updateTeamDefaultApprovalPolicy: DrawerSettingsProps["onTeamDefaultApprovalPolicyChange"];
-  updateTeamDefaultCodexModel: (model: string) => void;
-  updateTeamDefaultInviteApprovalGate: (enabled: boolean) => void;
-  applyTeamDefaultsToRoom: () => void;
 }
 
 export interface SidebarSources {
@@ -97,32 +65,31 @@ export interface SidebarSources {
 }
 
 export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }) {
-  const capabilities = useMemo(() => buildSidebarNavigationCapabilities(sources), [sources]);
+  const currentUser = useAppStore((state) => state.currentUser);
+  const authBusy = useAppStore((state) => state.authBusy);
+  const authConfig = useAppStore((state) => state.authConfig);
+  const authError = useAppStore((state) => state.authError);
+  const deviceFlow = useAppStore((state) => state.deviceFlow);
+  const sidebarQuery = useAppStore((state) => state.sidebarQuery);
+  const workspaceError = useAppStore((state) => state.workspaceError);
+  const newTeamName = useAppStore((state) => state.newTeamName);
+  const newRoomName = useAppStore((state) => state.newRoomName);
+  const newRoomProjectPath = useAppStore((state) => state.newRoomProjectPath);
+  const selectedTeam = useAppStore((state) => state.selectedTeam);
+  const selectedRoomId = useAppStore((state) => state.selectedRoomId);
+  const teams = useAppStore((state) => state.teams);
+  const rooms = useAppStore((state) => state.rooms);
+  const messagesByRoom = useAppStore((state) => state.messagesByRoom);
+  const historyPresenceByRoom = useAppStore((state) => state.historyPresenceByRoom);
+  const codexRuntimeByRoom = useAppStore((state) => state.codexRuntimeByRoom);
+  const terminalRuntimeByRoom = useAppStore((state) => state.terminalRuntimeByRoom);
+  const browserByRoom = useAppStore((state) => state.browserByRoom);
+  const forgottenRoomIds = useAppStore((state) => state.forgottenRoomIds);
+  const revokedRoomIds = useAppStore((state) => state.revokedRoomIds);
+  const revokedTeamIds = useAppStore((state) => state.revokedTeamIds);
+  const historySearchBusy = useAppStore((state) => state.historySearchBusy);
+  const activeSidebarPanel = useAppStore((state) => state.activeSidebarPanel);
   const {
-    currentUser,
-    authBusy,
-    authConfig,
-    authError,
-    deviceFlow,
-    sidebarQuery,
-    workspaceError,
-    newTeamName,
-    newRoomName,
-    newRoomProjectPath,
-    selectedTeam,
-    selectedRoomId,
-    teams,
-    rooms,
-    messagesByRoom,
-    historyPresenceByRoom,
-    codexRuntimeByRoom,
-    terminalRuntimeByRoom,
-    browserByRoom,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    historySearchBusy,
-    activeSidebarPanel,
     setSidebarQuery,
     setNewTeamName,
     setNewRoomName,
@@ -131,7 +98,7 @@ export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }
     selectWorkspaceRoom,
     setSelectedRoomId,
     setActiveSidebarPanel
-  } = useAppStore(useShallow(selectSidebarNavigationView));
+  } = useAppStore.getState();
 
   const visibleRooms = useMemo(
     () => hideUnreadForLockedRooms(rooms, forgottenRoomIds, revokedRoomIds, revokedTeamIds),
@@ -227,69 +194,74 @@ export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }
           onDismiss={() => applyOnboardingEvent({ type: "dismiss_checklist" })}
         />
       }
-      onSignIn={capabilities.signIn}
-      onSignOut={capabilities.signOut}
+      onSignIn={sources.githubAuth.beginGitHubSignIn}
+      onSignOut={sources.roomRuntime.signOut}
       onSidebarQueryChange={setSidebarQuery}
       onClearSidebarQuery={() => setSidebarQuery("")}
       onNewTeamNameChange={setNewTeamName}
-      onCreateTeam={capabilities.createTeam}
+      onCreateTeam={sources.workspaceFlow.addTeam}
       onSelectTeam={(teamId) => selectTeamRoom(teamId, rooms[0]?.id ?? "")}
       onNewRoomNameChange={setNewRoomName}
       onNewRoomProjectPathChange={setNewRoomProjectPath}
-      onChooseNewRoomProjectPath={capabilities.chooseNewRoomProjectPath}
-      onCreateRoom={capabilities.createRoom}
+      onChooseNewRoomProjectPath={sources.workspaceFlow.chooseNewRoomProjectPath}
+      onCreateRoom={sources.workspaceFlow.addRoom}
       onSelectRoom={(roomId, teamId) => {
         if (teamId) selectWorkspaceRoom(teamId, roomId);
         else setSelectedRoomId(roomId);
       }}
-      onSetTeamLifecycle={capabilities.setTeamLifecycle}
-      onSetRoomLifecycle={capabilities.setRoomLifecycle}
+      onSetTeamLifecycle={sources.workspaceFlow.setTeamLifecycle}
+      onSetRoomLifecycle={sources.workspaceFlow.setRoomLifecycle}
       onSelectSidebarPanel={setActiveSidebarPanel}
     />
   );
 }
 
 export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources }) {
-  const capabilities = useMemo(() => buildSidebarDrawerCapabilities(sources), [sources]);
+  const currentUser = useAppStore((state) => state.currentUser);
+  const authBusy = useAppStore((state) => state.authBusy);
+  const authConfig = useAppStore((state) => state.authConfig);
+  const authError = useAppStore((state) => state.authError);
+  const deviceFlow = useAppStore((state) => state.deviceFlow);
+  const selectedTeam = useAppStore((state) => state.selectedTeam);
+  const selectedRoom = useAppStore((state) => state.rooms.find((room) => room.id === state.selectedRoomId) ?? null);
+  const hasSelectedRoom = selectedRoom != null;
+  const activeSidebarPanel = useAppStore((state) => state.activeSidebarPanel);
+  const appConfig = useAppStore((state) => state.appConfig);
+  const relayHttpDraft = useAppStore((state) => state.relayHttpDraft);
+  const relayWsDraft = useAppStore((state) => state.relayWsDraft);
+  const appConfigMessage = useAppStore((state) => state.appConfigMessage);
+  const relayStatus = useAppStore((state) => state.relayStatus);
+  const codexProbe = useAppStore((state) => state.codexProbe);
+  const deviceIdentity = useAppStore((state) => state.deviceIdentity);
+  const deviceIdentityMessage = useAppStore((state) => state.deviceIdentityMessage);
+  const forgottenRoomIds = useAppStore((state) => state.forgottenRoomIds);
+  const revokedRoomIds = useAppStore((state) => state.revokedRoomIds);
+  const revokedTeamIds = useAppStore((state) => state.revokedTeamIds);
+  const roomSettings =
+    useAppStore((state) => (state.selectedRoomId ? state.roomSettingsByRoom[state.selectedRoomId] : undefined)) ?? {};
+  const inviteApprovalGate =
+    useAppStore((state) =>
+      state.selectedRoomId ? state.inviteByRoom[state.selectedRoomId]?.approvalGate : undefined
+    ) ?? true;
+  const historySettings = useAppStore((state) => state.historySettings);
+  const teamHistorySettings = useAppStore((state) => state.teamHistorySettings);
+  const teamDefaultApprovalPolicy = useAppStore((state) => state.teamDefaultApprovalPolicy);
+  const teamDefaultCodexModel = useAppStore((state) => state.teamDefaultCodexModel);
+  const teamDefaultInviteApprovalGate = useAppStore((state) => state.teamDefaultInviteApprovalGate);
+  const historyMessage = useAppStore((state) =>
+    state.selectedRoomId ? (state.historyPresenceByRoom[state.selectedRoomId]?.historyMessage ?? null) : null
+  );
+  const teamHistoryMessage = useAppStore(
+    (state) => state.teamHistoryByTeam[state.selectedTeam || "__no-team"]?.message ?? null
+  );
   const {
-    currentUser,
-    authBusy,
-    authConfig,
-    authError,
-    deviceFlow,
-    selectedTeam,
-    selectedRoom,
-    hasSelectedRoom,
-    activeSidebarPanel,
-    appConfig,
-    relayHttpDraft,
-    relayWsDraft,
-    appConfigMessage,
-    relayStatus,
-    codexProbe,
-    deviceIdentity,
-    deviceIdentityMessage,
-    forgottenRoomIds,
-    revokedRoomIds,
-    revokedTeamIds,
-    roomSettings,
-    inviteApprovalGate,
-    historySettings,
-    teamHistorySettings,
-    teamDefaultApprovalPolicy,
-    teamDefaultCodexModel,
-    teamDefaultBrowserProfilePersistent,
-    teamDefaultInviteApprovalGate,
-    historyMessage,
-    teamHistoryMessage,
     setActiveSidebarPanel,
     setRelayHttpDraft,
     setRelayWsDraft,
     resetRelayConfiguration,
     saveRelayConfiguration,
-    setRoomNotificationsMuted,
-    setTeamDefaultBrowserProfilePersistent
-  } = useAppStore(useShallow(selectSidebarDrawerView));
+    setRoomNotificationsMuted
+  } = useAppStore.getState();
   const { deviceId, localUser } = useLocalIdentity(currentUser);
   const onboarding = useAppStore((state) => state.onboarding);
   const applyOnboardingEvent = useAppStore((state) => state.applyOnboardingEvent);
@@ -304,12 +276,10 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
     historySettings,
     inviteApprovalGate
   });
-  const settingsMessage = resolveSidebarSettingsMessage(
-    appConfigMessage,
-    roomSettings.settingsMessage,
-    historyMessage,
-    teamHistoryMessage
-  );
+  const settingsMessage =
+    [appConfigMessage, roomSettings.settingsMessage, historyMessage, teamHistoryMessage].find(
+      (message): message is string => message != null
+    ) ?? null;
   const roomDisplay = sidebarRoomDisplay(selectedRoom);
 
   return (
@@ -334,10 +304,10 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
             hasSelectedRoom={hasSelectedRoom}
           />
         ),
-        onRotateDeviceIdentity: capabilities.rotateDeviceIdentity,
-        onHostedAccountDeleted: capabilities.clearDeletedHostedAccount,
-        onSignIn: capabilities.signIn,
-        onSignOut: capabilities.signOut
+        onRotateDeviceIdentity: sources.roomRuntime.rotateDeviceIdentity,
+        onHostedAccountDeleted: sources.githubAuth.clearDeletedHostedAccount,
+        onSignIn: sources.githubAuth.beginGitHubSignIn,
+        onSignOut: sources.roomRuntime.signOut
       }}
       settings={{
         relaySummary: appConfig.relayWsUrl ? `${relayStatus} · ${appConfig.relayWsUrl}` : "Not configured",
@@ -371,7 +341,6 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         teamDefaultCodexModel,
         defaultCodexModel,
         codexModelOptions,
-        teamDefaultBrowserProfilePersistent,
         teamDefaultInviteApprovalGate,
         message: settingsMessage,
         archivePanel: (
@@ -381,7 +350,7 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
             hasSelectedRoom={hasSelectedRoom}
           />
         ),
-        onChooseProject: capabilities.chooseProject,
+        onChooseProject: sources.roomRuntime.chooseProjectPath,
         onRelayHttpDraftChange: setRelayHttpDraft,
         onRelayWsDraftChange: setRelayWsDraft,
         onResetRelay: resetRelayConfiguration,
@@ -389,20 +358,20 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         onNotificationsMutedChange: (muted) => {
           if (selectedRoom) setRoomNotificationsMuted(selectedRoom.id, muted);
         },
-        onHistoryEnabledChange: (enabled) => capabilities.updateLocalHistorySettings({ ...historySettings, enabled }),
+        onHistoryEnabledChange: (enabled) =>
+          sources.workspaceFlow.updateLocalHistorySettings({ ...historySettings, enabled }),
         onHistoryRetentionDaysChange: (retentionDays) =>
-          capabilities.updateLocalHistorySettings({ ...historySettings, retentionDays }),
-        onClearRoomHistory: capabilities.clearRoomHistory,
-        onForgetRoomLocalData: capabilities.forgetSelectedRoomLocalData,
+          sources.workspaceFlow.updateLocalHistorySettings({ ...historySettings, retentionDays }),
+        onClearRoomHistory: sources.workspaceFlow.clearRoomHistory,
+        onForgetRoomLocalData: sources.workspaceFlow.forgetSelectedRoomLocalData,
         onTeamHistoryEnabledChange: (enabled) =>
-          capabilities.updateTeamHistoryDefaults({ ...teamHistorySettings, enabled }),
+          sources.workspaceFlow.updateTeamHistoryDefaults({ ...teamHistorySettings, enabled }),
         onTeamHistoryRetentionDaysChange: (retentionDays) =>
-          capabilities.updateTeamHistoryDefaults({ ...teamHistorySettings, retentionDays }),
-        onTeamDefaultApprovalPolicyChange: capabilities.updateTeamDefaultApprovalPolicy,
-        onTeamDefaultCodexModelChange: capabilities.updateTeamDefaultCodexModel,
-        onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
-        onTeamDefaultInviteApprovalGateChange: capabilities.updateTeamDefaultInviteApprovalGate,
-        onApplyTeamDefaultsToRoom: capabilities.applyTeamDefaultsToRoom
+          sources.workspaceFlow.updateTeamHistoryDefaults({ ...teamHistorySettings, retentionDays }),
+        onTeamDefaultApprovalPolicyChange: sources.workspaceFlow.updateTeamDefaultApprovalPolicy,
+        onTeamDefaultCodexModelChange: sources.workspaceFlow.updateTeamDefaultCodexModel,
+        onTeamDefaultInviteApprovalGateChange: sources.workspaceFlow.updateTeamDefaultInviteApprovalGate,
+        onApplyTeamDefaultsToRoom: sources.workspaceFlow.applyTeamDefaultsToRoom
       }}
       help={{
         completedSteps: onboardingProgress.completedSteps,

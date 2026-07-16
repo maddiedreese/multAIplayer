@@ -281,7 +281,10 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
   await guest.execute(
     (targetRoomName, key) => {
       const page = globalThis as typeof globalThis & {
-        __multaiplayerGroupStateResults?: Record<string, { state?: unknown; message?: string } | undefined>;
+        __multaiplayerGroupStateResults?: Record<
+          string,
+          { state?: unknown; code?: string; message?: string } | undefined
+        >;
       };
       const results = (page.__multaiplayerGroupStateResults ??= {});
       results[key] = undefined;
@@ -299,7 +302,14 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
           results[key] = { state };
         })
         .catch((error) => {
-          results[key] = { message: String(error) };
+          const code =
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            typeof (error as { code?: unknown }).code === "string"
+              ? (error as { code: string }).code
+              : undefined;
+          results[key] = { code, message: String(error) };
         });
     },
     roomName,
@@ -309,7 +319,10 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
     () =>
       guest.execute((key) => {
         const page = globalThis as typeof globalThis & {
-          __multaiplayerGroupStateResults?: Record<string, { state?: unknown; message?: string } | undefined>;
+          __multaiplayerGroupStateResults?: Record<
+            string,
+            { state?: unknown; code?: string; message?: string } | undefined
+          >;
         };
         return page.__multaiplayerGroupStateResults?.[key] !== undefined;
       }, resultKey),
@@ -317,7 +330,10 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
   );
   const result = await guest.execute((key) => {
     const page = globalThis as typeof globalThis & {
-      __multaiplayerGroupStateResults?: Record<string, { state?: unknown; message?: string } | undefined>;
+      __multaiplayerGroupStateResults?: Record<
+        string,
+        { state?: unknown; code?: string; message?: string } | undefined
+      >;
     };
     const value = page.__multaiplayerGroupStateResults?.[key];
     if (page.__multaiplayerGroupStateResults) delete page.__multaiplayerGroupStateResults[key];
@@ -325,11 +341,7 @@ async function assertGuestMlsGroupLocked(guest: Browser, roomName: string, asser
   }, resultKey);
   assert.ok(result, `${assertionContext}: native MLS group-state result disappeared before collection`);
   assert.equal("state" in result, false, `${assertionContext}: guest unexpectedly had native MLS group state`);
-  assert.match(
-    result.message ?? "",
-    /group is not open/i,
-    `${assertionContext}: native MLS lookup did not report an absent group`
-  );
+  assert.equal(result.code, "not_found", `${assertionContext}: native MLS lookup did not report an absent group`);
 }
 
 export async function inviteAndDeny(host: Browser, guest: Browser, context: InviteScenarioContext) {

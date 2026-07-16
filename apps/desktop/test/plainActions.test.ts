@@ -65,7 +65,6 @@ const room: ClientRoomRecord = {
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
-  browserProfilePersistent: true,
   unread: 0
 };
 
@@ -706,7 +705,6 @@ test("team default actions report missing selection without touching storage", (
     setTeamHistorySettings: () => undefined,
     setTeamDefaultApprovalPolicy: () => undefined,
     setTeamDefaultCodexModel: () => undefined,
-    setTeamDefaultBrowserProfilePersistent: () => undefined,
     setTeamDefaultInviteApprovalGate: () => undefined
   });
 
@@ -870,7 +868,7 @@ test("file opens treat traversal and prompt-injection-shaped names as inert nati
   nativeInvoke = async (command, args) => {
     if (command === "project_file_read") {
       readRequest = args;
-      throw new Error("project path escapes the selected workspace");
+      throw { code: "invalid_argument", message: "project path escapes the selected workspace" };
     }
     if (command === "git_diff_file") return { path: attemptedPath, diff: "", binary: false };
     throw new Error(`Unexpected native command: ${command}`);
@@ -908,7 +906,7 @@ test("stale and symlink-rejected file saves preserve the editor buffer and pendi
   nativeInvoke = async (command, args) => {
     if (command === "project_file_write") {
       writeRequest = args;
-      throw new Error("refusing symlink escape or stale file write");
+      throw { code: "invalid_argument", message: "refusing symlink escape or stale file write" };
     }
     throw new Error(`Unexpected native command: ${command}`);
   };

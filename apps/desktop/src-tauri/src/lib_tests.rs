@@ -488,13 +488,13 @@ fn sanitize_window_label_replaces_unsupported_room_id_characters() {
 }
 
 #[test]
-fn browser_profile_scope_is_separate_per_project() {
-    let first = browser_profile_scope("room-alpha", Some("/Users/maddie/project-a"))
-        .expect("first browser profile scope");
-    let second = browser_profile_scope("room-alpha", Some("/Users/maddie/project-b"))
-        .expect("second browser profile scope");
-    let first_again = browser_profile_scope("room-alpha", Some("  /Users/maddie/project-a  "))
-        .expect("stable browser profile scope");
+fn browser_view_scope_is_separate_per_project() {
+    let first = browser_view_scope("room-alpha", Some("/Users/maddie/project-a"))
+        .expect("first browser view scope");
+    let second = browser_view_scope("room-alpha", Some("/Users/maddie/project-b"))
+        .expect("second browser view scope");
+    let first_again = browser_view_scope("room-alpha", Some("  /Users/maddie/project-a  "))
+        .expect("stable browser view scope");
 
     assert_ne!(first, second);
     assert_eq!(first, first_again);
@@ -507,12 +507,29 @@ fn browser_profile_scope_is_separate_per_project() {
 }
 
 #[test]
-fn room_browser_guard_script_blocks_clipboard_and_file_inputs() {
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("navigator.clipboard"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("writeText"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("input[type=file]"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("dragover"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("drop"));
+fn room_browser_guard_script_is_packaged_from_the_tested_source() {
+    assert_eq!(ROOM_BROWSER_GUARD_SCRIPT, include_str!("browser_guard.js"));
+}
+
+#[test]
+fn room_browser_creation_remains_native_only() {
+    let production_capabilities = include_str!("../capabilities/default.json");
+    let native_test_config = include_str!("../tauri.native-e2e.conf.json");
+    let native_browser = include_str!("browser.rs");
+    let browser_panel = include_str!("../../src/components/BrowserAccessPanel.tsx");
+
+    for source in [production_capabilities, native_test_config] {
+        assert!(!source.contains("allow-create-webview"));
+        assert!(!source.contains("allow-webview-close"));
+        assert!(!source.contains("allow-set-webview-position"));
+        assert!(!source.contains("allow-set-webview-size"));
+        assert!(!source.contains("allow-set-webview-focus"));
+    }
+    assert!(!browser_panel.contains("@tauri-apps/api/webview"));
+    assert!(!browser_panel.contains("new Webview"));
+    assert!(browser_panel.contains("openBrowserView"));
+    assert!(native_browser.contains(".incognito(true)"));
+    assert!(!native_browser.contains(".data_directory("));
 }
 
 #[test]

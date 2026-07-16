@@ -59,15 +59,32 @@ jobs:
         if: steps.release.outputs.prs_created == 'true'
         run: |
           npm run sync:release-versions
+          npm run finalize:release-changelog
           npm run check:release-versions
           if git diff --quiet; then
             exit 0
           fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add package.json package-lock.json apps packages
+          git add CHANGELOG.md package.json package-lock.json apps packages
           git commit --signoff --message "chore: synchronize release metadata"
           git push
+      - name: Use the reviewed changelog for the release pull request body
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        run: |
+          pr_number="$(jq --exit-status --raw-output '.number' <<< "$RELEASE_PR")"
+          version="$(node -p "require('./package.json').version")"
+          {
+            echo "## multAIplayer $version"
+            echo
+            node tools/release/finalize-changelog.mjs --extract="$version"
+            echo
+            echo "The complete reviewed notes are maintained in \`CHANGELOG.md\`."
+          } > "$RUNNER_TEMP/release-pr-body.md"
+          gh pr edit "$pr_number" --body-file "$RUNNER_TEMP/release-pr-body.md"
       - name: Dispatch protected checks for a built-in-token release pull request
         if: steps.release.outputs.prs_created == 'true' && steps.credential.outputs.uses_custom_token == 'false'
         env:
@@ -169,10 +186,8 @@ jobs:
           ref: ${{ needs.resolve.outputs.commit }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
-      - name: Install pinned Rust toolchain
-        run: |
-          rustup toolchain install 1.89.0 --profile minimal
-          rustup default 1.89.0
+      - name: Install repository Rust toolchain
+        uses: ./.github/actions/setup-rust
       - name: Install Tauri, WebDriver, display, and Secret Service dependencies
         run: >-
           sudo apt-get update &&
@@ -197,10 +212,21 @@ jobs:
       - name: Exercise two real native clients before release publication
         run: xvfb-run -a npm run test:e2e:native
 
+  release-supply-chain-gate:
+    name: Exact-source supply-chain gate
+    needs: resolve
+    permissions:
+      contents: read
+      issues: write
+      security-events: write
+    uses: ./.github/workflows/supply-chain.yml
+    with:
+      commit: ${{ needs.resolve.outputs.commit }}
+
   build:
     name: Build signed macOS artifacts
-    needs: [resolve, release-native-gate]
-    if: needs.release-native-gate.result == 'success'
+    needs: [resolve, release-native-gate, release-supply-chain-gate]
+    if: needs.release-native-gate.result == 'success' && needs.release-supply-chain-gate.result == 'success'
     runs-on: macos-15
     timeout-minutes: 90
     permissions:
@@ -222,6 +248,11 @@ jobs:
 
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
+
+      - name: Set up repository Rust toolchain and native lint components
+        uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt clippy
 
       - name: Install Apple silicon Rust target
         run: rustup target add aarch64-apple-darwin
@@ -432,6 +463,8 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.build.outputs.commit }}
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
       - name: Download trusted build output
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -532,7 +565,9 @@ jobs:
               exit 0
             fi
           else
-            release_args=(--generate-notes --draft)
+            node tools/release/finalize-changelog.mjs --extract="${RELEASE_TAG#v}" \
+              > "$RUNNER_TEMP/release-notes.md"
+            release_args=(--notes-file "$RUNNER_TEMP/release-notes.md" --draft)
             if [ "$RELEASE_PRERELEASE" = "true" ]; then
               release_args+=(--prerelease)
             fi
@@ -587,6 +622,8 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ needs.build.outputs.commit }}
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
       - name: Download and authenticate the immutable public release
         env:
           GH_TOKEN: ${{ github.token }}

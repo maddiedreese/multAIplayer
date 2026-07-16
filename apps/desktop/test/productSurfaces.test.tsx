@@ -31,6 +31,8 @@ test("room browser exposes host controls, tab selection, and safe fallback ifram
   const view = render(
     <BrowserAccessPanel
       hidden={false}
+      roomId="room-test"
+      projectPath="/tmp/project"
       activeBrowserUrl="https://preview.example/"
       browserRequests={[]}
       browserMessage={null}
@@ -69,6 +71,42 @@ test("room browser exposes host controls, tab selection, and safe fallback ifram
   assert.ok(view.getByRole("button", { name: "Return browser to column" }));
 });
 
+test("room browser history navigation is not overwritten by the active tab synchronization", async () => {
+  const visited: string[] = [];
+  const firstUrl = "https://first.example/";
+  const secondUrl = "https://second.example/";
+  const renderBrowser = (activeBrowserUrl: string) => (
+    <BrowserAccessPanel
+      hidden={false}
+      roomId="room-history"
+      projectPath="/tmp/project"
+      activeBrowserUrl={activeBrowserUrl}
+      browserTabs={[]}
+      browserRequests={[]}
+      browserMessage={null}
+      activeBrowserTabId={null}
+      browserUrl={activeBrowserUrl}
+      canHostBrowser
+      onBrowserUrlChange={(url) => visited.push(url)}
+      onOpenBrowserNow={() => undefined}
+      onApproveBrowserRequest={() => undefined}
+      onDenyBrowserRequest={() => undefined}
+      onOpenApprovedBrowserRequest={() => undefined}
+      onSelectBrowserTab={() => undefined}
+      onCloseBrowserTab={() => undefined}
+    />
+  );
+
+  const view = render(renderBrowser(firstUrl));
+  view.rerender(renderBrowser(secondUrl));
+
+  const back = view.getByRole("button", { name: "Back" }) as HTMLButtonElement;
+  await waitFor(() => assert.equal(back.disabled, false));
+  fireEvent.click(back);
+  await waitFor(() => assert.equal(view.getByTitle("Room browser").getAttribute("src"), firstUrl));
+  assert.equal(visited.at(-1), firstUrl);
+});
+
 test("room browser exposes pending request provenance and explicit host approval actions", () => {
   const events: string[] = [];
   const pending = {
@@ -89,6 +127,8 @@ test("room browser exposes pending request provenance and explicit host approval
   const view = render(
     <BrowserAccessPanel
       hidden={false}
+      roomId="room-test"
+      projectPath="/tmp/project"
       activeBrowserUrl={null}
       browserTabs={[]}
       browserRequests={[approved, pending]}

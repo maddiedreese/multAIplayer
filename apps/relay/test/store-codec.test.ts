@@ -54,7 +54,6 @@ function currentRoom(overrides: Partial<RoomRecord> & Pick<RoomRecord, "id" | "t
     host: "No host",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    browserProfilePersistent: false,
     ...overrides
   };
 }
@@ -827,8 +826,7 @@ test("startup accepts a complete current offline room without synthesizing autho
         host: "Creator",
         hostUserId: "github:creator",
         hostStatus: "offline",
-        approvalPolicy: "ask_every_turn",
-        browserProfilePersistent: true
+        approvalPolicy: "ask_every_turn"
       }
     ],
     teamMembers: [
@@ -864,23 +862,6 @@ test("startup rejects incomplete or legacy-shaped critical team and room rows", 
   assert.throws(
     () => codec().codec.applyStoredRelayState({ ...base, teams: [{ id: "team-core", members: 0 }] }),
     /team row failed validation/
-  );
-  assert.throws(
-    () =>
-      codec().codec.applyStoredRelayState({
-        ...base,
-        rooms: [
-          {
-            id: "room",
-            teamId: "team-core",
-            name: "Room",
-            host: "No host",
-            hostStatus: "offline",
-            approvalPolicy: "ask_every_turn"
-          }
-        ]
-      }),
-    /room row failed validation/
   );
   assert.throws(
     () =>

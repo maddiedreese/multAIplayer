@@ -4,7 +4,7 @@ description: Installs the repository Node major and exact package-manager versio
 inputs:
   node-version:
     description: Node.js version accepted by the repository.
-    default: "22"
+    default: "24"
 
 runs:
   using: composite

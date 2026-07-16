@@ -191,6 +191,44 @@ async function visible(browser: Browser, selector: string, timeout = 30_000) {
   return element;
 }
 
+async function captureRendererDiagnostics(browser: Browser) {
+  return browser.executeAsync((done) => {
+    const diagnosticsModule = "/src/lib/platform/diagnostics.ts";
+    const storeModule = "/src/store/appStore.ts";
+    Promise.all([import(/* @vite-ignore */ diagnosticsModule), import(/* @vite-ignore */ storeModule)])
+      .then(([diagnostics, store]) => {
+        const state = store.useAppStore.getState();
+        const rootElement = document.getElementById("root");
+        done({
+          page: {
+            title: document.title.slice(0, 120),
+            rootPresent: rootElement !== null,
+            rootChildCount: rootElement?.childElementCount ?? 0,
+            rootMarkupLength: rootElement?.innerHTML.length ?? 0
+          },
+          state: {
+            teamCount: state.teams.length,
+            roomCount: state.rooms.length,
+            hasSelectedTeam: state.selectedTeam.length > 0,
+            hasSelectedRoom: state.selectedRoomId !== null,
+            onboardingSurface: state.onboarding.surface,
+            onboardingIntent: state.onboarding.intent
+          },
+          diagnostics: diagnostics.loadDiagnosticEntries()
+        });
+      })
+      .catch((error) => done({ error: String(error) }));
+  });
+}
+
+async function captureClientFailureEvidence(browser: Browser, client: "host" | "guest", reportDir: string) {
+  await runtime.bestEffort(`${client} failure screenshot`, browser.saveScreenshot(join(reportDir, `${client}.png`)));
+  const diagnostics = await runtime
+    .withTimeout(captureRendererDiagnostics(browser), webdriverOperationTimeoutMs, `${client} renderer diagnostics`)
+    .catch((error) => ({ error: String(error) }));
+  await writeFile(join(reportDir, `${client}-renderer.json`), `${JSON.stringify(diagnostics, null, 2)}\n`, "utf8");
+}
+
 async function assertFirstRunWelcome(browser: Browser) {
   // WebKitWebDriver supports parallel clients, but concurrent commands within
   // one session can wedge the GTK bridge. Keep each client's probes ordered.
@@ -605,15 +643,11 @@ async function main() {
     await writeFile(join(reportDir, "failure.txt"), `${String(error)}\n`, "utf8");
     if (browser) {
       stage("capturing bounded failure diagnostics");
+      const host = browser.getInstance("host");
+      const guest = restartedGuest ?? browser.getInstance("guest");
       await Promise.all([
-        runtime.bestEffort(
-          "host failure screenshot",
-          browser.getInstance("host").saveScreenshot(join(reportDir, "host.png"))
-        ),
-        runtime.bestEffort(
-          "guest failure screenshot",
-          (restartedGuest ?? browser.getInstance("guest")).saveScreenshot(join(reportDir, "guest.png"))
-        )
+        captureClientFailureEvidence(host, "host", reportDir),
+        captureClientFailureEvidence(guest, "guest", reportDir)
       ]);
     }
     throw error;

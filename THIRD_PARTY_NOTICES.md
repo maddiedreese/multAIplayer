@@ -12,7 +12,7 @@ Monaco powers the in-app workspace file editor and syntax-aware editing surface.
 
 - xterm.js (`@xterm/xterm`) - MIT License - https://github.com/xtermjs/xterm.js
 - xterm.js Fit Addon (`@xterm/addon-fit`) - MIT License - https://github.com/xtermjs/xterm.js
-- portable-pty (`portable-pty`) - MIT License - https://github.com/wezterm/wezterm
+- portable-pty (`portable-pty`) 0.9.0 - MIT License - https://github.com/wezterm/wezterm
 
 xterm.js renders the terminal UI. The native Tauri host uses a Rust PTY layer through `portable-pty` to start, read, write, and stop host-side terminal sessions.
 
@@ -25,13 +25,13 @@ Tauri and Wry provide the native desktop shell and in-room WebView surface. The 
 
 ## MLS, HPKE, And Encrypted Storage
 
-- `mls-rs` 0.54.0, `mls-rs-core` 0.26.0, `mls-rs-crypto-awslc` 0.23.0, and `mls-rs-provider-sqlite` 0.22.0 - Apache-2.0 OR MIT - https://github.com/awslabs/mls-rs
+- `mls-rs` 0.55.2, `mls-rs-core` 0.27.0, `mls-rs-crypto-awslc` 0.25.0, and `mls-rs-provider-sqlite` 0.23.0 - Apache-2.0 OR MIT - https://github.com/awslabs/mls-rs
 - `hpke` 0.14.0 - MIT OR Apache-2.0 - https://github.com/rozbb/rust-hpke
-- `aws-lc-rs` 1.16.2 - ISC AND (Apache-2.0 OR ISC) - https://github.com/aws/aws-lc-rs
+- `aws-lc-rs` 1.16.3 - ISC AND (Apache-2.0 OR ISC) - https://github.com/aws/aws-lc-rs
 - `libsqlite3-sys` 0.35.0 - MIT - https://github.com/rusqlite/rusqlite
 
-These crates implement RFC 9420 MLS, the residual RFC 9180 pairwise invite seal, cryptographic primitives, and the SQLCipher-backed native state provider. Cargo dependency licenses were reviewed manually for this migration because the npm license gate does not inspect the Cargo graph.
+These crates implement RFC 9420 MLS, the residual RFC 9180 pairwise invite seal, cryptographic primitives, and the SQLCipher-backed native state provider. The release license gate verifies the project Cargo manifests and checks these reviewed native-component versions against the locked graph.
 
 ## License Maintenance
 
-Keep this file current when adding or replacing embedded editor, terminal, browser, cryptographic, storage, or native runtime dependencies. Release checks should continue to run `npm run license:check`; Rust crate licenses must also be reviewed before release when Cargo dependencies change.
+Keep this file current when adding or replacing embedded editor, terminal, browser, cryptographic, storage, or native runtime dependencies. Release checks run `npm run license:check`; Rust crate licenses and notices must also be reviewed before release when Cargo dependencies change.

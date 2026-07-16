@@ -53,6 +53,8 @@ jobs:
         run: node scripts/check-pr-title.mjs "$PR_TITLE"
       - name: Install dependencies
         run: npm ci
+      - name: Set up repository Rust toolchain
+        uses: ./.github/actions/setup-rust
       - name: Derive the relay runtime closure from the real locked npm tree
         run: |
           npm ls --omit=dev --all --json -w @multaiplayer/relay > "$RUNNER_TEMP/relay-production-tree.json"
@@ -74,6 +76,10 @@ jobs:
         uses: ./.github/actions/setup-node-npm
       - name: Install dependencies
         run: npm ci
+      - name: Set up repository Rust toolchain and native lint components
+        uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt clippy
       - name: Install native Linux build dependencies
         run: >-
           sudo apt-get update &&

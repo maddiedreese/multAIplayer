@@ -23,17 +23,19 @@ type AppStoreActionName = {
   [Key in keyof AppStoreState]: AppStoreState[Key] extends (...args: never[]) => unknown ? Key : never;
 }[keyof AppStoreState];
 
-const storeActionCache = new Map<AppStoreActionName, AppStoreState[AppStoreActionName]>();
+const cachedStoreActions = new Map<AppStoreActionName, AppStoreState[AppStoreActionName]>();
 
 function storeAction<Key extends AppStoreActionName>(name: Key): AppStoreState[Key] {
-  const cached = storeActionCache.get(name);
+  const cached = cachedStoreActions.get(name);
   if (cached) return cached as AppStoreState[Key];
-
+  // Resolve at invocation time so long-lived room adapters never retain an action
+  // implementation replaced by a store reset or runtime reconfiguration. Cache
+  // the adapter itself so React effect dependencies remain stable across renders.
   const action = ((...args: unknown[]) => {
     const action = useAppStore.getState()[name] as (...actionArgs: unknown[]) => unknown;
     return action(...args);
   }) as AppStoreState[Key];
-  storeActionCache.set(name, action);
+  cachedStoreActions.set(name, action);
   return action;
 }
 
@@ -85,7 +87,6 @@ export function createRoomActions({
   const setBrowserMessageForRoom = storeAction("setBrowserMessageForRoom");
   const selectBrowserTabForRoom = storeAction("selectBrowserTabForRoom");
   const closeBrowserTabForRoom = storeAction("closeBrowserTabForRoom");
-  const clearBrowserStatusForRoom = storeAction("clearBrowserStatusForRoom");
   const setInviteLinkForRoom = storeAction("setInviteLinkForRoom");
   const setInviteApprovalGateForRoom = storeAction("setInviteApprovalGateForRoom");
   const setInviteMessageForRoom = storeAction("setInviteMessageForRoom");
@@ -181,7 +182,6 @@ export function createRoomActions({
     setBrowserMessageForRoom,
     selectBrowserTabForRoom,
     closeBrowserTabForRoom,
-    clearBrowserStatusForRoom,
     setSelectedBrowserMessage: (message: string | null) =>
       withSelectedRoom((roomId) => setBrowserMessageForRoom(roomId, message)),
     setInviteLinkForRoom,

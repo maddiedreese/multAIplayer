@@ -1,0 +1,253 @@
+/* Sidebar, header, history, and roster density. */
+.inspector .panel,
+.sidebar-drawer .drawer-section {
+  overflow: hidden;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.drawer-content {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  overflow: auto;
+  padding: 16px;
+  grid-auto-rows: max-content;
+  align-items: start;
+}
+
+.drawer-content > * {
+  align-self: start;
+}
+
+.drawer-section {
+  display: grid;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  background: #ffffff;
+  min-width: 0;
+  padding: 14px 16px;
+  gap: 10px;
+}
+
+.info-row {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(76px, 0.52fr) minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.info-row span,
+.info-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  min-width: 0;
+  line-height: 1.28;
+}
+
+.info-row strong {
+  color: #1e1e1e;
+  font-weight: 720;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-tool-nav,
+.header-actions,
+.host-controls {
+  min-width: 0;
+}
+
+.header-actions {
+  justify-content: flex-start;
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-model-switcher:has(select:disabled) {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+
+.history-panel .ghost-wide,
+.history-panel .primary-wide {
+  width: 100%;
+  justify-content: center;
+  min-height: 42px;
+  padding-inline: 14px;
+  white-space: normal;
+}
+
+.history-retention {
+  display: grid;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.2;
+  grid-template-columns: minmax(108px, 0.72fr) minmax(128px, 1fr);
+  align-items: center;
+}
+
+.history-retention > * {
+  min-width: 0;
+}
+
+.history-defaults {
+  display: grid;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border-color: var(--border);
+  background: var(--surface-strong);
+  align-items: start;
+}
+
+.history-defaults > div {
+  min-width: 0;
+}
+
+.room-archive-panel .drawer-section-title {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.archive-library-list,
+.archive-message-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.archive-library-row {
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 0.55rem;
+}
+
+.archive-library-row > div,
+.read-only-archive header,
+.archive-message-list > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.read-only-archive {
+  background: var(--surface-soft);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.65rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+}
+
+.read-only-archive header span,
+.archive-library-row small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.archive-message-list {
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.archive-message-list > div {
+  border-block-start: 1px solid var(--border-subtle);
+  padding-block-start: 0.45rem;
+  white-space: pre-wrap;
+}
+
+.history-defaults strong,
+.history-defaults span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.member-row > img,
+.member-row > span {
+  grid-area: avatar;
+  font-size: 14px;
+  font-weight: 620;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.member-row > div:first-of-type {
+  grid-area: identity;
+  min-width: 0;
+  align-self: end;
+}
+
+.team-member-row > img,
+.team-member-row > span {
+  width: 42px;
+  height: 42px;
+}
+
+.team-member-row strong {
+  font-size: 14px;
+}
+
+.team-member-row small {
+  font-size: 12px;
+}
+
+.team-button > * {
+  min-width: 0;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sidebar-footer button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  padding: 7px 8px;
+  border-radius: 9px;
+  height: var(--control-height);
+  min-width: 0;
+  padding-inline: 8px;
+  font-size: 12px;
+  min-height: 40px;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

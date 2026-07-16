@@ -21,7 +21,7 @@ The incoming host must re-verify, rather than inherit on trust:
 - the room and team identifiers, relay origin, membership, and exact eligible device roster;
 - its own user id, device id, MLS leaf, signature key, HPKE key, and full fingerprints, plus the authenticated group roster;
 - the canonical project directory/repository binding and any local branch or checkout used for Codex;
-- its own Codex login, model/app-server compatibility, MCP/app connections, Git/GitHub identity, browser profile, credentials, and approval defaults;
+- its own Codex login, model/app-server compatibility, MCP/app connections, Git/GitHub identity, private browser sessions, credentials, and approval defaults;
 - every pending Codex turn, terminal/browser/file request, and native approval under the new host's current context and policy.
 
 Old approvals, repeat-command grants, native session bindings, pending invite approvals, browser sessions, terminal sessions, and claimed credential state do not transfer. Pending proposals may remain visible for continuity, but they are untrusted input and require a new decision by the incoming host. The incoming host must not execute an outgoing host's serialized local state as authority. In particular, a transferred Git patch is staged and shown to the incoming host; applying it is a separate explicit action after authority changes.

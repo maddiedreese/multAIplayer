@@ -4,10 +4,10 @@ import { CodexApprovalCard } from "../../../apps/desktop/src/components/CodexApp
 import { formatCodexSandboxLevel } from "../../../apps/desktop/src/lib/formatting/appFormatters";
 import { canApproveCodexTurn } from "../../../apps/desktop/src/lib/codex/codexApproval";
 import {
+  buildHighPrivilegeLabels,
   formatApprovalAttachments,
   formatApprovalMessages
 } from "../../../apps/desktop/src/presentation/codex/codexApprovalSummary";
-import { buildHighPrivilegeLabels } from "../../../apps/desktop/src/presentation/containers/containerPropBuilders";
 import {
   buildCodexApprovalSnapshot,
   buildCodexTurnInput,
@@ -36,7 +36,6 @@ const room: RoomRecord = {
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   codexSandboxLevel: "workspace_write",
-  browserProfilePersistent: true,
   unread: 0
 };
 

@@ -14,7 +14,6 @@ const room: ClientRoomRecord = {
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-room",
-  browserProfilePersistent: true,
   unread: 0
 };
 
@@ -61,6 +60,21 @@ test("room actions resolve store implementations when invoked", () => {
 
   actions.setChatMessageForRoom("room-late", "latest action");
   assert.deepEqual(calls, [["room-late", "latest action"]]);
+});
+
+test("room store adapters keep stable identities across view recomposition", () => {
+  const first = createRoomActions(createOptions().options);
+  const second = createRoomActions(createOptions().options);
+
+  assert.equal(first.hydrateLocalRoomHistoryForRoom, second.hydrateLocalRoomHistoryForRoom);
+  assert.equal(first.setChatMessageForRoom, second.setChatMessageForRoom);
+
+  const calls: Array<[string, string | null]> = [];
+  useAppStore.setState({
+    setChatMessageForRoom: (roomId, message) => calls.push([roomId, message])
+  });
+  first.setChatMessageForRoom("room-after-recomposition", "latest implementation");
+  assert.deepEqual(calls, [["room-after-recomposition", "latest implementation"]]);
 });
 
 test("selected wrappers read the current room and team from the store", () => {

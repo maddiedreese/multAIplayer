@@ -90,3 +90,25 @@ test("production doctor warns when the single trusted-proxy opt-in is enabled", 
     /\[ok\] production trusted-proxy configuration: WARNING: forwarded headers are trusted; ensure the relay is unreachable except through a proxy that overwrites client forwarding headers/
   );
 });
+
+test("production doctor accepts only the packaged desktop custom origin", () => {
+  const desktopResult = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://app.example.test,tauri://localhost"
+  });
+  assert.equal(desktopResult.status, 0, desktopResult.output);
+
+  const customSchemeResult = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "multaiplayer://localhost"
+  });
+  assert.notEqual(customSchemeResult.status, 0);
+  assert.match(customSchemeResult.output, /exact tauri:\/\/localhost desktop origin/);
+
+  const mixedInvalidResult = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://app.example.test,https://app.example.test/path"
+  });
+  assert.notEqual(mixedInvalidResult.status, 0);
+  assert.match(mixedInvalidResult.output, /must be a bare origin without path, query, or hash/);
+});

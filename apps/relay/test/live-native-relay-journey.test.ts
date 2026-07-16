@@ -142,8 +142,7 @@ function workspace(host: DeviceIdentity, guest: DeviceIdentity): StoredRelayStat
         activeHostDeviceId: host.deviceId,
         hostStatus: "active",
         acceptedMlsEpoch: 0,
-        approvalPolicy: "ask_every_turn",
-        browserProfilePersistent: false
+        approvalPolicy: "ask_every_turn"
       }
     ],
     invites: [],

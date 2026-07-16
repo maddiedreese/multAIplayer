@@ -34,13 +34,16 @@ import { CodexAccountProvider } from "./hooks/useCodexAccount";
 import { OnboardingAssistant } from "./components/OnboardingAssistant";
 import { useOnboardingFlow } from "./hooks/useOnboardingFlow";
 import { useNativeInviteIntake } from "./hooks/useNativeInviteIntake";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 
 export function App() {
   if (!isTauriRuntime()) return <NativeAppRequired />;
   return (
-    <CodexAccountProvider>
-      <NativeApp />
-    </CodexAccountProvider>
+    <AppErrorBoundary>
+      <CodexAccountProvider>
+        <NativeApp />
+      </CodexAccountProvider>
+    </AppErrorBoundary>
   );
 }
 

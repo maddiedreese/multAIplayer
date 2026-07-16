@@ -6,6 +6,8 @@ export type NativeCommandErrorCode = keyof typeof nativeCommandErrorCodeMap;
 const nativeCommandErrorCodes = new Set<NativeCommandErrorCode>(
   Object.keys(nativeCommandErrorCodeMap) as NativeCommandErrorCode[]
 );
+const maxNativeCommandErrorMessageChars = 801;
+const fallbackNativeCommandErrorMessage = "The native command could not be completed.";
 
 export class NativeCommandError extends Error {
   override readonly name = "NativeCommandError";
@@ -35,11 +37,13 @@ export async function invokeNative<T>(
 export function normalizeNativeCommandError(error: unknown): NativeCommandError {
   if (error instanceof NativeCommandError) return error;
   if (isRecord(error) && isSupportedNativeCommandErrorCode(error.code) && typeof error.message === "string") {
-    return new NativeCommandError(error.code, error.message);
+    return new NativeCommandError(error.code, boundNativeCommandErrorMessage(error.message));
   }
-  if (typeof error === "string") return new NativeCommandError("internal_error", error);
-  if (error instanceof Error && error.message) return new NativeCommandError("internal_error", error.message);
-  return new NativeCommandError("internal_error", "The native command could not be completed.");
+  return new NativeCommandError("internal_error", fallbackNativeCommandErrorMessage);
+}
+
+function boundNativeCommandErrorMessage(message: string): string {
+  return Array.from(message).slice(0, maxNativeCommandErrorMessageChars).join("") || fallbackNativeCommandErrorMessage;
 }
 
 export function isNativeCommandErrorCode(error: unknown, code: NativeCommandErrorCode): error is NativeCommandError {

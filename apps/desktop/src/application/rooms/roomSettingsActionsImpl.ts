@@ -60,9 +60,6 @@ export function createRoomSettingsActions({
     setSettingsBusyForRoom,
     setSelectedSettingsMessage,
     setSettingsMessageForRoom,
-    setSelectedBrowserMessage,
-    setBrowserMessageForRoom,
-    clearBrowserStatusForRoom,
     resetCodexApprovalForRoom
   } = mutationContext;
   const { setApprovalPolicy } = createRoomApprovalSettingsActions({
@@ -323,56 +320,6 @@ export function createRoomSettingsActions({
     }
   }
 
-  async function setBrowserProfilePersistence(browserProfilePersistent: boolean) {
-    const selectedRoom = currentSelectedRoom();
-    if (!selectedRoom) return;
-    if (currentRoomAccess(selectedRoom).locked) {
-      setSelectedBrowserMessage(roomLockMessage(selectedRoom, currentRoomAccess(selectedRoom).revoked));
-      return;
-    }
-    if (!isCurrentUserActiveHost()) {
-      setSelectedBrowserMessage(currentRoomSettingsGateMessage());
-      return;
-    }
-    if (browserProfilePersistent === selectedRoom.browserProfilePersistent) return;
-    const roomId = selectedRoom.id;
-    if (reportRoomSettingsMutationInFlight(roomId, setBrowserMessageForRoom)) return;
-    setSettingsBusyForRoom(roomId, true);
-    setBrowserMessageForRoom(roomId, null);
-    try {
-      const previousPersistence = selectedRoom.browserProfilePersistent;
-      const room = await updateRoomSettings(roomId, {
-        ...currentRoomSettingsActor(),
-        browserProfilePersistent
-      });
-      replaceRoom(room);
-      await publishRoomSettingsEvent(room, {
-        id: crypto.randomUUID(),
-        setting: "browserProfilePersistent",
-        previousValue: String(previousPersistence),
-        nextValue: String(browserProfilePersistent),
-        changedAt: new Date().toISOString()
-      });
-      if (!browserProfilePersistent) {
-        clearBrowserStatusForRoom(roomId);
-      }
-      resetCodexApprovalForRoom(roomId);
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
-        setBrowserMessageForRoom(
-          roomId,
-          browserProfilePersistent
-            ? "Browser profile persistence enabled for this room."
-            : "Browser profile will refresh before each approved page opens."
-        );
-      }
-    } catch (error) {
-      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId))
-        setBrowserMessageForRoom(roomId, String(error));
-    } finally {
-      setSettingsBusyForRoom(roomId, false);
-    }
-  }
-
   const { updateProjectPath, chooseProjectPath } = createRoomProjectSettingsActions({
     selectedRoomId: () => selectedRoomIdRef.current,
     reportInFlight: reportRoomSettingsMutationInFlight,
@@ -389,7 +336,6 @@ export function createRoomSettingsActions({
     setCodexSpeed,
     setCodexSandboxLevel,
     renameRoom,
-    setBrowserProfilePersistence,
     updateProjectPath,
     chooseProjectPath
   };

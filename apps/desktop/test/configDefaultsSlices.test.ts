@@ -101,7 +101,6 @@ test("team defaults load into one coherent store snapshot", () => {
   saveTeamRoomDefaults("team-config", {
     approvalPolicy: "never_host",
     codexModel: "gpt-5.4-thinking",
-    browserProfilePersistent: false,
     inviteApprovalGate: false
   });
 
@@ -111,7 +110,6 @@ test("team defaults load into one coherent store snapshot", () => {
   assert.deepEqual(state.teamHistorySettings, { enabled: false, retentionDays: 14 });
   assert.equal(state.teamDefaultApprovalPolicy, "never_host");
   assert.equal(state.teamDefaultCodexModel, "gpt-5.4-thinking");
-  assert.equal(state.teamDefaultBrowserProfilePersistent, false);
   assert.equal(state.teamDefaultInviteApprovalGate, true);
 });
 

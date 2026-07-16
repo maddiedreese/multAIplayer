@@ -11,13 +11,20 @@ export default function ReadmeBrowserScenario() {
     <section className="readme-browser-surface" data-readme-capture aria-label="Room browser feature">
       <BrowserAccessPanel
         hidden={false}
+        roomId="readme-room"
+        projectPath="/tmp/readme-project"
         activeBrowserUrl={null}
         browserTabs={[]}
+        browserRequests={[]}
+        browserMessage={null}
         activeBrowserTabId={null}
         browserUrl=""
         canHostBrowser
         onBrowserUrlChange={noop}
         onOpenBrowserNow={noop}
+        onApproveBrowserRequest={noop}
+        onDenyBrowserRequest={noop}
+        onOpenApprovedBrowserRequest={noop}
         onSelectBrowserTab={noop}
         onCloseBrowserTab={noop}
       />

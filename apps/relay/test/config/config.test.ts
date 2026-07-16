@@ -308,6 +308,25 @@ test("relay loads configuration from env files without overriding process env", 
   }
 });
 
+test("relay rejects the entire allowed-origin configuration when any entry is invalid", () => {
+  const previous = process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS;
+  const previousNodeEnv = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS = "https://app.example.test,https://app.example.test/path";
+    assert.throws(
+      () => loadRelayConfig(),
+      /ALLOWED_ORIGINS entries must be bare HTTP\(S\) origins or the exact tauri:\/\/localhost/
+    );
+
+    process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS = "https://app.example.test,tauri://localhost";
+    assert.deepEqual(loadRelayConfig().allowedCorsOrigins, ["https://app.example.test", "tauri://localhost"]);
+  } finally {
+    restoreEnv("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS", previous);
+    restoreEnv("NODE_ENV", previousNodeEnv);
+  }
+});
+
 function restoreEnv(name: string, value: string | undefined) {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;

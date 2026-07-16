@@ -1,6 +1,9 @@
 use serde::Serialize;
 use std::fmt;
 
+const MAX_COMMAND_ERROR_MESSAGE_CHARS: usize = 800;
+const INTERNAL_ERROR_MESSAGE: &str = "The native command could not be completed.";
+
 macro_rules! define_command_error_codes {
     ($($variant:ident => $serialized:literal),+ $(,)?) => {
         #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -40,7 +43,7 @@ impl CommandError {
     pub(crate) fn new(code: CommandErrorCode, message: impl Into<String>) -> Self {
         Self {
             code,
-            message: message.into(),
+            message: bound_public_message(message.into()),
         }
     }
 
@@ -81,8 +84,21 @@ impl CommandError {
 // command paths still return human-readable String errors. Keep their Tauri IPC
 // boundary structured until those helpers are converted within their owning domains.
 impl From<String> for CommandError {
-    fn from(message: String) -> Self {
-        Self::new(CommandErrorCode::InternalError, message)
+    fn from(_message: String) -> Self {
+        Self::new(CommandErrorCode::InternalError, INTERNAL_ERROR_MESSAGE)
+    }
+}
+
+fn bound_public_message(message: String) -> String {
+    let mut chars = message.chars();
+    let bounded = chars
+        .by_ref()
+        .take(MAX_COMMAND_ERROR_MESSAGE_CHARS)
+        .collect::<String>();
+    if chars.next().is_some() {
+        format!("{bounded}…")
+    } else {
+        bounded
     }
 }
 
@@ -122,10 +138,21 @@ mod tests {
     }
 
     #[test]
-    fn string_based_native_helpers_receive_a_stable_ipc_code() {
+    fn string_based_native_helpers_hide_unclassified_causes() {
         let error = CommandError::from("native helper failure".to_string());
         assert_eq!(error.code, CommandErrorCode::InternalError);
-        assert_eq!(error.message, "native helper failure");
+        assert_eq!(error.message, INTERNAL_ERROR_MESSAGE);
+    }
+
+    #[test]
+    fn public_messages_are_bounded() {
+        let error =
+            CommandError::invalid_argument("x".repeat(MAX_COMMAND_ERROR_MESSAGE_CHARS + 20));
+        assert_eq!(
+            error.message.chars().count(),
+            MAX_COMMAND_ERROR_MESSAGE_CHARS + 1
+        );
+        assert!(error.message.ends_with('…'));
     }
 
     #[test]
@@ -148,7 +175,11 @@ mod tests {
         for (error, expected_code) in cases {
             let value = serde_json::to_value(error).expect("command error should serialize");
             assert_eq!(value["code"], expected_code);
-            assert_eq!(value["message"], "message");
+            if expected_code == "internal_error" {
+                assert_eq!(value["message"], INTERNAL_ERROR_MESSAGE);
+            } else {
+                assert_eq!(value["message"], "message");
+            }
         }
     }
 

@@ -10,7 +10,7 @@ export const roomArchiveOmissions = [
   "MLS group, epoch, exporter, device, signing, HPKE, and private-key state",
   "invite capabilities, KeyPackages, Welcome messages, and pending admissions",
   "pending approvals, queued turns, active goals, host handoff authority, and Codex thread/session ids",
-  "attachment blob ciphertext, browser profiles, and live process authority",
+  "attachment blob ciphertext and live process authority",
   "workspace paths are reduced to display basenames in terminal transcripts"
 ] as const;
 

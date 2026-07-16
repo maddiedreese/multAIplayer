@@ -269,23 +269,6 @@ export interface CodexGoal {
   tokenBudget: number | null;
 }
 
-export interface BrowserOpenResult {
-  label: string;
-  url: string;
-  reused: boolean;
-  profilePath: string;
-  persistent: boolean;
-  downloadsBlocked: boolean;
-  clipboardBlocked: boolean;
-  fileUploadsBlocked: boolean;
-}
-
-export interface BrowserProfileResult {
-  roomId: string;
-  profilePath: string;
-  reset: boolean;
-}
-
 export interface GitWorkflowResult {
   command: string;
   cwd: string;

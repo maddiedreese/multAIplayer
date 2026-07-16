@@ -12,7 +12,7 @@ Do this while every relevant device and the hosted relay are still available:
 4. Save attachments that matter outside relay storage. A relay migration does not copy encrypted attachment blobs automatically.
 5. Preserve any host-local Codex work through normal commits, patches, and project backups.
 
-Encrypted room archives are a data-exit path, not a room backup or membership migration. They preserve normalized display history in a bounded, versioned `age` passphrase file and import into a device-local read-only library. They deliberately omit MLS group/epoch/exporter/private state, device keys, invite capabilities, KeyPackages, Welcome messages, pending approvals, queued turns, host-handoff authority, Codex thread/session ids, browser profiles, live processes, and encrypted attachment-blob bodies. An imported archive cannot send, execute, join, host, or restore a live room. See [Encrypted room archives](room-archives.md) for the exact boundary.
+Encrypted room archives are a data-exit path, not a room backup or membership migration. They preserve normalized display history in a bounded, versioned `age` passphrase file and import into a device-local read-only library. They deliberately omit MLS group/epoch/exporter/private state, device keys, invite capabilities, KeyPackages, Welcome messages, pending approvals, queued turns, host-handoff authority, Codex thread/session ids, live processes, and encrypted attachment-blob bodies. An imported archive cannot send, execute, join, host, or restore a live room. See [Encrypted room archives](room-archives.md) for the exact boundary.
 
 ## Self-host forever
 

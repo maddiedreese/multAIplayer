@@ -40,7 +40,6 @@ export function RoomSettingsDrawerPanel({
   teamDefaultCodexModel,
   defaultCodexModel,
   codexModelOptions,
-  teamDefaultBrowserProfilePersistent,
   message,
   archivePanel,
   onChooseProject,
@@ -57,7 +56,6 @@ export function RoomSettingsDrawerPanel({
   onTeamHistoryRetentionDaysChange,
   onTeamDefaultApprovalPolicyChange,
   onTeamDefaultCodexModelChange,
-  onTeamDefaultBrowserProfilePersistentChange,
   onApplyTeamDefaultsToRoom
 }: {
   relaySummary: string;
@@ -88,7 +86,6 @@ export function RoomSettingsDrawerPanel({
   teamDefaultCodexModel: string;
   defaultCodexModel: string;
   codexModelOptions: readonly CodexModelOptionDisplay[];
-  teamDefaultBrowserProfilePersistent: boolean;
   teamDefaultInviteApprovalGate: boolean;
   message: string | null;
   archivePanel?: ReactNode;
@@ -106,7 +103,6 @@ export function RoomSettingsDrawerPanel({
   onTeamHistoryRetentionDaysChange: (days: number) => void;
   onTeamDefaultApprovalPolicyChange: (policy: ApprovalPolicy) => void;
   onTeamDefaultCodexModelChange: (model: string) => void;
-  onTeamDefaultBrowserProfilePersistentChange: (persistent: boolean) => void;
   onTeamDefaultInviteApprovalGateChange: (enabled: boolean) => void;
   onApplyTeamDefaultsToRoom: () => void;
 }) {
@@ -255,15 +251,6 @@ export function RoomSettingsDrawerPanel({
               </option>
             ))}
           </select>
-        </label>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={teamDefaultBrowserProfilePersistent}
-            disabled={!selectedTeam}
-            onChange={(event) => onTeamDefaultBrowserProfilePersistentChange(event.target.checked)}
-          />
-          <span>Persist browser profiles in new team rooms</span>
         </label>
         <button className="ghost-wide" onClick={onApplyTeamDefaultsToRoom} disabled={!hasSelectedRoom || settingsBusy}>
           <Check size={15} />

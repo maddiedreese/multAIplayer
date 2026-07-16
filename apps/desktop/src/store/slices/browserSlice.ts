@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { omitRecordKey } from "../../lib/core/setUtils";
-import type { BrowserAccessRequest, BrowserStatus } from "../../types";
+import type { BrowserAccessRequest } from "../../types";
 import type { AppStoreState } from "../appStore";
 import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
 
@@ -9,7 +9,6 @@ export interface BrowserRoomState {
   url?: string;
   reason?: string;
   message?: string | null;
-  status?: BrowserStatus;
   activeUrl?: string | null;
   tabs?: BrowserTab[];
   activeTabId?: string | null;
@@ -76,11 +75,9 @@ export interface BrowserSlice {
   openEmbeddedBrowserForRoom: (roomId: string, url: string) => void;
   selectBrowserTabForRoom: (roomId: string, tabId: string) => void;
   closeBrowserTabForRoom: (roomId: string, tabId: string) => void;
-  resetEmbeddedBrowserForRoom: (roomId: string, profilePath: string | null) => void;
   setBrowserUrlForRoom: (roomId: string, url: string, defaultBrowserUrl: string) => void;
   setBrowserReasonForRoom: (roomId: string, reason: string, defaultBrowserReason: string) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
-  clearBrowserStatusForRoom: (roomId: string) => void;
 }
 
 export const emptyBrowserState: Pick<BrowserSlice, "browserByRoom"> = {
@@ -122,13 +119,7 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
           ...roomState,
           tabs: nextTabs,
           activeTabId: activeTab.id,
-          activeUrl: activeTab.url,
-          status: {
-            profilePath: "Embedded in this room",
-            downloadsBlocked: false,
-            clipboardBlocked: false,
-            fileUploadsBlocked: false
-          }
+          activeUrl: activeTab.url
         };
       })
     }));
@@ -163,25 +154,6 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
           tabs: nextTabs,
           activeTabId: nextActiveTab?.id ?? null,
           activeUrl: nextActiveTab?.url ?? null
-        };
-      })
-    }));
-  },
-  resetEmbeddedBrowserForRoom: (roomId, profilePath) => {
-    set((state) => ({
-      browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => {
-        const nextRoom = { ...roomState };
-        delete nextRoom.activeUrl;
-        delete nextRoom.tabs;
-        delete nextRoom.activeTabId;
-        return {
-          ...nextRoom,
-          status: {
-            profilePath,
-            downloadsBlocked: false,
-            clipboardBlocked: false,
-            fileUploadsBlocked: false
-          }
         };
       })
     }));
@@ -221,18 +193,6 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
         } else {
           delete nextRoom.message;
         }
-        return nextRoom;
-      })
-    }));
-  },
-  clearBrowserStatusForRoom: (roomId) => {
-    set((state) => ({
-      browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => {
-        const nextRoom = { ...roomState };
-        delete nextRoom.status;
-        delete nextRoom.activeUrl;
-        delete nextRoom.tabs;
-        delete nextRoom.activeTabId;
         return nextRoom;
       })
     }));

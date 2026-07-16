@@ -27,10 +27,9 @@ async function rejectedSocketStatus(
   });
 }
 
-test("relay normalizes configured CORS origins", async () => {
+test("relay deduplicates configured CORS origins", async () => {
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS:
-      "https://multaiplayer.com/ https://multaiplayer.com tauri://localhost https://bad.example/path"
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com https://multaiplayer.com tauri://localhost"
   });
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);
@@ -70,7 +69,7 @@ test("relay rejects disallowed browser origins before handling requests", async 
 
 test("relay applies configured CORS origin allowlist", async () => {
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com/ http://127.0.0.1:1420"
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com http://127.0.0.1:1420"
   });
   try {
     const allowed = await fetch(`${relay.baseUrl}/auth/config`, {

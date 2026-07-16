@@ -257,8 +257,7 @@ function room(id: string, hostUserId: string) {
     activeHostDeviceId: "device-one",
     hostStatus: "active" as const,
     approvalPolicy: "ask_every_turn" as const,
-    codexModel: "gpt-5.4",
-    browserProfilePersistent: false
+    codexModel: "gpt-5.4"
   };
 }
 

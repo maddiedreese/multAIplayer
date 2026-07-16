@@ -405,11 +405,12 @@ function parseAllowedOriginEnv(value: string | undefined): string[] {
   const origins = new Set<string>();
   for (const item of parseListEnv(value)) {
     const normalized = normalizeConfiguredOrigin(item);
-    if (normalized) {
-      origins.add(normalized);
-    } else {
-      logRelayEvent("warn", "invalid_allowed_origin_ignored");
+    if (!normalized) {
+      throw new Error(
+        "MULTAIPLAYER_RELAY_ALLOWED_ORIGINS entries must be bare HTTP(S) origins or the exact tauri://localhost desktop origin."
+      );
     }
+    origins.add(normalized);
   }
   return Array.from(origins);
 }
@@ -418,9 +419,9 @@ function normalizeConfiguredOrigin(value: string): string | null {
   try {
     const parsed = new URL(value);
     if (!["", "/"].includes(parsed.pathname) || parsed.search || parsed.hash) return null;
+    if (parsed.username || parsed.password) return null;
     if (["http:", "https:"].includes(parsed.protocol)) return parsed.origin;
-    if (!/^[a-z][a-z0-9+.-]*:$/i.test(parsed.protocol) || !parsed.hostname) return null;
-    return `${parsed.protocol}//${parsed.host}`;
+    return parsed.protocol === "tauri:" && parsed.hostname === "localhost" && !parsed.port ? "tauri://localhost" : null;
   } catch {
     return null;
   }

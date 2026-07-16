@@ -103,13 +103,6 @@ export interface WorkspaceFileSaveRequest extends WorkspaceFileSaveRequestPlaint
   status: "pending" | "approved" | "denied";
 }
 
-export interface BrowserStatus {
-  profilePath: string | null;
-  downloadsBlocked: boolean;
-  clipboardBlocked: boolean;
-  fileUploadsBlocked: boolean;
-}
-
 export interface InviteJoinRequest {
   id: string;
   inviteId: string;

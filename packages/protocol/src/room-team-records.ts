@@ -58,7 +58,6 @@ export const RoomRecord = z
     activeHostDeviceId: DeviceId.optional(),
     hostStatus: z.enum(["active", "offline"]),
     approvalPolicy: z.enum(["ask_every_turn", "never_host"]),
-    browserProfilePersistent: z.boolean(),
     archivedAt: z.string().datetime().optional(),
     deletedAt: z.string().datetime().optional()
   })
