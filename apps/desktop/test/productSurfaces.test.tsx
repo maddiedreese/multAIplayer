@@ -31,6 +31,9 @@ test("room browser exposes host controls, tab selection, and safe fallback ifram
   const view = render(
     <BrowserAccessPanel
       hidden={false}
+      roomId="room-test"
+      projectPath="/tmp/project"
+      browserProfilePersistent
       activeBrowserUrl="https://preview.example/"
       browserRequests={[]}
       browserMessage={null}
@@ -89,6 +92,9 @@ test("room browser exposes pending request provenance and explicit host approval
   const view = render(
     <BrowserAccessPanel
       hidden={false}
+      roomId="room-test"
+      projectPath="/tmp/project"
+      browserProfilePersistent
       activeBrowserUrl={null}
       browserTabs={[]}
       browserRequests={[approved, pending]}

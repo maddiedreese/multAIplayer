@@ -3,16 +3,23 @@ import { invokeNative } from "../nativeCommandError";
 import { isTauriRuntime } from "./runtime";
 import type { BrowserOpenResult, BrowserProfileResult } from "./types";
 
+export interface BrowserViewBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export async function openBrowserView(
   roomId: string,
   projectPath: string,
   url: string,
-  title?: string,
+  bounds: BrowserViewBounds,
   persistent = true
 ): Promise<BrowserOpenResult> {
   if (isTauriRuntime()) {
     return invokeNative<BrowserOpenResult>("open_browser_view", {
-      request: { roomId, projectPath, url, title, persistent }
+      request: { roomId, projectPath, url, bounds, persistent }
     });
   }
 
@@ -26,6 +33,24 @@ export async function openBrowserView(
     downloadsBlocked: false,
     pageGuardInstalled: false
   };
+}
+
+export async function positionBrowserView(
+  roomId: string,
+  projectPath: string,
+  bounds: BrowserViewBounds
+): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invokeNative<void>("position_browser_view", {
+    request: { roomId, projectPath, bounds }
+  });
+}
+
+export async function closeBrowserView(roomId: string, projectPath: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invokeNative<void>("close_browser_view", {
+    request: { roomId, projectPath }
+  });
 }
 
 export async function resetBrowserProfile(roomId: string, projectPath: string): Promise<BrowserProfileResult> {

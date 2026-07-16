@@ -407,6 +407,9 @@ export function useRoomInspectorComposition({
   const commonWorkProps = composeCommonWorkProps();
   const browserProps: React.ComponentProps<typeof BrowserAccessPanel> = {
     hidden: false,
+    roomId: selectedRoom.id,
+    projectPath: selectedRoom.projectPath,
+    browserProfilePersistent: selectedRoom.browserProfilePersistent,
     activeBrowserUrl: firstPresent(browser.tabs?.find((tab) => tab.id === browser.activeTabId)?.url, browser.activeUrl),
     browserTabs: valueOr(browser.tabs, []),
     browserRequests: valueOr(browser.requests, []),

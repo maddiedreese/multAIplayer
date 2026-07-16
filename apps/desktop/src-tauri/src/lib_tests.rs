@@ -512,6 +512,24 @@ fn room_browser_guard_script_is_packaged_from_the_tested_source() {
 }
 
 #[test]
+fn room_browser_creation_remains_native_only() {
+    let production_capabilities = include_str!("../capabilities/default.json");
+    let native_test_config = include_str!("../tauri.native-e2e.conf.json");
+    let browser_panel = include_str!("../../src/components/BrowserAccessPanel.tsx");
+
+    for source in [production_capabilities, native_test_config] {
+        assert!(!source.contains("allow-create-webview"));
+        assert!(!source.contains("allow-webview-close"));
+        assert!(!source.contains("allow-set-webview-position"));
+        assert!(!source.contains("allow-set-webview-size"));
+        assert!(!source.contains("allow-set-webview-focus"));
+    }
+    assert!(!browser_panel.contains("@tauri-apps/api/webview"));
+    assert!(!browser_panel.contains("new Webview"));
+    assert!(browser_panel.contains("openBrowserView"));
+}
+
+#[test]
 fn terminal_validation_rejects_bad_names_and_oversized_text() {
     assert!(ensure_room_id("room-alpha_123").is_ok());
     assert!(ensure_room_id("room.alpha").is_err());
