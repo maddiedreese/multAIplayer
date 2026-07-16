@@ -19,7 +19,7 @@ export function useRoomMainColumnInteractions({
   retryMarkdownCopy
 }: {
   roomId: string;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   fallback: MarkdownFallback | null;
   onOpenRoomBrowser: () => void;
   retryMarkdownCopy: (title: string, markdown: string, roomId: string) => void;

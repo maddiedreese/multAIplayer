@@ -14,12 +14,20 @@ interface LocalUser {
 
 interface CreateCodexBrowserOpenCommandOptions {
   localUser: LocalUser;
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
   defaultBrowserUrl: string;
 }
+
+export type CodexBrowserOpenCommandSource = { kind: "local_host" } | { kind: "incoming_room"; senderUserId: string };
+
+export type HandleCodexBrowserOpenCommand = (
+  message: ChatMessage,
+  room: ClientRoomRecord,
+  source: CodexBrowserOpenCommandSource
+) => boolean;
 
 export function createCodexBrowserOpenCommand({
   localUser,
@@ -29,7 +37,7 @@ export function createCodexBrowserOpenCommand({
   revokedTeamIds,
   defaultBrowserUrl
 }: CreateCodexBrowserOpenCommandOptions) {
-  return (message: ChatMessage, room: ClientRoomRecord): boolean => {
+  return (message: ChatMessage, room: ClientRoomRecord, source: CodexBrowserOpenCommandSource): boolean => {
     const url = extractCodexBrowserOpenUrl(message.body);
     if (!url) return false;
 
@@ -44,15 +52,28 @@ export function createCodexBrowserOpenCommand({
 
     const request: BrowserAccessRequest = {
       id: crypto.randomUUID(),
-      requester: localUser.name,
-      requesterUserId: localUser.id,
+      requester: source.kind === "local_host" ? localUser.name : message.author,
+      requesterUserId: source.kind === "local_host" ? localUser.id : source.senderUserId,
       url,
-      reason: `Opened by ${message.author} through Codex.`,
+      reason:
+        source.kind === "local_host"
+          ? `Opened by ${message.author} through Codex.`
+          : `Requested by ${message.author} through Codex.`,
       requestedAt: new Date().toISOString(),
-      status: "approved"
+      status: source.kind === "local_host" ? "approved" : "pending"
     };
     const store = useAppStore.getState();
     store.appendBrowserRequest(room.id, request);
+    if (source.kind === "incoming_room") {
+      if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
+        store.setBrowserMessageForRoom(
+          room.id,
+          `${message.author} requested browser access to ${formatBrowserAccessLabel(request.url)}.`
+        );
+        store.setInspectorTabForRoom(room.id, "browser");
+      }
+      return true;
+    }
     store.setBrowserMessageForRoom(room.id, null);
     store.setBrowserUrlForRoom(room.id, request.url, defaultBrowserUrl);
     store.openEmbeddedBrowserForRoom(room.id, request.url);

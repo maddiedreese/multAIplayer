@@ -11,15 +11,16 @@ import { clearCodexGoal, setCodexGoal, steerCodexTurn, type CodexSteerResult } f
 import { codexSteeringInput, loadCodexFollowUpBehavior } from "../../lib/codex/codexFollowUpBehavior";
 import { currentSelectedRoomContext } from "../workspace/selectedWorkspace";
 import type { ChatMessage, PendingCodexApproval, QueuedCodexTurn, RoomGoal } from "../../types";
+import type { HandleCodexBrowserOpenCommand } from "./codexBrowserOpenCommand";
 
 type AppState = ReturnType<typeof useAppStore.getState>;
 type AppCodexRuntime = AppState["codexRuntimeByRoom"][string];
 type AppRoomChatRuntime = AppState["roomChatByRoom"][string];
 
 export interface CodexInvokeActionsOptions {
-  selectedRoomIdRef: { current: string };
+  selectedRoomIdRef: { current: string | null };
   publishChatMessage: (message: ChatMessage, room?: ClientRoomRecord) => Promise<void>;
-  handleCodexBrowserOpenCommand: (message: ChatMessage, room: ClientRoomRecord) => boolean;
+  handleCodexBrowserOpenCommand: HandleCodexBrowserOpenCommand;
   publishCodexQueueEvent: (
     event: {
       turnId: string;
@@ -183,10 +184,7 @@ export function createCodexInvokeActions({
 
   async function sendMessage() {
     const current = currentRoomState();
-    if (!current) {
-      store().setChatMessageForRoom(selectedRoomIdRef.current, "Create or join a room before sending messages.");
-      return;
-    }
+    if (!current) return;
     const {
       selectedRoom,
       localUser,
@@ -233,7 +231,7 @@ export function createCodexInvokeActions({
     };
     await publishChatMessage(message);
     if (invokesCodex) {
-      if (!handleCodexBrowserOpenCommand(message, selectedRoom)) handleCodexInvoke(message);
+      if (!handleCodexBrowserOpenCommand(message, selectedRoom, { kind: "local_host" })) handleCodexInvoke(message);
     }
     store().setDraftForRoom(roomId, "");
     store().setReplyToMessageForRoom(roomId, null);
@@ -242,10 +240,7 @@ export function createCodexInvokeActions({
 
   function handleCodexInvoke(pendingMessage?: ChatMessage) {
     const current = currentRoomState();
-    if (!current) {
-      store().setHostMessageForRoom(selectedRoomIdRef.current, "Create or join a room before invoking Codex.");
-      return;
-    }
+    if (!current) return;
     const {
       selectedRoom,
       localUser,
@@ -397,7 +392,7 @@ export function createCodexInvokeActions({
       : !canUseRoomChat(selectedRoom)
         ? roomChatGateMessage(selectedRoom)
         : selectedRoom.approvalPolicy === "never_host"
-          ? "This room is set to never host Codex turns."
+          ? "Codex hosting is disabled for this room."
           : null;
     if (!gateMessage) return true;
     store().setHostMessageForRoom(roomId, gateMessage);

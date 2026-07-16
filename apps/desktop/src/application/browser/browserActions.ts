@@ -16,7 +16,7 @@ import { currentSelectedRoom, currentSelectedRoomContext } from "../workspace/se
 import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
 
 interface BrowserActionsOptions {
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   defaultBrowserUrl: string;
   defaultBrowserReason: string;
   relayRef: MutableRefObject<RelayClient | null>;
@@ -38,8 +38,10 @@ export function createBrowserActions({
   publishRequestStatus
 }: BrowserActionsOptions) {
   const currentContext = () => currentSelectedRoomContext();
-  const setSelectedBrowserMessage = (message: string | null) =>
-    useAppStore.getState().setBrowserMessageForRoom(useAppStore.getState().selectedRoomId, message);
+  const setSelectedBrowserMessage = (message: string | null) => {
+    const roomId = useAppStore.getState().selectedRoomId;
+    if (roomId) useAppStore.getState().setBrowserMessageForRoom(roomId, message);
+  };
 
   function browserRequestsForRoom(roomId: string) {
     return useAppStore.getState().browserByRoom[roomId]?.requests ?? [];

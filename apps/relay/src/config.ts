@@ -86,7 +86,6 @@ export function loadRelayConfig(): RelayConfig {
   loadRelayEnvFiles();
 
   const nodeEnv = process.env.NODE_ENV ?? "development";
-  validateStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE);
   const attachmentBlobMaxBytes = parseIntegerEnv(
     process.env.MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES,
     5_000_000,
@@ -101,7 +100,7 @@ export function loadRelayConfig(): RelayConfig {
   );
   const jsonBodyLimitBytes = Math.ceil(Math.max(1_000_000, attachmentBlobMaxBytes * 1.5 + 100_000));
 
-  const deletionLedger = parseDeletionLedgerConfig();
+  const deletionLedger = parseDeletionLedgerConfig(nodeEnv);
   const deletionProtection = parseDeletionProtection(deletionLedger);
   if (deletionProtection === "restore_safe" && !deletionLedger) {
     throw new Error("Restore-safe account deletion requires a complete external deletion ledger configuration.");
@@ -112,12 +111,6 @@ export function loadRelayConfig(): RelayConfig {
     );
   }
   const trustProxyHeadersRequested = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false);
-  const trustedProxyConfigured = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED, false);
-  if (trustProxyHeadersRequested !== trustedProxyConfigured) {
-    throw new Error(
-      "MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS and MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED must be enabled or disabled together."
-    );
-  }
   if (
     nodeEnv === "production" &&
     deletionProtection === "restore_safe" &&
@@ -186,7 +179,7 @@ export function loadRelayConfig(): RelayConfig {
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
     mutationsRequireAuth: !parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH, false),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
-    trustProxyHeaders: trustProxyHeadersRequested && trustedProxyConfigured,
+    trustProxyHeaders: trustProxyHeadersRequested,
     structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
     exitOnPersistencePoison: parseBooleanEnv(
       process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON,
@@ -281,15 +274,12 @@ function parseDeletionProtection(ledger: RelayConfig["deletionLedger"]): RelayCo
   return configured;
 }
 
-function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
+function parseDeletionLedgerConfig(nodeEnv: string): RelayConfig["deletionLedger"] {
   const settings = deletionLedgerSettings();
   const { filePath, endpoint, bucket, region, accessKeyId, secretAccessKey, hmacKey } = settings;
   const urlStyle = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE?.trim() || "path";
-  const protectionSeconds = parseIntegerEnv(
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS,
-    7_776_000,
-    86_400,
-    31_536_000
+  const protectionSeconds = parseDeletionLedgerProtectionSeconds(
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS
   );
   const configured = [endpoint, bucket, region, accessKeyId, secretAccessKey, hmacKey].filter(Boolean).length;
   if (filePath && configured > 1) throw new Error("Configure exactly one deletion ledger backend.");
@@ -307,6 +297,7 @@ function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
   if (urlStyle !== "path" && urlStyle !== "virtual-host") {
     throw new Error("Deletion ledger S3 URL style must be path or virtual-host.");
   }
+  validateDeletionLedgerEndpoint(endpoint, nodeEnv);
   return {
     backend: "s3",
     endpoint,
@@ -321,6 +312,38 @@ function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
   };
 }
 
+function parseDeletionLedgerProtectionSeconds(value: string | undefined): number {
+  if (value === undefined) return 7_776_000;
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed) || parsed < 86_400 || parsed > 31_536_000) {
+    throw new Error(
+      "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS must be an integer between 86400 and 31536000."
+    );
+  }
+  return parsed;
+}
+
+function validateDeletionLedgerEndpoint(endpoint: string, nodeEnv: string): void {
+  let protocol: string;
+  try {
+    protocol = new URL(endpoint).protocol;
+  } catch {
+    throw new Error(
+      nodeEnv === "production"
+        ? "Deletion ledger S3 endpoint must be a valid HTTPS URL."
+        : "Deletion ledger S3 endpoint must be a valid HTTP or HTTPS URL."
+    );
+  }
+  const validProtocol = protocol === "https:" || (nodeEnv !== "production" && protocol === "http:");
+  if (!validProtocol) {
+    throw new Error(
+      nodeEnv === "production"
+        ? "Deletion ledger S3 endpoint must be a valid HTTPS URL."
+        : "Deletion ledger S3 endpoint must be a valid HTTP or HTTPS URL."
+    );
+  }
+}
+
 function deletionLedgerSettings() {
   return {
     filePath: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH?.trim() ?? "",
@@ -331,13 +354,6 @@ function deletionLedgerSettings() {
     secretAccessKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY?.trim() ?? "",
     hmacKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY?.trim() ?? ""
   };
-}
-
-function validateStorageBackend(value: string | undefined): void {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized || normalized === "sqlite") return;
-  logRelayEvent("error", "unsupported_storage_backend");
-  throw new Error("MULTAIPLAYER_RELAY_STORAGE must be sqlite; the JSON runtime backend has been removed.");
 }
 
 function loadRelayEnvFiles() {

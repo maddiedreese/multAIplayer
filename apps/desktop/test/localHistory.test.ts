@@ -194,12 +194,7 @@ test("close snapshot construction includes current state from every hydrated eli
   });
   const store = useAppStore.getState();
   store.resetAppStore();
-  store.initializeWorkspaceUi({
-    teams: [],
-    rooms: [room("room-a"), room("room-b")],
-    projectPath: "/tmp/room-a",
-    roomId: "room-a"
-  });
+  useAppStore.setState({ rooms: [room("room-a"), room("room-b")], selectedRoomId: "room-a" });
   store.setHistoryHydrationStatusForRoom("room-a", "ready");
   store.setHistoryHydrationStatusForRoom("room-b", "ready");
   store.appendRoomMessage("room-a", { id: "a", author: "A", role: "human", body: "A", time: new Date().toISOString() });

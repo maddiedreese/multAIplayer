@@ -324,10 +324,7 @@ async function runSecurityJourney() {
   const fixture = generated.fixture;
   const forbidden = fixture.forbiddenValues.map((value) => Buffer.from(value, "base64"));
   assert.ok(forbidden.every((value) => value.length > 0));
-  const relay = await startRelayWithWorkspace(
-    { MULTAIPLAYER_RELAY_STORAGE: "sqlite", MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath },
-    workspace(fixture)
-  );
+  const relay = await startRelayWithWorkspace({ MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath }, workspace(fixture));
   const hostSocket = new WebSocket(relay.wsUrl);
   const nextSocket = new WebSocket(relay.wsUrl);
   const hostOpened = onceOpen(hostSocket);

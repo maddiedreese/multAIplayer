@@ -1,4 +1,15 @@
-import { ArrowLeft, ArrowRight, CornerDownRight, Globe2, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CornerDownRight,
+  ExternalLink,
+  Globe2,
+  Maximize2,
+  Minimize2,
+  RotateCw,
+  X
+} from "lucide-react";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { Webview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -6,6 +17,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { closeRoomBrowserSurfaceEvent } from "../lib/browser/browserSurfaceEvents";
 import type { BrowserTab } from "../store/slices/browserSlice";
 import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
+import { formatBrowserAccessLabel } from "../lib/browser/browserUi";
+import type { BrowserAccessRequest } from "../types";
 
 const browserWebviewLabel = "room_browser";
 
@@ -15,29 +28,41 @@ function browserSurfaceTop(slot: HTMLElement) {
   const toolbarBottom =
     panel?.querySelector<HTMLElement>(".browser-toolbar")?.getBoundingClientRect().bottom ?? rect.top;
   const tabsBottom = panel?.querySelector<HTMLElement>(".browser-tabs")?.getBoundingClientRect().bottom ?? rect.top;
-  return Math.max(rect.top, toolbarBottom, tabsBottom) + 16;
+  const requestsBottom =
+    panel?.querySelector<HTMLElement>(".browser-requests")?.getBoundingClientRect().bottom ?? rect.top;
+  return Math.max(rect.top, toolbarBottom, tabsBottom, requestsBottom) + 16;
 }
 
 export function BrowserAccessPanel({
   hidden,
   activeBrowserUrl,
   browserTabs,
+  browserRequests,
+  browserMessage,
   activeBrowserTabId,
   browserUrl,
   canHostBrowser,
   onBrowserUrlChange,
   onOpenBrowserNow,
+  onApproveBrowserRequest,
+  onDenyBrowserRequest,
+  onOpenApprovedBrowserRequest,
   onSelectBrowserTab,
   onCloseBrowserTab
 }: {
   hidden: boolean;
   activeBrowserUrl: string | null;
   browserTabs: BrowserTab[];
+  browserRequests: BrowserAccessRequest[];
+  browserMessage: string | null;
   activeBrowserTabId: string | null;
   browserUrl: string;
   canHostBrowser: boolean;
   onBrowserUrlChange: (url: string) => void;
   onOpenBrowserNow: () => void;
+  onApproveBrowserRequest: (request: BrowserAccessRequest) => void;
+  onDenyBrowserRequest: (requestId: string) => void;
+  onOpenApprovedBrowserRequest: (request: BrowserAccessRequest) => void;
   onSelectBrowserTab: (tabId: string) => void;
   onCloseBrowserTab: (tabId: string) => void;
 }) {
@@ -223,6 +248,13 @@ export function BrowserAccessPanel({
         onSelectTab={selectBrowserTab}
         onCloseTab={onCloseBrowserTab}
       />
+      <BrowserRequestList
+        requests={browserRequests}
+        canHostBrowser={canHostBrowser}
+        onApprove={onApproveBrowserRequest}
+        onDeny={onDenyBrowserRequest}
+        onOpen={onOpenApprovedBrowserRequest}
+      />
       <div className={`browser-viewport ${browserSurfaceUrl ? "active" : ""}`} ref={browserViewportRef}>
         {browserSurfaceUrl && !tauriRuntime ? (
           <iframe
@@ -245,8 +277,74 @@ export function BrowserAccessPanel({
           </div>
         )}
       </div>
+      {browserMessage && <div className="workflow-message">{browserMessage}</div>}
       {browserSurfaceError && <div className="workflow-message">{browserSurfaceError}</div>}
     </section>
+  );
+}
+
+function BrowserRequestList({
+  requests,
+  canHostBrowser,
+  onApprove,
+  onDeny,
+  onOpen
+}: {
+  requests: BrowserAccessRequest[];
+  canHostBrowser: boolean;
+  onApprove: (request: BrowserAccessRequest) => void;
+  onDeny: (requestId: string) => void;
+  onOpen: (request: BrowserAccessRequest) => void;
+}) {
+  if (requests.length === 0) return null;
+  return (
+    <div className="browser-requests" aria-label="Browser access requests">
+      {requests
+        .slice(-6)
+        .reverse()
+        .map((request) => (
+          <div className={`browser-request ${request.status}`} key={request.id}>
+            <div>
+              <strong>{request.url}</strong>
+              <span>{request.reason}</span>
+              <small>Requested by {request.requester}</small>
+            </div>
+            <small>{request.status}</small>
+            {request.status === "pending" && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => onApprove(request)}
+                  disabled={!canHostBrowser}
+                  aria-label={`Approve browser access to ${formatBrowserAccessLabel(request.url)}`}
+                >
+                  <Check size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeny(request.id)}
+                  disabled={!canHostBrowser}
+                  aria-label={`Deny browser access to ${formatBrowserAccessLabel(request.url)}`}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            )}
+            {request.status === "approved" && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => onOpen(request)}
+                  disabled={!canHostBrowser}
+                  aria-label={`Open approved browser page at ${formatBrowserAccessLabel(request.url)}`}
+                >
+                  <ExternalLink size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+    </div>
   );
 }
 

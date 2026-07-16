@@ -1,3 +1,3 @@
-export function shouldApplyRoomScopedUiUpdate(activeRoomId: string, targetRoomId: string): boolean {
+export function shouldApplyRoomScopedUiUpdate(activeRoomId: string | null, targetRoomId: string): boolean {
   return activeRoomId === targetRoomId;
 }

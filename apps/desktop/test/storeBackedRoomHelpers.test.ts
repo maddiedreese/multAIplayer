@@ -41,7 +41,7 @@ test("room notice dismissals resolve store actions when invoked", () => {
   assert.equal(state.roomChatByRoom[room.id]?.message, undefined);
 });
 
-test("Codex browser open commands write directly to the room store", () => {
+test("local host Codex browser commands open directly", () => {
   const handleCommand = createCodexBrowserOpenCommand({
     localUser: { id: "github:maddie", name: "Maddie" },
     selectedRoomIdRef: { current: room.id },
@@ -60,7 +60,8 @@ test("Codex browser open commands write directly to the room store", () => {
         body: "@codex open docs.example.com/guide",
         time: "10:00"
       },
-      room
+      room,
+      { kind: "local_host" }
     ),
     true
   );
@@ -69,5 +70,44 @@ test("Codex browser open commands write directly to the room store", () => {
   assert.equal(state.browserByRoom[room.id]?.requests?.length, 1);
   assert.equal(state.browserByRoom[room.id]?.activeUrl, "http://docs.example.com/guide");
   assert.match(state.browserByRoom[room.id]?.message ?? "", /Opened in-room browser/);
+  assert.equal(state.historyPresenceByRoom[room.id]?.inspectorTab, "browser");
+});
+
+test("incoming room Codex browser commands stay pending without navigation", () => {
+  const handleCommand = createCodexBrowserOpenCommand({
+    localUser: { id: "github:maddie", name: "Maddie" },
+    selectedRoomIdRef: { current: room.id },
+    forgottenRoomIds: new Set(),
+    revokedRoomIds: new Set(),
+    revokedTeamIds: new Set(),
+    defaultBrowserUrl: "https://default.example.com"
+  });
+
+  assert.equal(
+    handleCommand(
+      {
+        id: "message-remote-browser-open",
+        author: "Rowan",
+        authorUserId: "github:rowan",
+        role: "human",
+        body: "@codex open review.example/path",
+        time: "10:01"
+      },
+      room,
+      { kind: "incoming_room", senderUserId: "github:rowan" }
+    ),
+    true
+  );
+
+  const state = useAppStore.getState();
+  const request = state.browserByRoom[room.id]?.requests?.[0];
+  assert.equal(request?.status, "pending");
+  assert.equal(request?.requester, "Rowan");
+  assert.equal(request?.requesterUserId, "github:rowan");
+  assert.equal(request?.url, "http://review.example/path");
+  assert.equal(state.browserByRoom[room.id]?.activeUrl, undefined);
+  assert.equal(state.browserByRoom[room.id]?.activeTabId, undefined);
+  assert.equal(state.browserByRoom[room.id]?.url, undefined);
+  assert.match(state.browserByRoom[room.id]?.message ?? "", /Rowan requested browser access/);
   assert.equal(state.historyPresenceByRoom[room.id]?.inspectorTab, "browser");
 });

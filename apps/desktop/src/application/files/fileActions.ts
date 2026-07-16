@@ -24,7 +24,7 @@ import { currentSelectedRoom, currentSelectedRoomContext } from "../workspace/se
 import { createFileAttachmentActions } from "./fileAttachmentActions";
 
 interface FileActionsOptions {
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   reportRoomFileActionInFlight: (roomId: string) => boolean;
@@ -46,8 +46,10 @@ export function createFileActions({
     };
   }
 
-  const setSelectedFileMessage = (message: string | null) =>
-    useAppStore.getState().setFileMessageForRoom(useAppStore.getState().selectedRoomId, message);
+  const setSelectedFileMessage = (message: string | null) => {
+    const roomId = useAppStore.getState().selectedRoomId;
+    if (roomId) useAppStore.getState().setFileMessageForRoom(roomId, message);
+  };
   const setFileBusyForRoom = (roomId: string, busy: boolean) => useAppStore.getState().setFileBusyForRoom(roomId, busy);
   const setSelectedFileForRoom = (roomId: string, file: ProjectFileContent | null) =>
     useAppStore.getState().setSelectedFileForRoom(roomId, file);

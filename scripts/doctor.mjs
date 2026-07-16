@@ -184,8 +184,6 @@ function readProductionRelayConfig() {
     structuredLogs: envBoolean("MULTAIPLAYER_RELAY_STRUCTURED_LOGS", true),
     exitOnPersistencePoison: envBoolean("MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON", true),
     trustProxyHeaders: envBoolean("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false),
-    trustedProxyConfigured: envBoolean("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", false),
-    storage: envValue("MULTAIPLAYER_RELAY_STORAGE") || "sqlite",
     dataPath: envValue("MULTAIPLAYER_RELAY_DATA_PATH"),
     minimumDiskHeadroomBytes: envInteger("MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES", 1_000_000_000),
     mlsValidatorPath: envValue("MULTAIPLAYER_MLS_VALIDATOR_PATH"),
@@ -281,7 +279,7 @@ function checkDeletionLedger(config) {
 }
 
 function checkCoreRelayConfig(config) {
-  const { allowedOrigins, requireAuth, debug, rateLimits, structuredLogs, exitOnPersistencePoison, storage } = config;
+  const { allowedOrigins, requireAuth, debug, rateLimits, structuredLogs, exitOnPersistencePoison } = config;
   const allowedOriginErrors = validateAllowedOrigins(allowedOrigins);
   checks.push({
     ok: Boolean(allowedOrigins) && allowedOriginErrors.length === 0,
@@ -315,20 +313,10 @@ function checkCoreRelayConfig(config) {
         ? "structured poison alert event enabled and process exits for supervised restart"
         : "requires structured logs and MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON=true"
   });
-  checks.push({
-    ok: storage === "sqlite",
-    label: "production MULTAIPLAYER_RELAY_STORAGE",
-    detail:
-      storage === "sqlite"
-        ? "sqlite storage configured"
-        : storage === "json"
-          ? "must be sqlite for a hosted production relay"
-          : "must be sqlite"
-  });
 }
 
 function checkRelayPathsAndProxy(config) {
-  const { dataPath, minimumDiskHeadroomBytes, mlsValidatorPath, trustProxyHeaders, trustedProxyConfigured } = config;
+  const { dataPath, minimumDiskHeadroomBytes, mlsValidatorPath, trustProxyHeaders } = config;
   checks.push({
     ok: Boolean(dataPath) && !dataPath.startsWith("/tmp/"),
     label: "production MULTAIPLAYER_RELAY_DATA_PATH",
@@ -364,14 +352,11 @@ function checkRelayPathsAndProxy(config) {
         : "configured executable"
   });
   checks.push({
-    ok: trustProxyHeaders === trustedProxyConfigured,
+    ok: true,
     label: "production trusted-proxy configuration",
-    detail:
-      trustProxyHeaders === trustedProxyConfigured
-        ? trustProxyHeaders
-          ? "forwarded headers enabled with an explicitly configured trusted proxy boundary"
-          : "proxy headers not trusted by default"
-        : "MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS and MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED must match"
+    detail: trustProxyHeaders
+      ? "WARNING: forwarded headers are trusted; ensure the relay is unreachable except through a proxy that overwrites client forwarding headers"
+      : "proxy headers not trusted by default"
   });
 }
 

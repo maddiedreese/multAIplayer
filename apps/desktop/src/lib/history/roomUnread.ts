@@ -8,7 +8,7 @@ export function markRoomRead(rooms: ClientRoomRecord[], roomId: string): ClientR
 export function markRoomUnreadForIncomingChat(
   rooms: ClientRoomRecord[],
   roomId: string,
-  activeRoomId: string,
+  activeRoomId: string | null,
   senderDeviceId: string,
   localDeviceId: string
 ): ClientRoomRecord[] {

@@ -9,6 +9,8 @@ export function buildRoomBrowserProps(input: {
   browser: {
     activeUrl?: string | null;
     activeTabId?: string | null;
+    message?: string | null;
+    requests?: BrowserPanelProps["browserRequests"];
     url?: string;
     tabs?: BrowserPanelProps["browserTabs"];
   };
@@ -16,6 +18,9 @@ export function buildRoomBrowserProps(input: {
   canHostBrowser: boolean;
   setUrl: (roomId: string, url: string, fallbackUrl: string) => void;
   openNow: () => void;
+  approveRequest: BrowserPanelProps["onApproveBrowserRequest"];
+  denyRequest: BrowserPanelProps["onDenyBrowserRequest"];
+  openApprovedRequest: BrowserPanelProps["onOpenApprovedBrowserRequest"];
   selectTab: (roomId: string, tabId: string) => void;
   closeTab: (roomId: string, tabId: string) => void;
 }): BrowserPanelProps {
@@ -24,11 +29,16 @@ export function buildRoomBrowserProps(input: {
     activeBrowserUrl:
       input.browser.tabs?.find((tab) => tab.id === input.browser.activeTabId)?.url ?? input.browser.activeUrl ?? null,
     browserTabs: input.browser.tabs ?? [],
+    browserRequests: input.browser.requests ?? [],
+    browserMessage: input.browser.message ?? null,
     activeBrowserTabId: input.browser.activeTabId ?? null,
     browserUrl: input.browser.url ?? input.defaultUrl,
     canHostBrowser: input.canHostBrowser,
     onBrowserUrlChange: (url) => input.setUrl(input.roomId, url, input.defaultUrl),
     onOpenBrowserNow: input.openNow,
+    onApproveBrowserRequest: input.approveRequest,
+    onDenyBrowserRequest: input.denyRequest,
+    onOpenApprovedBrowserRequest: input.openApprovedRequest,
     onSelectBrowserTab: (tabId) => input.selectTab(input.roomId, tabId),
     onCloseBrowserTab: (tabId) => input.closeTab(input.roomId, tabId)
   };

@@ -60,8 +60,14 @@ export function createRoomChatPanelActions({
   openBrowserUrl: (room: ClientRoomRecord, url: string, reason: string) => void;
 }) {
   const selectedRoomId = () => useAppStore.getState().selectedRoomId;
-  const selectedRoomMessages = () => useAppStore.getState().messagesByRoom[selectedRoomId()] ?? [];
-  const selectedRoomPreviews = () => useAppStore.getState().localPreviewByRoom[selectedRoomId()]?.previews ?? [];
+  const selectedRoomMessages = () => {
+    const roomId = selectedRoomId();
+    return roomId ? (useAppStore.getState().messagesByRoom[roomId] ?? []) : [];
+  };
+  const selectedRoomPreviews = () => {
+    const roomId = selectedRoomId();
+    return roomId ? (useAppStore.getState().localPreviewByRoom[roomId]?.previews ?? []) : [];
+  };
 
   function onCopyMessageMarkdown(messageId: string) {
     const message = selectedRoomMessages().find((item) => item.id === messageId);
@@ -96,6 +102,7 @@ export function createRoomChatPanelActions({
 
   function onDenyApproval() {
     const roomId = selectedRoomId();
+    if (!roomId) return;
     const selectedRoom = currentSelectedRoom();
     const deniedTurn = useAppStore.getState().codexRuntimeByRoom[roomId]?.pendingApproval ?? null;
     const store = useAppStore.getState();
@@ -126,11 +133,13 @@ export function createRoomChatPanelActions({
   function onCopyLocalPreviewLink(previewId: string) {
     const preview = selectedRoomPreviews().find((item) => item.id === previewId);
     if (preview?.publicUrl) {
+      const roomId = selectedRoomId();
+      if (!roomId) return;
       void copyMarkdownWithFallback(
         "local preview link",
         preview.publicUrl,
-        (message) => useAppStore.getState().setChatMessageForRoom(selectedRoomId(), message),
-        selectedRoomId()
+        (message) => useAppStore.getState().setChatMessageForRoom(roomId, message),
+        roomId
       );
     }
   }
@@ -153,12 +162,21 @@ export function createRoomChatPanelActions({
     onOpenLocalPreview,
     onCopyLocalPreviewLink,
     onStopLocalPreview: (previewId: string) => void stopLocalPreview(previewId),
-    onOpenFileSelector: () => useAppStore.getState().setInspectorTabForRoom(selectedRoomId(), "files"),
-    onReplyToMessage: (messageId: string) =>
-      useAppStore.getState().setReplyToMessageForRoom(selectedRoomId(), messageId),
-    onCancelReply: () => useAppStore.getState().setReplyToMessageForRoom(selectedRoomId(), null),
+    onOpenFileSelector: () => {
+      const roomId = selectedRoomId();
+      if (roomId) useAppStore.getState().setInspectorTabForRoom(roomId, "files");
+    },
+    onReplyToMessage: (messageId: string) => {
+      const roomId = selectedRoomId();
+      if (roomId) useAppStore.getState().setReplyToMessageForRoom(roomId, messageId);
+    },
+    onCancelReply: () => {
+      const roomId = selectedRoomId();
+      if (roomId) useAppStore.getState().setReplyToMessageForRoom(roomId, null);
+    },
     onCancelQueuedCodexTurn: (turnId: string) => {
       const roomId = selectedRoomId();
+      if (!roomId) return;
       const selectedRoom = currentSelectedRoom();
       useAppStore.getState().removeQueuedCodexApprovalForRoom(roomId, turnId);
       void publishCodexQueueEvent(
@@ -179,6 +197,9 @@ export function createRoomChatPanelActions({
         createdAt: new Date().toISOString()
       });
     },
-    onDraftChange: (nextDraft: string) => useAppStore.getState().setDraftForRoom(selectedRoomId(), nextDraft)
+    onDraftChange: (nextDraft: string) => {
+      const roomId = selectedRoomId();
+      if (roomId) useAppStore.getState().setDraftForRoom(roomId, nextDraft);
+    }
   };
 }

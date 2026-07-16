@@ -6,7 +6,7 @@ import type { GitStatusSummary, TerminalSnapshot } from "../../lib/platform/loca
 
 export interface UseHostHandoffActionsOptions {
   selectedRoom: ClientRoomRecord | null;
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   isSelectedRoomLocked: boolean;
   isSelectedRoomRevoked: boolean;
   isActiveHost: boolean;
@@ -38,7 +38,7 @@ export interface UseHostHandoffActionsOptions {
 }
 
 export interface HostHandoffAuthorizationSnapshot {
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   room: ClientRoomRecord | null;
   isActiveHost: boolean;
   hostHandoffs: HostHandoffRecord[];

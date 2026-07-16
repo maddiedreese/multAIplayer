@@ -6,7 +6,7 @@ import { useAppStore } from "../store/appStore";
 interface UseTerminalLifecycleOptions {
   hasSelectedRoom: boolean;
   canReadLocalWorkspace: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectedTerminalId: string | null;
   selectedTerminalRunning: boolean | undefined;
 }
@@ -19,7 +19,7 @@ export function useTerminalLifecycle({
   selectedTerminalRunning
 }: UseTerminalLifecycleOptions) {
   useEffect(() => {
-    if (!hasSelectedRoom) {
+    if (!hasSelectedRoom || !selectedRoomId) {
       useAppStore.getState().clearTerminalSnapshots();
       return;
     }
@@ -55,7 +55,7 @@ export function useTerminalLifecycle({
   }, [canReadLocalWorkspace, hasSelectedRoom, selectedRoomId]);
 
   useEffect(() => {
-    if (!canReadLocalWorkspace || !selectedTerminalId || !selectedTerminalRunning) return;
+    if (!canReadLocalWorkspace || !selectedRoomId || !selectedTerminalId || !selectedTerminalRunning) return;
     let cancelled = false;
     const timer = window.setInterval(() => {
       readTerminal(selectedTerminalId)

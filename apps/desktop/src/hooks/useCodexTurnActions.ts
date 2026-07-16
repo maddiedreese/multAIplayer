@@ -74,7 +74,7 @@ export function useCodexTurnActions({
       return false;
     }
     if (room.approvalPolicy === "never_host") {
-      state.setHostMessageForRoom(roomId, "This room is set to never host Codex turns.");
+      state.setHostMessageForRoom(roomId, "Codex hosting is disabled for this room.");
       state.setPendingCodexApprovalForRoom(roomId, null);
       state.setApprovalVisibleForRoom(roomId, false);
       return false;
@@ -119,13 +119,16 @@ export function useCodexTurnActions({
       setCodexContinuationForRoom,
       setRoomGoalForRoom
     } = state;
-    if (!room) {
-      setHostMessageForRoom(roomId, "This Codex approval belongs to a room that is no longer available.");
-      setPendingCodexApprovalForRoom(roomId, null);
-      setApprovalVisibleForRoom(roomId, false);
+    if (!roomId || !room) {
+      if (roomId) {
+        setHostMessageForRoom(roomId, "This Codex approval belongs to a room that is no longer available.");
+        setPendingCodexApprovalForRoom(roomId, null);
+        setApprovalVisibleForRoom(roomId, false);
+      }
       return;
     }
     if (!validateApprovalRoom(room, roomId, state)) return;
+    const approvedRoomId = roomId;
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
     const roomCanReadLocalWorkspace = canUseLocalWorkspace(room, localUser, roomLocked);
@@ -200,7 +203,7 @@ export function useCodexTurnActions({
           room
         );
         const result = await runCodexTurn(
-          roomId,
+          approvedRoomId,
           turnId,
           projectPath,
           input,
@@ -257,21 +260,21 @@ export function useCodexTurnActions({
           },
           room
         );
-        appendTerminalLinesForRoom(roomId, [`Codex error: ${String(error)}`], maxTerminalActivityLines);
+        appendTerminalLinesForRoom(approvedRoomId, [`Codex error: ${String(error)}`], maxTerminalActivityLines);
       } finally {
-        if (continuationHandoff) setCodexContinuationForRoom(roomId, null);
-        setCodexRunningForRoom(roomId, false);
-        promoteNextCodexApprovalForRoom(roomId);
+        if (continuationHandoff) setCodexContinuationForRoom(approvedRoomId, null);
+        setCodexRunningForRoom(approvedRoomId, false);
+        promoteNextCodexApprovalForRoom(approvedRoomId);
       }
     }
 
     async function publishSuccessfulTurn(room: ClientRoomRecord, result: Awaited<ReturnType<typeof runCodexTurn>>) {
       const threadId = normalizeCodexThreadId(result.threadId);
       if (threadId) {
-        setCodexThreadIdForRoom(roomId, threadId);
-        void getCodexGoal(roomId, threadId)
+        setCodexThreadIdForRoom(approvedRoomId, threadId);
+        void getCodexGoal(approvedRoomId, threadId)
           .then((goal) => {
-            setRoomGoalForRoom(roomId, goal ? codexGoalToRoomGoal(goal) : null);
+            setRoomGoalForRoom(approvedRoomId, goal ? codexGoalToRoomGoal(goal) : null);
           })
           .catch((error) => reportNonFatal("load a Codex goal after completing a turn", error));
       }
@@ -309,7 +312,7 @@ export function useCodexTurnActions({
           imageAttachments.push(await createCodexImageAttachment(room, generatedImage));
         } catch (error) {
           appendTerminalLinesForRoom(
-            roomId,
+            approvedRoomId,
             [`Could not publish a Codex-generated image: ${String(error)}`],
             maxTerminalActivityLines
           );
@@ -333,7 +336,7 @@ export function useCodexTurnActions({
         room
       );
       appendTerminalLinesForRoom(
-        roomId,
+        approvedRoomId,
         [
           `Codex status: ${result.status}`,
           `Codex thread: ${result.threadId ?? "unknown"}`,
@@ -360,6 +363,17 @@ function selectCodexApprovalContext(
   const activeApproval = selectedRoom ? pendingApprovalForRoom(state.codexRuntimeByRoom, selectedRoom.id) : null;
   const approval = requestedApproval ?? activeApproval;
   const roomId = approval?.roomId ?? selectedRoom?.id ?? state.selectedRoomId;
+  if (!roomId) {
+    return {
+      approval,
+      roomId: null,
+      room: undefined,
+      browserRequests: [],
+      gitStatus: null,
+      codexContinuation: null,
+      codexThreadId: null
+    };
+  }
   return {
     approval,
     roomId,

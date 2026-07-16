@@ -182,41 +182,97 @@ test("production rejects the development filesystem deletion ledger", () => {
   }
 });
 
-test("relay supports only SQLite persistence", () => {
-  const previousStorage = process.env.MULTAIPLAYER_RELAY_STORAGE;
+test("deletion ledger protection horizon rejects malformed and out-of-range values", () => {
+  const names = [
+    "NODE_ENV",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS"
+  ] as const;
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  try {
+    for (const name of names) delete process.env[name];
+    process.env.NODE_ENV = "development";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH = ".multaiplayer/test-deletion-ledger";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
+    for (const invalid of ["not-an-integer", "7776000.5", "86399", "31536001"]) {
+      process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS = invalid;
+      assert.throws(
+        () => loadRelayConfig(),
+        /MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS must be an integer between 86400 and 31536000/
+      );
+    }
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS = "31536000";
+    assert.equal(loadRelayConfig().deletionLedger?.protectionSeconds, 31_536_000);
+  } finally {
+    for (const name of names) restoreEnv(name, previous.get(name));
+  }
+});
+
+test("production S3 deletion ledger requires HTTPS while development permits HTTP", () => {
+  const names = [
+    "NODE_ENV",
+    "MULTAIPLAYER_RELAY_DELETION_PROTECTION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS"
+  ] as const;
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  try {
+    for (const name of names) delete process.env[name];
+    process.env.MULTAIPLAYER_RELAY_DELETION_PROTECTION = "restore_safe";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET = "relay";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION = "us-test-1";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID = "test-access-key";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY = "test-secret-key-at-least-32-characters";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
+
+    process.env.NODE_ENV = "production";
+    for (const invalidEndpoint of ["http://ledger.example.test", "not-a-url"]) {
+      process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = invalidEndpoint;
+      assert.throws(() => loadRelayConfig(), /S3 endpoint must be a valid HTTPS URL/);
+    }
+
+    process.env.NODE_ENV = "development";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = "http://ledger.example.test";
+    assert.equal(loadRelayConfig().deletionLedger?.backend, "s3");
+  } finally {
+    for (const name of names) restoreEnv(name, previous.get(name));
+  }
+});
+
+test("relay defaults to SQLite persistence", () => {
   const previousDataPath = process.env.MULTAIPLAYER_RELAY_DATA_PATH;
   try {
-    delete process.env.MULTAIPLAYER_RELAY_STORAGE;
     delete process.env.MULTAIPLAYER_RELAY_DATA_PATH;
     const defaultConfig = loadRelayConfig();
     assert.match(defaultConfig.dataPath, /relay-store\.sqlite$/);
-
-    process.env.MULTAIPLAYER_RELAY_STORAGE = "json";
-    assert.throws(() => loadRelayConfig(), /JSON runtime backend has been removed/);
-
-    process.env.MULTAIPLAYER_RELAY_STORAGE = "invalid";
-    assert.throws(() => loadRelayConfig(), /must be sqlite/);
   } finally {
-    if (previousStorage === undefined) delete process.env.MULTAIPLAYER_RELAY_STORAGE;
-    else process.env.MULTAIPLAYER_RELAY_STORAGE = previousStorage;
     if (previousDataPath === undefined) delete process.env.MULTAIPLAYER_RELAY_DATA_PATH;
     else process.env.MULTAIPLAYER_RELAY_DATA_PATH = previousDataPath;
   }
 });
 
-test("relay rejects one-sided trusted-proxy configuration", () => {
+test("relay trusts proxy headers only through the explicit opt-in", () => {
   const previousTrust = process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS;
-  const previousConfigured = process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED;
   try {
+    delete process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS;
+    assert.equal(loadRelayConfig().trustProxyHeaders, false);
     process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS = "true";
-    process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED = "false";
-    assert.throws(() => loadRelayConfig(), /must be enabled or disabled together/);
-    process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS = "false";
-    process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED = "true";
-    assert.throws(() => loadRelayConfig(), /must be enabled or disabled together/);
+    assert.equal(loadRelayConfig().trustProxyHeaders, true);
   } finally {
     restoreEnv("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", previousTrust);
-    restoreEnv("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", previousConfigured);
   }
 });
 

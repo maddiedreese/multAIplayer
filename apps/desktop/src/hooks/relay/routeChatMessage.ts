@@ -57,7 +57,12 @@ export async function routeChatMessage(
       revokedRoomIds: access.revokedRoomIds,
       revokedTeamIds: access.revokedTeamIds
     }).catch((error) => reportNonFatal("send room notification", error));
-    if (room) context.handleCodexBrowserOpenCommand(message, room);
+    if (room) {
+      context.handleCodexBrowserOpenCommand(message, room, {
+        kind: "incoming_room",
+        senderUserId: envelope.senderUserId
+      });
+    }
     return true;
   }
   if (envelope.kind === "chat.reaction") {

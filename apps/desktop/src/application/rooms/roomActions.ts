@@ -54,6 +54,10 @@ export function createRoomActions({
     defaultProjectPath: string;
   };
 }) {
+  const withSelectedRoom = (action: (roomId: string) => void) => {
+    const roomId = useAppStore.getState().selectedRoomId;
+    if (roomId) action(roomId);
+  };
   const setHostMessageForRoom = storeAction("setHostMessageForRoom");
   const setChatMessageForRoom = storeAction("setChatMessageForRoom");
   const setMarkdownCopyFallbackForRoom = storeAction("setMarkdownCopyFallbackForRoom");
@@ -142,25 +146,25 @@ export function createRoomActions({
   return {
     setHostMessageForRoom,
     setSelectedHostMessage: (message: string | null) =>
-      setHostMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setHostMessageForRoom(roomId, message)),
     setChatMessageForRoom,
     setSelectedChatMessage: (message: string | null) =>
-      setChatMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setChatMessageForRoom(roomId, message)),
     setMarkdownCopyFallbackForRoom,
     setInspectorTabForRoom,
     setSecretWarningVisibleForRoom,
     setHistoryMessageForRoom,
     setSelectedHistoryMessage: (message: string | null) =>
-      setHistoryMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setHistoryMessageForRoom(roomId, message)),
     setTeamHistoryMessageForTeam,
     setSelectedTeamHistoryMessage: (message: string | null) =>
       setTeamHistoryMessageForTeam(useAppStore.getState().selectedTeam || "__no-team", message),
     setSettingsMessageForRoom,
     setSelectedSettingsMessage: (message: string | null) =>
-      setSettingsMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setSettingsMessageForRoom(roomId, message)),
     setGitWorkflowMessageForRoom,
     setSelectedGitWorkflowMessage: (message: string | null) =>
-      setGitWorkflowMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setGitWorkflowMessageForRoom(roomId, message)),
     setGitStatusForRoom,
     recordGitHubActionsRefreshForRoom,
     applyGitHubActionsEventForRoom,
@@ -179,12 +183,12 @@ export function createRoomActions({
     closeBrowserTabForRoom,
     clearBrowserStatusForRoom,
     setSelectedBrowserMessage: (message: string | null) =>
-      setBrowserMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setBrowserMessageForRoom(roomId, message)),
     setInviteLinkForRoom,
     setInviteApprovalGateForRoom,
     setInviteMessageForRoom,
     setSelectedInviteMessage: (message: string | null) =>
-      setInviteMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setInviteMessageForRoom(roomId, message)),
     setCustomCodexModelForRoom: (roomId: string, model: string) => {
       const room = useAppStore.getState().rooms.find((item) => item.id === roomId);
       setCustomCodexModelForRoom(roomId, model, room?.codexModel ?? project.defaultCodexModel);
@@ -226,12 +230,12 @@ export function createRoomActions({
     appendFileSaveRequest,
     updateFileSaveRequestStatus,
     setSelectedFileMessage: (message: string | null) =>
-      setFileMessageForRoom(useAppStore.getState().selectedRoomId, message),
+      withSelectedRoom((roomId) => setFileMessageForRoom(roomId, message)),
     resetFileContextForRoom,
     setSelectedTerminalIdForRoom,
     setTerminalErrorForRoom,
     setSelectedTerminalError: (error: string | null) =>
-      setTerminalErrorForRoom(useAppStore.getState().selectedRoomId, error),
+      withSelectedRoom((roomId) => setTerminalErrorForRoom(roomId, error)),
     appendTerminalLinesForRoom: (roomId: string, lines: string[]) =>
       appendTerminalLinesForRoom(roomId, lines, maxTerminalActivityLines),
     setApprovalVisibleForRoom,

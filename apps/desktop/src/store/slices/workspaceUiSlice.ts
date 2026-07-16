@@ -9,15 +9,7 @@ import {
 import type { LocalRoomReadState, SidebarPanel } from "../../types";
 import type { AppStoreState } from "../appStore";
 
-export interface WorkspaceUiInitialState {
-  teams: TeamRecord[];
-  rooms: ClientRoomRecord[];
-  projectPath: string;
-  roomId: string;
-}
-
 export interface WorkspaceUiSlice {
-  workspaceUiInitialized: boolean;
   workspaceBootstrapStatus: "loading" | "ready" | "error";
   workspaceBootstrapError: string | null;
   workspaceBootstrapAttempt: number;
@@ -29,9 +21,8 @@ export interface WorkspaceUiSlice {
   newRoomName: string;
   newRoomProjectPath: string;
   selectedTeam: string;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   sidebarQuery: string;
-  initializeWorkspaceUi: (initialState: WorkspaceUiInitialState) => void;
   replaceTeams: (teams: TeamRecord[]) => void;
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
@@ -41,7 +32,12 @@ export interface WorkspaceUiSlice {
   replaceRoomRecord: (room: ClientRoomRecord) => void;
   markRoomReadById: (roomId: string) => void;
   hydrateRoomReadState: (roomId: string, readState?: LocalRoomReadState) => void;
-  markIncomingChatUnread: (roomId: string, activeRoomId: string, senderDeviceId: string, localDeviceId: string) => void;
+  markIncomingChatUnread: (
+    roomId: string,
+    activeRoomId: string | null,
+    senderDeviceId: string,
+    localDeviceId: string
+  ) => void;
   setWorkspaceStatusError: (message: string | null) => void;
   beginWorkspaceBootstrap: () => void;
   completeWorkspaceBootstrap: () => void;
@@ -53,16 +49,15 @@ export interface WorkspaceUiSlice {
   setNewRoomProjectPath: (path: string) => void;
   setSelectedTeam: (teamId: string) => void;
   selectExistingTeamOrFirst: (teams: TeamRecord[]) => void;
-  setSelectedRoomId: (roomId: string) => void;
+  setSelectedRoomId: (roomId: string | null) => void;
   selectExistingRoomOrFirst: (rooms: ClientRoomRecord[]) => void;
   selectWorkspaceRoom: (teamId: string, roomId: string) => void;
-  selectTeamRoom: (teamId: string, fallbackRoomId: string) => void;
+  selectTeamRoom: (teamId: string, fallbackRoomId: string | null) => void;
   setSidebarQuery: (query: string) => void;
 }
 
 export const emptyWorkspaceUiState: Pick<
   WorkspaceUiSlice,
-  | "workspaceUiInitialized"
   | "workspaceBootstrapStatus"
   | "workspaceBootstrapError"
   | "workspaceBootstrapAttempt"
@@ -77,7 +72,6 @@ export const emptyWorkspaceUiState: Pick<
   | "selectedRoomId"
   | "sidebarQuery"
 > = {
-  workspaceUiInitialized: false,
   workspaceBootstrapStatus: "loading",
   workspaceBootstrapError: null,
   workspaceBootstrapAttempt: 0,
@@ -89,7 +83,7 @@ export const emptyWorkspaceUiState: Pick<
   newRoomName: "",
   newRoomProjectPath: "",
   selectedTeam: "",
-  selectedRoomId: "",
+  selectedRoomId: null,
   sidebarQuery: ""
 };
 
@@ -101,29 +95,20 @@ function existingIdOrFirst<T extends { id: string }>(records: T[], currentId: st
   return records.some((record) => record.id === currentId) ? currentId : (records[0]?.id ?? "");
 }
 
-function repairRoomSelection(rooms: ClientRoomRecord[], selectedRoomId: string, selectedTeam: string) {
+function existingRoomIdOrFirst(rooms: ClientRoomRecord[], currentId: string | null): string | null {
+  return rooms.some((room) => room.id === currentId) ? currentId : (rooms[0]?.id ?? null);
+}
+
+function repairRoomSelection(rooms: ClientRoomRecord[], selectedRoomId: string | null, selectedTeam: string) {
   if (rooms.some((room) => room.id === selectedRoomId)) return { selectedRoomId, selectedTeam };
   const fallbackRoom = rooms[0];
   return fallbackRoom
     ? { selectedRoomId: fallbackRoom.id, selectedTeam: fallbackRoom.teamId }
-    : { selectedRoomId: "", selectedTeam };
+    : { selectedRoomId: null, selectedTeam };
 }
 
 export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], WorkspaceUiSlice> = (set) => ({
   ...emptyWorkspaceUiState,
-  initializeWorkspaceUi: ({ teams, rooms, projectPath, roomId }) => {
-    set((state) => {
-      if (state.workspaceUiInitialized) return state;
-      return {
-        workspaceUiInitialized: true,
-        teams,
-        rooms,
-        newRoomProjectPath: projectPath,
-        selectedTeam: teams[0]?.id ?? "",
-        selectedRoomId: existingIdOrFirst(rooms, roomId)
-      };
-    });
-  },
   replaceTeams: (teams) => {
     set((state) => {
       const nextTeams = activeRecords(teams);
@@ -239,7 +224,7 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
   selectExistingRoomOrFirst: (rooms) => {
     const nextRooms = activeRecords(rooms);
     set((state) => {
-      const selectedRoomId = existingIdOrFirst(nextRooms, state.selectedRoomId);
+      const selectedRoomId = existingRoomIdOrFirst(nextRooms, state.selectedRoomId);
       const selectedRoom = nextRooms.find((room) => room.id === selectedRoomId);
       return {
         selectedRoomId,

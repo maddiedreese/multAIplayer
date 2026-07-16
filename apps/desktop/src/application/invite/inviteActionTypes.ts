@@ -3,7 +3,7 @@ import type { ClientRoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import type { RelayClient } from "../../lib/relay/relayClient";
 
 export interface UseInviteActionsOptions {
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   reportMembershipCommitInFlight: (roomId: string) => boolean;

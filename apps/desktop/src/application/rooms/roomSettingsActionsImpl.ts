@@ -29,7 +29,7 @@ type CurrentRef<T> = { current: T };
 type BusyMap = Record<string, boolean>;
 
 export interface CreateRoomSettingsActionsOptions {
-  selectedRoomIdRef: CurrentRef<string>;
+  selectedRoomIdRef: CurrentRef<string | null>;
   settingsBusyRef: CurrentRef<BusyMap>;
   approvalPolicyLabels: Record<string, string>;
   reportRoomSettingsMutationInFlight: (

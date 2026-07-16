@@ -233,7 +233,7 @@ if (rustToolchain.missing) {
     const host = await NativeClient.start("github:live-host", "device-live-host");
     const guest = await NativeClient.start("github:live-guest", "device-live-guest");
     const relay = await startRelayWithWorkspace(
-      { MULTAIPLAYER_RELAY_STORAGE: "sqlite", MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath },
+      { MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath },
       workspace(host.identity, guest.identity)
     );
     const hostSocket = new WebSocket(relay.wsUrl);

@@ -16,7 +16,7 @@ interface AdmissionDependencies {
 
 interface AdmissionSelectionStore {
   selectedTeam: string;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectWorkspaceRoom: (teamId: string, roomId: string) => void;
 }
 

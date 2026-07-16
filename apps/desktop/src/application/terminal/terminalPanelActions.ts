@@ -22,6 +22,7 @@ export function createTerminalPanelActions({
 }) {
   function onApproveTerminalRequest(requestId: string) {
     const state = useAppStore.getState();
+    if (!state.selectedRoomId) return;
     const request = (state.terminalRuntimeByRoom[state.selectedRoomId]?.requests ?? []).find(
       (item) => item.id === requestId
     );
@@ -35,6 +36,7 @@ export function createTerminalPanelActions({
     onDenyTerminalRequest: denyTerminalRequest,
     onSelectTerminal: (terminalId: string) => {
       const state = useAppStore.getState();
+      if (!state.selectedRoomId) return;
       state.setSelectedTerminalIdForRoom(state.selectedRoomId, terminalId);
     },
     onSendTerminalData: (input: string) => sendTerminalData(input),

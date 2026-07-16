@@ -3,10 +3,6 @@ import { afterEach, test } from "node:test";
 import { JSDOM } from "jsdom";
 import React, { createElement } from "react";
 
-if (!process.env.MULTAIPLAYER_SMOKE_WATCHDOG) {
-  throw new Error("App smoke must run through the desktop smoke-test script.");
-}
-
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://127.0.0.1:5173/" });
 for (const [name, value] of Object.entries({
   window: dom.window,

@@ -12,9 +12,9 @@ interface LatestRef<T> {
 interface UseGitHubRemoteInferenceOptions {
   hasSelectedRoom: boolean;
   canReadLocalWorkspace: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectedRoomProjectPath: string;
-  selectedRoomIdRef: LatestRef<string>;
+  selectedRoomIdRef: LatestRef<string | null>;
 }
 
 export function useGitHubRemoteInference({
@@ -25,7 +25,7 @@ export function useGitHubRemoteInference({
   selectedRoomIdRef
 }: UseGitHubRemoteInferenceOptions) {
   useEffect(() => {
-    if (!hasSelectedRoom) return;
+    if (!hasSelectedRoom || !selectedRoomId) return;
     if (!canReadLocalWorkspace) return;
     const roomId = selectedRoomId;
     const projectPath = selectedRoomProjectPath;

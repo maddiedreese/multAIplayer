@@ -22,6 +22,7 @@ export function createWorkspaceFilesPanelActions({
   function onCloseFileViewer() {
     const store = useAppStore.getState();
     const selectedRoomId = store.selectedRoomId;
+    if (!selectedRoomId) return;
     store.setSelectedFileForRoom(selectedRoomId, null);
     store.setSelectedDiffForRoom(selectedRoomId, null);
     store.setSensitiveAttachmentReviewKey(null);
@@ -31,6 +32,7 @@ export function createWorkspaceFilesPanelActions({
     onCopyProjectMarkdown: copyProjectMarkdown,
     onFileQueryChange: (query: string) => {
       const state = useAppStore.getState();
+      if (!state.selectedRoomId) return;
       state.setFileQueryForRoom(state.selectedRoomId, query);
     },
     onOpenProjectFile: openProjectFile,
@@ -41,6 +43,7 @@ export function createWorkspaceFilesPanelActions({
     onDenyFileSaveRequest: denyFileSaveRequest,
     onFilePreviewTabChange: (tab: FilePreviewTab) => {
       const state = useAppStore.getState();
+      if (!state.selectedRoomId) return;
       state.setFilePreviewTabForRoom(state.selectedRoomId, tab);
     },
     onCloseFileViewer

@@ -60,13 +60,22 @@ claims, audit status, metadata exposure, and residual risks.
 - Codex runs through the active host's standard local Codex app-server and
   account. The supported version range and version-specific feature limits live
   in [How Codex hosting works](codex-hosting.md).
-- Codex settings, apps, MCP servers, project files, terminals, browser sessions,
-  Git, and GitHub credentials remain host-local. multAIplayer's warnings and
-  approval prompts reduce accidental sharing; they are not a sandbox or a
-  complete secret scanner.
-- Browser and Computer Use are not exposed because the app-server surface used by
-  multAIplayer does not support them. Usage-limit handoff also cannot transfer
-  processes, credentials, or unsaved host state.
+- The host's Codex credentials, running process and session, account, app and MCP
+  state, terminal and browser processes, and Git or GitHub credentials remain
+  host-local. Project contents are not transferred wholesale automatically, but
+  selected previews, files, diffs, attachments, handoff patches, structured Codex
+  activity, and approved local previews can be shared with and retained by room
+  members. The selected project path and room Codex model, reasoning,
+  service-tier, speed, raw-reasoning, and sandbox settings are shared with room
+  members in authenticated, encrypted `room.config` snapshots. multAIplayer's
+  warnings and approval prompts reduce accidental sharing; they are not a sandbox
+  or a complete secret scanner.
+- Codex's upstream Computer Use and first-party browser capabilities are not
+  exposed through multAIplayer's app-server integration. multAIplayer separately
+  provides a host-local in-room browser: the active host can open URLs directly,
+  while Codex and room browser-open requests remain behind host approval.
+  Usage-limit handoff also cannot transfer processes, credentials, or unsaved
+  host state.
 - Local preview sharing creates a temporary public `trycloudflare.com` URL.
   Anyone with the URL may be able to view the preview until the tunnel stops.
 

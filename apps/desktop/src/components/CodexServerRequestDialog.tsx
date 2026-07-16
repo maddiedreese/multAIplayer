@@ -30,7 +30,7 @@ export function CodexServerRequestDialog({
   selectedRoomId,
   canRespond
 }: {
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   canRespond: boolean;
 }) {
   const [requests, setRequests] = useState<CodexServerRequest[]>([]);

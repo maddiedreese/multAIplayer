@@ -31,39 +31,8 @@ const roomB: ClientRoomRecord = {
 
 test.beforeEach(() => useAppStore.getState().resetAppStore());
 
-test("workspace UI initializes once from the React seed and resets coherently", () => {
-  let store = useAppStore.getState();
-  store.initializeWorkspaceUi({
-    teams: [teamA, teamB],
-    rooms: [roomA, roomB],
-    projectPath: "/tmp/new",
-    roomId: roomB.id
-  });
-  store.initializeWorkspaceUi({
-    teams: [],
-    rooms: [],
-    projectPath: "/ignored",
-    roomId: "ignored"
-  });
-
-  store = useAppStore.getState();
-  assert.equal(store.workspaceUiInitialized, true);
-  assert.deepEqual(store.teams, [teamA, teamB]);
-  assert.deepEqual(store.rooms, [roomA, roomB]);
-  assert.equal(store.selectedTeam, teamA.id);
-  assert.equal(store.selectedRoomId, roomB.id);
-  assert.equal(store.newRoomProjectPath, "/tmp/new");
-
-  store.resetAppStore();
-  store = useAppStore.getState();
-  store.initializeWorkspaceUi({
-    teams: [teamA],
-    rooms: [roomA],
-    projectPath: "/tmp/new",
-    roomId: "missing-room"
-  });
-  assert.equal(useAppStore.getState().selectedRoomId, roomA.id);
-
+test("workspace UI resets coherently", () => {
+  const store = useAppStore.getState();
   store.setWorkspaceStatusError("problem");
   store.setActiveSidebarPanel("settings");
   store.setNewTeamName("New team");
@@ -71,19 +40,18 @@ test("workspace UI initializes once from the React seed and resets coherently", 
   store.setSidebarQuery("needle");
   store.resetAppStore();
 
-  store = useAppStore.getState();
-  assert.equal(store.workspaceUiInitialized, false);
-  assert.equal(store.workspaceBootstrapStatus, "loading");
-  assert.equal(store.workspaceBootstrapError, null);
-  assert.equal(store.workspaceBootstrapAttempt, 0);
-  assert.deepEqual(store.teams, []);
-  assert.deepEqual(store.rooms, []);
-  assert.equal(store.workspaceError, null);
-  assert.equal(store.activeSidebarPanel, null);
-  assert.equal(store.newTeamName, "");
-  assert.equal(store.newRoomName, "");
-  assert.equal(store.newRoomProjectPath, "");
-  assert.equal(store.sidebarQuery, "");
+  const state = useAppStore.getState();
+  assert.equal(state.workspaceBootstrapStatus, "loading");
+  assert.equal(state.workspaceBootstrapError, null);
+  assert.equal(state.workspaceBootstrapAttempt, 0);
+  assert.deepEqual(state.teams, []);
+  assert.deepEqual(state.rooms, []);
+  assert.equal(state.workspaceError, null);
+  assert.equal(state.activeSidebarPanel, null);
+  assert.equal(state.newTeamName, "");
+  assert.equal(state.newRoomName, "");
+  assert.equal(state.newRoomProjectPath, "");
+  assert.equal(state.sidebarQuery, "");
 });
 
 test("workspace bootstrap readiness transitions and retries independently of room relay state", () => {
@@ -109,7 +77,7 @@ test("workspace bootstrap readiness transitions and retries independently of roo
 
 test("team replacement and upsert keep selection valid and preserve record update semantics", () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({ teams: [teamA, teamB], rooms: [], projectPath: "/tmp", roomId: "" });
+  useAppStore.setState({ teams: [teamA, teamB], selectedTeam: teamA.id });
   store.setSelectedTeam(teamB.id);
 
   store.replaceTeams([
@@ -135,11 +103,11 @@ test("team replacement and upsert keep selection valid and preserve record updat
 
 test("room mutations preserve unread state and repair selection atomically", () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({
+  useAppStore.setState({
     teams: [teamA, teamB],
     rooms: [roomA, roomB],
-    projectPath: "/tmp",
-    roomId: roomA.id
+    selectedTeam: teamA.id,
+    selectedRoomId: roomA.id
   });
 
   store.upsertRoomRecord({ ...roomA, name: "Renamed", unread: 0 });
@@ -166,11 +134,11 @@ test("room mutations preserve unread state and repair selection atomically", () 
 
 test("room collection replacement repairs a cross-team fallback atomically", () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({
+  useAppStore.setState({
     teams: [teamA, teamB],
     rooms: [roomA, roomB],
-    projectPath: "/tmp",
-    roomId: roomA.id
+    selectedTeam: teamA.id,
+    selectedRoomId: roomA.id
   });
 
   store.replaceRooms([roomB]);
@@ -182,11 +150,11 @@ test("room collection replacement repairs a cross-team fallback atomically", () 
 
 test("room upsert deletion repairs a cross-team fallback atomically", () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({
+  useAppStore.setState({
     teams: [teamA, teamB],
     rooms: [roomA, roomB],
-    projectPath: "/tmp",
-    roomId: roomA.id
+    selectedTeam: teamA.id,
+    selectedRoomId: roomA.id
   });
 
   store.upsertRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
@@ -198,7 +166,7 @@ test("room upsert deletion repairs a cross-team fallback atomically", () => {
 
 test("room selection moves from none to hydrated data and back to none when the final room leaves", () => {
   const store = useAppStore.getState();
-  assert.equal(store.selectedRoomId, "");
+  assert.equal(store.selectedRoomId, null);
   assert.deepEqual(store.rooms, []);
 
   store.replaceRooms([roomA]);
@@ -211,18 +179,18 @@ test("room selection moves from none to hydrated data and back to none when the 
 
   state.replaceRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
   state = useAppStore.getState();
-  assert.equal(state.selectedRoomId, "");
+  assert.equal(state.selectedRoomId, null);
   assert.equal(state.selectedTeam, teamA.id);
   assert.deepEqual(state.rooms, []);
 });
 
 test("workspace selection helpers preserve explicit and team-relative navigation semantics", () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({
+  useAppStore.setState({
     teams: [teamA, teamB],
     rooms: [roomA, roomB],
-    projectPath: "/tmp",
-    roomId: roomA.id
+    selectedTeam: teamA.id,
+    selectedRoomId: roomA.id
   });
 
   store.selectWorkspaceRoom(teamB.id, roomB.id);
@@ -239,7 +207,7 @@ test("workspace selection helpers preserve explicit and team-relative navigation
 
 test("room fallback synchronizes the selected team when the first team has no rooms", () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({ teams: [teamA, teamB], rooms: [], projectPath: "/tmp", roomId: "" });
+  useAppStore.setState({ teams: [teamA, teamB], selectedTeam: teamA.id });
 
   store.selectExistingTeamOrFirst([teamA, teamB]);
   store.selectExistingRoomOrFirst([roomB]);
@@ -251,11 +219,11 @@ test("room fallback synchronizes the selected team when the first team has no ro
 
 test("room fallback preserves an existing valid room and team selection", () => {
   const store = useAppStore.getState();
-  store.initializeWorkspaceUi({
+  useAppStore.setState({
     teams: [teamA, teamB],
     rooms: [roomA, roomB],
-    projectPath: "/tmp",
-    roomId: roomA.id
+    selectedTeam: teamA.id,
+    selectedRoomId: roomA.id
   });
   store.selectWorkspaceRoom(teamB.id, roomB.id);
 
