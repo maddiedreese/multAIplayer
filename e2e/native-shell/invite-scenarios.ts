@@ -46,7 +46,25 @@ export async function selectRoom(browser: Browser, roomName: string) {
 
 export async function openRoomInspector(browser: Browser) {
   const tools = await visible(browser, 'nav[aria-label="Room tools"]');
-  await (await tools.$("button=Room")).click();
+  const roomButton = await tools.$("button=Room");
+  await roomButton.click();
+  try {
+    await roomButton.waitUntil(async () => (await roomButton.getAttribute("aria-pressed")) === "true", {
+      timeout: 3_000,
+      timeoutMsg: "Room inspector tab did not activate after click"
+    });
+  } catch {
+    // A native refresh can replace the header after WebDriver dispatches the
+    // first click. Resolve the live button once more and still require the
+    // actual UI tab to become active.
+    const refreshedTools = await visible(browser, 'nav[aria-label="Room tools"]');
+    const refreshedRoomButton = await refreshedTools.$("button=Room");
+    await refreshedRoomButton.click();
+    await refreshedRoomButton.waitUntil(
+      async () => (await refreshedRoomButton.getAttribute("aria-pressed")) === "true",
+      { timeout: 10_000, timeoutMsg: "Room inspector tab did not activate after bounded retry" }
+    );
+  }
 }
 
 export async function createInviteLink(host: Browser) {
