@@ -9,15 +9,7 @@ import {
 import type { LocalRoomReadState, SidebarPanel } from "../../types";
 import type { AppStoreState } from "../appStore";
 
-export interface WorkspaceUiInitialState {
-  teams: TeamRecord[];
-  rooms: ClientRoomRecord[];
-  projectPath: string;
-  roomId: string;
-}
-
 export interface WorkspaceUiSlice {
-  workspaceUiInitialized: boolean;
   workspaceBootstrapStatus: "loading" | "ready" | "error";
   workspaceBootstrapError: string | null;
   workspaceBootstrapAttempt: number;
@@ -31,7 +23,6 @@ export interface WorkspaceUiSlice {
   selectedTeam: string;
   selectedRoomId: string;
   sidebarQuery: string;
-  initializeWorkspaceUi: (initialState: WorkspaceUiInitialState) => void;
   replaceTeams: (teams: TeamRecord[]) => void;
   updateTeamRoleForTeam: (teamId: string, role: TeamRecord["role"] | undefined) => void;
   updateTeamMemberCountForTeam: (teamId: string, members: number) => void;
@@ -62,7 +53,6 @@ export interface WorkspaceUiSlice {
 
 export const emptyWorkspaceUiState: Pick<
   WorkspaceUiSlice,
-  | "workspaceUiInitialized"
   | "workspaceBootstrapStatus"
   | "workspaceBootstrapError"
   | "workspaceBootstrapAttempt"
@@ -77,7 +67,6 @@ export const emptyWorkspaceUiState: Pick<
   | "selectedRoomId"
   | "sidebarQuery"
 > = {
-  workspaceUiInitialized: false,
   workspaceBootstrapStatus: "loading",
   workspaceBootstrapError: null,
   workspaceBootstrapAttempt: 0,
@@ -111,19 +100,6 @@ function repairRoomSelection(rooms: ClientRoomRecord[], selectedRoomId: string, 
 
 export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], WorkspaceUiSlice> = (set) => ({
   ...emptyWorkspaceUiState,
-  initializeWorkspaceUi: ({ teams, rooms, projectPath, roomId }) => {
-    set((state) => {
-      if (state.workspaceUiInitialized) return state;
-      return {
-        workspaceUiInitialized: true,
-        teams,
-        rooms,
-        newRoomProjectPath: projectPath,
-        selectedTeam: teams[0]?.id ?? "",
-        selectedRoomId: existingIdOrFirst(rooms, roomId)
-      };
-    });
-  },
   replaceTeams: (teams) => {
     set((state) => {
       const nextTeams = activeRecords(teams);

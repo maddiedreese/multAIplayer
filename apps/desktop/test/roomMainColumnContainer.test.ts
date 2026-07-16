@@ -87,11 +87,11 @@ const sources = {
 beforeEach(() => {
   const store = useAppStore.getState();
   store.resetAppStore();
-  store.initializeWorkspaceUi({
+  useAppStore.setState({
     teams: seededTeams,
     rooms: seededRooms,
-    projectPath: seededRooms[0]?.projectPath ?? "",
-    roomId: seededRooms[0]?.id ?? ""
+    selectedTeam: seededTeams[0]?.id ?? "",
+    selectedRoomId: seededRooms[0]?.id ?? null
   });
   localStorage.clear();
 });

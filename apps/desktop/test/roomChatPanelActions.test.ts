@@ -39,7 +39,7 @@ test("local preview actions resolve the selected room when invoked", () => {
   };
   const store = useAppStore.getState();
   store.resetAppStore();
-  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   store.appendLocalPreviewEvent(room.id, preview);
   const actions = createRoomChatPanelActions({
     copyMessageMarkdown: noop,
@@ -82,7 +82,7 @@ test("local preview actions resolve the selected room when invoked", () => {
 test("room header actions mutate the store without a React subscription", () => {
   const store = useAppStore.getState();
   store.resetAppStore();
-  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   let browserOpenCount = 0;
   const actions = createRoomHeaderActions({
     selectedRoomId: "room-fallback",
@@ -104,7 +104,7 @@ test("room header actions mutate the store without a React subscription", () => 
 test("terminal panel actions resolve request ids before approval", () => {
   const store = useAppStore.getState();
   store.resetAppStore();
-  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   store.appendTerminalRequest(room.id, {
     id: "request-1",
     roomId: room.id,
@@ -151,9 +151,7 @@ test("terminal panel actions resolve request ids before approval", () => {
 
 test("workspace file panel close clears all viewer state", () => {
   useAppStore.getState().resetAppStore();
-  useAppStore
-    .getState()
-    .initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   useAppStore.getState().setSelectedFileForRoom(room.id, {
     path: "src/main.ts",
     content: "export {};",

@@ -83,7 +83,7 @@ test.beforeEach(() => {
   localStorage.setItem("multaiplayer:history-settings:room-a", JSON.stringify({ enabled: true, retentionDays: 30 }));
   const store = useAppStore.getState();
   store.resetAppStore();
-  store.initializeWorkspaceUi({ teams: [], rooms: [room], projectPath: room.projectPath, roomId: room.id });
+  useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
 });
 
 test("hydration completion unlocks persistence without racing reconnect with a no-change save", async () => {
