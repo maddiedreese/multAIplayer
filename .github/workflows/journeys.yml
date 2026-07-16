@@ -43,13 +43,18 @@ jobs:
             echo "product=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if ! changed_files="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"; then
+          if ! changed_files="$(git diff --no-renames --name-only "$BASE_SHA" "$GITHUB_SHA")"; then
             echo "Could not compare the pull request with its base commit." >&2
             exit 1
           fi
           if grep -Eq '^(apps|packages|e2e)/|^scripts/run-e2e\.mjs$|^package(-lock)?\.json$|^\.github/(actions|workflows/journeys\.yml)' <<< "$changed_files"; then
             echo "product=true" >> "$GITHUB_OUTPUT"
           else
+            grep_status=$?
+            if [ "$grep_status" -ne 1 ]; then
+              echo "Could not classify the changed paths." >&2
+              exit "$grep_status"
+            fi
             echo "product=false" >> "$GITHUB_OUTPUT"
           fi
 
