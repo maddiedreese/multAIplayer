@@ -23,13 +23,20 @@ type AppStoreActionName = {
   [Key in keyof AppStoreState]: AppStoreState[Key] extends (...args: never[]) => unknown ? Key : never;
 }[keyof AppStoreState];
 
+const cachedStoreActions = new Map<AppStoreActionName, AppStoreState[AppStoreActionName]>();
+
 function storeAction<Key extends AppStoreActionName>(name: Key): AppStoreState[Key] {
+  const cached = cachedStoreActions.get(name);
+  if (cached) return cached as AppStoreState[Key];
   // Resolve at invocation time so long-lived room adapters never retain an action
-  // implementation replaced by a store reset or runtime reconfiguration.
-  return ((...args: unknown[]) => {
+  // implementation replaced by a store reset or runtime reconfiguration. Cache
+  // the adapter itself so React effect dependencies remain stable across renders.
+  const action = ((...args: unknown[]) => {
     const action = useAppStore.getState()[name] as (...actionArgs: unknown[]) => unknown;
     return action(...args);
   }) as AppStoreState[Key];
+  cachedStoreActions.set(name, action);
+  return action;
 }
 
 export function createRoomActions({
