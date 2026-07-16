@@ -31,6 +31,7 @@ export function runtimeWalkerArguments(tag) {
     "none",
     "--no-healthcheck",
     "--read-only",
+    "--interactive",
     "--user",
     "0:0",
     "--entrypoint",

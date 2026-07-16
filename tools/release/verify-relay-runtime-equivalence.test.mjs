@@ -111,13 +111,14 @@ test("runtime exclusions and walker confinement remain explicit", () => {
     ["/.dockerenv", "/dev", "/etc/hostname", "/etc/hosts", "/etc/resolv.conf", "/proc", "/sys"].sort()
   );
   const args = runtimeWalkerArguments("relay:test");
-  assert.deepEqual(args.slice(0, 13), [
+  assert.deepEqual(args.slice(0, 14), [
     "run",
     "--rm",
     "--network",
     "none",
     "--no-healthcheck",
     "--read-only",
+    "--interactive",
     "--user",
     "0:0",
     "--entrypoint",
