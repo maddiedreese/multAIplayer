@@ -33,6 +33,37 @@ test("relay stores only opaque exporter-sealed attachment blobs", async () => {
       `${relay.baseUrl}/attachment-blobs/${body.blob.id}?teamId=team-core&roomId=room-desktop`
     );
     assert.equal(fetched.status, 200);
+    const archived = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "archive" })
+    });
+    assert.equal(archived.status, 200);
+    assert.equal(
+      (await fetch(`${relay.baseUrl}/attachment-blobs/${body.blob.id}?teamId=team-core&roomId=room-desktop`)).status,
+      409
+    );
+    const uploadWhileArchived = await fetch(`${relay.baseUrl}/attachment-blobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        blobId: "blob-while-archived",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        name: "late",
+        type: "file",
+        size: 32,
+        epoch: 0,
+        sealedBlob
+      })
+    });
+    assert.equal(uploadWhileArchived.status, 409);
+    const restored = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "restore" })
+    });
+    assert.equal(restored.status, 200);
     const replay = await fetch(`${relay.baseUrl}/attachment-blobs`, {
       method: "POST",
       headers: { "content-type": "application/json" },

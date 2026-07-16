@@ -13,6 +13,7 @@ import {
 } from "../state.js";
 import { isStrictExporterCiphertextJson } from "../opaque.js";
 import { acquireDurableQuotaTransaction, reserveDurableQuota, rollbackDurableQuota } from "../auth/account-quotas.js";
+import { isActiveRoom } from "../relay-domain.js";
 
 interface RegisterAttachmentRoutesOptions {
   app: Express;
@@ -85,6 +86,10 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
     }
     if (blob.teamId !== teamId || blob.roomId !== roomId) {
       sendRelayError(res, 404, "not_found", "Attachment blob not found");
+      return;
+    }
+    if (!isActiveRoom(store, teamId, roomId)) {
+      sendRelayError(res, 409, "conflict", "Restore the team and room before reading attachment blobs.");
       return;
     }
     if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
@@ -210,6 +215,9 @@ function validateAttachmentTarget(
   if (!options.store.hasTeam(teamId)) return sendAttachmentTargetError(res, 404, "team_not_found", "Team not found");
   if (options.store.getRoom(roomId)?.teamId !== teamId) {
     return sendAttachmentTargetError(res, 404, "room_not_found", "Room not found");
+  }
+  if (!isActiveRoom(options.store, teamId, roomId)) {
+    return sendAttachmentTargetError(res, 409, "conflict", "Restore the team and room before uploading attachments.");
   }
   if (!blobId) return sendAttachmentTargetError(res, 400, "invalid_request", "blobId is required and must be bounded.");
   if (options.store.getAttachmentBlob(blobId)) {
