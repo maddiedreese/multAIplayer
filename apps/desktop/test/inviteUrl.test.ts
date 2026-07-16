@@ -43,9 +43,14 @@ test("readInviteUrlPayload ignores non-invite fragments", () => {
 test("readInviteUrlPayload rejects incomplete, ambiguous, and non-current fragments", () => {
   for (const hash of [
     "#multaiplayerJoin=encoded-join&approval=request",
+    "#invite=invite_123&approval=request",
     "#invite=invite_123&multaiplayerJoin=encoded-join",
     "#invite=invite_123&multaiplayerJoin=encoded-join&approval=other",
+    "#invite=&multaiplayerJoin=encoded-join&approval=request",
+    "#invite=invite_123&multaiplayerJoin=&approval=request",
     "#invite=invite_123&invite=other&multaiplayerJoin=encoded-join&approval=request",
+    "#invite=invite_123&multaiplayerJoin=encoded-join&multaiplayerJoin=other&approval=request",
+    "#invite=invite_123&multaiplayerJoin=encoded-join&approval=request&approval=request",
     "#invite=invite_123&multaiplayerJoin=encoded-join&approval=request&extra=value"
   ]) {
     assert.equal(readInviteUrlPayload({ pathname: "/", search: "", hash }), null);
