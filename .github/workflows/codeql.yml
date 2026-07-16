@@ -18,13 +18,33 @@ permissions:
 
 jobs:
   analyze:
+    # Keep this job id stable: GitHub identifies the default CodeQL
+    # configuration as <workflow path>:<job id> when comparing a PR with main.
+    # The additional language matrix below must not replace that identity.
+    name: JavaScript and TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        with:
+          build-mode: none
+          config-file: ./.github/codeql-config.yml
+          languages: javascript-typescript
+          queries: security-extended
+      - name: Analyze production code
+        uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+
+  analyze-additional-languages:
     name: ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        language: [actions, javascript-typescript, rust]
+        language: [actions, rust]
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
