@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
 
+mod atomic_file;
 mod browser;
 mod codex;
 mod codex_account;

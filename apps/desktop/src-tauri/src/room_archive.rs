@@ -11,6 +11,8 @@ use std::{
 };
 use tauri::Manager;
 
+use crate::atomic_file::atomic_write_private_file;
+
 const ARCHIVE_VERSION: u8 = 1;
 const MAX_ARCHIVE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_PLAINTEXT_BYTES: usize = 12 * 1024 * 1024;
@@ -404,37 +406,10 @@ fn safe_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
         path.file_name()
             .ok_or_else(|| "Archive destination is invalid.".to_string())?,
     );
-    if let Ok(metadata) = fs::symlink_metadata(&target) {
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err("Archive destination must not be a symlink or special file.".to_string());
-        }
-    }
-    let temporary = parent.join(format!(
-        ".{}.{}.tmp",
-        target
-            .file_name()
-            .and_then(|v| v.to_str())
-            .unwrap_or("archive"),
-        uuid::Uuid::new_v4()
-    ));
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options
-        .open(&temporary)
-        .map_err(|_| "Archive temporary file could not be created.".to_string())?;
-    let result = file
-        .write_all(bytes)
-        .and_then(|_| file.sync_all())
-        .and_then(|_| fs::rename(&temporary, &target));
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
-        return Err("Archive could not be written safely.".to_string());
-    }
+    atomic_write_private_file(&target, |file| {
+        file.write_all(bytes).map_err(|error| error.to_string())
+    })
+    .map_err(|_| "Archive could not be written safely.".to_string())?;
     secure_permissions(&target)?;
     Ok(())
 }

@@ -2,11 +2,11 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
+use crate::atomic_file::atomic_write_private_file;
 use crate::output::{bound_git_diff, untracked_file_diff};
 use crate::validation::safe_project_path;
 use crate::workspace::{canonical_project_root, ensure_existing_dir};
@@ -262,27 +262,10 @@ pub(crate) fn project_file_write(
 }
 
 fn atomic_write_project_file(path: &Path, content: &[u8]) -> Result<(), String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| "File path must stay inside the project".to_string())?;
-    let temporary = parent.join(format!(".multaiplayer-write-{}", uuid::Uuid::new_v4()));
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temporary)
-        .map_err(|error| format!("Failed to create temporary project file: {error}"))?;
-    let result = (|| {
+    atomic_write_private_file(path, |file| {
         file.write_all(content)
-            .map_err(|error| format!("Failed to write temporary project file: {error}"))?;
-        file.sync_all()
-            .map_err(|error| format!("Failed to sync temporary project file: {error}"))?;
-        fs::rename(&temporary, path)
-            .map_err(|error| format!("Failed to replace project file: {error}"))
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    result
+            .map_err(|error| format!("Failed to write temporary project file: {error}"))
+    })
 }
 
 fn safe_project_write_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
