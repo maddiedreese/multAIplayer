@@ -10,10 +10,12 @@ Object.defineProperty(globalThis, "navigator", { configurable: true, value: dom.
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: dom.window.localStorage });
 
 let loadHistory: () => Promise<string | null> = async () => null;
+let nativeInvocations: string[] = [];
 Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
   configurable: true,
   value: {
     invoke: async (command: string) => {
+      nativeInvocations.push(command);
       if (command === "mls_history_load_latest") return loadHistory();
       if (command === "mls_history_retention_set") return 1;
       throw new Error(`Unexpected command ${command}`);
@@ -70,6 +72,27 @@ test.beforeEach(() => {
   localStorage.setItem("multaiplayer:history-settings:room-a", JSON.stringify({ enabled: true, retentionDays: 30 }));
   useAppStore.getState().resetAppStore();
   loadHistory = async () => null;
+  nativeInvocations = [];
+});
+
+test("no selected room does not start native history hydration", async () => {
+  const view = renderHook(() =>
+    useLocalHistoryHydration({
+      hasSelectedRoom: false,
+      selectedRoomId: "",
+      selectedRoomTeamId: "",
+      forgottenRoomIds: noForgottenRoomIds,
+      replaceHistorySettings: () => undefined,
+      hydrateLocalRoomHistoryForRoom: (roomId, payload) =>
+        useAppStore.getState().hydrateLocalRoomHistoryForRoom(roomId, payload),
+      hydrateRoomReadState: (roomId, readState) => useAppStore.getState().hydrateRoomReadState(roomId, readState)
+    })
+  );
+
+  await Promise.resolve();
+  assert.deepEqual(nativeInvocations, []);
+  assert.equal(useAppStore.getState().historyPresenceByRoom[""], undefined);
+  view.unmount();
 });
 
 test("delayed hydration merges a live message instead of overwriting it", async () => {

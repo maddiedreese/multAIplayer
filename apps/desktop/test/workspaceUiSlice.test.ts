@@ -167,6 +167,25 @@ test("room mutations preserve unread state and repair selection atomically", () 
   );
 });
 
+test("room selection moves from none to hydrated data and back to none when the final room leaves", () => {
+  const store = useAppStore.getState();
+  assert.equal(store.selectedRoomId, "");
+  assert.deepEqual(store.rooms, []);
+
+  store.replaceRooms([roomA]);
+  let state = useAppStore.getState();
+  assert.equal(state.selectedRoomId, roomA.id);
+  assert.equal(
+    state.rooms.find((room) => room.id === state.selectedRoomId),
+    roomA
+  );
+
+  state.replaceRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
+  state = useAppStore.getState();
+  assert.equal(state.selectedRoomId, "");
+  assert.deepEqual(state.rooms, []);
+});
+
 test("workspace selection helpers preserve explicit and team-relative navigation semantics", () => {
   const store = useAppStore.getState();
   store.initializeWorkspaceUi({

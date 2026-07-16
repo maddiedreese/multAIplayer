@@ -29,8 +29,7 @@ import type { LocalHostUser } from "../lib/access/roomHost";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 interface UseSelectedRoomRuntimeOptions {
-  selectedRoom: ClientRoomRecord;
-  selectedRoomId: string;
+  selectedRoom: ClientRoomRecord | null;
   localUser: LocalHostUser;
   isSelectedRoomLocked: boolean;
   messages: ChatMessage[];
@@ -62,7 +61,6 @@ interface UseSelectedRoomRuntimeOptions {
 
 export function useSelectedRoomRuntime({
   selectedRoom,
-  selectedRoomId,
   localUser,
   isSelectedRoomLocked,
   messages,
@@ -91,7 +89,7 @@ export function useSelectedRoomRuntime({
   settingsBusyByRoom,
   membershipCommitBusyByRoom
 }: UseSelectedRoomRuntimeOptions) {
-  const roomId = selectedRoom.id ?? selectedRoomId;
+  const roomId = selectedRoom?.id ?? "";
   const runtime = selectRoomRuntimeCollections(
     {
       pendingCodexApprovalsByRoom,
@@ -137,28 +135,26 @@ export function useSelectedRoomRuntime({
   } = runtime;
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
-  const selectedTerminalCanControl = canControlRoomTerminal(
-    selectedRoom,
-    localUser,
-    selectedTerminal,
-    isSelectedRoomLocked
-  );
+  const selectedTerminalCanControl = selectedRoom
+    ? canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)
+    : false;
   const inspectorAttention = inspectorAttentionCounts({ approvalVisible, terminalRequests, browserRequests });
   const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
   const replyTarget = selectReplyTarget(messages, replyToMessageId);
   const codexApprovalSummaryDisplay = {
     messages: formatApprovalMessages(approvalTranscriptMessages),
     attachments: formatApprovalAttachments(approvalTranscriptMessages),
-    sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
+    sandbox: formatCodexSandboxLevel(selectedRoom?.codexSandboxLevel ?? defaultCodexSandboxLevel),
     highPrivilegeLabels: activeCodexApproval
       ? codexHighPrivilegeLabels(
           activeCodexApproval.summary,
-          selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel
+          selectedRoom?.codexSandboxLevel ?? defaultCodexSandboxLevel
         )
       : [],
-    riskFlags: activeCodexApproval
-      ? detectCodexTurnRiskFlags(approvalTranscriptMessages, selectedRoom, browserRequests, null)
-      : []
+    riskFlags:
+      activeCodexApproval && selectedRoom
+        ? detectCodexTurnRiskFlags(approvalTranscriptMessages, selectedRoom, browserRequests, null)
+        : []
   };
   const currentMessagesSinceLastCodex = messagesSinceLastCodex(messages).length;
   const queuedCodexTurnRows = queuedCodexApprovals.map((turn) => ({
@@ -168,13 +164,13 @@ export function useSelectedRoomRuntime({
     queuedAt: turn.queuedAt,
     messagesSinceLastCodex: currentMessagesSinceLastCodex,
     canCancel:
-      !isSelectedRoomLocked && (turn.requestedByUserId === localUser.id || selectedRoom.hostUserId === localUser.id)
+      !isSelectedRoomLocked && (turn.requestedByUserId === localUser.id || selectedRoom?.hostUserId === localUser.id)
   }));
   const pendingAttachmentSummary =
     `${pendingAttachments.length}/${maxMessageAttachments} files · ` +
     `${formatBytes(pendingAttachmentBytes)}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`;
-  const hostStatusLabel = formatHostStatus(selectedRoom);
-  const roomCanUseChat = canUseRoomChat(selectedRoom, isSelectedRoomLocked);
+  const hostStatusLabel = selectedRoom ? formatHostStatus(selectedRoom) : "No room selected";
+  const roomCanUseChat = selectedRoom ? canUseRoomChat(selectedRoom, isSelectedRoomLocked) : false;
 
   return {
     activeCodexApproval,

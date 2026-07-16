@@ -5,8 +5,7 @@ import type { BrowserAccessRequest, ChatMessage, HostHandoffRecord, QueuedCodexT
 import type { GitStatusSummary, TerminalSnapshot } from "../../lib/platform/localBackend";
 
 export interface UseHostHandoffActionsOptions {
-  hasSelectedRoom: boolean;
-  selectedRoom: ClientRoomRecord;
+  selectedRoom: ClientRoomRecord | null;
   selectedRoomIdRef: MutableRefObject<string>;
   isSelectedRoomLocked: boolean;
   isSelectedRoomRevoked: boolean;

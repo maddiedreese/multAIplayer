@@ -68,7 +68,7 @@ export function useAppRelaySync({
       forgottenRoomIds: state.forgottenRoomIds,
       revokedRoomIds: state.revokedRoomIds,
       revokedTeamIds: state.revokedTeamIds,
-      selectedInviteAdmission: state.inviteByRoom[selectedRoom.id]?.admission
+      selectedInviteAdmission: selectedRoom ? state.inviteByRoom[selectedRoom.id]?.admission : undefined
     }))
   );
   const { refreshTeamMembers } = useTeamMembersRefresh({ selectedTeam });
@@ -92,7 +92,8 @@ export function useAppRelaySync({
         selectedTeam,
         selectedRoom,
         hasSelectedRoom,
-        inviteAdmissionsByRoom: selectedInviteAdmission ? { [selectedRoom.id]: selectedInviteAdmission } : {},
+        inviteAdmissionsByRoom:
+          selectedInviteAdmission && selectedRoom ? { [selectedRoom.id]: selectedInviteAdmission } : {},
         relayRef: appRefs.relayRef,
         seenEnvelopeIds: appRefs.seenEnvelopeIds,
         roomsRef: appRefs.roomsRef,

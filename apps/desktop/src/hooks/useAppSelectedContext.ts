@@ -19,7 +19,7 @@ export function useAppSelectedContext({
 }) {
   const selectedRoomContext = useSelectedRoomContext(roomContext);
   const markdownSelectionState = useMarkdownSelection({
-    activeRoomId: selectedRoomContext.selectedRoom.id,
+    activeRoomId: selectedRoomContext.selectedRoom?.id ?? "",
     enabled: selectedRoomContext.hasSelectedRoom,
     ...markdownSelection
   });

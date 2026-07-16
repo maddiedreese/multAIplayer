@@ -1,4 +1,3 @@
-import { emptyRoom } from "../../appDefaults";
 import type { AppStoreState } from "../../store/appStore";
 import type { BrowserRoomState } from "../../store/slices/browserSlice";
 import type { CodexRuntimeRoomState } from "../../store/slices/codexHostHandoffSlice";
@@ -19,10 +18,16 @@ const noMessages: NonNullable<AppStoreState["messagesByRoom"][string]> = [];
 const noBrowserRequests: NonNullable<NonNullable<AppStoreState["browserByRoom"][string]>["requests"]> = [];
 const noPreviews: NonNullable<NonNullable<AppStoreState["localPreviewByRoom"][string]>["previews"]> = [];
 
+function selectedRoomValue<T>(roomId: string | null, values: Record<string, T>): T | undefined {
+  if (!roomId) return undefined;
+  return values[roomId];
+}
+
 export function selectRoomInspectorView(state: AppStoreState) {
-  const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
+  const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? null;
+  const roomId = selectedRoom?.id ?? null;
   const selectedTeamId = state.selectedTeam;
-  const presenceState = state.historyPresenceByRoom[selectedRoom.id];
+  const presenceState = selectedRoomValue(roomId, state.historyPresenceByRoom);
   const {
     presence,
     inspectorTab = "files",
@@ -33,16 +38,16 @@ export function selectRoomInspectorView(state: AppStoreState) {
     currentUser: state.currentUser,
     authConfig: state.authConfig,
     selectedRoom,
-    hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
+    hasSelectedRoom: selectedRoom != null,
     selectedTeamId,
     selectedTeam: state.teams.find((team) => team.id === selectedTeamId) ?? null,
-    browser: state.browserByRoom[selectedRoom.id] ?? emptyBrowser,
-    codexRuntime: state.codexRuntimeByRoom[selectedRoom.id] ?? emptyCodexRuntime,
-    filePanel: state.filePanelByRoom[selectedRoom.id] ?? emptyFilePanel,
-    gitRuntime: state.gitWorkflowRuntimeByRoom[selectedRoom.id] ?? emptyGitRuntime,
-    invite: state.inviteByRoom[selectedRoom.id] ?? emptyInvite,
-    roomSettings: state.roomSettingsByRoom[selectedRoom.id] ?? emptyRoomSettings,
-    terminal: state.terminalRuntimeByRoom[selectedRoom.id] ?? emptyTerminal,
+    browser: selectedRoomValue(roomId, state.browserByRoom) ?? emptyBrowser,
+    codexRuntime: selectedRoomValue(roomId, state.codexRuntimeByRoom) ?? emptyCodexRuntime,
+    filePanel: selectedRoomValue(roomId, state.filePanelByRoom) ?? emptyFilePanel,
+    gitRuntime: selectedRoomValue(roomId, state.gitWorkflowRuntimeByRoom) ?? emptyGitRuntime,
+    invite: selectedRoomValue(roomId, state.inviteByRoom) ?? emptyInvite,
+    roomSettings: selectedRoomValue(roomId, state.roomSettingsByRoom) ?? emptyRoomSettings,
+    terminal: selectedRoomValue(roomId, state.terminalRuntimeByRoom) ?? emptyTerminal,
     terminals: state.terminals,
     teamRoster: state.teamRosterByTeam[selectedTeamId],
     presence,
@@ -69,26 +74,28 @@ export function selectRoomInspectorView(state: AppStoreState) {
 }
 
 export function selectRoomMainColumnView(state: AppStoreState) {
-  const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
-  const roomId = selectedRoom.id;
+  const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? null;
+  const roomId = selectedRoom?.id ?? null;
   return {
     teams: state.teams,
     selectedTeam: state.selectedTeam,
     selectedRoomId: state.selectedRoomId,
     selectedRoom,
-    hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
-    messages: state.messagesByRoom[roomId] ?? noMessages,
-    chat: state.roomChatByRoom[roomId],
-    settings: state.roomSettingsByRoom[roomId],
-    codex: state.codexRuntimeByRoom[roomId],
-    previews: state.localPreviewByRoom[roomId]?.previews ?? noPreviews,
-    fallback: state.filePanelByRoom[roomId]?.markdownCopyFallback ?? null,
-    inspectorTab: state.historyPresenceByRoom[roomId]?.inspectorTab ?? "files",
-    forgotten: state.forgottenRoomIds.has(roomId),
-    revoked: state.revokedRoomIds.has(roomId) || state.revokedTeamIds.has(selectedRoom.teamId),
+    hasSelectedRoom: selectedRoom != null,
+    messages: selectedRoomValue(roomId, state.messagesByRoom) ?? noMessages,
+    chat: selectedRoomValue(roomId, state.roomChatByRoom),
+    settings: selectedRoomValue(roomId, state.roomSettingsByRoom),
+    codex: selectedRoomValue(roomId, state.codexRuntimeByRoom),
+    previews: selectedRoomValue(roomId, state.localPreviewByRoom)?.previews ?? noPreviews,
+    fallback: selectedRoomValue(roomId, state.filePanelByRoom)?.markdownCopyFallback ?? null,
+    inspectorTab: selectedRoomValue(roomId, state.historyPresenceByRoom)?.inspectorTab ?? "files",
+    forgotten: roomId ? state.forgottenRoomIds.has(roomId) : false,
+    revoked: selectedRoom
+      ? state.revokedRoomIds.has(selectedRoom.id) || state.revokedTeamIds.has(selectedRoom.teamId)
+      : false,
     codexProbe: state.codexProbe,
     currentUser: state.currentUser,
-    browserRequests: state.browserByRoom[roomId]?.requests ?? noBrowserRequests
+    browserRequests: selectedRoomValue(roomId, state.browserByRoom)?.requests ?? noBrowserRequests
   };
 }
 
@@ -130,7 +137,8 @@ export function selectSidebarNavigationView(state: AppStoreState) {
 }
 
 export function selectSidebarDrawerView(state: AppStoreState) {
-  const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? state.rooms[0] ?? emptyRoom;
+  const selectedRoom = state.rooms.find((room) => room.id === state.selectedRoomId) ?? null;
+  const roomId = selectedRoom?.id ?? null;
   return {
     currentUser: state.currentUser,
     authBusy: state.authBusy,
@@ -139,7 +147,7 @@ export function selectSidebarDrawerView(state: AppStoreState) {
     deviceFlow: state.deviceFlow,
     selectedTeam: state.selectedTeam,
     selectedRoom,
-    hasSelectedRoom: state.rooms.some((room) => room.id === state.selectedRoomId),
+    hasSelectedRoom: selectedRoom != null,
     activeSidebarPanel: state.activeSidebarPanel,
     appConfig: state.appConfig,
     relayHttpDraft: state.relayHttpDraft,
@@ -152,15 +160,15 @@ export function selectSidebarDrawerView(state: AppStoreState) {
     forgottenRoomIds: state.forgottenRoomIds,
     revokedRoomIds: state.revokedRoomIds,
     revokedTeamIds: state.revokedTeamIds,
-    roomSettings: state.roomSettingsByRoom[selectedRoom.id] ?? emptyRoomSettings,
-    inviteApprovalGate: state.inviteByRoom[selectedRoom.id]?.approvalGate ?? true,
+    roomSettings: selectedRoomValue(roomId, state.roomSettingsByRoom) ?? emptyRoomSettings,
+    inviteApprovalGate: selectedRoomValue(roomId, state.inviteByRoom)?.approvalGate ?? true,
     historySettings: state.historySettings,
     teamHistorySettings: state.teamHistorySettings,
     teamDefaultApprovalPolicy: state.teamDefaultApprovalPolicy,
     teamDefaultCodexModel: state.teamDefaultCodexModel,
     teamDefaultBrowserProfilePersistent: state.teamDefaultBrowserProfilePersistent,
     teamDefaultInviteApprovalGate: state.teamDefaultInviteApprovalGate,
-    historyMessage: state.historyPresenceByRoom[selectedRoom.id]?.historyMessage ?? null,
+    historyMessage: selectedRoomValue(roomId, state.historyPresenceByRoom)?.historyMessage ?? null,
     teamHistoryMessage: state.teamHistoryByTeam[state.selectedTeam || "__no-team"]?.message ?? null,
     setActiveSidebarPanel: state.setActiveSidebarPanel,
     setRelayHttpDraft: state.setRelayHttpDraft,

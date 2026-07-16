@@ -13,6 +13,7 @@ import type { useLocalIdentity } from "./useLocalIdentity";
 import { useRoomRuntimeContext } from "./useRoomRuntimeContext";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 type AppRefs = ReturnType<typeof useAppRefs>;
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
@@ -23,6 +24,25 @@ type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
 type HostHandoffActions = ReturnType<typeof useAppHostHandoffActions>;
+
+function selectedRoomRuntimeKey(room: ClientRoomRecord | null) {
+  if (!room) return { roomId: null, teamId: "", projectPath: "" };
+  return { roomId: room.id, teamId: room.teamId, projectPath: room.projectPath };
+}
+
+function roomRuntimeSlices(state: ReturnType<typeof useAppStore.getState>, roomId: string | null) {
+  if (!roomId) return { chatEdits: undefined, chatDeletes: undefined, selectedLocalPreviews: undefined };
+  return {
+    chatEdits: state.chatEditsByRoom[roomId],
+    chatDeletes: state.chatDeletesByRoom[roomId],
+    selectedLocalPreviews: state.localPreviewByRoom[roomId]?.previews
+  };
+}
+
+function activeRoomMap<T>(roomId: string | null, value: T | undefined): Record<string, T> {
+  if (!roomId || value === undefined) return {};
+  return { [roomId]: value };
+}
 
 export function useAppRoomRuntime({
   appRefs,
@@ -68,7 +88,8 @@ export function useAppRoomRuntime({
     terminalBusy,
     selectedTerminalId
   } = selected;
-  const roomId = selectedRoom.id;
+  const roomSelection = selectedRoomRuntimeKey(selectedRoom);
+  const { roomId } = roomSelection;
   const {
     forgottenRoomIds,
     revokedRoomIds,
@@ -87,9 +108,7 @@ export function useAppRoomRuntime({
       selectedRoomId: state.selectedRoomId,
       terminals: state.terminals,
       historySettings: state.historySettings,
-      chatEdits: state.chatEditsByRoom[roomId],
-      chatDeletes: state.chatDeletesByRoom[roomId],
-      selectedLocalPreviews: state.localPreviewByRoom[roomId]?.previews
+      ...roomRuntimeSlices(state, roomId)
     }))
   );
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
@@ -141,7 +160,6 @@ export function useAppRoomRuntime({
           useAppStore.getState().untrustDeviceForRoom(targetRoomId, deviceId)
       },
       githubActions: {
-        hasSelectedRoom,
         selectedRoom,
         roomsRef: appRefs.roomsRef,
         actionsBusyRef: appRefs.actionsBusyRef,
@@ -173,8 +191,7 @@ export function useAppRoomRuntime({
       localHistoryPersistence: {
         hasSelectedRoom,
         selectedRoomId,
-        selectedRoomTeamId: selectedRoom.teamId,
-        selectedRoom,
+        selectedRoomTeamId: roomSelection.teamId,
         forgottenRoomIds,
         revokedRoomIds,
         revokedTeamIds,
@@ -198,7 +215,7 @@ export function useAppRoomRuntime({
         codexThreadGraph: selectedRuntime.codexThreadGraph
       },
       localPreviewPolling: {
-        localPreviewsByRoom: selectedLocalPreviews ? { [roomId]: selectedLocalPreviews } : {},
+        localPreviewsByRoom: activeRoomMap(roomId, selectedLocalPreviews),
         localUserId: localIdentity.localUser.id,
         roomsRef: appRefs.roomsRef,
         publishLocalPreviewEvent: relaySync.publishLocalPreviewEvent
@@ -206,33 +223,33 @@ export function useAppRoomRuntime({
       roomGitStatusRefresh: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: selectedRoom.id,
-        selectedRoomProjectPath: selectedRoom.projectPath
+        selectedRoomId: roomId ?? "",
+        selectedRoomProjectPath: roomSelection.projectPath
       },
       gitHubRemoteInference: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: selectedRoom.id,
-        selectedRoomProjectPath: selectedRoom.projectPath,
+        selectedRoomId: roomId ?? "",
+        selectedRoomProjectPath: roomSelection.projectPath,
         selectedRoomIdRef: appRefs.selectedRoomIdRef
       },
       gitHubActionsDraftReset: {
         hasSelectedRoom,
-        selectedRoomId: selectedRoom.id,
+        selectedRoomId: roomId ?? "",
         gitWorkflowDraft
       },
       projectFilesSearch: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: selectedRoom.id,
-        selectedRoomProjectPath: selectedRoom.projectPath,
+        selectedRoomId: roomId ?? "",
+        selectedRoomProjectPath: roomSelection.projectPath,
         fileQuery,
         localWorkspaceMessage: roomInteraction.localWorkspaceMessage
       },
       terminalLifecycle: {
         hasSelectedRoom,
         canReadLocalWorkspace: roomInteraction.canReadLocalWorkspace,
-        selectedRoomId: selectedRoom.id,
+        selectedRoomId: roomId ?? "",
         selectedTerminalId,
         selectedTerminalRunning: selectedRuntime.selectedTerminal?.running
       },
@@ -244,19 +261,20 @@ export function useAppRoomRuntime({
         isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
         terminalBusy,
         roomTerminalCount: roomTerminals.length,
-        selectedRoomId: selectedRoom.id,
+        selectedRoomId: roomId ?? "",
         terminalAutoOpenedRoomsRef
       },
       roomDraftCleanup: {
         hasSelectedRoom,
-        selectedRoomId: selectedRoom.id,
-        selectedRoomProjectPath: selectedRoom.projectPath,
+        selectedRoomId: roomId ?? "",
+        selectedRoomProjectPath: roomSelection.projectPath,
         selectedCodexModel
       }
     }
   });
 
   useEffect(() => {
+    if (!selectedRoom) return;
     if (!roomInteraction.isActiveHost) return;
     if (selectedRuntime.activeCodexApproval || selectedRuntime.codexRunning) return;
     if (selectedRuntime.queuedCodexApprovals.length === 0) return;
@@ -264,7 +282,7 @@ export function useAppRoomRuntime({
   }, [
     roomInteraction.isActiveHost,
     runtime,
-    selectedRoom.id,
+    selectedRoom,
     selectedRuntime.activeCodexApproval,
     selectedRuntime.codexRunning,
     selectedRuntime.queuedCodexApprovals

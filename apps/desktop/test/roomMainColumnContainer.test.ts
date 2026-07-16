@@ -98,6 +98,17 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+test("main-column container renders an explicit empty state until a real room is selected", () => {
+  useAppStore.getState().replaceRooms([]);
+  const view = render(createElement(RoomMainColumnContainer, { sources }));
+
+  assert.ok(view.getByText("Select or create a room to start collaborating."));
+  assert.equal(view.queryByLabelText("Room title"), null);
+
+  act(() => useAppStore.getState().replaceRooms(seededRooms));
+  assert.equal((view.getByLabelText("Room title") as HTMLInputElement).value, seededRooms[0]?.name);
+});
+
 test("main-column container reads and mutates selected-room state at its component boundary", () => {
   const view = render(createElement(RoomMainColumnContainer, { sources }));
 

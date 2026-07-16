@@ -8,7 +8,7 @@ import type { HostHandoffRecord } from "../types";
 import { buildAcceptedHandoffMessage, resolveHandoffProject } from "../application/handoff/hostHandoffProject";
 
 interface Options {
-  room: ClientRoomRecord;
+  room: ClientRoomRecord | null;
   handoffs: HostHandoffRecord[];
   localUserId: string;
   deviceId: string;
@@ -28,7 +28,9 @@ export function useFinalizeIncomingHostHandoff(options: Options): void {
   const latest = useRef(options);
   latest.current = options;
   const setContinuation = useAppStore((state) => state.setCodexContinuationForRoom);
-  const authorityVersion = `${options.room.id}:${options.room.hostStatus}:${options.room.hostUserId ?? ""}:${options.room.activeHostDeviceId ?? ""}:${options.localUserId}:${options.deviceId}`;
+  const authorityVersion = options.room
+    ? `${options.room.id}:${options.room.hostStatus}:${options.room.hostUserId ?? ""}:${options.room.activeHostDeviceId ?? ""}:${options.localUserId}:${options.deviceId}`
+    : "no-room";
   const handoffVersion = options.handoffs.map((handoff) => `${handoff.id}:${handoff.status}`).join("|");
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export function useFinalizeIncomingHostHandoff(options: Options): void {
     void handoffVersion;
     const current = latest.current;
     const { room } = current;
+    if (!room) return;
     if (
       room.hostStatus !== "active" ||
       room.hostUserId !== current.localUserId ||
@@ -59,6 +62,7 @@ async function finalize(
   handoff: HostHandoffRecord,
   setContinuation: (roomId: string, handoff: HostHandoffRecord | null) => void
 ): Promise<void> {
+  if (!options.room) return;
   const patch = createHandoffSettingsPatch(handoff);
   const project = await resolveHandoffProject(handoff, options.room.projectPath);
   const updated = await updateRoomSettings(options.room.id, {

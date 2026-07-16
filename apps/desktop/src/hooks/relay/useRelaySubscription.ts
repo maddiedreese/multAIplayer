@@ -44,7 +44,7 @@ interface UseRelaySubscriptionOptions {
   devicePublicKeyFingerprint?: string;
   deviceSessionToken: string;
   selectedTeam: string;
-  selectedRoom: ClientRoomRecord;
+  selectedRoom: ClientRoomRecord | null;
   hasSelectedRoom: boolean;
   inviteAdmissionsByRoom: Record<string, string | undefined>;
   relayRef: MutableRefObject<RelayClient | null>;
@@ -80,7 +80,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
     seenEnvelopeIds
   } = options;
   const latest = useLatestRef(options);
-  const selectedRoomInviteAdmission = inviteAdmissionsByRoom[selectedRoom.id];
+  const selectedRoomInviteAdmission = selectedRoom ? inviteAdmissionsByRoom[selectedRoom.id] : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -260,7 +260,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
             void pendingMlsOutboxRoomIds().then((roomIds) => {
               if (!isCurrent()) return;
               for (const roomId of roomIds) {
-                if (roomId === current.selectedRoom.id) continue;
+                if (roomId === current.selectedRoom?.id) continue;
                 store.setHostMessageForRoom(
                   roomId,
                   "This room has a durable MLS message awaiting delivery. Select the room while connected to retry it."
@@ -414,9 +414,9 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
     localUser.name,
     relayRef,
     seenEnvelopeIds,
-    selectedRoom.id,
+    selectedRoom?.id,
     selectedRoomInviteAdmission,
-    selectedRoom.teamId,
+    selectedRoom?.teamId,
     selectedTeam
   ]);
 }

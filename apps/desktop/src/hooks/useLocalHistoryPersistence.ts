@@ -8,7 +8,6 @@ import {
 } from "../application/history/localHistorySnapshot";
 import { reportNonFatal } from "../lib/core/nonFatalReporting";
 import type { TerminalSnapshot } from "../lib/platform/localBackend";
-import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type {
   BrowserAccessRequest,
   ChatMessage,
@@ -35,7 +34,6 @@ interface UseLocalHistoryPersistenceOptions {
   hasSelectedRoom: boolean;
   selectedRoomId: string;
   selectedRoomTeamId: string;
-  selectedRoom: ClientRoomRecord;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
@@ -63,7 +61,6 @@ export function useLocalHistoryPersistence({
   hasSelectedRoom,
   selectedRoomId,
   selectedRoomTeamId,
-  selectedRoom,
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
@@ -143,7 +140,6 @@ export function useLocalHistoryPersistence({
     codexThreadGraph,
     selectedRoomId,
     selectedRoomTeamId,
-    selectedRoom,
     terminalRequests
   ]);
 }

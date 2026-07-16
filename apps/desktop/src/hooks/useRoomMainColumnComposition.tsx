@@ -50,6 +50,7 @@ import {
   replyTargetDisplay
 } from "./roomMainColumnCompositionValues";
 import { useRoomMainColumnInteractions } from "./useRoomMainColumnInteractions";
+import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 type MainColumnProps = ComponentProps<typeof RoomMainColumn>;
 type HeaderProps = MainColumnProps["headerProps"];
@@ -116,13 +117,19 @@ export interface RoomMainColumnSources {
   chatActions: RoomPanels["roomChatPanelActions"];
 }
 
-export function useRoomMainColumnComposition({ sources }: { sources: RoomMainColumnSources }) {
+export function useRoomMainColumnComposition({
+  sources,
+  selectedRoom
+}: {
+  sources: RoomMainColumnSources;
+  selectedRoom: ClientRoomRecord;
+}) {
   const capabilities = useMemo(() => buildRoomMainColumnCapabilities(sources), [sources]);
   const {
     teams,
     selectedTeam,
     selectedRoomId,
-    selectedRoom,
+    selectedRoom: _storeSelectedRoom,
     hasSelectedRoom,
     messages,
     chat,

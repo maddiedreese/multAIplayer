@@ -19,8 +19,7 @@ import type { TerminalRuntimeByRoom } from "../store/slices/terminalSlice";
 import type { ChatAttachment, ChatMessage, MarkdownCopyFallback } from "../types";
 
 interface UseSelectedRoomValuesOptions {
-  selectedRoom: ClientRoomRecord;
-  selectedRoomId: string;
+  selectedRoom: ClientRoomRecord | null;
   selectedTeam: string;
   selectedMessageIds: string[];
   markdownSelectionMode: boolean;
@@ -41,7 +40,6 @@ interface UseSelectedRoomValuesOptions {
 
 export function useSelectedRoomValues({
   selectedRoom,
-  selectedRoomId,
   selectedTeam,
   selectedMessageIds,
   markdownSelectionMode,
@@ -59,7 +57,8 @@ export function useSelectedRoomValues({
   defaultBrowserUrl,
   defaultBrowserReason
 }: UseSelectedRoomValuesOptions) {
-  const roomId = selectedRoom.id ?? selectedRoomId;
+  const roomSelection = selectedRoomMetadata(selectedRoom);
+  const roomId = roomSelection.roomId;
   const { selectedCodexModel, selectedCodexReasoningEffort, selectedCodexSpeed, selectedCodexSandboxLevel } =
     selectCodexDefaults(selectedRoom);
   const sources = selectRoomValueSources(
@@ -98,7 +97,7 @@ export function useSelectedRoomValues({
     selectedCodexSandboxLevel,
     replyToMessageId,
     customCodexModel: roomSettings.customCodexModel ?? selectedCodexModel,
-    projectPathDraft: roomSettings.projectPathDraft ?? selectedRoom.projectPath,
+    projectPathDraft: roomSettings.projectPathDraft ?? roomSelection.projectPath,
     messages,
     draft: roomChat.draft ?? "",
     selectedMessages: markdownSelectionMode
@@ -122,6 +121,11 @@ export function useSelectedRoomValues({
     visibleHistoryMessage: historyMessage ?? teamHistoryMessage,
     markdownCopyFallback
   };
+}
+
+function selectedRoomMetadata(room: ClientRoomRecord | null) {
+  if (!room) return { roomId: "", projectPath: "" };
+  return { roomId: room.id, projectPath: room.projectPath };
 }
 
 function selectRoomValueSources(
@@ -152,12 +156,12 @@ function selectRoomValueSources(
   };
 }
 
-function selectCodexDefaults(room: ClientRoomRecord) {
+function selectCodexDefaults(room: ClientRoomRecord | null) {
   return {
-    selectedCodexModel: room.codexModel ?? defaultCodexModel,
-    selectedCodexReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
-    selectedCodexSpeed: room.codexSpeed ?? defaultCodexSpeed,
-    selectedCodexSandboxLevel: room.codexSandboxLevel ?? defaultCodexSandboxLevel
+    selectedCodexModel: room?.codexModel ?? defaultCodexModel,
+    selectedCodexReasoningEffort: room?.codexReasoningEffort ?? defaultCodexReasoningEffort,
+    selectedCodexSpeed: room?.codexSpeed ?? defaultCodexSpeed,
+    selectedCodexSandboxLevel: room?.codexSandboxLevel ?? defaultCodexSandboxLevel
   };
 }
 
