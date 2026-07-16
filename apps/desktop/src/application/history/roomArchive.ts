@@ -1,5 +1,5 @@
 import type { AppStoreState } from "../../store/appStore";
-import type { ChatAttachment, ChatMessage, LocalRoomHistoryPayload } from "../../types";
+import type { ChatAttachment, ChatMessage } from "../../types";
 import type { RoomArchiveBody } from "../../lib/platform/localBackend";
 import { normalizeLocalRoomHistory } from "../../lib/history/localRoomHistoryPayload";
 
@@ -66,7 +66,10 @@ export interface ReadOnlyRoomArchiveProjection {
 /** Converts untrusted decrypted JSON to the same bounded history types used by live local history. */
 export function projectReadOnlyRoomArchive(archive: RoomArchiveBody): ReadOnlyRoomArchiveProjection {
   const history = normalizeLocalRoomHistory({
-    version: 3,
+    // Archive version 1 is an explicitly lossy, user-editable interchange
+    // format. Keep its bounded sanitizing migration separate from strict v3
+    // encrypted-history recovery.
+    version: 2,
     messages: archive.history.messages,
     chatEdits: archive.history.chatEdits,
     chatDeletes: archive.history.chatDeletes,
@@ -83,7 +86,7 @@ export function projectReadOnlyRoomArchive(archive: RoomArchiveBody): ReadOnlyRo
     hostHandoffs: [],
     queuedCodexTurns: [],
     ...(archive.history.roomGoal ? { roomGoal: archive.history.roomGoal } : {})
-  } as unknown as LocalRoomHistoryPayload);
+  });
   return {
     roomName: archive.source.roomName,
     ...(archive.source.teamName ? { teamName: archive.source.teamName } : {}),

@@ -118,7 +118,7 @@ test("Codex account view renders native capabilities and dispatches account acti
 
 test("Monaco language selection covers the app's documented editing formats", () => {
   assert.equal(languageForPath("src/App.TSX"), "typescript");
-  assert.equal(languageForPath("Cargo.toml"), "toml");
+  assert.equal(languageForPath("Cargo.toml"), undefined);
   assert.equal(languageForPath("workflow.yaml"), "yaml");
   assert.equal(languageForPath("README.mdx"), "markdown");
   assert.equal(languageForPath("LICENSE"), undefined);
@@ -244,4 +244,20 @@ test("Monaco editor synchronizes external values, read-only state, edits, and di
   view.unmount();
   assert.equal(editorDisposed, 1);
   assert.equal(modelDisposed, 1);
+});
+
+test("Monaco editor exposes a retry when its lazy bundle fails to load", async () => {
+  let attempts = 0;
+  const loadMonaco = async () => {
+    attempts += 1;
+    throw new Error("chunk unavailable");
+  };
+  const view = render(
+    <MonacoFileEditor path="/src/app.ts" value="" disabled={false} onChange={() => undefined} loadMonaco={loadMonaco} />
+  );
+
+  const retry = await view.findByRole("button", { name: "Retry editor" });
+  assert.equal(attempts, 1);
+  fireEvent.click(retry);
+  await waitFor(() => assert.equal(attempts, 2));
 });

@@ -178,7 +178,6 @@ export function useAppRoomRuntime({
         forgottenRoomIds,
         revokedRoomIds,
         revokedTeamIds,
-        historyLoadedRoomIds: appRefs.historyLoadedRoomIds,
         historySettings,
         messages,
         chatEdits: chatEdits ?? [],

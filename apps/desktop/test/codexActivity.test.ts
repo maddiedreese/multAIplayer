@@ -3,7 +3,15 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CodexActivityTimelineView } from "../src/components/CodexActivityTimeline";
-import { emptyLocalRoomHistoryPayload, normalizeLocalRoomHistory } from "../src/lib/history/localRoomHistoryPayload";
+import {
+  emptyLocalRoomHistoryPayload,
+  maxLocalHistoryItemsPerContainer,
+  normalizeLocalRoomHistory,
+  normalizeRetainedLocalRoomHistory,
+  pruneLocalRoomHistory,
+  InvalidLocalRoomHistoryError,
+  UnsupportedLocalRoomHistoryVersionError
+} from "../src/lib/history/localRoomHistoryPayload";
 import { useAppStore } from "../src/store/appStore";
 import type { CodexActivity } from "../src/types";
 
@@ -70,6 +78,87 @@ test("local-history round trips omit absent optional state", () => {
   const roundTripped = normalizeLocalRoomHistory(JSON.parse(JSON.stringify({ ...empty, readState: undefined })));
   assert.equal(Object.hasOwn(roundTripped, "readState"), false);
   assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(roundTripped)), "readState"), false);
+});
+
+test("local-history normalization rejects non-objects and unknown schema versions", () => {
+  assert.throws(() => normalizeLocalRoomHistory(null), InvalidLocalRoomHistoryError);
+  assert.throws(() => normalizeLocalRoomHistory("not history"), InvalidLocalRoomHistoryError);
+  assert.throws(
+    () => normalizeRetainedLocalRoomHistory({ version: 99, messages: [{ body: "untrusted" }] }, 30),
+    UnsupportedLocalRoomHistoryVersionError
+  );
+});
+
+test("legacy local-history versions still sanitize malformed optional entries", () => {
+  const normalized = normalizeRetainedLocalRoomHistory(
+    {
+      version: 2,
+      messages: "not-an-array",
+      browserRequests: [null, { requestedAt: false }],
+      codexActivities: [{}],
+      readState: { lastReadAt: false }
+    },
+    30
+  );
+  assert.deepEqual(normalized.messages, []);
+  assert.deepEqual(normalized.browserRequests, []);
+  assert.deepEqual(normalized.codexActivities, []);
+  assert.deepEqual(normalized.readState, { unread: 0 });
+});
+
+test("current local-history schema fails closed on malformed required containers and entries", () => {
+  const current = emptyLocalRoomHistoryPayload();
+  assert.throws(
+    () => normalizeRetainedLocalRoomHistory({ ...current, messages: "not-an-array" }, 30),
+    InvalidLocalRoomHistoryError
+  );
+  assert.throws(
+    () => normalizeRetainedLocalRoomHistory({ ...current, browserRequests: [{}] }, 30),
+    InvalidLocalRoomHistoryError
+  );
+  assert.throws(
+    () =>
+      normalizeRetainedLocalRoomHistory(
+        { ...current, codexThreadGraph: { activeThreadId: "missing", nodesById: {} } },
+        30
+      ),
+    InvalidLocalRoomHistoryError
+  );
+});
+
+test("legacy local-history migration is recognized and container-bounded", () => {
+  assert.throws(() => normalizeLocalRoomHistory({}), InvalidLocalRoomHistoryError);
+  assert.throws(
+    () => normalizeLocalRoomHistory({ version: 2, messages: Array.from({ length: 10_001 }, () => null) }),
+    InvalidLocalRoomHistoryError
+  );
+  assert.equal(
+    normalizeLocalRoomHistory([{ id: "legacy", author: "Maddie", role: "human", body: "Migrated", time: "earlier" }])
+      .messages[0]?.id,
+    "legacy"
+  );
+});
+
+test("canonical history retains the newest bounded messages and round trips through strict v3", () => {
+  const createdAt = new Date().toISOString();
+  const payload = {
+    ...emptyLocalRoomHistoryPayload(),
+    messages: Array.from({ length: maxLocalHistoryItemsPerContainer + 1 }, (_, index) => ({
+      id: `message-${index}`,
+      author: "Maddie",
+      role: "human" as const,
+      body: `Message ${index}`,
+      time: createdAt,
+      createdAt
+    }))
+  };
+  const normalized = pruneLocalRoomHistory(payload, 30);
+  assert.equal(normalized.messages.length, maxLocalHistoryItemsPerContainer);
+  assert.equal(normalized.messages[0]?.id, "message-1");
+  assert.equal(
+    normalizeLocalRoomHistory(JSON.parse(JSON.stringify(normalized))).messages.length,
+    maxLocalHistoryItemsPerContainer
+  );
 });
 
 test("activity timeline renders safe lifecycle metadata", () => {

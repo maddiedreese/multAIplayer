@@ -50,6 +50,7 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
     presence,
     inspectorTab,
     historyMessage,
+    historyHydrationStatus,
     teamHistoryMessage,
     sensitiveAttachmentReviewKey,
     deviceIdentity,
@@ -284,6 +285,7 @@ export function useRoomInspectorComposition({ sources }: { sources: RoomInspecto
         teamDefaultBrowserProfilePersistent,
         teamDefaultInviteApprovalGate,
         message: historyMessage ?? teamHistoryMessage,
+        hydrationStatus: historyHydrationStatus,
         ...capabilities.history,
         onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent
       },

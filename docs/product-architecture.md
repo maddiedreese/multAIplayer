@@ -14,18 +14,18 @@ The alpha intentionally supports Apple-silicon macOS, GitHub identity, Codex app
 
 ## Repository map
 
-| Path | Owner |
-| --- | --- |
-| `apps/desktop` | React presentation, application workflows, and Tauri desktop shell |
-| `apps/desktop/src-tauri` | Native capability boundary, local integrations, and secure storage |
-| `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, invite cryptography, exporters, and encrypted state |
-| `apps/relay` | Authenticated HTTP/WebSocket routing, quotas, and SQLite persistence |
-| `packages/protocol` | Shared wire records and runtime validation |
-| `packages/codex` | Codex app-server adapter and compatibility contract |
-| `packages/git`, `packages/github` | Host-side repository and GitHub adapters |
-| `e2e` | UI contracts and multi-process desktop journeys |
-| `tools` | Focused verification, release, and maintenance utilities |
-| `docs/decisions` | Normative architecture decision records |
+| Path                                     | Owner                                                                |
+| ---------------------------------------- | -------------------------------------------------------------------- |
+| `apps/desktop`                           | React presentation, application workflows, and Tauri desktop shell   |
+| `apps/desktop/src-tauri`                 | Native capability boundary, local integrations, and secure storage   |
+| `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, invite cryptography, exporters, and encrypted state   |
+| `apps/relay`                             | Authenticated HTTP/WebSocket routing, quotas, and SQLite persistence |
+| `packages/protocol`                      | Shared wire records and runtime validation                           |
+| `packages/codex`                         | Codex app-server adapter and compatibility contract                  |
+| `packages/git`, `packages/github`        | Host-side repository and GitHub adapters                             |
+| `e2e`                                    | UI contracts and multi-process desktop journeys                      |
+| `tools`                                  | Focused verification, release, and maintenance utilities             |
+| `docs/decisions`                         | Normative architecture decision records                              |
 
 Imports are directional. Desktop code is split into pure domain/platform modules under `src/lib`, store-aware workflows under `src/application`, component-facing projections under `src/presentation`, and rendering under `src/components`. ESLint rules enforce the important layer and ownership boundaries.
 
@@ -52,6 +52,10 @@ A teammate request is projected for host review, then crosses a typed TypeScript
 
 Handoff is an authenticated state-machine transition. The current host prepares bounded continuity data, the intended successor accepts, and room authority changes only after the protocol completes. Live processes, unsaved application state, and credentials do not teleport; ordinary Git and backups remain the durable continuity mechanism.
 
+### Encrypted local history
+
+History hydration validates the current schema before enabling persistence and merges delayed relay activity with entity-specific monotonic rules. Canonical snapshots apply the same container bounds enforced by the loader, retain the newest entries, and are shared by ordinary saves and the all-eligible-room shutdown drain. Clear, forget, and membership-revocation cleanup serialize with pending writes; failed deletion replays the newest blocked snapshot, while rejoin remains gated until old MLS state is successfully removed.
+
 ## Where changes belong
 
 - Put shared wire shapes and runtime guards in `packages/protocol`.
@@ -75,6 +79,8 @@ npm run verify
 Pull requests run fast blocking checks and path-selected journeys. Scheduled workflows run expensive mutation, fuzz, supply-chain, compatibility, and native evidence. Releases additionally verify signing, notarization, updater metadata, SBOM publication, and artifact reproducibility. [CONTRIBUTING.md](../CONTRIBUTING.md) owns the current workflow and check policy.
 
 Generated evidence should be preferred over prose sentinels. A test that supports a threat-model claim emits a machine-readable claim record; CI then regenerates or verifies the evidence table. A green check must correspond to verification that actually executed.
+
+The desktop production build also inventories emitted web assets and enforces a 7 MiB total / 3 MiB per-file budget. Monaco is loaded only when the file editor opens, with the languages and workers the product uses. Update the budget only after documenting an intentional product need; do not raise it merely to absorb an accidental dependency or eager import.
 
 ## Contributor walkthrough
 

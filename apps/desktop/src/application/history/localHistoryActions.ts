@@ -12,8 +12,7 @@ import { loadTeamRoomDefaults, teamDefaultsRoomSettings } from "../../lib/team/t
 import { updateRoomSettings } from "../workspace/workspaceClient";
 import { roomLockMessage } from "../runtime/appRuntime";
 import { shouldApplyRoomScopedUiUpdate } from "../../lib/room/roomScopedUi";
-import { terminalsForLocalHistory } from "../../lib/terminal/terminalState";
-import { pruneLocalRoomHistory } from "../../lib/history/localRoomHistoryPayload";
+import { localHistoryPayloadForRoom } from "./localHistorySnapshot";
 import { clearRoomVisibilityWarningAcknowledgement } from "../../lib/history/roomVisibilityWarning";
 import { useAppStore } from "../../store/appStore";
 import { omitRecordKey } from "../../lib/core/setUtils";
@@ -30,7 +29,6 @@ interface CreateLocalHistoryActionsOptions {
   ) => boolean;
   replaceHistorySettings: (next: LocalHistorySettings) => void;
   replaceRoom: (room: ClientRoomRecord) => void;
-  historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
 
 export function createLocalHistoryActions({
@@ -38,8 +36,7 @@ export function createLocalHistoryActions({
   settingsBusyRef,
   reportRoomSettingsMutationInFlight,
   replaceHistorySettings,
-  replaceRoom,
-  historyLoadedRoomIds
+  replaceRoom
 }: CreateLocalHistoryActionsOptions) {
   const currentSelectedRoom = () => {
     const state = useAppStore.getState();
@@ -72,7 +69,7 @@ export function createLocalHistoryActions({
     }
     replaceHistorySettings(saved);
     if (saved.enabled) {
-      const payload = localHistoryPayloadForRoom(roomId, saved.retentionDays);
+      const payload = localHistoryPayloadForRoom(useAppStore.getState(), roomId, saved.retentionDays);
       useAppStore.getState().hydrateLocalRoomHistoryForRoom(roomId, payload);
     }
     setHistoryMessageForRoom(
@@ -142,9 +139,15 @@ export function createLocalHistoryActions({
       return;
     }
     const roomId = selectedRoom.id;
-    await clearEncryptedHistory(selectedRoom.id);
-    useAppStore.getState().clearRoomScopedStateForRoom(roomId);
-    setHistoryMessageForRoom(roomId, "Cleared encrypted local history for this room.");
+    try {
+      await clearEncryptedHistory(selectedRoom.id);
+      const store = useAppStore.getState();
+      store.clearRoomScopedStateForRoom(roomId);
+      store.setHistoryHydrationStatusForRoom(roomId, "ready");
+      setHistoryMessageForRoom(roomId, "Cleared encrypted local history for this room.");
+    } catch (error) {
+      reportHistoryMutationFailure(roomId, "Encrypted local history could not be cleared", error);
+    }
   }
 
   async function forgetSelectedRoomLocalData() {
@@ -158,13 +161,25 @@ export function createLocalHistoryActions({
       `Forget ${selectedRoom.name} on this device?\n\nThis deletes local history, room settings, and this device's room access. You will need a fresh invite or host approval to read or send room messages again.`
     );
     if (!confirmed) return;
-    await forgetRoomLocalData(selectedRoom.id);
+    try {
+      await forgetRoomLocalData(selectedRoom.id);
+    } catch (error) {
+      reportHistoryMutationFailure(roomId, "This room could not be forgotten on this device", error);
+      return;
+    }
     clearRoomVisibilityWarningAcknowledgement(selectedRoom.id);
-    historyLoadedRoomIds.current.delete(selectedRoom.id);
+    useAppStore.getState().setHistoryHydrationStatusForRoom(selectedRoom.id, undefined);
     useAppStore.getState().rememberForgottenRoom(selectedRoom.id);
     useAppStore.getState().clearRoomScopedStateForRoom(roomId);
     replaceHistorySettings(loadHistorySettings(selectedRoom.id));
     useAppStore.getState().setSecretWarningVisibleForRoom(selectedRoom.id, true);
+    const workspaceError = useAppStore.getState().workspaceError;
+    if (
+      workspaceError?.includes(`Access to ${selectedRoom.name} was removed`) &&
+      workspaceError.includes("could not delete")
+    ) {
+      useAppStore.getState().setWorkspaceStatusError(null);
+    }
     setHistoryMessageForRoom(roomId, "Forgot this room on this device. Rejoin from an invite to unlock it again.");
   }
 
@@ -176,41 +191,7 @@ export function createLocalHistoryActions({
   };
 }
 
-function localHistoryPayloadForRoom(roomId: string, retentionDays: number) {
-  const store = useAppStore.getState();
-  const codexRuntime = store.codexRuntimeByRoom[roomId] ?? {};
-  const gitRuntime = store.gitWorkflowRuntimeByRoom[roomId] ?? {};
-  return pruneLocalRoomHistory(
-    {
-      version: 3,
-      messages: store.messagesByRoom[roomId] ?? [],
-      terminalRequests: store.terminalRuntimeByRoom[roomId]?.requests ?? [],
-      fileSaveRequests: store.filePanelByRoom[roomId]?.saveRequests ?? [],
-      browserRequests: store.browserByRoom[roomId]?.requests ?? [],
-      inviteRequests: store.inviteByRoom[roomId]?.requests ?? [],
-      ...codexHistoryFields(codexRuntime),
-      ...gitHistoryFields(gitRuntime),
-      localPreviews: store.localPreviewByRoom[roomId]?.previews ?? [],
-      terminalSnapshots: terminalsForLocalHistory(store.terminals.filter((terminal) => terminal.roomId === roomId))
-    },
-    retentionDays
-  );
-}
-
-function codexHistoryFields(codexRuntime: ReturnType<typeof useAppStore.getState>["codexRuntimeByRoom"][string]) {
-  const codexThreadGraph = codexRuntime.threadGraph ?? { activeThreadId: null, nodesById: {} };
-  return {
-    codexEvents: codexRuntime.events ?? [],
-    codexActivities: codexRuntime.activities ?? [],
-    hostHandoffs: codexRuntime.hostHandoffs ?? [],
-    ...(codexRuntime.goal ? { roomGoal: codexRuntime.goal } : {}),
-    ...(codexThreadGraph.activeThreadId ? { codexThreadGraph } : {})
-  };
-}
-
-function gitHistoryFields(gitRuntime: ReturnType<typeof useAppStore.getState>["gitWorkflowRuntimeByRoom"][string]) {
-  return {
-    gitWorkflowEvents: gitRuntime.workflow?.events ?? [],
-    githubActionsEvents: gitRuntime.actions?.events ?? []
-  };
+function reportHistoryMutationFailure(roomId: string, message: string, error: unknown): void {
+  const detail = error instanceof Error ? error.message : String(error);
+  useAppStore.getState().setHistoryMessageForRoom(roomId, `${message}: ${detail}`);
 }

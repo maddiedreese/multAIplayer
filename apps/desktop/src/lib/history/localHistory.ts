@@ -1,6 +1,8 @@
 import { invokeNative } from "../platform/nativeCommandError";
 import { createMlsGroup, setMlsHistoryRetention } from "../mls/mlsClient";
 import { reportNonFatal } from "../core/nonFatalReporting";
+import { LocalHistoryWriteQueue } from "./localHistoryWriteQueue";
+import { runRoomLocalDataCleanup } from "../core/roomLocalDataCleanup";
 
 const defaultRetentionDays = 30;
 
@@ -20,7 +22,7 @@ export async function loadEncryptedHistory<T>(roomId: string): Promise<T | null>
 export async function saveEncryptedHistory(roomId: string, value: unknown): Promise<void> {
   const settings = loadHistorySettings(roomId);
   if (!settings.enabled) {
-    await clearEncryptedHistory(roomId);
+    await deleteEncryptedHistoryNow(roomId);
     return;
   }
   await invokeNative<number>("mls_history_save", {
@@ -29,12 +31,36 @@ export async function saveEncryptedHistory(roomId: string, value: unknown): Prom
 }
 
 export async function clearEncryptedHistory(roomId: string): Promise<void> {
-  await invokeNative("mls_history_delete_all", { request: { roomId } });
+  await historyWriteQueue.withBarrier(roomId, () => deleteEncryptedHistoryNow(roomId));
 }
 
 export async function forgetRoomLocalData(roomId: string): Promise<void> {
-  await invokeNative("mls_room_local_data_delete", { request: { roomId } });
-  localStorage.removeItem(settingsKey(roomId));
+  await runRoomLocalDataCleanup(roomId, () =>
+    historyWriteQueue.withBarrier(roomId, async () => {
+      await invokeNative("mls_room_local_data_delete", { request: { roomId } });
+      localStorage.removeItem(settingsKey(roomId));
+    })
+  );
+}
+
+const historyWriteQueue = new LocalHistoryWriteQueue(saveEncryptedHistory);
+
+/** Serializes each room's native writes and coalesces bursts to the newest snapshot. */
+export function queueEncryptedHistorySave(
+  roomId: string,
+  value: unknown,
+  onError: (error: unknown) => void,
+  onSuccess?: () => void
+): void {
+  historyWriteQueue.queue(roomId, value, onError, onSuccess);
+}
+
+export async function flushEncryptedHistorySaves(roomId?: string): Promise<void> {
+  await historyWriteQueue.flush(roomId);
+}
+
+async function deleteEncryptedHistoryNow(roomId: string): Promise<void> {
+  await invokeNative("mls_history_delete_all", { request: { roomId } });
 }
 
 export function loadHistorySettings(roomId: string): LocalHistorySettings {

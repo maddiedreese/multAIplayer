@@ -151,8 +151,8 @@ pub(crate) fn open_browser_view(
         .data_directory(profile_dir.clone())
         .initialization_script_for_all_frames(ROOM_BROWSER_GUARD_SCRIPT)
         .on_download(|_webview, event| match event {
-            DownloadEvent::Requested { url, .. } => {
-                eprintln!("Blocked multAIplayer room browser download: {url}");
+            DownloadEvent::Requested { .. } => {
+                eprintln!("Blocked a multAIplayer room browser download");
                 false
             }
             DownloadEvent::Finished { .. } => true,

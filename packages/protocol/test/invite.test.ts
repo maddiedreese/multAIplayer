@@ -107,3 +107,16 @@ test("publish errors correlate to one pending MLS message", () => {
     true
   );
 });
+
+test("relay errors can identify the affected team and room", () => {
+  assert.equal(
+    RelayServerMessage.safeParse({
+      type: "error",
+      message: "membership removed",
+      code: "membership_removed",
+      teamId: "team-core",
+      roomId: "room-core"
+    }).success,
+    true
+  );
+});
