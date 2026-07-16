@@ -19,7 +19,7 @@ Object.defineProperty(globalThis, "React", { configurable: true, value: React })
 const { cleanup, fireEvent, render, waitFor } = await import("@testing-library/react");
 const { BrowserAccessPanel } = await import("../src/components/BrowserAccessPanel");
 const { CodexAccountPanelView } = await import("../src/components/CodexAccountPanel");
-const { languageForPath, MonacoFileEditor } = await import("../src/components/MonacoFileEditor");
+const { languageForPath, MonacoFileEditor, workerKindForLabel } = await import("../src/components/MonacoFileEditor");
 const { WorkspaceFilesPanel } = await import("../src/components/WorkspaceFilesPanel");
 type CodexAccountController = import("../src/hooks/useCodexAccount").CodexAccountController;
 type WorkspaceFilesPanelProps = import("../src/components/workspaceFilesPanelTypes").WorkspaceFilesPanelProps;
@@ -207,12 +207,27 @@ test("Codex account view renders native capabilities and dispatches account acti
   assert.match(view.getByText("Drive").parentElement?.textContent ?? "", /Sign-in needed/);
 });
 
-test("Monaco language selection covers the app's documented editing formats", () => {
+test("Monaco routes supported files and language services to their complete implementations", () => {
   assert.equal(languageForPath("src/App.TSX"), "typescript");
+  assert.equal(languageForPath("src/legacy.cjs"), "javascript");
+  assert.equal(languageForPath("styles/theme.scss"), "scss");
+  assert.equal(languageForPath("styles/tokens.less"), "less");
+  assert.equal(languageForPath("views/card.hbs"), "handlebars");
+  assert.equal(languageForPath("views/page.cshtml"), "razor");
+  assert.equal(languageForPath("config.jsonc"), "json");
   assert.equal(languageForPath("Cargo.toml"), undefined);
   assert.equal(languageForPath("workflow.yaml"), "yaml");
   assert.equal(languageForPath("README.mdx"), "markdown");
   assert.equal(languageForPath("LICENSE"), undefined);
+
+  assert.equal(workerKindForLabel("typescript"), "typescript");
+  assert.equal(workerKindForLabel("javascript"), "typescript");
+  assert.equal(workerKindForLabel("scss"), "css");
+  assert.equal(workerKindForLabel("less"), "css");
+  assert.equal(workerKindForLabel("handlebars"), "html");
+  assert.equal(workerKindForLabel("razor"), "html");
+  assert.equal(workerKindForLabel("json"), "json");
+  assert.equal(workerKindForLabel("markdown"), "editor");
 });
 
 test("workspace files switch between project lists and a diff-only viewer without losing actions", () => {

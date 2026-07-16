@@ -66,7 +66,6 @@ test("accepted hosted-account deletion is reported as protected and pending clea
         deviceIdentityMessage={null}
         relaySessionPersistence="Encrypted"
         codexAccountPanel={null}
-        onRotateDeviceIdentity={() => undefined}
         onHostedAccountDeleted={() => {
           deleted += 1;
         }}
@@ -74,6 +73,7 @@ test("accepted hosted-account deletion is reported as protected and pending clea
         onSignOut={() => undefined}
       />
     );
+    assert.equal(view.queryByRole("button", { name: "Reset device identity" }), null);
 
     fireEvent.click(view.getByRole("button", { name: "Delete hosted account data" }));
     const confirmation = view.getByLabelText(/Type delete my account to confirm/) as HTMLInputElement;

@@ -33,7 +33,7 @@ GitHub sign-in is used for identity, draft pull requests, and GitHub Actions rea
 
 GitHub sign-in opens the operating system's default browser at GitHub's device-verification page and displays the short user code in the app. There is no redirect URI back to multAIplayer; the native app polls GitHub and the app observes completion. ChatGPT sign-in is a different browser or device-code flow owned by the local Codex app-server. Neither provider's credentials are exchanged with the other.
 
-Each desktop install has a device identity used for encrypted invite approval and room-key delivery. The profile drawer shows the local device id and public key fingerprint. Resetting the device identity creates a new local device key, which can make other room members see the device as untrusted until they review the new fingerprint.
+Each desktop install has a device identity used for encrypted invite approval and room-key delivery. The profile drawer shows the local device id and public key fingerprint.
 
 `Save diagnostics` opens the system save dialog in the native app. Rust validates and re-redacts the owner-only diagnostic records, assembles the JSON bundle, and writes it directly to the selected file; stored entries and bundle contents are never returned to the webview. Capture-redacted warning/error entries are retained for up to seven days, 256 KiB, or 500 entries, whichever bound is reached first. The bundle is designed to exclude transcripts, room secrets, terminal output, browser contents, file contents, invite fragments, and GitHub tokens. Review the saved bundle before attaching it to an issue. Browser builds show only a native-app notice and expose no diagnostics action.
 

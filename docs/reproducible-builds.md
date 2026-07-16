@@ -59,13 +59,16 @@ original source commit.
 
 An independent source build remains useful for investigation, but it is not an
 automated release eligibility claim. Use a clean macOS environment and the exact
-tag under review:
+tag under review. Replace the placeholder below with a tag that the GitHub
+Releases page identifies as a supported release; the documentation deliberately
+does not pin this procedure to an obsolete prerelease tag.
 
 ```bash
 git clone https://github.com/maddiedreese/multAIplayer.git
 cd multAIplayer
 git fetch --tags --force
-git checkout --detach v0.1.0-alpha.0
+RELEASE_TAG="replace-with-a-supported-release-tag"
+git checkout --detach "$RELEASE_TAG"
 git status --porcelain
 npm install --global npm@11.16.0 --ignore-scripts
 npm ci

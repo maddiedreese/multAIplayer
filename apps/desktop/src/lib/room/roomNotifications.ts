@@ -2,6 +2,7 @@ import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { MutableRefObject } from "react";
 import type { ChatMessage } from "../../types";
 import { reportNonFatal } from "../core/nonFatalReporting";
+import { isTauriRuntime } from "../platform/localBackend/runtime";
 
 const maxNotificationBodyChars = 180;
 
@@ -27,10 +28,6 @@ export type RoomNotificationSuppressionReason =
 
 export type RoomNotificationEligibility =
   { eligible: true } | { eligible: false; reason: RoomNotificationSuppressionReason };
-
-function isTauriRuntime(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
 
 function compactPreviewText(value: string): string {
   return value.replace(/\s+/g, " ").trim();

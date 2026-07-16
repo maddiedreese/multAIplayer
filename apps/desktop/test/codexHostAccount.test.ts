@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   createCoalescedAsyncTask,
@@ -7,62 +6,6 @@ import {
 } from "../src/lib/platform/localBackend/codexHostBackend";
 import { projectCodexAccountReadiness } from "../src/hooks/useCodexAccount";
 import type { CodexHostSnapshot } from "../src/lib/platform/localBackend";
-
-const repoRoot = new URL("../../..", import.meta.url);
-
-async function source(path: string) {
-  return readFile(new URL(path, repoRoot), "utf8");
-}
-
-test("Codex account controls stay in a host-local backend and out of relay/history paths", async () => {
-  const [native, projection, backend, panel, controller] = await Promise.all([
-    source("apps/desktop/src-tauri/src/codex_account.rs"),
-    source("apps/desktop/src-tauri/src/codex_request_projection.rs"),
-    source("apps/desktop/src/lib/platform/localBackend/codexHostBackend.ts"),
-    source("apps/desktop/src/components/CodexAccountPanel.tsx"),
-    source("apps/desktop/src/hooks/useCodexAccount.tsx")
-  ]);
-
-  assert.match(native, /stderr\(Stdio::null\(\)\)/);
-  assert.match(projection, /account\/chatgptAuthTokens\/refresh/);
-  assert.match(native, /Unsupported in host-control session/);
-  assert.match(native, /sanitize_notification/);
-  assert.doesNotMatch(backend, /relay|appendRoom|localStorage|sessionStorage|diagnostic/i);
-  assert.doesNotMatch(panel, /relay|appendRoom|localStorage|sessionStorage|diagnostic/i);
-  assert.doesNotMatch(controller, /relay|appendRoom|localStorage|sessionStorage|diagnostic/i);
-  assert.match(controller, /Credentials remain in Codex on this device/);
-});
-
-test("Codex host UI exposes browser and device login, MCP status, and gated writes approval", async () => {
-  const [panel, currentManifest, previousManifest] = await Promise.all([
-    source("apps/desktop/src/components/CodexAccountPanel.tsx"),
-    source("contracts/codex-app-server/0.144.0.json").then(JSON.parse),
-    source("contracts/codex-app-server/0.143.0.json").then(JSON.parse)
-  ]);
-
-  assert.match(panel, /Sign in with ChatGPT/);
-  assert.match(panel, /Use device code/);
-  assert.match(panel, /MCP servers/);
-  assert.match(panel, /supportsWritesApproval/);
-  assert.match(panel, /Prompt for writes/);
-  assert.ok(currentManifest.appToolApprovalModes.includes("writes"));
-  assert.ok(!previousManifest.appToolApprovalModes.includes("writes"));
-});
-
-test("host notifications refresh the shared local account controller without entering the app store", async () => {
-  const [panel, controller, app] = await Promise.all([
-    source("apps/desktop/src/components/CodexAccountPanel.tsx"),
-    source("apps/desktop/src/hooks/useCodexAccount.tsx"),
-    source("apps/desktop/src/App.tsx")
-  ]);
-  assert.match(controller, /listenForCodexHostNotifications/);
-  assert.match(controller, /account\/login\/completed/);
-  assert.match(controller, /mcpServer\/oauthLogin\/completed/);
-  assert.doesNotMatch(controller, /useAppStore|publishRoom|roomId/);
-  assert.match(panel, /useCodexAccount\(\)/);
-  assert.match(app, /<CodexAccountProvider>/);
-  assert.equal(app.match(/<CodexAccountProvider>/g)?.length, 1);
-});
 
 test("Codex host refreshes coalesce bursts and never overlap", async () => {
   let calls = 0;

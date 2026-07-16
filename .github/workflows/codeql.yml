@@ -18,17 +18,24 @@ permissions:
 
 jobs:
   analyze:
-    name: JavaScript and TypeScript
+    name: ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript-typescript, rust]
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Initialize CodeQL
         uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
+          build-mode: none
           config-file: ./.github/codeql-config.yml
-          languages: javascript-typescript
+          languages: ${{ matrix.language }}
           queries: security-extended
       - name: Analyze production code
         uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        with:
+          category: "/language:${{ matrix.language }}"

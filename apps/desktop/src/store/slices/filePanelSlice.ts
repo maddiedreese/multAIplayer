@@ -20,18 +20,6 @@ export interface FilePanelRoomState {
 
 export type FilePanelByRoom = Record<string, FilePanelRoomState>;
 
-export interface FilePanelMaps {
-  fileQueriesByRoom: Record<string, string>;
-  projectFilesByRoom: Record<string, ProjectFileEntry[]>;
-  selectedFilesByRoom: Record<string, ProjectFileContent | null>;
-  selectedDiffsByRoom: Record<string, GitDiffResult | null>;
-  filePreviewTabsByRoom: Record<string, FilePreviewTab>;
-  fileBusyByRoom: Record<string, boolean>;
-  fileMessagesByRoom: Record<string, string | null>;
-  markdownCopyFallbacksByRoom: Record<string, MarkdownCopyFallback | null>;
-  fileSaveRequestsByRoom: Record<string, WorkspaceFileSaveRequest[]>;
-}
-
 function shallowEqualFilePanelRoomState(left: FilePanelRoomState, right: FilePanelRoomState): boolean {
   const leftKeys = Object.keys(left) as Array<keyof FilePanelRoomState>;
   const rightKeys = Object.keys(right) as Array<keyof FilePanelRoomState>;
@@ -48,56 +36,6 @@ function updateFilePanelForRoom(
   if (shallowEqualFilePanelRoomState(currentRoomPanel, nextRoomPanel)) return current;
   if (Object.keys(nextRoomPanel).length === 0) return roomId in current ? omitRecordKey(current, roomId) : current;
   return { ...current, [roomId]: nextRoomPanel };
-}
-
-export function projectFilePanelMaps(filePanelByRoom: FilePanelByRoom): FilePanelMaps {
-  return {
-    fileQueriesByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.query)
-        .map(([roomId, panel]) => [roomId, panel.query ?? ""])
-    ),
-    projectFilesByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.projectFiles)
-        .map(([roomId, panel]) => [roomId, panel.projectFiles ?? []])
-    ),
-    selectedFilesByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.selectedFile)
-        .map(([roomId, panel]) => [roomId, panel.selectedFile ?? null])
-    ),
-    selectedDiffsByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.selectedDiff)
-        .map(([roomId, panel]) => [roomId, panel.selectedDiff ?? null])
-    ),
-    filePreviewTabsByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.previewTab)
-        .map(([roomId, panel]) => [roomId, panel.previewTab ?? "file"])
-    ),
-    fileBusyByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.busy)
-        .map(([roomId]) => [roomId, true])
-    ),
-    fileMessagesByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.message)
-        .map(([roomId, panel]) => [roomId, panel.message ?? null])
-    ),
-    markdownCopyFallbacksByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.markdownCopyFallback)
-        .map(([roomId, panel]) => [roomId, panel.markdownCopyFallback ?? null])
-    ),
-    fileSaveRequestsByRoom: Object.fromEntries(
-      Object.entries(filePanelByRoom)
-        .filter(([, panel]) => panel.saveRequests)
-        .map(([roomId, panel]) => [roomId, panel.saveRequests ?? []])
-    )
-  };
 }
 
 export interface FilePanelSlice {

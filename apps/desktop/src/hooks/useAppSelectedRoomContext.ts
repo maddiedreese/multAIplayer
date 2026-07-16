@@ -54,7 +54,6 @@ export function useAppSelectedRoomContext({
     teams,
     selectedRoomId,
     selectedTeam,
-    roomId,
     teamRoster,
     messages,
     roomChat,
@@ -78,8 +77,8 @@ export function useAppSelectedRoomContext({
     roomContext: {
       rooms,
       selectedRoomId,
-      inspectorTabsByRoom: activeMap(roomId, historyPresence?.inspectorTab),
-      secretWarningsVisibleByRoom: activeMap(roomId, codexRuntime?.secretWarningVisible),
+      inspectorTab: historyPresence?.inspectorTab,
+      secretWarningVisible: codexRuntime?.secretWarningVisible,
       terminals
     },
     markdownSelection: {
@@ -95,24 +94,19 @@ export function useAppSelectedRoomContext({
       localUserId: localIdentity.localUser.id
     },
     roomValues: {
-      selectedTeam,
-      roomSettingsByRoom: activeMap(roomId, roomSettings),
-      messagesByRoom: activeMap(roomId, messages),
-      roomChatByRoom: activeMap(roomId, roomChat),
-      codexRuntimeByRoom: activeMap(roomId, codexRuntime),
-      browserByRoom: activeMap(roomId, browser),
-      gitWorkflowRuntimeByRoom: activeMap(roomId, gitRuntime),
-      terminalRuntimeByRoom: activeMap(roomId, terminalRuntime),
-      filePanelByRoom: activeMap(roomId, filePanel),
-      inviteByRoom: activeMap(roomId, invite),
-      historyMessagesByRoom: activeMap(roomId, historyPresence?.historyMessage ?? null),
-      teamHistoryMessagesByTeam: activeMap(selectedTeam, teamHistory?.message ?? null),
+      roomSettings,
+      messages,
+      roomChat,
+      codexRuntime,
+      browser,
+      gitRuntime,
+      terminalRuntime,
+      filePanel,
+      invite,
+      historyMessage: historyPresence?.historyMessage,
+      teamHistoryMessage: teamHistory?.message,
       defaultBrowserUrl,
       defaultBrowserReason
     }
   });
-}
-
-function activeMap<T>(key: string | null, value: T | null | undefined): Record<string, T> {
-  return key == null || value == null ? {} : { [key]: value };
 }

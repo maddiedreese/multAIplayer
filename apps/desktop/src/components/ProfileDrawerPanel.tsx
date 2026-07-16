@@ -27,7 +27,6 @@ export function ProfileDrawerPanel({
   relaySessionPersistence,
   codexAccountPanel = <CodexAccountPanel />,
   archivePanel,
-  onRotateDeviceIdentity,
   onHostedAccountDeleted,
   onSignIn,
   onSignOut
@@ -43,7 +42,6 @@ export function ProfileDrawerPanel({
   relaySessionPersistence: string;
   codexAccountPanel?: ReactNode;
   archivePanel?: ReactNode;
-  onRotateDeviceIdentity: () => void;
   onHostedAccountDeleted: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
@@ -127,9 +125,6 @@ export function ProfileDrawerPanel({
         deviceIdentity={deviceIdentity}
       />
 
-      <button className="ghost-wide" onClick={onRotateDeviceIdentity}>
-        Reset device identity
-      </button>
       {deviceIdentityMessage && <div className="workflow-message">{deviceIdentityMessage}</div>}
 
       <button className="ghost-wide" onClick={exportDiagnostics}>

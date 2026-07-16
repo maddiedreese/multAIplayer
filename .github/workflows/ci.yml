@@ -61,7 +61,7 @@ jobs:
           node tools/release/relay-runtime-dependency-closure.mjs \
             check-tree node_modules "$RUNNER_TEMP/relay-production-tree.json"
       - name: Verify web, relay, and packages
-        run: npm run lint && npm run format:check && npm run test:release-tools && npm run build:packages && npm run test:workspaces && npm run build:apps
+        run: npm run lint && npm run format:check && npm run check:security-exceptions && npm run test:release-tools && npm run build:packages && npm run test:workspaces && npm run build:apps
 
   native-core:
     name: Native formatting, lints, and tests

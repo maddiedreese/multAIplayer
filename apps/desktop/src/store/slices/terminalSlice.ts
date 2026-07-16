@@ -9,7 +9,6 @@ type TerminalLinesByRoom = Record<string, string[]>;
 type TerminalBusyByRoom = Record<string, boolean>;
 type Terminals = TerminalSnapshot[];
 type TerminalRequestsByRoom = Record<string, TerminalCommandRequest[]>;
-type SelectedTerminalIdsByRoom = Record<string, string | null>;
 
 export interface TerminalRoomUiState {
   error?: string;
@@ -44,14 +43,6 @@ function updateTerminalUiForRoomState(
   return Object.keys(nextUi).length > 0 ? { ...rest, ui: nextUi } : rest;
 }
 
-export function projectTerminalRuntimeLinesByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalLinesByRoom {
-  return Object.fromEntries(
-    Object.entries(terminalRuntimeByRoom)
-      .filter(([, terminal]) => terminal.lines)
-      .map(([roomId, terminal]) => [roomId, terminal.lines ?? []])
-  );
-}
-
 export function projectTerminalRuntimeBusyByRoom(terminalRuntimeByRoom: TerminalRuntimeByRoom): TerminalBusyByRoom {
   return Object.fromEntries(
     Object.entries(terminalRuntimeByRoom)
@@ -67,16 +58,6 @@ export function projectTerminalRuntimeRequestsByRoom(
     Object.entries(terminalRuntimeByRoom)
       .filter(([, terminal]) => terminal.requests)
       .map(([roomId, terminal]) => [roomId, terminal.requests ?? []])
-  );
-}
-
-export function projectSelectedTerminalRuntimeIdsByRoom(
-  terminalRuntimeByRoom: TerminalRuntimeByRoom
-): SelectedTerminalIdsByRoom {
-  return Object.fromEntries(
-    Object.entries(terminalRuntimeByRoom)
-      .filter(([, terminal]) => terminal.selectedTerminalId)
-      .map(([roomId, terminal]) => [roomId, terminal.selectedTerminalId ?? null])
   );
 }
 

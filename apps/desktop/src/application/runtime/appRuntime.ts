@@ -1,6 +1,7 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import type { ThemeMode } from "../../lib/core/uiTypes";
 import { membershipRemovedRoomMessage } from "../../lib/relay/relayAccess";
+import { isTauriRuntime } from "../../lib/platform/localBackend/runtime";
 
 export function loadOrCreateDeviceId(): string {
   if (typeof localStorage === "undefined") return "device-nonbrowser-runtime";
@@ -26,8 +27,4 @@ export function roomLockMessage(room: ClientRoomRecord, revoked: boolean): strin
 
 export function mlsStateStorageLabel(): string {
   return isTauriRuntime() ? "encrypted native MLS store" : "unavailable outside the native app";
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }

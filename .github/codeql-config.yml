@@ -1,4 +1,4 @@
-name: "Production JavaScript and TypeScript"
+name: "Production source"
 
 paths-ignore:
   - "e2e/**"

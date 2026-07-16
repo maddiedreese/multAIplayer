@@ -91,17 +91,12 @@ test.beforeEach(() => {
 test("account sign-out actions preserve preview cleanup ordering without React", async () => {
   const calls: string[] = [];
   const actions = createAccountActions({
-    selectedRoomId: room.id,
-    deviceId: "device-1",
     stopOwnedLocalPreviews: async (reason) => {
       calls.push(`preview:${reason}`);
     },
     signOutGitHub: async () => {
       calls.push("github");
-    },
-    replaceDeviceIdentity: () => undefined,
-    setDeviceIdentityStatusMessage: () => undefined,
-    untrustDeviceForRoom: () => undefined
+    }
   });
 
   await actions.signOut();

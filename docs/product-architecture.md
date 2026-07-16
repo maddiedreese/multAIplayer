@@ -79,7 +79,7 @@ Pull requests run blocking workspace checks and an always-present product-journe
 
 Tests that support security or release claims must assert behavior that actually executed. A green check is not evidence when it only matches output from an otherwise failing command.
 
-The desktop production build also inventories emitted web assets and enforces a 7 MiB total / 3 MiB per-file budget. Monaco is loaded only when the file editor opens, with the languages and workers the product uses. Update the budget only after documenting an intentional product need; do not raise it merely to absorb an accidental dependency or eager import.
+The desktop production build also inventories emitted web assets and enforces an 18 MiB total / 9 MiB per-file budget. Monaco is loaded only when the file editor opens and ships complete offline language-service workers for TypeScript/JavaScript, CSS-family, HTML-family, and JSON editing; the TypeScript worker accounts for roughly 8 MiB of the emitted assets. Rust, Markdown, and YAML use Monaco's syntax-highlighting contributions. Update the budget only after documenting an intentional product need; do not raise it merely to absorb an accidental dependency or eager import.
 
 ## Contributor walkthrough
 
