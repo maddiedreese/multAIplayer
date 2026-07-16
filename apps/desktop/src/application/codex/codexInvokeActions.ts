@@ -11,6 +11,7 @@ import { clearCodexGoal, setCodexGoal, steerCodexTurn, type CodexSteerResult } f
 import { codexSteeringInput, loadCodexFollowUpBehavior } from "../../lib/codex/codexFollowUpBehavior";
 import { currentSelectedRoomContext } from "../workspace/selectedWorkspace";
 import type { ChatMessage, PendingCodexApproval, QueuedCodexTurn, RoomGoal } from "../../types";
+import type { HandleCodexBrowserOpenCommand } from "./codexBrowserOpenCommand";
 
 type AppState = ReturnType<typeof useAppStore.getState>;
 type AppCodexRuntime = AppState["codexRuntimeByRoom"][string];
@@ -19,7 +20,7 @@ type AppRoomChatRuntime = AppState["roomChatByRoom"][string];
 export interface CodexInvokeActionsOptions {
   selectedRoomIdRef: { current: string | null };
   publishChatMessage: (message: ChatMessage, room?: ClientRoomRecord) => Promise<void>;
-  handleCodexBrowserOpenCommand: (message: ChatMessage, room: ClientRoomRecord) => boolean;
+  handleCodexBrowserOpenCommand: HandleCodexBrowserOpenCommand;
   publishCodexQueueEvent: (
     event: {
       turnId: string;
@@ -230,7 +231,7 @@ export function createCodexInvokeActions({
     };
     await publishChatMessage(message);
     if (invokesCodex) {
-      if (!handleCodexBrowserOpenCommand(message, selectedRoom)) handleCodexInvoke(message);
+      if (!handleCodexBrowserOpenCommand(message, selectedRoom, { kind: "local_host" })) handleCodexInvoke(message);
     }
     store().setDraftForRoom(roomId, "");
     store().setReplyToMessageForRoom(roomId, null);

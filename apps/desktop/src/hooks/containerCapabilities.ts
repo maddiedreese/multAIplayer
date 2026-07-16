@@ -9,7 +9,12 @@ import type {
 
 export function buildRoomInspectorCapabilities(sources: RoomInspectorSources): RoomInspectorCapabilities {
   return {
-    browser: { openNow: sources.roomRuntime.openRoomBrowserNow },
+    browser: {
+      openNow: sources.roomRuntime.openRoomBrowserNow,
+      approveRequest: sources.roomRuntime.approveBrowserRequest,
+      denyRequest: sources.roomRuntime.denyBrowserRequest,
+      openApprovedRequest: sources.roomRuntime.openApprovedBrowserRequest
+    },
     project: { choosePath: sources.roomRuntime.chooseProjectPath, updatePath: sources.roomRuntime.updateProjectPath },
     teamRoster: {
       onPromote: (member) => sources.workspaceFlow.changeTeamMemberRole(member, "admin"),

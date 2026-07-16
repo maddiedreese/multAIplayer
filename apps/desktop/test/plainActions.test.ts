@@ -456,6 +456,58 @@ test("chat actions observe relay and access changes made after creation", async 
   assert.match(useAppStore.getState().roomChatByRoom[room.id]?.message ?? "", /removed|revoked|locked/i);
 });
 
+test("published local chat is marked seen before a relay echo can route it again", async () => {
+  nativeInvoke = async (command, args) => {
+    if (command === "mls_encrypt_application") {
+      const request = (args as { request: { messageId: string; authenticatedData: Record<string, unknown> } }).request;
+      return {
+        message: "AA==",
+        outboxId: request.messageId,
+        epoch: 1,
+        authenticatedData: JSON.stringify({
+          version: request.authenticatedData.version,
+          epoch: 1,
+          messageId: request.authenticatedData.messageId,
+          teamId: request.authenticatedData.teamId,
+          roomId: request.authenticatedData.roomId,
+          kind: request.authenticatedData.kind,
+          senderUserId: request.authenticatedData.senderUserId,
+          senderDeviceId: request.authenticatedData.senderDeviceId,
+          createdAt: request.authenticatedData.createdAt
+        })
+      };
+    }
+    if (command === "mls_publish_succeeded") return 1;
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  const publishedIds: string[] = [];
+  const seenEnvelopeIds = new Set<string>();
+  const actions = createChatActions({
+    relayRef: {
+      current: {
+        publishAndWaitForAck: async ({ message }: { message: { id: string } }) => {
+          publishedIds.push(message.id);
+        }
+      } as never
+    },
+    seenEnvelopeIds: { current: seenEnvelopeIds }
+  });
+  useAppStore.getState().replaceRelayStatus("open");
+
+  await actions.publishChatMessage({
+    id: "message-local-codex-open",
+    author: "Maddie",
+    authorUserId: "github:maddie",
+    role: "human",
+    body: "@Codex open https://example.com/local",
+    time: "9:43",
+    createdAt: "2026-07-09T12:00:00.000Z"
+  });
+
+  assert.equal(publishedIds.length, 1);
+  assert.equal(seenEnvelopeIds.has(publishedIds[0]!), true);
+});
+
 test("chat edits observe Codex watermark changes made after creation", async () => {
   const message: ChatMessage = {
     id: "message-before-codex",

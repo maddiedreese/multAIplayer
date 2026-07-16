@@ -369,6 +369,9 @@ export function useRoomInspectorComposition({
     canHostBrowser: access.canHostBrowser,
     setUrl: setBrowserUrlForRoom,
     openNow: capabilities.browser.openNow,
+    approveRequest: capabilities.browser.approveRequest,
+    denyRequest: capabilities.browser.denyRequest,
+    openApprovedRequest: capabilities.browser.openApprovedRequest,
     selectTab: selectBrowserTabForRoom,
     closeTab: closeBrowserTabForRoom
   });
