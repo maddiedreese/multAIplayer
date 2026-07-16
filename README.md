@@ -27,6 +27,10 @@
 Start a private project room, invite people you trust, and work with Codex as a team. Everyone can follow the conversation, propose the next turn, inspect structured progress, review changes, and use room-scoped files, diffs, terminals, browser previews, Git, and GitHub workflows. One active host supplies the project, local tools, credentials, and Codex account; an explicit handoff can move that responsibility to another verified member.
 
 <p align="center">
+  <img src="docs/assets/screens/room-app.png" width="92%" alt="The multAIplayer desktop workspace with an active team room, shared Codex chat, and live work context">
+</p>
+
+<p align="center">
   <img src="docs/assets/screens/room-chat.png" width="64%" alt="Team chat with a Codex result and structured activity inside a shared room">
 </p>
 <p align="center">

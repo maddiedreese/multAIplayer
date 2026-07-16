@@ -43,6 +43,7 @@ try {
   await capture(page, "readme-chat", "room-chat.png");
   await capture(page, "readme-browser", "room-browser.png");
   await capture(page, "readme-terminal", "room-terminal.png");
+  await capture(page, "readme-app", "room-app.png");
 } finally {
   await browser?.close();
   await stopServer(server);
@@ -69,6 +70,15 @@ async function captureFeature(page, filename) {
     const terminalOutput = (await feature.locator(".xterm-rows").textContent())?.trim() ?? "";
     if (terminalOutput !== "") throw new Error("README terminal capture must not include session output.");
   }
+  if (filename === "room-app.png") {
+    await feature.getByLabel("Codex activity timeline").waitFor({ state: "visible" });
+    if ((await feature.getByLabel("Room title").inputValue()) !== "Responsive launch") {
+      throw new Error("README full-app capture must show the active production room.");
+    }
+    if ((await feature.getByText("Welcome to multAIplayer").count()) !== 0) {
+      throw new Error("README full-app capture must not include onboarding.");
+    }
+  }
   await settlePage(page);
   const dimensions = await feature.evaluate((element) => ({
     clientHeight: element.clientHeight,
@@ -78,6 +88,25 @@ async function captureFeature(page, filename) {
   }));
   if (dimensions.scrollHeight !== dimensions.clientHeight || dimensions.scrollWidth !== dimensions.clientWidth) {
     throw new Error(`README feature ${filename} overflows its capture surface: ${JSON.stringify(dimensions)}`);
+  }
+  if (filename === "room-app.png") {
+    const fullAppGeometry = await feature.evaluate((element) => {
+      const shell = element.querySelector(".app-shell");
+      return {
+        captureHeight: element.getBoundingClientRect().height,
+        captureWidth: element.getBoundingClientRect().width,
+        shellHeight: shell?.clientHeight ?? 0,
+        shellWidth: shell?.clientWidth ?? 0
+      };
+    });
+    if (
+      fullAppGeometry.captureWidth !== 1320 ||
+      fullAppGeometry.captureHeight !== 760 ||
+      fullAppGeometry.shellWidth !== dimensions.clientWidth ||
+      fullAppGeometry.shellHeight !== dimensions.clientHeight
+    ) {
+      throw new Error(`README full-app capture has unexpected shell geometry: ${JSON.stringify(fullAppGeometry)}`);
+    }
   }
   await feature.screenshot({ path: `${output}/${filename}`, omitBackground: true });
 }

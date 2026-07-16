@@ -7,7 +7,7 @@ export const mockedBoundaries = ["Codex app-server event delivery", "MLS encrypt
 
 const noop = () => undefined;
 const now = "2026-07-15T18:00:00.000Z";
-const messages: RoomChatMessageDisplay[] = [
+export const readmeMessages: RoomChatMessageDisplay[] = [
   {
     id: "teammate-request",
     author: "Maya",
@@ -29,7 +29,7 @@ const messages: RoomChatMessageDisplay[] = [
     reactions: []
   }
 ];
-const activities: CodexActivity[] = [
+export const readmeActivities: CodexActivity[] = [
   {
     eventType: "codex.activity",
     activityId: "responsive-edit",
@@ -52,60 +52,62 @@ const activities: CodexActivity[] = [
   }
 ];
 
+export const readmeChatProps: React.ComponentProps<typeof RoomChatPanel> = {
+  messages: readmeMessages,
+  codexActivities: readmeActivities,
+  approvalVisible: false,
+  approvalSummary: {
+    messages: "0",
+    attachments: "None",
+    sandbox: "Workspace write",
+    highPrivilegeLabels: [],
+    riskFlags: []
+  },
+  isActiveHost: true,
+  codexRunning: false,
+  canApproveCodex: true,
+  canUseChat: true,
+  canSendMessage: true,
+  roomLocked: false,
+  lockedPlaceholder: "Room locked",
+  chatEnabled: true,
+  draft: "",
+  pendingAttachments: [],
+  replyTarget: null,
+  roomGoal: null,
+  localPreviewCards: [],
+  pendingAttachmentSummary: "0/5 files",
+  markdownSelectionMode: false,
+  onToggleMessageSelection: noop,
+  onCopyMessageMarkdown: noop,
+  onOpenAttachment: noop,
+  onToggleReaction: noop,
+  onEditMessage: noop,
+  onDeleteMessage: noop,
+  onDenyApproval: noop,
+  onApproveApproval: noop,
+  onInvokeCodex: noop,
+  onRemovePendingAttachment: noop,
+  onPauseGoal: noop,
+  onResumeGoal: noop,
+  onEditGoal: noop,
+  onDeleteGoal: noop,
+  onTickGoalElapsed: noop,
+  onOpenLocalPreview: noop,
+  onCopyLocalPreviewLink: noop,
+  onStopLocalPreview: noop,
+  onOpenFileSelector: noop,
+  onReplyToMessage: noop,
+  onCancelReply: noop,
+  onCancelQueuedCodexTurn: noop,
+  onDraftChange: noop,
+  onSendMessage: noop
+};
+
 export default function ReadmeChatScenario() {
   return (
     <section className="readme-chat-surface" data-readme-capture aria-label="Shared Codex room chat feature">
-      <RoomChatPanel
-        messages={messages}
-        codexActivities={activities}
-        approvalVisible={false}
-        approvalSummary={{
-          messages: "0",
-          attachments: "None",
-          sandbox: "Workspace write",
-          highPrivilegeLabels: [],
-          riskFlags: []
-        }}
-        isActiveHost
-        codexRunning={false}
-        canApproveCodex
-        canUseChat
-        canSendMessage
-        roomLocked={false}
-        lockedPlaceholder="Room locked"
-        chatEnabled
-        draft=""
-        pendingAttachments={[]}
-        replyTarget={null}
-        roomGoal={null}
-        localPreviewCards={[]}
-        pendingAttachmentSummary="0/5 files"
-        markdownSelectionMode={false}
-        onToggleMessageSelection={noop}
-        onCopyMessageMarkdown={noop}
-        onOpenAttachment={noop}
-        onToggleReaction={noop}
-        onEditMessage={noop}
-        onDeleteMessage={noop}
-        onDenyApproval={noop}
-        onApproveApproval={noop}
-        onInvokeCodex={noop}
-        onRemovePendingAttachment={noop}
-        onPauseGoal={noop}
-        onResumeGoal={noop}
-        onEditGoal={noop}
-        onDeleteGoal={noop}
-        onTickGoalElapsed={noop}
-        onOpenLocalPreview={noop}
-        onCopyLocalPreviewLink={noop}
-        onStopLocalPreview={noop}
-        onOpenFileSelector={noop}
-        onReplyToMessage={noop}
-        onCancelReply={noop}
-        onCancelQueuedCodexTurn={noop}
-        onDraftChange={noop}
-        onSendMessage={noop}
-      />
+      <RoomChatPanel {...readmeChatProps} />
     </section>
   );
 }
