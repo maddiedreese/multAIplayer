@@ -12,7 +12,7 @@ hosted relay. The [documentation map](docs/README.md) routes deeper reading.
 ## First pull request
 
 Use the Dev Container for the shortest reproducible setup. For a local checkout,
-install Node.js 24 or newer (`nvm use` uses the same version family as CI) and Rust 1.89 (`rustup` reads the repository's `rust-toolchain.toml`), then:
+install Node.js 24.x (`nvm use` uses the same version family as CI) and Rust 1.89.x (`rustup` reads the repository's `rust-toolchain.toml`), then:
 
 ```sh
 npm install --global npm@11.16.0 --ignore-scripts

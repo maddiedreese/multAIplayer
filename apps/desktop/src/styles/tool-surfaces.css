@@ -52,26 +52,47 @@
   gap: 6px;
 }
 
-.team-button,
+.team-button {
+  border-radius: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  min-height: 54px;
+  border: 0;
+  background: transparent;
+  padding: 10px 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.team-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: none;
+}
+
+.team-button small {
+  min-width: 0;
+  overflow: hidden;
+  color: #707070;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 82px;
+  justify-self: end;
+}
+
 .room-button {
   border-radius: 10px;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   overflow: hidden;
-}
-
-.team-button span,
-.team-button small,
-.room-button strong,
-.room-button span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.room-button {
   display: grid;
   gap: 10px;
   align-items: center;
@@ -81,6 +102,15 @@
   border: 0;
   background: transparent;
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.room-button strong,
+.room-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .room-button > div:first-child {
@@ -142,27 +172,6 @@
 
 .room-create-section {
   margin-top: 4px;
-}
-
-.browser-policy-state {
-  flex-wrap: wrap;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-muted);
-  display: grid;
-  gap: 7px;
-  padding: 13px 14px;
-}
-
-.browser-policy-state span,
-.browser-policy-state strong {
-  min-width: 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.35;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 20px;
 }
 
 .browser-toolbar input {
@@ -265,23 +274,6 @@
 .viewer-search {
   flex: 0 0 auto;
   margin: 10px 10px 0;
-}
-
-.file-viewer-picker {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  flex: 0 0 auto;
-  max-height: 260px;
-  overflow: auto;
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.file-viewer-picker-column {
-  display: grid;
-  min-width: 0;
-  gap: 6px;
 }
 
 .file-viewer-switcher label {
@@ -637,34 +629,6 @@
   line-height: 1.35;
 }
 
-.team-button {
-  display: grid;
-  gap: 9px;
-  align-items: center;
-  text-align: left;
-  min-height: 34px;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  grid-template-columns: 18px minmax(96px, 1fr) minmax(58px, max-content);
-}
-
-.team-button span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: none;
-}
-
-.team-button small {
-  overflow: hidden;
-  color: #707070;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 88px;
-}
-
 @media (max-width: 980px) {
   .team-button {
     grid-template-columns: minmax(0, 1fr) minmax(58px, max-content);
@@ -746,16 +710,6 @@
   height: 100%;
 }
 
-.terminal-command-line.fallback {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-}
-
 .terminal-panel .panel-title {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -787,27 +741,6 @@
 .terminal-panel .panel-title-actions .terminal-expand-button {
   width: 36px;
   padding: 0;
-}
-
-.terminal-command-line span,
-.terminal-command-line b {
-  color: var(--text);
-  font-weight: 760;
-}
-
-.terminal-command-line input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  caret-color: var(--text);
-}
-
-.terminal-command-line input::placeholder {
-  color: color-mix(in srgb, #bebebe 58%, transparent);
 }
 
 .terminal-session-actions {

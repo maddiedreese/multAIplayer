@@ -71,7 +71,6 @@ export function useRoomInspectorComposition({
   const teamHistorySettings = useAppStore((state) => state.teamHistorySettings);
   const teamDefaultApprovalPolicy = useAppStore((state) => state.teamDefaultApprovalPolicy);
   const teamDefaultCodexModel = useAppStore((state) => state.teamDefaultCodexModel);
-  const teamDefaultBrowserProfilePersistent = useAppStore((state) => state.teamDefaultBrowserProfilePersistent);
   const teamDefaultInviteApprovalGate = useAppStore((state) => state.teamDefaultInviteApprovalGate);
   const codexProbe = useAppStore((state) => state.codexProbe);
   const inviteSecretInput = useAppStore((state) => state.inviteSecretInput);
@@ -82,7 +81,6 @@ export function useRoomInspectorComposition({
     setProjectPathDraftForRoom,
     setInviteSecretInputValue,
     setCustomCodexModelForRoom,
-    setTeamDefaultBrowserProfilePersistent,
     editGitWorkflowDraftForRoom,
     setFileQueryForRoom,
     setFilePreviewTabForRoom,
@@ -291,7 +289,6 @@ export function useRoomInspectorComposition({
         teamDefaultCodexModel,
         defaultCodexModel,
         codexModelOptions,
-        teamDefaultBrowserProfilePersistent,
         teamDefaultInviteApprovalGate,
         message: historyMessage ?? teamHistoryMessage,
         hydrationStatus: historyHydrationStatus,
@@ -321,8 +318,7 @@ export function useRoomInspectorComposition({
           }),
         onTeamDefaultApprovalPolicyChange: sources.workspaceFlow.updateTeamDefaultApprovalPolicy,
         onTeamDefaultCodexModelChange: sources.workspaceFlow.updateTeamDefaultCodexModel,
-        onTeamDefaultInviteApprovalGateChange: sources.workspaceFlow.updateTeamDefaultInviteApprovalGate,
-        onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent
+        onTeamDefaultInviteApprovalGateChange: sources.workspaceFlow.updateTeamDefaultInviteApprovalGate
       },
       workspaceFiles: composeWorkspaceFilesProps(),
       gitHandoff: {
@@ -409,7 +405,6 @@ export function useRoomInspectorComposition({
     hidden: false,
     roomId: selectedRoom.id,
     projectPath: selectedRoom.projectPath,
-    browserProfilePersistent: selectedRoom.browserProfilePersistent,
     activeBrowserUrl: firstPresent(browser.tabs?.find((tab) => tab.id === browser.activeTabId)?.url, browser.activeUrl),
     browserTabs: valueOr(browser.tabs, []),
     browserRequests: valueOr(browser.requests, []),

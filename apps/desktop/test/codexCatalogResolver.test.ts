@@ -28,7 +28,6 @@ const room: ClientRoomRecord = {
   configRevision: 1,
   configEpoch: 0,
   configPending: false,
-  browserProfilePersistent: true,
   unread: 0
 };
 

@@ -25,8 +25,7 @@ const room = {
   hostUserId: "user-1",
   activeHostDeviceId: "device-1",
   hostStatus: "active" as const,
-  approvalPolicy: "ask_every_turn" as const,
-  browserProfilePersistent: false
+  approvalPolicy: "ask_every_turn" as const
 };
 
 const clientCases = [

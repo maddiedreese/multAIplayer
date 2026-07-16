@@ -132,7 +132,6 @@ declare_registered_commands! {
     open_browser_view,
     position_browser_view,
     close_browser_view,
-    reset_browser_profile,
     mls_identity_initialize,
     mls_device_auth_sign,
     mls_group_state,

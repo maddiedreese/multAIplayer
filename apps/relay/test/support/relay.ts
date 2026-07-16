@@ -219,8 +219,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       activeHostDeviceId: "host-device-1",
       hostStatus: "active",
       acceptedMlsEpoch: 0,
-      approvalPolicy: "ask_every_turn",
-      browserProfilePersistent: true
+      approvalPolicy: "ask_every_turn"
     },
     {
       id: "room-relay",
@@ -231,8 +230,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
       activeHostDeviceId: "alex-device-1",
       hostStatus: "active",
       acceptedMlsEpoch: 0,
-      approvalPolicy: "ask_every_turn",
-      browserProfilePersistent: true
+      approvalPolicy: "ask_every_turn"
     }
   ];
   while (rooms.length < roomCount) {
@@ -518,7 +516,6 @@ export function waitForRoomUpdated(socket: WebSocket): Promise<{
   name: string;
   codexModel: string;
   approvalPolicy: string;
-  browserProfilePersistent: boolean;
 }> {
   return new Promise((resolveUpdate, rejectUpdate) => {
     const timer = setTimeout(() => rejectUpdate(new Error("Timed out waiting for room.updated")), 5_000);
@@ -531,7 +528,6 @@ export function waitForRoomUpdated(socket: WebSocket): Promise<{
           name: string;
           codexModel: string;
           approvalPolicy: string;
-          browserProfilePersistent: boolean;
         };
       };
       if (message.type === "room.updated" && message.room) {

@@ -78,7 +78,6 @@ export {
   codexReasoningEffortOptions,
   codexSandboxLevelOptions,
   codexSpeedOptions,
-  defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexModelPolicy,
   defaultCodexReasoningEffort,

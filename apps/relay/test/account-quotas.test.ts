@@ -326,8 +326,7 @@ test("attachment persistence failure rolls back both blob and byte reservation",
     host: "User",
     hostUserId: "github:user",
     hostStatus: "active",
-    approvalPolicy: "ask_every_turn",
-    browserProfilePersistent: false
+    approvalPolicy: "ask_every_turn"
   });
   registerAttachmentRoutes({
     app,

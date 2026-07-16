@@ -33,7 +33,6 @@ export interface RoomCreationSettings {
   codexSpeed?: ClientRoomRecord["codexSpeed"];
   codexServiceTierPolicy?: ClientRoomRecord["codexServiceTierPolicy"];
   codexSandboxLevel?: ClientRoomRecord["codexSandboxLevel"];
-  browserProfilePersistent?: boolean;
 }
 
 export interface InviteLookupResult {
@@ -316,7 +315,6 @@ export async function updateRoomSettings(
     codexServiceTierPolicy?: ClientRoomRecord["codexServiceTierPolicy"];
     codexSandboxLevel?: ClientRoomRecord["codexSandboxLevel"];
     projectPath?: string;
-    browserProfilePersistent?: boolean;
     requesterName?: string;
     requesterUserId?: string;
   }

@@ -16,7 +16,22 @@ import type { BrowserTab } from "../store/slices/browserSlice";
 import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 import { formatBrowserAccessLabel } from "../lib/browser/browserUi";
 import { closeBrowserView, openBrowserView, positionBrowserView } from "../lib/platform/localBackend";
+import { isTauriRuntime } from "../lib/platform/localBackend/runtime";
 import type { BrowserAccessRequest } from "../types";
+
+interface BrowserHistoryState {
+  entries: string[];
+  index: number;
+}
+
+interface BrowserViewBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const emptyBrowserHistory: BrowserHistoryState = { entries: [], index: -1 };
 
 function browserSurfaceTop(slot: HTMLElement) {
   const rect = slot.getBoundingClientRect();
@@ -29,11 +44,20 @@ function browserSurfaceTop(slot: HTMLElement) {
   return Math.max(rect.top, toolbarBottom, tabsBottom, requestsBottom) + 16;
 }
 
+function browserBoundsEqual(left: BrowserViewBounds, right: BrowserViewBounds | null) {
+  return (
+    right !== null &&
+    left.x === right.x &&
+    left.y === right.y &&
+    left.width === right.width &&
+    left.height === right.height
+  );
+}
+
 export function BrowserAccessPanel({
   hidden,
   roomId,
   projectPath,
-  browserProfilePersistent,
   activeBrowserUrl,
   browserTabs,
   browserRequests,
@@ -52,7 +76,6 @@ export function BrowserAccessPanel({
   hidden: boolean;
   roomId: string;
   projectPath: string;
-  browserProfilePersistent: boolean;
   activeBrowserUrl: string | null;
   browserTabs: BrowserTab[];
   browserRequests: BrowserAccessRequest[];
@@ -70,16 +93,17 @@ export function BrowserAccessPanel({
 }) {
   const browserViewportRef = useRef<HTMLDivElement | null>(null);
   const browserWebviewOpenRef = useRef(false);
+  const browserOperationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastBrowserBoundsRef = useRef<BrowserViewBounds | null>(null);
   const [browserSurfaceError, setBrowserSurfaceError] = useState<string | null>(null);
   const [browserExpanded, setBrowserExpanded] = useState(false);
   const [browserSurfaceUrl, setBrowserSurfaceUrl] = useState(activeBrowserUrl);
   const [browserSurfaceRevision, setBrowserSurfaceRevision] = useState(0);
-  const [browserHistory, setBrowserHistory] = useState<string[]>([]);
-  const [browserHistoryIndex, setBrowserHistoryIndex] = useState(-1);
-  const tauriRuntime = "__TAURI_INTERNALS__" in window;
+  const [browserHistory, setBrowserHistory] = useState<BrowserHistoryState>(emptyBrowserHistory);
+  const tauriRuntime = isTauriRuntime();
   const canOpenUrl = canHostBrowser && browserUrl.trim().length > 0;
-  const canGoBack = browserHistoryIndex > 0;
-  const canGoForward = browserHistoryIndex >= 0 && browserHistoryIndex < browserHistory.length - 1;
+  const canGoBack = browserHistory.index > 0;
+  const canGoForward = browserHistory.index >= 0 && browserHistory.index < browserHistory.entries.length - 1;
   const panelClassName = `panel browser-panel ${hidden ? "" : "browser-open"} ${browserExpanded ? "expanded" : ""}`;
 
   function openBrowserUrl() {
@@ -87,19 +111,35 @@ export function BrowserAccessPanel({
     onOpenBrowserNow();
   }
 
-  const closeBrowserWebview = useCallback(async () => {
+  const enqueueBrowserOperation = useCallback((operation: () => Promise<void>) => {
+    const queued = browserOperationQueueRef.current
+      .catch(() => reportExpectedFailure("room browser operation queue recovered from a failed operation"))
+      .then(operation);
+    browserOperationQueueRef.current = queued.catch(() =>
+      reportExpectedFailure("room browser operation failed before the surface reached a stable state")
+    );
+    return queued;
+  }, []);
+
+  const closeBrowserWebviewImmediately = useCallback(async () => {
     browserWebviewOpenRef.current = false;
+    lastBrowserBoundsRef.current = null;
     if (!tauriRuntime) return;
     await closeBrowserView(roomId, projectPath).catch(() =>
       reportExpectedFailure("room browser WebView was already closed")
     );
   }, [projectPath, roomId, tauriRuntime]);
 
+  const closeBrowserWebview = useCallback(
+    () => enqueueBrowserOperation(closeBrowserWebviewImmediately),
+    [closeBrowserWebviewImmediately, enqueueBrowserOperation]
+  );
+
   function navigateBrowserHistory(delta: -1 | 1) {
-    const nextIndex = browserHistoryIndex + delta;
-    const nextUrl = browserHistory[nextIndex];
+    const nextIndex = browserHistory.index + delta;
+    const nextUrl = browserHistory.entries[nextIndex];
     if (!nextUrl) return;
-    setBrowserHistoryIndex(nextIndex);
+    setBrowserHistory((current) => ({ ...current, index: nextIndex }));
     setBrowserSurfaceUrl(nextUrl);
     onBrowserUrlChange(nextUrl);
   }
@@ -117,22 +157,19 @@ export function BrowserAccessPanel({
   useEffect(() => {
     if (!activeBrowserUrl) {
       setBrowserSurfaceUrl(null);
-      setBrowserHistory([]);
-      setBrowserHistoryIndex(-1);
+      setBrowserHistory(emptyBrowserHistory);
       return;
     }
     setBrowserSurfaceUrl(activeBrowserUrl);
     setBrowserHistory((current) => {
-      const existingIndex = current.indexOf(activeBrowserUrl);
+      const existingIndex = current.entries.indexOf(activeBrowserUrl);
       if (existingIndex >= 0) {
-        setBrowserHistoryIndex(existingIndex);
-        return current;
+        return { ...current, index: existingIndex };
       }
-      const next = browserHistoryIndex >= 0 ? current.slice(0, browserHistoryIndex + 1) : current;
-      setBrowserHistoryIndex(next.length);
-      return [...next, activeBrowserUrl];
+      const next = current.index >= 0 ? current.entries.slice(0, current.index + 1) : current.entries;
+      return { entries: [...next, activeBrowserUrl], index: next.length };
     });
-  }, [activeBrowserUrl, browserHistoryIndex]);
+  }, [activeBrowserUrl]);
 
   useEffect(() => {
     const close = () => {
@@ -146,7 +183,7 @@ export function BrowserAccessPanel({
     let cancelled = false;
     let cleanupPositioning: (() => void) | null = null;
 
-    function browserBounds() {
+    function browserBounds(): BrowserViewBounds | null {
       const slot = browserViewportRef.current;
       if (!slot) return null;
       const rect = slot.getBoundingClientRect();
@@ -162,9 +199,13 @@ export function BrowserAccessPanel({
     async function positionBrowserWebview() {
       const bounds = browserBounds();
       if (!bounds || !browserWebviewOpenRef.current) return;
-      await positionBrowserView(roomId, projectPath, bounds).catch(() =>
-        reportExpectedFailure("room browser WebView was unavailable while positioning")
-      );
+      if (browserBoundsEqual(bounds, lastBrowserBoundsRef.current)) return;
+      try {
+        await positionBrowserView(roomId, projectPath, bounds);
+        lastBrowserBoundsRef.current = bounds;
+      } catch {
+        reportExpectedFailure("room browser WebView was unavailable while positioning");
+      }
     }
 
     if (!tauriRuntime || hidden || !browserSurfaceUrl) {
@@ -173,20 +214,18 @@ export function BrowserAccessPanel({
     }
 
     setBrowserSurfaceError(null);
-    void closeBrowserWebview().then(async () => {
+    void enqueueBrowserOperation(async () => {
+      await closeBrowserWebviewImmediately();
       if (cancelled || !browserViewportRef.current) return;
       const bounds = browserBounds();
       if (!bounds) return;
       try {
-        await openBrowserView(roomId, projectPath, browserSurfaceUrl, bounds, browserProfilePersistent);
-        if (cancelled) {
-          await closeBrowserView(roomId, projectPath);
-          return;
-        }
+        await openBrowserView(roomId, projectPath, browserSurfaceUrl, bounds);
+        if (cancelled) return;
         browserWebviewOpenRef.current = true;
-        await positionBrowserWebview();
+        lastBrowserBoundsRef.current = bounds;
       } catch (error) {
-        setBrowserSurfaceError(`Could not open in-app browser: ${String(error)}`);
+        if (!cancelled) setBrowserSurfaceError(`Could not open in-app browser: ${String(error)}`);
         return;
       }
 
@@ -202,7 +241,6 @@ export function BrowserAccessPanel({
       const secondAnimationFrame = window.requestAnimationFrame(() => {
         nestedAnimationFrame = window.requestAnimationFrame(reposition);
       });
-      const interval = window.setInterval(reposition, 250);
 
       cleanupPositioning = () => {
         observer.disconnect();
@@ -211,7 +249,6 @@ export function BrowserAccessPanel({
         window.cancelAnimationFrame(animationFrame);
         window.cancelAnimationFrame(secondAnimationFrame);
         if (nestedAnimationFrame !== null) window.cancelAnimationFrame(nestedAnimationFrame);
-        window.clearInterval(interval);
       };
     });
 
@@ -221,11 +258,11 @@ export function BrowserAccessPanel({
       void closeBrowserWebview();
     };
   }, [
-    browserProfilePersistent,
     browserSurfaceRevision,
     browserSurfaceUrl,
-    browserExpanded,
     closeBrowserWebview,
+    closeBrowserWebviewImmediately,
+    enqueueBrowserOperation,
     hidden,
     projectPath,
     roomId,

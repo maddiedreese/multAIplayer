@@ -8,14 +8,13 @@ test("roomPostureSummary explains host, workspace, history, and browser posture"
       locked: false,
       isActiveHost: true,
       canReadLocalWorkspace: true,
-      historySettings: { enabled: true, retentionDays: 30 },
-      browserProfilePersistent: false
+      historySettings: { enabled: true, retentionDays: 30 }
     }),
     {
       hostAccess: "This device is host",
       workspaceAccess: "Shared with room",
       history: "Encrypted, 30 days",
-      browserProfile: "Refreshes before opens"
+      browserSession: "Private session per open"
     }
   );
 });
@@ -26,14 +25,13 @@ test("roomPostureSummary makes locked and disabled states visible", () => {
       locked: true,
       isActiveHost: false,
       canReadLocalWorkspace: false,
-      historySettings: { enabled: false, retentionDays: 30 },
-      browserProfilePersistent: true
+      historySettings: { enabled: false, retentionDays: 30 }
     }),
     {
       hostAccess: "Locked on this device",
       workspaceAccess: "Locked on this device",
       history: "Disabled",
-      browserProfile: "Persists per room"
+      browserSession: "Private session per open"
     }
   );
 });

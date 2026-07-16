@@ -19,7 +19,6 @@ const room: ClientRoomRecord = {
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.6-sol",
-  browserProfilePersistent: true,
   unread: 0
 };
 
@@ -113,8 +112,7 @@ test("first workspace sends the exact reviewed safe room settings and initialize
     codexRawReasoningEnabled: false,
     codexSpeed: "standard",
     codexServiceTierPolicy: "auto",
-    codexSandboxLevel: "workspace_write",
-    browserProfilePersistent: true
+    codexSandboxLevel: "workspace_write"
   });
 });
 

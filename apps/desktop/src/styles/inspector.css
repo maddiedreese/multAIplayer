@@ -351,9 +351,7 @@
 }
 
 .team-button strong,
-.team-button span,
-.sidebar-room strong,
-.sidebar-room span {
+.team-button span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

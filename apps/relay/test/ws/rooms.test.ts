@@ -51,7 +51,6 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     codexSpeed: "standard",
     codexServiceTierPolicy: "pinned",
     codexSandboxLevel: "workspace-write",
-    browserProfilePersistent: false,
     acceptedMlsEpoch: 0
   });
   const invite = {

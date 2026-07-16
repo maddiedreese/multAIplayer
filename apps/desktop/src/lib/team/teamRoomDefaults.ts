@@ -1,11 +1,10 @@
-import { defaultCodexModel, defaultBrowserProfilePersistent, type ApprovalPolicy } from "@multaiplayer/protocol";
+import { defaultCodexModel, type ApprovalPolicy } from "@multaiplayer/protocol";
 import { normalizeCodexModel } from "../workspace/workspaceCreation";
 import { reportNonFatal } from "../core/nonFatalReporting";
 
 export interface TeamRoomDefaults {
   approvalPolicy: ApprovalPolicy;
   codexModel: string;
-  browserProfilePersistent: boolean;
   inviteApprovalGate: boolean;
 }
 
@@ -20,7 +19,6 @@ export function roomSettingsMutationInFlightMessage(): string {
 const defaultTeamRoomDefaults: TeamRoomDefaults = {
   approvalPolicy: "ask_every_turn",
   codexModel: defaultCodexModel,
-  browserProfilePersistent: defaultBrowserProfilePersistent,
   inviteApprovalGate: true
 };
 
@@ -48,22 +46,17 @@ export function sanitizeTeamRoomDefaults(defaults: Partial<TeamRoomDefaults>): T
   return {
     approvalPolicy: sanitizeApprovalPolicy(defaults.approvalPolicy),
     codexModel: normalizeCodexModel(defaults.codexModel ?? "") ?? defaultTeamRoomDefaults.codexModel,
-    browserProfilePersistent:
-      typeof defaults.browserProfilePersistent === "boolean"
-        ? defaults.browserProfilePersistent
-        : defaultTeamRoomDefaults.browserProfilePersistent,
     inviteApprovalGate: true
   };
 }
 
 export function teamDefaultsRoomSettings(
   defaults: TeamRoomDefaults
-): Pick<TeamRoomDefaults, "approvalPolicy" | "codexModel" | "browserProfilePersistent"> {
+): Pick<TeamRoomDefaults, "approvalPolicy" | "codexModel"> {
   const sanitized = sanitizeTeamRoomDefaults(defaults);
   return {
     approvalPolicy: sanitized.approvalPolicy,
-    codexModel: sanitized.codexModel,
-    browserProfilePersistent: sanitized.browserProfilePersistent
+    codexModel: sanitized.codexModel
   };
 }
 

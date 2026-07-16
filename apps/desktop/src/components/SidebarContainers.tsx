@@ -247,7 +247,6 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
   const teamHistorySettings = useAppStore((state) => state.teamHistorySettings);
   const teamDefaultApprovalPolicy = useAppStore((state) => state.teamDefaultApprovalPolicy);
   const teamDefaultCodexModel = useAppStore((state) => state.teamDefaultCodexModel);
-  const teamDefaultBrowserProfilePersistent = useAppStore((state) => state.teamDefaultBrowserProfilePersistent);
   const teamDefaultInviteApprovalGate = useAppStore((state) => state.teamDefaultInviteApprovalGate);
   const historyMessage = useAppStore((state) =>
     state.selectedRoomId ? (state.historyPresenceByRoom[state.selectedRoomId]?.historyMessage ?? null) : null
@@ -261,8 +260,7 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
     setRelayWsDraft,
     resetRelayConfiguration,
     saveRelayConfiguration,
-    setRoomNotificationsMuted,
-    setTeamDefaultBrowserProfilePersistent
+    setRoomNotificationsMuted
   } = useAppStore.getState();
   const { deviceId, localUser } = useLocalIdentity(currentUser);
   const onboarding = useAppStore((state) => state.onboarding);
@@ -343,7 +341,6 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
         teamDefaultCodexModel,
         defaultCodexModel,
         codexModelOptions,
-        teamDefaultBrowserProfilePersistent,
         teamDefaultInviteApprovalGate,
         message: settingsMessage,
         archivePanel: (
@@ -373,7 +370,6 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
           sources.workspaceFlow.updateTeamHistoryDefaults({ ...teamHistorySettings, retentionDays }),
         onTeamDefaultApprovalPolicyChange: sources.workspaceFlow.updateTeamDefaultApprovalPolicy,
         onTeamDefaultCodexModelChange: sources.workspaceFlow.updateTeamDefaultCodexModel,
-        onTeamDefaultBrowserProfilePersistentChange: setTeamDefaultBrowserProfilePersistent,
         onTeamDefaultInviteApprovalGateChange: sources.workspaceFlow.updateTeamDefaultInviteApprovalGate,
         onApplyTeamDefaultsToRoom: sources.workspaceFlow.applyTeamDefaultsToRoom
       }}

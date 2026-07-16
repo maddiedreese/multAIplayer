@@ -224,28 +224,8 @@
   font-size: 12px;
 }
 
-.team-button,
-.sidebar-room {
-  padding: 10px 11px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  min-height: 54px;
-  padding-inline: 14px;
-  overflow: hidden;
-}
-
-.team-button > *,
-.sidebar-room > * {
+.team-button > * {
   min-width: 0;
-}
-
-.team-button small,
-.sidebar-room small {
-  justify-self: end;
-  max-width: 82px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sidebar-footer {

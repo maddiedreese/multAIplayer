@@ -1,6 +1,40 @@
 use super::*;
 
 #[test]
+fn native_compatibility_bounds_match_the_shared_support_policy() {
+    let policy: Value = serde_json::from_str(include_str!(
+        "../../../../../contracts/codex-app-server/support-policy.json"
+    ))
+    .expect("support policy");
+    let minimum = policy["minimumSupportedVersion"]
+        .as_str()
+        .expect("minimum supported version");
+    let latest = policy["latestContractTestedVersion"]
+        .as_str()
+        .expect("latest contract-tested version");
+
+    let (minimum_major, minimum_minor, minimum_patch) =
+        parse_semver(minimum).expect("minimum semver");
+    let below_minimum = if minimum_patch > 0 {
+        format!("{minimum_major}.{minimum_minor}.{}", minimum_patch - 1)
+    } else {
+        format!("{minimum_major}.{}.0", minimum_minor - 1)
+    };
+    assert!(selected_manifest(&below_minimum).is_err());
+    assert!(selected_manifest(minimum).is_ok());
+
+    let (latest_major, latest_minor, _) = parse_semver(latest).expect("latest semver");
+    let latest_capabilities = capabilities_for_version(latest).expect("latest capabilities");
+    assert_eq!(latest_capabilities.manifest_version, latest);
+    assert!(latest_capabilities.compatibility_warning.is_none());
+    let newer = format!("{latest_major}.{}.0", latest_minor + 1);
+    assert!(capabilities_for_version(&newer)
+        .expect("newer capabilities")
+        .compatibility_warning
+        .is_some());
+}
+
+#[test]
 fn capability_gate_reads_bundled_manifests() {
     let old = capabilities_for_version("0.133.0").expect("old capabilities");
     let current = capabilities_for_version("0.144.0").expect("current capabilities");

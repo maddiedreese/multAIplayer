@@ -131,9 +131,9 @@ Terminal output is visible to the room when shared through terminal request resu
 
 ## Browser
 
-The Browser panel opens a room/project-scoped in-app browser surface on the active host's machine. It is not the host's normal Chrome profile.
+The Browser panel opens a private, nonpersistent in-app browser surface on the active host's machine. It does not use the host's normal Chrome session.
 
-The browser profile persists by default so signed-in sites can work inside that isolated room/project context. Hosts can reset the profile or use refresh mode, which clears the room/project browser profile before each approved open.
+Each approved open starts a private browser session. Closing it discards its cookies and website storage, so sites do not remain signed in between opens.
 
 Browser opens requested by Codex or other room events go through the host approval boundary. The native download callback denies downloads. A tested initialization guard rejects page Clipboard API calls and cancels file-input and drag/drop events, but that script is best-effort where WebKit or a page prevents injection. Signed-in pages can still expose sensitive content to the room if the host shares or approves that context.
 
@@ -177,11 +177,11 @@ The current project path and Codex model/tuning configuration are also saved in 
 
 Room notifications can be muted per room. Muting affects local notifications/unread attention on that device; it does not mute the room for other members.
 
-Team defaults control settings for newly created rooms, including local history retention, default approval policy, default model, browser profile persistence, and whether new room invites require host approval.
+Team defaults control settings for newly created rooms, including local history retention, default approval policy, default model, and whether new room invites require host approval.
 
 ### Encrypted room export and read-only import
 
-Open **Room settings → Encrypted room archives** to export the selected room. The same library also appears in **Account**, so imports remain reachable while signed out, offline, or without a live room. Enter a passphrase of at least 12 bytes twice, choose a `.multai.age` destination, and keep the passphrase separately; multAIplayer does not store it or offer password recovery. The file uses the interoperable age passphrase format and is written owner-only. The export contains normalized display history available on this device at export time. Pending terminal/browser/file approvals, queued Codex turns, host handoffs, invite state, MLS/device secrets, Codex session/thread ids, browser profiles, running terminals, and attachment-blob ciphertext are omitted. Inline attachment and resolved file-review content can still be sensitive, so use a strong unique passphrase.
+Open **Room settings → Encrypted room archives** to export the selected room. The same library also appears in **Account**, so imports remain reachable while signed out, offline, or without a live room. Enter a passphrase of at least 12 bytes twice, choose a `.multai.age` destination, and keep the passphrase separately; multAIplayer does not store it or offer password recovery. The file uses the interoperable age passphrase format and is written owner-only. The export contains normalized display history available on this device at export time. Pending terminal/browser/file approvals, queued Codex turns, host handoffs, invite state, MLS/device secrets, Codex session/thread ids, running terminals, and attachment-blob ciphertext are omitted. Inline attachment and resolved file-review content can still be sensitive, so use a strong unique passphrase.
 
 **Import archive** decrypts and validates a selected archive, stores its still-encrypted bytes in the native archive library, and opens an inert view. The library list intentionally shows only “Locked archive,” import time, and encrypted size until the correct passphrase is entered; plaintext room/team names are not indexed. Opened messages and activity pass through the normal local-history validators. Import never adds a room to the sidebar, restores membership, sends an event, starts a process, grants an approval, or restores MLS state. Deleting an imported archive removes its encrypted library copy but does not delete an external export file. See [Encrypted room archives](room-archives.md) for bounds and recovery limits.
 

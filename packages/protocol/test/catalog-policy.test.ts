@@ -22,8 +22,7 @@ test("active rooms require a stable host identity", () => {
     host: "Maddie",
     activeHostDeviceId: "device-maddie",
     hostStatus: "active",
-    approvalPolicy: "ask_every_turn",
-    browserProfilePersistent: true
+    approvalPolicy: "ask_every_turn"
   };
 
   assert.equal(RoomRecord.safeParse(room).success, false);
@@ -48,7 +47,6 @@ test("room protocol derives its reasoning enum from the shared options", () => {
     codexSpeed: "standard",
     codexServiceTierPolicy: "auto",
     codexSandboxLevel: "workspace_write",
-    browserProfilePersistent: true,
     unread: 0,
     configRevision: 1,
     configEpoch: 1,

@@ -1,5 +1,4 @@
 import {
-  defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexModelPolicy,
   defaultCodexRawReasoningEnabled,
@@ -69,8 +68,7 @@ export const firstWorkspaceSafeRoomSettings: RequestedRoomCreationSettings = Obj
   codexRawReasoningEnabled: defaultCodexRawReasoningEnabled,
   codexSpeed: defaultCodexSpeed,
   codexServiceTierPolicy: defaultCodexServiceTierPolicy,
-  codexSandboxLevel: defaultCodexSandboxLevel,
-  browserProfilePersistent: defaultBrowserProfilePersistent
+  codexSandboxLevel: defaultCodexSandboxLevel
 });
 
 export async function createWorkspaceTeam(

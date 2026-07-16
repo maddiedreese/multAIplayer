@@ -186,7 +186,6 @@ function workspace(fixture: NativeFixture): StoredRelayStateFixture {
         activeHostDeviceId: fixture.host.deviceId,
         hostStatus: "active",
         approvalPolicy: "ask_every_turn",
-        browserProfilePersistent: false,
         acceptedMlsEpoch: 0
       }
     ],

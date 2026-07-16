@@ -102,45 +102,6 @@
   line-height: 1.35;
 }
 
-.browser-profile-state {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid #dcdcdc;
-  border-radius: 8px;
-  background: #f9f9f9;
-}
-
-.browser-profile-state strong,
-.browser-profile-state span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.browser-profile-state strong {
-  font-size: 12px;
-}
-
-.browser-profile-state span {
-  color: #707070;
-  font-size: 11px;
-}
-
-.browser-profile-state button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid #d5d5d5;
-  border-radius: 7px;
-  background: #ffffff;
-}
-
 .browser-panel input:disabled,
 .browser-panel textarea:disabled {
   background: #f1f1f1;
@@ -346,17 +307,6 @@
 
 .file-preview-tabs button:disabled {
   color: color-mix(in srgb, var(--text-muted) 55%, transparent);
-}
-
-.diff-preview pre {
-  overflow: auto;
-  margin: 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: #191919;
-  color: #ededed;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .diff-code-line {

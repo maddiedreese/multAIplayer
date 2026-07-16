@@ -18,7 +18,6 @@ const activeRoom: ClientRoomRecord = {
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
-  browserProfilePersistent: true,
   unread: 0
 };
 

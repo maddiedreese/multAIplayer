@@ -209,8 +209,7 @@ function approvedInviteFixture(deviceId: string) {
         hostStatus: "active",
         activeHostDeviceId: "host-device",
         acceptedMlsEpoch: 0,
-        approvalPolicy: "ask_every_turn",
-        browserProfilePersistent: false
+        approvalPolicy: "ask_every_turn"
       }
     ],
     invites: [

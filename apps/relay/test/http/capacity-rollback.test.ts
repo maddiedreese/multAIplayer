@@ -177,8 +177,7 @@ test("attachment upload rolls back its byte quota when real retained bytes exhau
     name: "Capacity",
     host: "Capacity",
     hostStatus: "active",
-    approvalPolicy: "ask_every_turn",
-    browserProfilePersistent: false
+    approvalPolicy: "ask_every_turn"
   });
   store.discardDurableMutations();
   const app = express();

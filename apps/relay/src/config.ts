@@ -405,11 +405,12 @@ function parseAllowedOriginEnv(value: string | undefined): string[] {
   const origins = new Set<string>();
   for (const item of parseListEnv(value)) {
     const normalized = normalizeConfiguredOrigin(item);
-    if (normalized) {
-      origins.add(normalized);
-    } else {
-      logRelayEvent("warn", "invalid_allowed_origin_ignored");
+    if (!normalized) {
+      throw new Error(
+        "MULTAIPLAYER_RELAY_ALLOWED_ORIGINS entries must be bare HTTP(S) origins or the exact tauri://localhost desktop origin."
+      );
     }
+    origins.add(normalized);
   }
   return Array.from(origins);
 }

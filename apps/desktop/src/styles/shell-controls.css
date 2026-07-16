@@ -75,8 +75,6 @@ button:not(:disabled):active {
 .attachment button,
 .browser-request button,
 .terminal-request button,
-.terminal-launcher button,
-.terminal-input-row button,
 .ghost-wide {
   border-color: var(--border);
   background: var(--button-bg);
@@ -142,8 +140,6 @@ button:not(:disabled):active {
 .project-path-editor input,
 .browser-panel input,
 .browser-panel textarea,
-.terminal-launcher input,
-.terminal-input-row input,
 .model-panel input,
 .model-panel select,
 .git-approval-panel input[type="text"],
@@ -218,15 +214,13 @@ button:not(:disabled):active {
 .message-hit-list span,
 .profile-card span,
 .sidebar-empty,
-.browser-profile-state span,
 .member-row small,
 .action-run small,
 .actions-summary span {
   color: var(--text-muted);
 }
 
-.room-indicators b,
-.tab-badge {
+.room-indicators b {
   background: var(--accent);
   color: #1b1b1b;
 }
@@ -363,13 +357,6 @@ button:not(:disabled):active {
   color: var(--text);
 }
 
-.host-message,
-.workflow-message {
-  border-color: var(--border);
-  background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
-  color: var(--text-muted);
-}
-
 .workflow-message {
   padding: 9px;
   border: 1px solid #dcdcdc;
@@ -477,7 +464,6 @@ button:not(:disabled):active {
 .approval-item,
 .project-card,
 .member-row,
-.browser-profile-state,
 .browser-request,
 .handoff-row,
 .diff-row,
@@ -548,6 +534,17 @@ button:not(:disabled):active {
   line-height: 1.2;
 }
 
+.panel-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
 .panel-state {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -562,17 +559,6 @@ button:not(:disabled):active {
   color: color-mix(in srgb, var(--accent) 82%, var(--text));
 }
 
-.panel-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 24px;
-  min-height: 24px;
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  background: var(--surface-muted);
-  color: var(--text);
-}
-
 .file-row.active,
 .model-options button.active,
 .terminal-tabs button.active {
@@ -581,7 +567,6 @@ button:not(:disabled):active {
   color: var(--text);
 }
 
-.diff-preview pre,
 .diff-code,
 .terminal-output {
   border: 1px solid var(--border);
@@ -599,21 +584,6 @@ button:not(:disabled):active {
   background: var(--surface-muted);
   color: var(--text-muted);
   text-align: center;
-}
-
-.browser-policy-state span::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 7px 1px 0;
-  border-radius: 99px;
-  background: var(--green);
-}
-
-.browser-policy-state strong {
-  color: color-mix(in srgb, var(--accent) 72%, var(--text));
-  font-weight: 700;
 }
 
 .browser-request.denied,

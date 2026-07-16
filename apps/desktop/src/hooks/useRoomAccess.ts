@@ -49,7 +49,7 @@ export function useRoomAccess({
         hostAccess: "No room selected",
         workspaceAccess: "No room selected",
         history: historySettings.enabled ? `Encrypted, ${historySettings.retentionDays} days` : "Disabled",
-        browserProfile: "No room selected"
+        browserSession: "No room selected"
       },
       browserAccessMessage: "Select a room to use its browser.",
       workspaceRequestMessage: "Select a room to request workspace access.",
@@ -72,8 +72,7 @@ export function useRoomAccess({
     locked: isSelectedRoomLocked,
     isActiveHost,
     canReadLocalWorkspace,
-    historySettings,
-    browserProfilePersistent: selectedRoom.browserProfilePersistent
+    historySettings
   });
   const browserAccessMessage = browserAccessGateMessage(selectedRoom, isSelectedRoomLocked);
   const workspaceRequestMessage = isSelectedRoomLocked

@@ -104,4 +104,11 @@ test("production doctor accepts only the packaged desktop custom origin", () => 
   });
   assert.notEqual(customSchemeResult.status, 0);
   assert.match(customSchemeResult.output, /exact tauri:\/\/localhost desktop origin/);
+
+  const mixedInvalidResult = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://app.example.test,https://app.example.test/path"
+  });
+  assert.notEqual(mixedInvalidResult.status, 0);
+  assert.match(mixedInvalidResult.output, /must be a bare origin without path, query, or hash/);
 });

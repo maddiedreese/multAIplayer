@@ -54,7 +54,7 @@ Before private use, read the [alpha limitations](docs/alpha-limitations.md), [cr
 
 ## Build locally
 
-Prerequisites are Node.js 24, npm 11.16.0, Rust 1.89/Cargo, Xcode command-line tools, and Codex:
+Prerequisites are Node.js 24.x, npm 11.16.0, Rust 1.89.x/Cargo, Xcode command-line tools, and Codex:
 
 ```sh
 npm install --global npm@11.16.0 --ignore-scripts

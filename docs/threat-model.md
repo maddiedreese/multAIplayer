@@ -105,7 +105,7 @@ Residual IPC trust is explicit. Non-Codex local project/Git commands still recei
 
 ## Desktop App Shell CSP
 
-The packaged Tauri app sets a Content Security Policy for the main multAIplayer window. It allows the app bundle itself, Tauri IPC, local development relay endpoints, and the official hosted relay origin. It does not allow the website or updater channel as webview connection origins: update checks run in the native signed-updater plugin, and ordinary product links open externally. It does not allow arbitrary HTTPS/WSS egress from the app shell; self-hosted packaged builds must include their relay origin in the build-time CSP. App-shell image loading is limited to bundled/data/blob images and GitHub-hosted avatars, and presence avatar URLs are filtered before render. This policy applies to the multAIplayer app shell; approved room browser pages open in separate room/project-scoped WebViews with their own profile and download blocking.
+The packaged Tauri app sets a Content Security Policy for the main multAIplayer window. It allows the app bundle itself, Tauri IPC, local development relay endpoints, and the official hosted relay origin. It does not allow the website or updater channel as webview connection origins: update checks run in the native signed-updater plugin, and ordinary product links open externally. It does not allow arbitrary HTTPS/WSS egress from the app shell; self-hosted packaged builds must include their relay origin in the build-time CSP. App-shell image loading is limited to bundled/data/blob images and GitHub-hosted avatars, and presence avatar URLs are filtered before render. This policy applies to the multAIplayer app shell; each approved room browser page opens in a separate nonpersistent WebView with download blocking.
 
 ## Diagnostics And Updates
 
@@ -121,7 +121,7 @@ The alpha uses Tauri's updater only after an explicit user action. The endpoint 
 
 ## Room Browser Capability Guards
 
-Approved room browser pages run in a room/project-scoped native WebView profile. The profile persists by default so signed-in sites can work inside that isolated room/project context, but the host can reset it or switch the room to refresh mode, which closes the room browser and clears the profile before each approved open. Downloads are denied by the native download handler. A guard script is injected into every frame to reject page Clipboard API calls and block file inputs, file input changes, and file drag/drop. This keeps the alpha on the conservative side until a host-approved browser upload flow exists.
+Approved room browser pages run in a nonpersistent native WebView data store. Each open starts a private browser session, and closing the view discards its cookies and website storage; the alpha deliberately does not support persistent sign-in state. Downloads are denied by the native download handler. A guard script is injected into every frame to reject page Clipboard API calls and block file inputs, file input changes, and file drag/drop. This keeps the alpha on the conservative side until a host-approved browser upload flow exists.
 
 ## Sensitive Attachment Review
 

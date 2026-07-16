@@ -6,7 +6,7 @@ Date: 2026-07-10
 
 ## Context
 
-A room can coordinate work across several people, but Codex, project files, terminals, browser profiles, Git, GitHub, secrets, and local credentials belong to one participant's machine and accounts. Room membership is therefore not sufficient authority to spend a Codex subscription or mutate host-local resources.
+A room can coordinate work across several people, but Codex, project files, terminals, browser sessions, Git, GitHub, secrets, and local credentials belong to one participant's machine and accounts. Room membership is therefore not sufficient authority to spend a Codex subscription or mutate host-local resources.
 
 ## Decision
 

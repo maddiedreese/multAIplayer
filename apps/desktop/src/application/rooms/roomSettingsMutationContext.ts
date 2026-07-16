@@ -45,7 +45,6 @@ export function createRoomSettingsMutationContext(
     },
     setBrowserMessageForRoom: (roomId: string, message: string | null) =>
       useAppStore.getState().setBrowserMessageForRoom(roomId, message),
-    clearBrowserStatusForRoom: (roomId: string) => useAppStore.getState().clearBrowserStatusForRoom(roomId),
     setProjectPathDraftForRoom: (roomId: string, path: string) =>
       useAppStore.getState().setProjectPathDraftForRoom(roomId, path, currentSelectedRoom()?.projectPath ?? ""),
     resetCodexApprovalForRoom: (roomId: string) => useAppStore.getState().resetCodexApprovalForRoom(roomId),

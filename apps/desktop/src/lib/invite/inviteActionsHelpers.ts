@@ -1,5 +1,5 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import { defaultBrowserProfilePersistent, defaultCodexModel } from "@multaiplayer/protocol";
+import { defaultCodexModel } from "@multaiplayer/protocol";
 import { defaultProjectPath } from "../platform/localBackend";
 import { ensureRoomDefaults } from "../room/roomDefaults";
 import { maxInviteLinkChars } from "./inviteUrl";
@@ -22,8 +22,7 @@ export function buildFallbackInvitedRoom({
     host: "No host",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    codexModel: defaultCodexModel,
-    browserProfilePersistent: defaultBrowserProfilePersistent
+    codexModel: defaultCodexModel
   });
 }
 

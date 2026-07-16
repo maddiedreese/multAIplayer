@@ -110,8 +110,7 @@ test("relay rejects expired invite metadata loaded from store", async () => {
           name: "Desktop client",
           host: "No host",
           hostStatus: "offline",
-          approvalPolicy: "ask_every_turn",
-          browserProfilePersistent: true
+          approvalPolicy: "ask_every_turn"
         }
       ],
       teamMembers: ownerMembership(),
@@ -152,8 +151,7 @@ test("relay drops invalid persisted invite metadata", async () => {
           name: "Desktop client",
           host: "No host",
           hostStatus: "offline",
-          approvalPolicy: "ask_every_turn",
-          browserProfilePersistent: true
+          approvalPolicy: "ask_every_turn"
         },
         {
           id: "room-deleted",
@@ -162,7 +160,6 @@ test("relay drops invalid persisted invite metadata", async () => {
           host: "No host",
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
-          browserProfilePersistent: true,
           deletedAt: new Date().toISOString()
         },
         {
@@ -171,8 +168,7 @@ test("relay drops invalid persisted invite metadata", async () => {
           name: "Room in deleted team",
           host: "No host",
           hostStatus: "offline",
-          approvalPolicy: "ask_every_turn",
-          browserProfilePersistent: true
+          approvalPolicy: "ask_every_turn"
         }
       ],
       teamMembers: ownerMembership(),
@@ -258,8 +254,7 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
           name: "Desktop client",
           host: "No host",
           hostStatus: "offline",
-          approvalPolicy: "ask_every_turn",
-          browserProfilePersistent: true
+          approvalPolicy: "ask_every_turn"
         }
       ],
       teamMembers: ownerMembership(),

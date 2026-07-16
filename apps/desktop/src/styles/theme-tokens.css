@@ -49,7 +49,6 @@
 .profile-card,
 .search-box,
 .team-button,
-.sidebar-room,
 .sidebar-footer button,
 .panel,
 .composer textarea,
@@ -58,7 +57,6 @@
 .header-copy,
 .host-controls,
 .room-tool-nav button,
-.inspector-tabs,
 .workflow-message,
 .warning-banner,
 .project-card,
@@ -69,10 +67,6 @@
 .empty-state,
 .sidebar-empty {
   box-shadow: none !important;
-}
-
-.room-subtitle span {
-  color: var(--text-muted);
 }
 
 .room-tool-nav button:hover,
@@ -248,47 +242,6 @@
 
 .composer .send {
   border-radius: 7px;
-}
-
-.inspector-tabs {
-  display: grid;
-  border: 1px solid var(--border);
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 2px;
-  padding: 4px;
-  border-radius: 8px;
-  background: var(--surface-muted);
-}
-
-.inspector-tabs button {
-  display: inline-flex;
-  align-items: center;
-  font-weight: 680;
-  min-height: 32px;
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  gap: 5px;
-  justify-content: center;
-  padding: 9px 5px;
-  border-radius: 6px;
-  text-transform: none;
-}
-
-.inspector-tabs button.active {
-  border-color: #161616;
-  color: var(--text);
-  box-shadow: 0 1px 4px rgba(33, 33, 33, 0.08);
-  background: var(--surface-strong);
-}
-
-.tab-badge,
-.sidebar-room .attention,
-.sidebar-room .unread,
-.panel-count {
-  border-color: var(--border-strong);
-  background: var(--surface-muted);
-  color: var(--text);
 }
 
 .primary-wide,

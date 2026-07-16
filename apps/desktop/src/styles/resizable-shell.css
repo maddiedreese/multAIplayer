@@ -52,14 +52,6 @@
   user-select: none;
 }
 
-.shell-resizer-left {
-  grid-column: 2;
-}
-
-.shell-resizer-right {
-  grid-column: 4;
-}
-
 .shell-resizer button {
   display: grid;
   place-items: center;
@@ -112,9 +104,7 @@
 .panel-count,
 .member-badges b,
 .member-badges button,
-.browser-policy-state span,
 .terminal-tabs span,
-.relay-dot,
 .header-copy,
 .host-controls button,
 .primary-tool {
@@ -167,8 +157,7 @@
   flex: 0 0 18px;
 }
 
-.drawer-help-text,
-.tool-panel-hint {
+.drawer-help-text {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
@@ -195,19 +184,4 @@
 
 .browser-panel .primary-wide + .ghost-wide {
   margin-top: -2px;
-}
-
-.terminal-launcher {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.terminal-launcher .tool-panel-hint {
-  grid-column: 1 / -1;
-}
-
-.terminal-launcher button {
-  width: auto;
-  min-width: 0;
 }

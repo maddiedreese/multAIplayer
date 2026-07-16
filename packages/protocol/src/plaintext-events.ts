@@ -429,8 +429,7 @@ export const RoomSettingsPlaintextPayload = z.object({
     "codexRawReasoningEnabled",
     "codexSpeed",
     "codexSandboxLevel",
-    "projectPath",
-    "browserProfilePersistent"
+    "projectPath"
   ]),
   previousValue: z.string().max(maxMediumTextChars),
   nextValue: z.string().max(maxMediumTextChars),

@@ -25,6 +25,30 @@ describe("packaged macOS WKWebView smoke", () => {
     const version = await browser.tauri.execute(({ core }) => core.invoke("app_version"));
     expect(version).toBe(expectedVersion);
 
+    const roomBrowserRequest = {
+      roomId: "native-smoke-room",
+      projectPath: "/tmp/multaiplayer-native-smoke",
+      bounds: { x: 24, y: 80, width: 360, height: 240 }
+    };
+    await browser.tauri.execute(
+      ({ core }, request) =>
+        core.invoke("open_browser_view", {
+          request: { ...request, url: "https://example.com" }
+        }),
+      roomBrowserRequest
+    );
+    await browser.tauri.execute(
+      ({ core }, request) =>
+        core.invoke("position_browser_view", {
+          request: { ...request, bounds: { x: 32, y: 88, width: 380, height: 260 } }
+        }),
+      roomBrowserRequest
+    );
+    await browser.tauri.execute(
+      ({ core }, request) => core.invoke("close_browser_view", { request }),
+      roomBrowserRequest
+    );
+
     await browser.saveScreenshot("reports/native-macos-smoke/wkwebview-smoke.png");
   });
 });

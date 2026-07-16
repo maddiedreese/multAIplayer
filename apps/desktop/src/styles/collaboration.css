@@ -299,9 +299,7 @@
 .panel-count,
 .member-badges b,
 .member-badges button,
-.browser-policy-state span,
 .terminal-tabs span,
-.relay-dot,
 .header-copy,
 .host-controls button,
 .primary-tool,
@@ -570,21 +568,6 @@
   padding: 16px;
   cursor: text;
   min-height: 420px;
-}
-
-.terminal-command-line {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: baseline;
-  gap: 8px;
-  color: #bebebe;
-  font-family: inherit;
-  font-size: 12px;
-  position: sticky;
-  bottom: 0;
-  margin-top: auto;
-  padding-top: 10px;
-  background: linear-gradient(180deg, transparent, var(--code-bg) 28%);
 }
 
 .file-viewer-switcher {

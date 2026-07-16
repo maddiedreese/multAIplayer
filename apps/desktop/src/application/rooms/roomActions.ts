@@ -24,6 +24,8 @@ type AppStoreActionName = {
 }[keyof AppStoreState];
 
 function storeAction<Key extends AppStoreActionName>(name: Key): AppStoreState[Key] {
+  // Resolve at invocation time so long-lived room adapters never retain an action
+  // implementation replaced by a store reset or runtime reconfiguration.
   return ((...args: unknown[]) => {
     const action = useAppStore.getState()[name] as (...actionArgs: unknown[]) => unknown;
     return action(...args);
@@ -78,7 +80,6 @@ export function createRoomActions({
   const setBrowserMessageForRoom = storeAction("setBrowserMessageForRoom");
   const selectBrowserTabForRoom = storeAction("selectBrowserTabForRoom");
   const closeBrowserTabForRoom = storeAction("closeBrowserTabForRoom");
-  const clearBrowserStatusForRoom = storeAction("clearBrowserStatusForRoom");
   const setInviteLinkForRoom = storeAction("setInviteLinkForRoom");
   const setInviteApprovalGateForRoom = storeAction("setInviteApprovalGateForRoom");
   const setInviteMessageForRoom = storeAction("setInviteMessageForRoom");
@@ -174,7 +175,6 @@ export function createRoomActions({
     setBrowserMessageForRoom,
     selectBrowserTabForRoom,
     closeBrowserTabForRoom,
-    clearBrowserStatusForRoom,
     setSelectedBrowserMessage: (message: string | null) =>
       withSelectedRoom((roomId) => setBrowserMessageForRoom(roomId, message)),
     setInviteLinkForRoom,

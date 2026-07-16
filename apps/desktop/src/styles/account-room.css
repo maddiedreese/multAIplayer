@@ -106,10 +106,6 @@
   color: #727272;
 }
 
-.drawer-modes {
-  gap: 7px;
-}
-
 .relay-config-section label {
   display: grid;
   gap: 5px;
@@ -151,16 +147,6 @@
   border-color: #d0d0d0;
   background: #f5f5f5;
   color: #414141;
-}
-
-.host-message {
-  margin: 12px 18px 0;
-  padding: 9px 11px;
-  border: 1px solid #dedede;
-  border-radius: 8px;
-  background: #f7f7f7;
-  color: #444444;
-  font-size: 13px;
 }
 
 .status-pill.green {
@@ -357,8 +343,7 @@
 .approval-title div,
 .approval-actions,
 .panel-title,
-.project-card,
-.inspector-tabs {
+.project-card {
   display: flex;
   align-items: center;
 }
@@ -485,22 +470,4 @@
   align-items: center;
   color: #707070;
   font-size: 11px;
-}
-
-.tab-badge {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: #505050;
-  color: #ffffff;
-  font-size: 11px;
-  line-height: 1;
-}
-
-.inspector-tabs button.active .tab-badge {
-  background: #d6d6d6;
-  color: #161616;
 }

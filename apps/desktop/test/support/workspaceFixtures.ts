@@ -1,5 +1,4 @@
 import {
-  defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexReasoningEffort,
   defaultCodexSpeed,
@@ -16,7 +15,6 @@ const roomDefaults = {
   codexReasoningEffort: defaultCodexReasoningEffort,
   codexSpeed: defaultCodexSpeed,
   codexSandboxLevel: "workspace_write" as const,
-  browserProfilePersistent: defaultBrowserProfilePersistent,
   unread: 0
 };
 

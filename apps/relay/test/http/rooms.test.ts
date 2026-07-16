@@ -25,21 +25,18 @@ test("relay accepts public room metadata and rejects host-local configuration", 
       body: JSON.stringify({
         teamId: "team-core",
         name: "Approval room",
-        approvalPolicy: "ask_every_turn",
-        browserProfilePersistent: false
+        approvalPolicy: "ask_every_turn"
       })
     });
     assert.equal(response.status, 201);
     const body = (await response.json()) as {
       room: {
         approvalPolicy: string;
-        browserProfilePersistent: boolean;
       };
     };
     assert.equal(body.room.approvalPolicy, "ask_every_turn");
     assert.equal("projectPath" in body.room, false);
     assert.equal("codexModel" in body.room, false);
-    assert.equal(body.room.browserProfilePersistent, false);
 
     assert.equal(
       await postJsonStatus(relay.baseUrl, "/rooms", {
@@ -54,14 +51,6 @@ test("relay accepts public room metadata and rejects host-local configuration", 
         teamId: "team-core",
         name: "Leaking raw reasoning setting",
         codexRawReasoningEnabled: "yes"
-      }),
-      400
-    );
-    assert.equal(
-      await postJsonStatus(relay.baseUrl, "/rooms", {
-        teamId: "team-core",
-        name: "Bad browser persistence room",
-        browserProfilePersistent: "sometimes"
       }),
       400
     );
@@ -272,8 +261,7 @@ test("relay lets only the active host change public room settings", async () => 
     assert.equal(
       await patchRoomSettings(relay.baseUrl, {
         requesterName: "Peer",
-        requesterUserId: "github:peer",
-        browserProfilePersistent: true
+        requesterUserId: "github:peer"
       }),
       403
     );
@@ -282,15 +270,11 @@ test("relay lets only the active host change public room settings", async () => 
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         requesterName: "Maddie",
-        requesterUserId: "github:maddiedreese",
-        browserProfilePersistent: true
+        requesterUserId: "github:maddiedreese"
       })
     });
     assert.equal(rawReasoningResponse.status, 200);
-    const rawReasoningBody = (await rawReasoningResponse.json()) as {
-      room: { browserProfilePersistent?: boolean };
-    };
-    assert.equal(rawReasoningBody.room.browserProfilePersistent, true);
+    await rawReasoningResponse.json();
   } finally {
     await relay.close();
   }
@@ -635,8 +619,7 @@ function hostBootstrapRoom(): RoomRecord {
     host: "Maddie",
     hostUserId: "github:maddiedreese",
     hostStatus: "offline",
-    approvalPolicy: "ask_every_turn",
-    browserProfilePersistent: false
+    approvalPolicy: "ask_every_turn"
   };
 }
 

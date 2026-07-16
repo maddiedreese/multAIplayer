@@ -20,7 +20,7 @@ checkOptionalFile(join("apps", "relay", ".env"), "optional: relay-local env file
 
 if (!productionRelay) {
   checkCommand("cargo", ["--version"], "Cargo is required for the Tauri desktop shell.");
-  checkCommand("rustc", ["--version"], "rustc is required for native Tauri tests and builds.");
+  checkRustVersion();
   checkCodexCompatibility();
   checkLocalFile(
     join("apps", "desktop", "src-tauri", "Cargo.lock"),
@@ -61,9 +61,26 @@ console.log(
 function checkNode() {
   const major = Number(process.versions.node.split(".")[0]);
   checks.push({
-    ok: Number.isFinite(major) && major >= 24,
+    ok: major === 24,
     label: "node",
-    detail: `found ${process.version}; Node 24 or newer is expected`
+    detail: `found ${process.version}; Node 24.x is required`
+  });
+}
+
+function checkRustVersion() {
+  const result = spawnSync("rustc", ["--version"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  const output = [result.stdout, result.stderr].filter(Boolean).join(" ").trim();
+  const version = output.match(/^rustc\s+(\d+)\.(\d+)\.(\d+)/);
+  checks.push({
+    ok: result.status === 0 && version?.[1] === "1" && version[2] === "89",
+    label: "rustc",
+    detail:
+      result.status === 0
+        ? `${output || "version unavailable"}; Rust 1.89.x is required`
+        : "rustc 1.89.x is required for native Tauri tests and builds."
   });
 }
 

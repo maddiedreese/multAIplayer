@@ -74,8 +74,6 @@ select {
 }
 
 .brand span,
-.room-subtitle,
-.sidebar-room span,
 .team-button span,
 .panel-title span,
 .project-card span,
@@ -87,7 +85,6 @@ select {
 .github-button,
 .profile-card,
 .team-button,
-.sidebar-room,
 .sidebar-footer button,
 .header-copy,
 .host-controls,
@@ -147,13 +144,6 @@ select {
   font-weight: 680;
 }
 
-.room-subtitle {
-  margin-top: 8px;
-  gap: 10px;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .room-tool-nav {
   display: flex;
   align-items: center;
@@ -205,27 +195,6 @@ select {
   background: var(--surface-strong);
   color: var(--text);
   text-decoration: none;
-}
-
-.relay-dot.open,
-.relay-dot.connecting,
-.relay-dot.closed,
-.relay-dot.error {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1;
-}
-
-.relay-dot.open {
-  border-color: var(--border-strong);
-  color: var(--text);
 }
 
 .host-controls,

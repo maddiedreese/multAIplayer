@@ -350,11 +350,6 @@ button:disabled {
   border-radius: 8px;
 }
 
-.room-button strong,
-.room-button span {
-  display: block;
-}
-
 .room-button span {
   margin-top: 3px;
   color: #727272;

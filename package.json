@@ -7,7 +7,7 @@
   "type": "module",
   "packageManager": "npm@11.16.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=24 <25"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true,
@@ -50,7 +50,7 @@
     "doctor": "node scripts/doctor.mjs",
     "sync:release-versions": "node tools/release/sync-release-metadata.mjs",
     "finalize:release-changelog": "node tools/release/finalize-changelog.mjs",
-    "license:check": "node scripts/license-check.mjs",
+    "license:check": "node scripts/license-check.mjs && node scripts/cargo-license-notices-check.mjs",
     "sqlite:backup-restore-drill": "node --import tsx e2e/relay/sqlite-backup-restore-drill.mjs --fixture",
     "verify:release-assets": "node tools/release/check-release-assets.mjs",
     "verify:updater-contract": "node tools/release/verify-updater-contract.mjs",

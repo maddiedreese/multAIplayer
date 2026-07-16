@@ -46,7 +46,6 @@ const room: ClientRoomRecord = {
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.5",
-  browserProfilePersistent: true,
   unread: 0
 };
 

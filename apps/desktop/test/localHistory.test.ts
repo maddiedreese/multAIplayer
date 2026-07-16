@@ -189,7 +189,6 @@ test("close snapshot construction includes current state from every hydrated eli
     hostStatus: "active" as const,
     approvalPolicy: "ask_every_turn" as const,
     codexModel: "gpt-5.4",
-    browserProfilePersistent: true,
     unread: 0
   });
   const store = useAppStore.getState();

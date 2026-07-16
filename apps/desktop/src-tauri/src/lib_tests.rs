@@ -488,13 +488,13 @@ fn sanitize_window_label_replaces_unsupported_room_id_characters() {
 }
 
 #[test]
-fn browser_profile_scope_is_separate_per_project() {
-    let first = browser_profile_scope("room-alpha", Some("/Users/maddie/project-a"))
-        .expect("first browser profile scope");
-    let second = browser_profile_scope("room-alpha", Some("/Users/maddie/project-b"))
-        .expect("second browser profile scope");
-    let first_again = browser_profile_scope("room-alpha", Some("  /Users/maddie/project-a  "))
-        .expect("stable browser profile scope");
+fn browser_view_scope_is_separate_per_project() {
+    let first = browser_view_scope("room-alpha", Some("/Users/maddie/project-a"))
+        .expect("first browser view scope");
+    let second = browser_view_scope("room-alpha", Some("/Users/maddie/project-b"))
+        .expect("second browser view scope");
+    let first_again = browser_view_scope("room-alpha", Some("  /Users/maddie/project-a  "))
+        .expect("stable browser view scope");
 
     assert_ne!(first, second);
     assert_eq!(first, first_again);
@@ -515,6 +515,7 @@ fn room_browser_guard_script_is_packaged_from_the_tested_source() {
 fn room_browser_creation_remains_native_only() {
     let production_capabilities = include_str!("../capabilities/default.json");
     let native_test_config = include_str!("../tauri.native-e2e.conf.json");
+    let native_browser = include_str!("browser.rs");
     let browser_panel = include_str!("../../src/components/BrowserAccessPanel.tsx");
 
     for source in [production_capabilities, native_test_config] {
@@ -527,6 +528,8 @@ fn room_browser_creation_remains_native_only() {
     assert!(!browser_panel.contains("@tauri-apps/api/webview"));
     assert!(!browser_panel.contains("new Webview"));
     assert!(browser_panel.contains("openBrowserView"));
+    assert!(native_browser.contains(".incognito(true)"));
+    assert!(!native_browser.contains(".data_directory("));
 }
 
 #[test]

@@ -87,8 +87,7 @@ export function createWorkspaceCreationActions({
         plan,
         {
           approvalPolicy: teamDefaults.approvalPolicy,
-          codexModel: teamDefaults.codexModel,
-          browserProfilePersistent: teamDefaults.browserProfilePersistent
+          codexModel: teamDefaults.codexModel
         },
         {
           inviteApprovalGate: teamDefaults.inviteApprovalGate,

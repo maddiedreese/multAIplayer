@@ -24,7 +24,6 @@ export function LocalHistoryPanel({
   teamDefaultCodexModel,
   defaultCodexModel,
   codexModelOptions,
-  teamDefaultBrowserProfilePersistent,
   message,
   hydrationStatus,
   onHistoryEnabledChange,
@@ -36,8 +35,7 @@ export function LocalHistoryPanel({
   onTeamHistoryEnabledChange,
   onTeamHistoryRetentionDaysChange,
   onTeamDefaultApprovalPolicyChange,
-  onTeamDefaultCodexModelChange,
-  onTeamDefaultBrowserProfilePersistentChange
+  onTeamDefaultCodexModelChange
 }: {
   historySettings: HistorySettingsDisplay;
   teamHistorySettings: HistorySettingsDisplay;
@@ -49,7 +47,6 @@ export function LocalHistoryPanel({
   teamDefaultCodexModel: string;
   defaultCodexModel: string;
   codexModelOptions: readonly CodexModelOptionDisplay[];
-  teamDefaultBrowserProfilePersistent: boolean;
   teamDefaultInviteApprovalGate: boolean;
   message: string | null;
   hydrationStatus: "loading" | "ready" | "failed" | null;
@@ -63,7 +60,6 @@ export function LocalHistoryPanel({
   onTeamHistoryRetentionDaysChange: (retentionDays: number) => void;
   onTeamDefaultApprovalPolicyChange: (policy: ApprovalPolicy) => void;
   onTeamDefaultCodexModelChange: (model: string) => void;
-  onTeamDefaultBrowserProfilePersistentChange: (persistent: boolean) => void;
   onTeamDefaultInviteApprovalGateChange: (enabled: boolean) => void;
 }) {
   return (
@@ -172,15 +168,6 @@ export function LocalHistoryPanel({
             </option>
           ))}
         </select>
-      </label>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={teamDefaultBrowserProfilePersistent}
-          disabled={!selectedTeam}
-          onChange={(event) => onTeamDefaultBrowserProfilePersistentChange(event.target.checked)}
-        />
-        <span>Persist browser profiles in new team rooms</span>
       </label>
       {message && <div className="workflow-message">{message}</div>}
     </section>
