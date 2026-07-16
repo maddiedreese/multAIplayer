@@ -8,7 +8,7 @@ All notable user-visible and security-relevant changes are recorded here. Releas
 
 - Native RFC 9420 MLS rooms with pinned `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`, active-host commits, KeyPackage invite approval, retained exporter-derived history secrets, and encrypted chat and attachments.
 - Room-scoped Codex hosting with explicit turn approval, bounded queues, goal controls, project/file/diff tools, terminals, an in-room browser, GitHub workflows, and host handoff.
-- SQLite relay persistence, production readiness checks, rate and quota controls, signed/notarized macOS release enforcement, checksums, SBOMs, and provenance attestations.
+- SQLite relay persistence, production readiness checks, rate and quota controls, signed/notarized macOS release enforcement, and published SHA-256 checksums.
 - Bounded, re-redacted native diagnostics export and an in-app release update banner.
 - Resumable first-run create/join setup with device readiness checks, conservative defaults, partial room-creation recovery, a persistent setup checklist, Help-based reopen/restart controls, and an in-room guided first Codex turn.
 

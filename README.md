@@ -74,7 +74,7 @@ npm test
 npm run verify
 ```
 
-Pull requests run workspace checks and product journeys when executable code changes. Scheduled workflows provide focused fuzz, supply-chain, container, and Codex-compatibility checks. Releases verify signing, notarization, authenticated updater metadata, the exact release asset set, and checksums. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
+Pull requests run workspace checks and product journeys when executable code changes. Scheduled workflows provide focused fuzz, supply-chain, container, and Codex-compatibility checks. Releases verify signing, notarization, authenticated updater metadata, the required release asset set, and checksums. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
 
 ## Repository map
 
