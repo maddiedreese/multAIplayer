@@ -12,7 +12,7 @@ interface UseTerminalAutoOpenOptions {
   isSelectedRoomLocked: boolean;
   terminalBusy: boolean;
   roomTerminalCount: number;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   terminalAutoOpenedRoomsRef: LatestRef<Set<string>>;
   openInteractiveTerminal: (options?: { reuseExisting?: boolean; quiet?: boolean }) => Promise<void>;
 }
@@ -33,6 +33,7 @@ export function useTerminalAutoOpen({
     if (
       inspectorTab !== "terminal" ||
       !hasSelectedRoom ||
+      !selectedRoomId ||
       !isActiveHost ||
       !canReadLocalWorkspace ||
       isSelectedRoomLocked ||

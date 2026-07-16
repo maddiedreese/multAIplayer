@@ -10,7 +10,7 @@ export function useAppBootstrapEffects({
   selectedTeamDefaults
 }: {
   workspace: Parameters<typeof useWorkspaceBootstrap>[0];
-  selectedRoomReadReceipt: { selectedRoomId: string; markRoomRead: (roomId: string) => void };
+  selectedRoomReadReceipt: { selectedRoomId: string | null; markRoomRead: (roomId: string) => void };
   deviceIdentity: Parameters<typeof useDeviceIdentityLifecycle>[0];
   selectedTeamDefaults: Parameters<typeof useSelectedTeamDefaults>[0];
 }) {

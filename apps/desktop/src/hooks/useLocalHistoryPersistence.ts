@@ -32,7 +32,7 @@ import { useAppStore } from "../store/appStore";
 
 interface UseLocalHistoryPersistenceOptions {
   hasSelectedRoom: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectedRoomTeamId: string;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
@@ -83,9 +83,12 @@ export function useLocalHistoryPersistence({
   roomGoal,
   codexThreadGraph
 }: UseLocalHistoryPersistenceOptions) {
-  const hydrationStatus = useAppStore((state) => state.historyPresenceByRoom[selectedRoomId]?.historyHydrationStatus);
+  const hydrationStatus = useAppStore((state) =>
+    selectedRoomId ? state.historyPresenceByRoom[selectedRoomId]?.historyHydrationStatus : undefined
+  );
   const persistenceEnabledRoomIds = useRef(new Set<string>());
   useEffect(() => {
+    if (!selectedRoomId) return;
     if (hydrationStatus !== "ready") {
       persistenceEnabledRoomIds.current.delete(selectedRoomId);
       return;

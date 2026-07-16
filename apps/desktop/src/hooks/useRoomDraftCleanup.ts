@@ -3,7 +3,7 @@ import { useAppStore } from "../store/appStore";
 
 interface UseRoomDraftCleanupOptions {
   hasSelectedRoom: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   selectedRoomProjectPath: string;
   selectedCodexModel: string;
 }
@@ -18,12 +18,12 @@ export function useRoomDraftCleanup({
   const setProjectPathDraftForRoom = useAppStore((state) => state.setProjectPathDraftForRoom);
 
   useEffect(() => {
-    if (!hasSelectedRoom) return;
+    if (!hasSelectedRoom || !selectedRoomId) return;
     setCustomCodexModelForRoom(selectedRoomId, selectedCodexModel, selectedCodexModel);
   }, [hasSelectedRoom, selectedCodexModel, selectedRoomId, setCustomCodexModelForRoom]);
 
   useEffect(() => {
-    if (!hasSelectedRoom) return;
+    if (!hasSelectedRoom || !selectedRoomId) return;
     setProjectPathDraftForRoom(selectedRoomId, selectedRoomProjectPath, selectedRoomProjectPath);
   }, [hasSelectedRoom, selectedRoomId, selectedRoomProjectPath, setProjectPathDraftForRoom]);
 }

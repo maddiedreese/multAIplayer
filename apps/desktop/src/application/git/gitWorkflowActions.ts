@@ -178,10 +178,6 @@ export function createGitWorkflowActions({
     const room = currentSelectedRoom();
     const state = useAppStore.getState();
     if (!room) {
-      state.setGitWorkflowMessageForRoom(
-        state.selectedRoomId,
-        "Create or join a room before approving a git workflow."
-      );
       return null;
     }
     const context = currentContext();

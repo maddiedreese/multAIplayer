@@ -4,7 +4,7 @@ import { useAppStore } from "../store/appStore";
 
 interface UseGitHubActionsDraftResetOptions {
   hasSelectedRoom: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   gitWorkflowDraft: GitWorkflowDraft;
 }
 
@@ -16,7 +16,7 @@ export function useGitHubActionsDraftReset({
   const resetGitHubActionsStateForRoom = useAppStore((state) => state.resetGitHubActionsStateForRoom);
 
   useEffect(() => {
-    if (!hasSelectedRoom) return;
+    if (!hasSelectedRoom || !selectedRoomId) return;
     resetGitHubActionsStateForRoom(selectedRoomId);
   }, [
     gitWorkflowDraft.branchName,

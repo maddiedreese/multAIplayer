@@ -69,12 +69,6 @@ export function createChatActions({ relayRef, seenEnvelopeIds }: ChatActionsOpti
   async function toggleMessageReaction(message: ChatMessage, emoji: string) {
     const selectedRoom = currentSelectedRoom();
     if (!selectedRoom) {
-      useAppStore
-        .getState()
-        .setChatMessageForRoom(
-          useAppStore.getState().selectedRoomId,
-          "Create or join a room before reacting to messages."
-        );
       return;
     }
     const roomId = selectedRoom.id;

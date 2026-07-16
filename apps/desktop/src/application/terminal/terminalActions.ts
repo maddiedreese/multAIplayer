@@ -27,7 +27,7 @@ import { currentSelectedRoom, currentSelectedRoomContext } from "../workspace/se
 const defaultInteractiveShellCommand = "exec zsh -f";
 
 interface TerminalActionsOptions {
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   terminalBusyRef: MutableRefObject<Record<string, boolean>>;
   reportRoomTerminalActionInFlight: (roomId: string) => boolean;
   maxTerminalActivityLines: number;
@@ -89,7 +89,8 @@ export function createTerminalActions({
   }
 
   function setSelectedTerminalError(message: string | null) {
-    useAppStore.getState().setTerminalErrorForRoom(useAppStore.getState().selectedRoomId, message);
+    const roomId = useAppStore.getState().selectedRoomId;
+    if (roomId) useAppStore.getState().setTerminalErrorForRoom(roomId, message);
   }
 
   function setTerminalErrorForRoom(roomId: string, message: string | null) {

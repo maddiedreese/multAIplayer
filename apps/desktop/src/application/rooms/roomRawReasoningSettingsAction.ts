@@ -8,7 +8,7 @@ import type { RoomSettingsMutationContext } from "./roomSettingsMutationContext"
 export async function updateCodexRawReasoningSetting(
   enabled: boolean,
   options: {
-    selectedRoomId: () => string;
+    selectedRoomId: () => string | null;
     reportInFlight: (roomId: string) => boolean;
     replaceRoom: (room: ClientRoomRecord) => void;
     publishEvent: (

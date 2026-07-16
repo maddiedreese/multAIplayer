@@ -84,7 +84,7 @@ test("no selected room does not start native history hydration", async () => {
   const view = renderHook(() =>
     useLocalHistoryHydration({
       hasSelectedRoom: false,
-      selectedRoomId: "",
+      selectedRoomId: null,
       selectedRoomTeamId: "",
       forgottenRoomIds: noForgottenRoomIds,
       replaceHistorySettings: () => undefined,

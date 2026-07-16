@@ -19,7 +19,7 @@ export async function runRelayWorkspaceStartupBarrier(options: {
 export function canContinueSelectedWorkspaceAfterAdmissionRecovery(options: {
   failedAdmissions: ReadonlyArray<{ teamId: string; roomId: string }>;
   selectedTeamId: string;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
 }): boolean {
   if (options.selectedRoomId) {
     return !options.failedAdmissions.some((admission) => admission.roomId === options.selectedRoomId);

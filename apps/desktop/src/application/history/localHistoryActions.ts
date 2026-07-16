@@ -21,7 +21,7 @@ import { currentSelectedRoomContext } from "../workspace/selectedWorkspace";
 type BusyMap = Record<string, boolean>;
 
 interface CreateLocalHistoryActionsOptions {
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   settingsBusyRef: MutableRefObject<BusyMap>;
   reportRoomSettingsMutationInFlight: (
     roomId: string,
@@ -42,8 +42,10 @@ export function createLocalHistoryActions({
     const state = useAppStore.getState();
     return state.rooms.find((room) => room.id === state.selectedRoomId);
   };
-  const setSelectedHistoryMessage = (message: string | null) =>
-    useAppStore.getState().setHistoryMessageForRoom(selectedRoomIdRef.current, message);
+  const setSelectedHistoryMessage = (message: string | null) => {
+    const roomId = selectedRoomIdRef.current;
+    if (roomId) useAppStore.getState().setHistoryMessageForRoom(roomId, message);
+  };
   const setHistoryMessageForRoom = (roomId: string, message: string | null) =>
     useAppStore.getState().setHistoryMessageForRoom(roomId, message);
   const setSettingsBusyForRoom = (roomId: string, busy: boolean) => {

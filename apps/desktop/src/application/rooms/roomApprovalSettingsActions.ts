@@ -6,7 +6,7 @@ import { currentSelectedRoom } from "../workspace/selectedWorkspace";
 import { updateRoomSettings } from "../workspace/workspaceClient";
 
 interface ApprovalActionsOptions {
-  selectedRoomId: () => string;
+  selectedRoomId: () => string | null;
   approvalPolicyLabels: Record<string, string>;
   reportInFlight: (roomId: string) => boolean;
   replaceRoom: (room: ClientRoomRecord) => void;

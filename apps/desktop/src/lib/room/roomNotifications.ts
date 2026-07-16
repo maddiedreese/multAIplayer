@@ -11,7 +11,7 @@ export interface RoomNotificationInput {
   relayOpen: boolean;
   room: ClientRoomRecord | undefined;
   message: ChatMessage;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   localDeviceId: string;
   senderDeviceId: string;
   localUserId: string;

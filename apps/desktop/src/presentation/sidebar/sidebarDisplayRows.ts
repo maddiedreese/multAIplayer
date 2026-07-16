@@ -33,7 +33,7 @@ export function buildSidebarRoomRows({
   allRooms: ClientRoomRecord[];
   teams: TeamRecord[];
   searchActive: boolean;
-  selectedRoomId: string;
+  selectedRoomId: string | null;
   approvalVisibleByRoom: Record<string, boolean>;
   terminalRequestsByRoom: Record<string, TerminalCommandRequest[]>;
   browserRequestsByRoom: Record<string, BrowserAccessRequest[]>;

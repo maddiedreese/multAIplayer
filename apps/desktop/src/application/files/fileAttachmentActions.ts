@@ -32,7 +32,7 @@ import type { FilePreviewTab } from "../../lib/files/filePreview";
 import type { currentSelectedRoom, currentSelectedRoomContext } from "../workspace/selectedWorkspace";
 
 interface FileAttachmentActionOptions {
-  selectedRoomIdRef: MutableRefObject<string>;
+  selectedRoomIdRef: MutableRefObject<string | null>;
   reportRoomFileActionInFlight: (roomId: string) => boolean;
   currentRoom: typeof currentSelectedRoom;
   currentContext: typeof currentSelectedRoomContext;

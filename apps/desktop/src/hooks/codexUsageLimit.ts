@@ -6,7 +6,7 @@ import type { ChatMessage, HostHandoffRecord } from "../types";
 
 interface CodexUsageLimitContext {
   localUserId: string;
-  selectedRoomId: () => string;
+  selectedRoomId: () => string | null;
   publishCodexEvent: (
     event: { turnId: string; status: "failed"; message: string; model: string },
     room: ClientRoomRecord

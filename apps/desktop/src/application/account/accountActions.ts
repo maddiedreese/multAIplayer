@@ -34,7 +34,8 @@ export function createAccountActions({
       const { localUser, deviceId } = currentLocalIdentity();
       const identity = await loadOrCreateDeviceIdentity(localUser.id, deviceId);
       replaceDeviceIdentity(identity);
-      untrustDeviceForRoom(useAppStore.getState().selectedRoomId, currentLocalIdentity().deviceId);
+      const selectedRoomId = useAppStore.getState().selectedRoomId;
+      if (selectedRoomId) untrustDeviceForRoom(selectedRoomId, currentLocalIdentity().deviceId);
       setDeviceIdentityStatusMessage(
         "Created new local device identity. Public key registration will refresh automatically."
       );

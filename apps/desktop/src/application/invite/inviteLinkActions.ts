@@ -20,8 +20,10 @@ export function createInviteLinkActions(
 ) {
   const { selectedRoomIdRef } = options;
   const { setInviteLinkForRoom, setInviteMessageForRoom } = store;
-  const setSelectedInviteMessage = (message: string | null) =>
-    setInviteMessageForRoom(selectedRoomIdRef.current, message);
+  const setSelectedInviteMessage = (message: string | null) => {
+    const roomId = selectedRoomIdRef.current;
+    if (roomId) setInviteMessageForRoom(roomId, message);
+  };
 
   async function copyInviteLink() {
     const selectedRoom = currentSelectedRoom();

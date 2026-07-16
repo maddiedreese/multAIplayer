@@ -129,7 +129,7 @@ test("admission failures block only the selected authorization boundary", () => 
     canContinueSelectedWorkspaceAfterAdmissionRecovery({
       failedAdmissions,
       selectedTeamId: "team-pending",
-      selectedRoomId: ""
+      selectedRoomId: null
     }),
     false
   );
@@ -137,7 +137,7 @@ test("admission failures block only the selected authorization boundary", () => 
     canContinueSelectedWorkspaceAfterAdmissionRecovery({
       failedAdmissions,
       selectedTeamId: "team-ready",
-      selectedRoomId: ""
+      selectedRoomId: null
     }),
     true
   );

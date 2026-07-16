@@ -89,7 +89,7 @@ export function useSelectedRoomRuntime({
   settingsBusyByRoom,
   membershipCommitBusyByRoom
 }: UseSelectedRoomRuntimeOptions) {
-  const roomId = selectedRoom?.id ?? "";
+  const roomId = selectedRoom?.id ?? null;
   const runtime = selectRoomRuntimeCollections(
     {
       pendingCodexApprovalsByRoom,
@@ -224,8 +224,30 @@ function selectRoomRuntimeCollections(
     | "settingsBusyByRoom"
     | "membershipCommitBusyByRoom"
   >,
-  roomId: string
+  roomId: string | null
 ) {
+  if (!roomId) {
+    return {
+      activeCodexApproval: null,
+      queuedCodexApprovals: [],
+      approvalVisible: false,
+      hostHandoffs: [],
+      terminalRequests: [],
+      localPreviews: [],
+      localPreviewBusy: false,
+      inviteRequests: [],
+      codexEvents: [],
+      codexActivities: [],
+      gitWorkflowEvents: [],
+      githubActionsEvents: [],
+      selectedCodexThreadId: null,
+      codexThreadGraph: { activeThreadId: null, nodesById: {} },
+      codexRunning: false,
+      hostBusy: false,
+      settingsBusy: false,
+      membershipCommitBusy: false
+    };
+  }
   return {
     activeCodexApproval: sources.pendingCodexApprovalsByRoom[roomId] ?? null,
     queuedCodexApprovals: sources.queuedCodexApprovalsByRoom[roomId] ?? [],

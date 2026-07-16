@@ -166,7 +166,7 @@ test("room upsert deletion repairs a cross-team fallback atomically", () => {
 
 test("room selection moves from none to hydrated data and back to none when the final room leaves", () => {
   const store = useAppStore.getState();
-  assert.equal(store.selectedRoomId, "");
+  assert.equal(store.selectedRoomId, null);
   assert.deepEqual(store.rooms, []);
 
   store.replaceRooms([roomA]);
@@ -179,7 +179,7 @@ test("room selection moves from none to hydrated data and back to none when the 
 
   state.replaceRoomRecord({ ...roomA, deletedAt: new Date().toISOString() });
   state = useAppStore.getState();
-  assert.equal(state.selectedRoomId, "");
+  assert.equal(state.selectedRoomId, null);
   assert.equal(state.selectedTeam, teamA.id);
   assert.deepEqual(state.rooms, []);
 });

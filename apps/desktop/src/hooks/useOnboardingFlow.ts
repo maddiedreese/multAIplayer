@@ -54,7 +54,9 @@ export function useOnboardingFlow({
   const codexProbe = useAppStore((state) => state.codexProbe);
   const selectedRoomId = useAppStore((state) => state.selectedRoomId);
   const selectedRoom = useAppStore((state) => state.rooms.find((room) => room.id === state.selectedRoomId));
-  const inviteRuntime = useAppStore((state) => state.inviteByRoom[state.selectedRoomId]);
+  const inviteRuntime = useAppStore((state) =>
+    state.selectedRoomId ? state.inviteByRoom[state.selectedRoomId] : undefined
+  );
   const teamRoster = useAppStore((state) =>
     onboarding.markers.membership ? state.teamRosterByTeam[onboarding.markers.membership.teamId] : undefined
   );

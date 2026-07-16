@@ -129,8 +129,10 @@ export function createInviteJoinActions(
   store: InviteJoinStore = useAppStore.getState()
 ) {
   const { clearInviteSecretInput, selectWorkspaceRoom, upsertRoom, upsertTeam } = options;
-  const setSelectedInviteMessage = (message: string | null) =>
-    store.setInviteMessageForRoom(options.selectedRoomIdRef.current, message);
+  const setSelectedInviteMessage = (message: string | null) => {
+    const roomId = options.selectedRoomIdRef.current;
+    if (roomId) store.setInviteMessageForRoom(roomId, message);
+  };
 
   async function requestNoSecretInviteAccess(encodedInvite: string, inviteId?: string | null) {
     const invite = decodeNoSecretRoomInvite(encodedInvite);
