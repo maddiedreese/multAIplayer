@@ -166,6 +166,69 @@ test("local history actions resolve Zustand mutations when invoked without React
   assert.deepEqual(messages, [[room.id, "Encrypted local history is disabled for this room."]]);
 });
 
+test("clearing local history removes room state and immediately restores persistence readiness", async () => {
+  const store = useAppStore.getState();
+  useAppStore.setState({ rooms: [{ ...room, unread: 4 }] });
+  store.setHistoryHydrationStatusForRoom(room.id, "ready");
+  store.appendRoomMessage(room.id, {
+    id: "message-before-clear",
+    author: "Maddie",
+    role: "human",
+    body: "Delete me",
+    time: "now"
+  });
+  const actions = createLocalHistoryActions({
+    selectedRoomIdRef: { current: room.id },
+    settingsBusyRef: { current: {} },
+    reportRoomSettingsMutationInFlight: () => false,
+    replaceHistorySettings: () => undefined,
+    replaceRoom: () => undefined
+  });
+  await actions.clearRoomHistory();
+  assert.equal(useAppStore.getState().messagesByRoom[room.id], undefined);
+  assert.equal(useAppStore.getState().historyPresenceByRoom[room.id]?.historyHydrationStatus, "ready");
+  assert.equal(useAppStore.getState().rooms[0]?.unread, 0);
+});
+
+test("clear and forget failures remain visible without clearing live room state", async () => {
+  const failures: string[] = [];
+  useAppStore.setState({
+    setHistoryMessageForRoom: (_roomId, message) => {
+      if (message) failures.push(message);
+    }
+  });
+  nativeInvoke = async () => {
+    throw new Error("keychain unavailable");
+  };
+  const store = useAppStore.getState();
+  store.appendRoomMessage(room.id, {
+    id: "message-preserved",
+    author: "Maddie",
+    role: "human",
+    body: "Keep me",
+    time: "now"
+  });
+  const actions = createLocalHistoryActions({
+    selectedRoomIdRef: { current: room.id },
+    settingsBusyRef: { current: {} },
+    reportRoomSettingsMutationInFlight: () => false,
+    replaceHistorySettings: () => undefined,
+    replaceRoom: () => undefined
+  });
+  await actions.clearRoomHistory();
+  assert.equal(useAppStore.getState().messagesByRoom[room.id]?.[0]?.id, "message-preserved");
+  assert.match(failures.at(-1) ?? "", /could not be cleared/i);
+  Object.assign(window, { confirm: () => true });
+  await actions.forgetSelectedRoomLocalData();
+  assert.equal(useAppStore.getState().forgottenRoomIds.has(room.id), false);
+  assert.equal(useAppStore.getState().messagesByRoom[room.id]?.[0]?.id, "message-preserved");
+  assert.match(failures.at(-1) ?? "", /could not be forgotten/i);
+  nativeInvoke = async () => null;
+  await actions.forgetSelectedRoomLocalData();
+  assert.equal(useAppStore.getState().forgottenRoomIds.has(room.id), true);
+  assert.equal(useAppStore.getState().messagesByRoom[room.id], undefined);
+});
+
 test("member actions update the current Zustand roster without React", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>

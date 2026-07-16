@@ -66,7 +66,10 @@ export interface ReadOnlyRoomArchiveProjection {
 /** Converts untrusted decrypted JSON to the same bounded history types used by live local history. */
 export function projectReadOnlyRoomArchive(archive: RoomArchiveBody): ReadOnlyRoomArchiveProjection {
   const history = normalizeLocalRoomHistory({
-    version: 3,
+    // Archive version 1 is an explicitly lossy, user-editable interchange
+    // format. Keep its bounded sanitizing migration separate from strict v3
+    // encrypted-history recovery.
+    version: 2,
     messages: archive.history.messages,
     chatEdits: archive.history.chatEdits,
     chatDeletes: archive.history.chatDeletes,

@@ -56,7 +56,7 @@ interface UseRelaySubscriptionOptions {
     senderDeviceId: string,
     localDeviceId: string
   ) => void;
-  handleRelayError: (message: string) => void;
+  handleRelayError: (error: Extract<RelayServerMessage, { type: "error" }>) => void;
   upsertRoom: (room: ClientRoomRecord) => void;
   upsertTeam: (team: TeamRecord) => void;
   refreshTeamMembers: (teamId: string, quiet?: boolean) => Promise<void>;
@@ -309,10 +309,10 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
             )
               return;
           } catch (error) {
-            current.handleRelayError(`Device session recovery failed: ${String(error)}`);
+            current.handleRelayError({ type: "error", message: `Device session recovery failed: ${String(error)}` });
             return;
           }
-          current.handleRelayError(message.message);
+          current.handleRelayError(message);
           return;
         }
         if (message.type === "presence") {

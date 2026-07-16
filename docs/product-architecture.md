@@ -52,6 +52,10 @@ A teammate request is projected for host review, then crosses a typed TypeScript
 
 Handoff is an authenticated state-machine transition. The current host prepares bounded continuity data, the intended successor accepts, and room authority changes only after the protocol completes. Live processes, unsaved application state, and credentials do not teleport; ordinary Git and backups remain the durable continuity mechanism.
 
+### Encrypted local history
+
+History hydration validates the current schema before enabling persistence and merges delayed relay activity with entity-specific monotonic rules. Canonical snapshots apply the same container bounds enforced by the loader, retain the newest entries, and are shared by ordinary saves and the all-eligible-room shutdown drain. Clear, forget, and membership-revocation cleanup serialize with pending writes; failed deletion replays the newest blocked snapshot, while rejoin remains gated until old MLS state is successfully removed.
+
 ## Where changes belong
 
 - Put shared wire shapes and runtime guards in `packages/protocol`.

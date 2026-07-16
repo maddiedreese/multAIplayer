@@ -155,7 +155,6 @@ const languageByExtension: Readonly<Record<string, string>> = {
   md: "markdown",
   mdx: "markdown",
   rs: "rust",
-  toml: "toml",
   yaml: "yaml",
   yml: "yaml"
 };

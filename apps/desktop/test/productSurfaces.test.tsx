@@ -118,7 +118,7 @@ test("Codex account view renders native capabilities and dispatches account acti
 
 test("Monaco language selection covers the app's documented editing formats", () => {
   assert.equal(languageForPath("src/App.TSX"), "typescript");
-  assert.equal(languageForPath("Cargo.toml"), "toml");
+  assert.equal(languageForPath("Cargo.toml"), undefined);
   assert.equal(languageForPath("workflow.yaml"), "yaml");
   assert.equal(languageForPath("README.mdx"), "markdown");
   assert.equal(languageForPath("LICENSE"), undefined);

@@ -4,6 +4,9 @@ import {
   CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
   CodexActivityPlaintextPayload as CodexActivityPlaintextPayloadSchema,
   CodexQueuePlaintextPayload as CodexQueuePlaintextPayloadSchema,
+  CodexEventPlaintextPayload as CodexEventPlaintextPayloadSchema,
+  GitWorkflowEventPlaintextPayload as GitWorkflowEventPlaintextPayloadSchema,
+  GitHubActionsEventPlaintextPayload as GitHubActionsEventPlaintextPayloadSchema,
   LocalPreviewPlaintextPayload as LocalPreviewPlaintextPayloadSchema,
   WorkspaceFileSaveRequestPlaintextPayload as WorkspaceFileSaveRequestPlaintextPayloadSchema,
   ChatDeletePlaintextPayload as ChatDeletePlaintextPayloadSchema,
@@ -23,7 +26,8 @@ import type { GitHubActionRun } from "../identity/authClient";
 import { normalizeChatMessage } from "../chat/chatSanitizer";
 import { normalizeCodexThreadId } from "../codex/codexThread";
 import { normalizeCodexThreadGraph } from "../codex/codexThreadGraph";
-import { sanitizeLocalRoomReadState } from "./roomUnread";
+import { maxCodexThreadGraphNodes } from "../codex/codexThreadGraph";
+import { isCurrentLocalRoomReadState, sanitizeLocalRoomReadState } from "./roomUnread";
 import type { GitWorkflowResult, TerminalSnapshot } from "../platform/localBackend";
 import { terminalsForLocalHistory } from "../terminal/terminalState";
 import type {
@@ -38,44 +42,9 @@ import type {
   TerminalCommandRequest,
   WorkspaceFileSaveRequest
 } from "../../types";
+import { maxLocalHistoryItemsPerContainer, pruneLocalRoomHistory } from "./localHistoryRetention";
 
-export function pruneLocalRoomHistory(
-  payload: LocalRoomHistoryPayload,
-  retentionDays: number
-): LocalRoomHistoryPayload {
-  const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-  return {
-    version: 3,
-    messages: payload.messages.filter((message) => isWithinRetention(message.createdAt ?? message.time, cutoffMs)),
-    chatEdits: (payload.chatEdits ?? []).filter((edit) => isWithinRetention(edit.editedAt, cutoffMs)),
-    chatDeletes: (payload.chatDeletes ?? []).filter((deletion) => isWithinRetention(deletion.deletedAt, cutoffMs)),
-    ...(payload.readState ? { readState: payload.readState } : {}),
-    terminalRequests: payload.terminalRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
-    fileSaveRequests: (payload.fileSaveRequests ?? []).filter((request) =>
-      isWithinRetention(request.requestedAt, cutoffMs)
-    ),
-    browserRequests: payload.browserRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
-    inviteRequests: payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs)),
-    codexEvents: payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
-    codexActivities: (payload.codexActivities ?? [])
-      .filter((activity) => isWithinRetention(activity.updatedAt, cutoffMs))
-      .slice(-maxCodexActivitiesPerRoom),
-    gitWorkflowEvents: payload.gitWorkflowEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs)),
-    githubActionsEvents: payload.githubActionsEvents.filter((event) => isWithinRetention(event.checkedAt, cutoffMs)),
-    localPreviews: payload.localPreviews.filter((preview) => isWithinRetention(preview.updatedAt, cutoffMs)),
-    terminalSnapshots: terminalsForLocalHistory(
-      payload.terminalSnapshots.filter((terminal) => isWithinRetention(terminal.startedAt, cutoffMs))
-    ),
-    hostHandoffs: payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs)),
-    queuedCodexTurns: (payload.queuedCodexTurns ?? []).filter((turn) => isWithinRetention(turn.queuedAt, cutoffMs)),
-    ...(payload.roomGoal && isWithinRetention(payload.roomGoal.updatedAt, cutoffMs)
-      ? { roomGoal: payload.roomGoal }
-      : {}),
-    ...(payload.codexThreadGraph?.activeThreadId
-      ? { codexThreadGraph: normalizeCodexThreadGraph(payload.codexThreadGraph) }
-      : {})
-  };
-}
+export { maxLocalHistoryItemsPerContainer, pruneLocalRoomHistory } from "./localHistoryRetention";
 
 export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
   return {
@@ -100,16 +69,18 @@ export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
 
 export function normalizeLocalRoomHistory(value: unknown): LocalRoomHistoryPayload {
   if (Array.isArray(value)) {
+    assertLegacyContainerBound("messages", value);
     return {
       ...emptyLocalRoomHistoryPayload(),
       messages: normalizeChatHistoryMessages(value)
     };
   }
 
-  if (!isRecord(value)) return emptyLocalRoomHistoryPayload();
-  if (!isSupportedLocalHistoryVersion(value.version)) {
-    return emptyLocalRoomHistoryPayload();
-  }
+  if (!isRecord(value))
+    throw new InvalidLocalRoomHistoryError("Encrypted local history is not an object or legacy message list.");
+  if (!isSupportedLocalHistoryVersion(value.version)) throw new UnsupportedLocalRoomHistoryVersionError();
+  if (value.version === 3) assertCurrentLocalHistoryShape(value);
+  else assertLegacyLocalHistoryShape(value);
 
   // One-way v2-alpha migration: old encrypted history may contain the former
   // flat thread-id mirror, but all normalized and newly persisted payloads are
@@ -146,9 +117,129 @@ export function normalizeLocalRoomHistory(value: unknown): LocalRoomHistoryPaylo
   };
 }
 
+export class UnsupportedLocalRoomHistoryVersionError extends Error {
+  constructor() {
+    super("Encrypted local history uses an unsupported schema version.");
+    this.name = "UnsupportedLocalRoomHistoryVersionError";
+  }
+}
+
+export class InvalidLocalRoomHistoryError extends Error {
+  constructor(message = "Encrypted local history does not match the current schema.") {
+    super(message);
+    this.name = "InvalidLocalRoomHistoryError";
+  }
+}
+
+export function normalizeRetainedLocalRoomHistory(value: unknown, retentionDays: number): LocalRoomHistoryPayload {
+  return pruneLocalRoomHistory(normalizeLocalRoomHistory(value), retentionDays);
+}
+
 function historyArray(value: Record<string, unknown>, key: string): unknown[] {
   const candidate = value[key];
   return Array.isArray(candidate) ? candidate : [];
+}
+
+function assertCurrentLocalHistoryShape(value: Record<string, unknown>): void {
+  const requiredArrays: Array<[string, (item: unknown) => boolean]> = [
+    ["messages", isChatMessage],
+    ["terminalRequests", isTerminalCommandRequest],
+    ["fileSaveRequests", isWorkspaceFileSaveRequest],
+    ["browserRequests", isBrowserAccessRequest],
+    ["inviteRequests", isInviteJoinRequest],
+    ["codexEvents", (item) => CodexEventPlaintextPayloadSchema.safeParse(item).success],
+    ["gitWorkflowEvents", (item) => GitWorkflowEventPlaintextPayloadSchema.safeParse(item).success],
+    ["githubActionsEvents", (item) => GitHubActionsEventPlaintextPayloadSchema.safeParse(item).success],
+    ["localPreviews", isLocalPreviewPlaintextPayload],
+    ["terminalSnapshots", isTerminalSnapshot],
+    ["hostHandoffs", isHostHandoffRecord]
+  ];
+  const optionalArrays: Array<[string, (item: unknown) => boolean]> = [
+    ["chatEdits", isChatEditPlaintextPayload],
+    ["chatDeletes", isChatDeletePlaintextPayload],
+    ["codexActivities", isCodexActivityPlaintextPayload],
+    ["queuedCodexTurns", isQueuedCodexTurn]
+  ];
+  for (const [key, validate] of requiredArrays) assertHistoryArray(value, key, validate, true);
+  for (const [key, validate] of optionalArrays) assertHistoryArray(value, key, validate, false);
+  if (value.roomGoal !== undefined && !isRoomGoal(value.roomGoal)) throw new InvalidLocalRoomHistoryError();
+  if (value.readState !== undefined && !isCurrentLocalRoomReadState(value.readState)) {
+    throw new InvalidLocalRoomHistoryError();
+  }
+  if (value.codexThreadGraph !== undefined && !isCurrentCodexThreadGraph(value.codexThreadGraph)) {
+    throw new InvalidLocalRoomHistoryError();
+  }
+}
+
+const legacyHistoryContainerKeys = [
+  "messages",
+  "chatEdits",
+  "chatDeletes",
+  "terminalRequests",
+  "fileSaveRequests",
+  "browserRequests",
+  "inviteRequests",
+  "codexEvents",
+  "codexActivities",
+  "gitWorkflowEvents",
+  "githubActionsEvents",
+  "localPreviews",
+  "terminalSnapshots",
+  "hostHandoffs",
+  "queuedCodexTurns"
+] as const;
+
+function assertLegacyLocalHistoryShape(value: Record<string, unknown>): void {
+  if (value.version === undefined && !legacyHistoryContainerKeys.some((key) => key in value)) {
+    throw new InvalidLocalRoomHistoryError("Unversioned encrypted local history has no recognized containers.");
+  }
+  for (const key of legacyHistoryContainerKeys) {
+    const items = value[key];
+    if (items !== undefined && Array.isArray(items)) assertLegacyContainerBound(key, items);
+  }
+}
+
+function assertLegacyContainerBound(key: string, items: unknown[]): void {
+  if (items.length > maxLocalHistoryItemsPerContainer) {
+    throw new InvalidLocalRoomHistoryError(`Encrypted local history container ${key} exceeds its migration limit.`);
+  }
+}
+
+function assertHistoryArray(
+  value: Record<string, unknown>,
+  key: string,
+  validate: (item: unknown) => boolean,
+  required: boolean
+): void {
+  const items = value[key];
+  if (items === undefined && !required) return;
+  if (!Array.isArray(items) || items.length > maxLocalHistoryItemsPerContainer || !items.every(validate)) {
+    throw new InvalidLocalRoomHistoryError();
+  }
+}
+
+function isCurrentCodexThreadGraph(value: unknown): boolean {
+  if (!isRecord(value) || Array.isArray(value) || !isRecord(value.nodesById) || Array.isArray(value.nodesById)) {
+    return false;
+  }
+  if (value.activeThreadId !== null && typeof value.activeThreadId !== "string") return false;
+  const entries = Object.entries(value.nodesById);
+  if (entries.length > maxCodexThreadGraphNodes) return false;
+  if (value.activeThreadId !== null && !Object.hasOwn(value.nodesById, value.activeThreadId)) return false;
+  return entries.every(([key, node]) => {
+    if (!isRecord(node) || Array.isArray(node) || node.id !== key) return false;
+    return (
+      typeof node.id === "string" &&
+      (node.sessionId === undefined || typeof node.sessionId === "string") &&
+      (node.parentThreadId === undefined || typeof node.parentThreadId === "string") &&
+      typeof node.title === "string" &&
+      ["notLoaded", "idle", "systemError", "active", "unknown"].includes(String(node.status)) &&
+      Number.isSafeInteger(node.createdAt) &&
+      Number(node.createdAt) >= 0 &&
+      Number.isSafeInteger(node.updatedAt) &&
+      Number(node.updatedAt) >= 0
+    );
+  });
 }
 
 function isSupportedLocalHistoryVersion(value: unknown): boolean {
@@ -312,13 +403,6 @@ function isGitHubActionsEventPlaintextPayloadLenient(value: unknown): value is G
     Array.isArray(value.runs) &&
     value.runs.every(isGitHubActionRun)
   );
-}
-
-function isWithinRetention(value: string | undefined, cutoffMs: number): boolean {
-  if (!value) return true;
-  const timestampMs = Date.parse(value);
-  if (Number.isNaN(timestampMs)) return true;
-  return timestampMs >= cutoffMs;
 }
 
 function normalizeChatHistoryMessages(value: unknown[]): ChatMessage[] {

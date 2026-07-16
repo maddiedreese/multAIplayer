@@ -7,8 +7,12 @@ import {
   saveHistorySettings,
   type LocalHistorySettings
 } from "../lib/history/localHistory";
-import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
+import { normalizeRetainedLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
 import { reportNonFatal } from "../lib/core/nonFatalReporting";
+import {
+  clearMatchingHistoryMessage,
+  historyHydrationFailureMessage
+} from "../application/history/localHistorySnapshot";
 import { useAppStore } from "../store/appStore";
 import type { ChatMessage, LocalRoomHistoryPayload, LocalRoomReadState } from "../types";
 
@@ -56,21 +60,20 @@ export function useLocalHistoryHydration({
       .then((storedHistory) => {
         if (cancelled) return;
         if (storedHistory) {
-          const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
+          const payload = normalizeRetainedLocalRoomHistory(storedHistory, settings.retentionDays);
+          const hadLiveMessages = (useAppStore.getState().messagesByRoom[selectedRoomId]?.length ?? 0) > 0;
           hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
-          hydrateRoomReadState(selectedRoomId, payload.readState);
+          if (!hadLiveMessages) hydrateRoomReadState(selectedRoomId, payload.readState);
         }
         useAppStore.getState().setHistoryHydrationStatusForRoom(selectedRoomId, "ready");
+        clearMatchingHistoryMessage(selectedRoomId, historyHydrationFailureMessage);
       })
       .catch((error) => {
         if (cancelled) return;
         reportNonFatal("load encrypted local history", error);
         const state = useAppStore.getState();
         state.setHistoryHydrationStatusForRoom(selectedRoomId, "failed");
-        state.setHistoryMessageForRoom(
-          selectedRoomId,
-          "Encrypted local history could not be loaded. Saving is paused to protect the existing history. Retry the load before continuing."
-        );
+        state.setHistoryMessageForRoom(selectedRoomId, historyHydrationFailureMessage);
       });
     return () => {
       cancelled = true;

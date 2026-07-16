@@ -606,6 +606,8 @@ test("desktop store clears local room-scoped state", () => {
   store.setDraftForRoom("room-a", "clear me");
   store.setDraftForRoom("room-b", "keep me");
   store.setSensitiveAttachmentReviewKey("room-a:.env");
+  store.openLocalPreviewDialogForRoom("room-a");
+  store.setLocalPreviewDialogManualUrl("http://localhost:4173/private-preview");
 
   store.clearRoomScopedStateForRoom("room-a");
 
@@ -632,6 +634,8 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.sensitiveAttachmentReviewKey, null);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.localPreviewByRoom["room-a"], undefined);
+  assert.equal(state.localPreviewDialog.open, false);
+  assert.equal(state.localPreviewDialog.manualUrl, "");
   assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, undefined);
   assert.equal(
     state.terminals.some((terminal) => terminal.roomId === "room-a"),
