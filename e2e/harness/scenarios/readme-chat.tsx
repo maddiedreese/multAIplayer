@@ -12,7 +12,7 @@ export const readmeMessages: RoomChatMessageDisplay[] = [
     id: "teammate-request",
     author: "Maya",
     role: "human",
-    body: "Can you tighten the empty state and verify the preview at mobile width?",
+    body: "Can we make inviting a teammate feel clear from the first click?",
     time: "11:42",
     selected: false,
     attachments: [],
@@ -22,7 +22,7 @@ export const readmeMessages: RoomChatMessageDisplay[] = [
     id: "codex-result",
     author: "Codex via Avery",
     role: "codex",
-    body: "Updated the empty state and added a focused responsive test. The preview now stays readable down to 360 px.",
+    body: "Simplified the invite flow, added verified-device feedback, and covered the full keyboard path.",
     time: "11:44",
     selected: false,
     attachments: [],
@@ -32,17 +32,17 @@ export const readmeMessages: RoomChatMessageDisplay[] = [
 export const readmeActivities: CodexActivity[] = [
   {
     eventType: "codex.activity",
-    activityId: "responsive-edit",
+    activityId: "invite-flow-edit",
     turnId: "readme-turn",
-    itemId: "responsive-edit",
+    itemId: "invite-flow-edit",
     kind: "file_change",
     status: "completed",
-    title: "Updated the responsive empty state",
+    title: "Polished teammate invites",
     details: {
       type: "file_change",
       changes: [
-        { path: "src/components/EmptyState.tsx", action: "update", diff: "+ <p>Start by inviting your team.</p>" },
-        { path: "test/empty-state.test.tsx", action: "create", diff: "+ test('fits mobile width', ...);" }
+        { path: "src/components/InvitePanel.tsx", action: "update", diff: "+ <VerifiedDeviceStatus />" },
+        { path: "e2e/invite-join.spec.ts", action: "update", diff: "+ test('supports keyboard invite flow', ...);" }
       ]
     },
     startedAt: now,

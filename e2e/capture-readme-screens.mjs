@@ -13,6 +13,12 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const output = fileURLToPath(new URL("../docs/assets/screens/", import.meta.url));
 const port = 1423;
 const baseUrl = `http://127.0.0.1:${port}/e2e/harness/index.html`;
+const expectedCaptureGeometry = new Map([
+  ["room-chat.png", { width: 760, minHeight: 390, maxHeight: 400 }],
+  ["room-browser.png", { width: 760, minHeight: 360, maxHeight: 360 }],
+  ["room-terminal.png", { width: 760, minHeight: 400, maxHeight: 460 }],
+  ["room-app.png", { width: 1200, minHeight: 700, maxHeight: 700 }]
+]);
 
 await mkdir(output, { recursive: true });
 const npmExecPath = process.env.npm_execpath;
@@ -72,7 +78,7 @@ async function captureFeature(page, filename) {
   }
   if (filename === "room-app.png") {
     await feature.getByLabel("Codex activity timeline").waitFor({ state: "visible" });
-    if ((await feature.getByLabel("Room title").inputValue()) !== "Responsive launch") {
+    if ((await feature.getByLabel("Room title").inputValue()) !== "Launch") {
       throw new Error("README full-app capture must show the active production room.");
     }
     if ((await feature.getByText("Welcome to multAIplayer").count()) !== 0) {
@@ -89,19 +95,30 @@ async function captureFeature(page, filename) {
   if (dimensions.scrollHeight !== dimensions.clientHeight || dimensions.scrollWidth !== dimensions.clientWidth) {
     throw new Error(`README feature ${filename} overflows its capture surface: ${JSON.stringify(dimensions)}`);
   }
+  const expectedGeometry = expectedCaptureGeometry.get(filename);
+  const captureGeometry = await feature.evaluate((element) => ({
+    height: element.getBoundingClientRect().height,
+    width: element.getBoundingClientRect().width
+  }));
+  if (
+    !expectedGeometry ||
+    captureGeometry.width !== expectedGeometry.width ||
+    captureGeometry.height < expectedGeometry.minHeight ||
+    captureGeometry.height > expectedGeometry.maxHeight
+  ) {
+    throw new Error(
+      `README feature ${filename} has unexpected capture geometry: ${JSON.stringify({ captureGeometry, expectedGeometry })}`
+    );
+  }
   if (filename === "room-app.png") {
     const fullAppGeometry = await feature.evaluate((element) => {
       const shell = element.querySelector(".app-shell");
       return {
-        captureHeight: element.getBoundingClientRect().height,
-        captureWidth: element.getBoundingClientRect().width,
         shellHeight: shell?.clientHeight ?? 0,
         shellWidth: shell?.clientWidth ?? 0
       };
     });
     if (
-      fullAppGeometry.captureWidth !== 1320 ||
-      fullAppGeometry.captureHeight !== 760 ||
       fullAppGeometry.shellWidth !== dimensions.clientWidth ||
       fullAppGeometry.shellHeight !== dimensions.clientHeight
     ) {

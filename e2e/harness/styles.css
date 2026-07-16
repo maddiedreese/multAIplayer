@@ -52,7 +52,7 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 }
 
 .readme-browser-surface {
-  height: 520px;
+  height: 360px;
 }
 
 .readme-terminal-surface {
@@ -73,14 +73,21 @@ html[data-theme="dark"][data-presentation="readme"] #root {
   width: 100%;
   height: auto;
   margin: 0;
+  padding: 12px;
+  gap: 8px;
 }
 
 .readme-terminal-surface .terminal-panel .panel-title {
-  gap: 16px;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .readme-terminal-surface .terminal-panel .panel-title-actions {
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1.15fr) 36px;
+}
+
+.readme-terminal-surface .terminal-output.xterm-output {
+  height: 240px;
 }
 
 .readme-terminal-surface .terminal-tab.active {
@@ -98,11 +105,11 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 }
 
 .readme-feature[data-scenario="readme-app"] {
-  width: min(1320px, calc(100vw - 80px));
+  width: min(1200px, calc(100vw - 80px));
 }
 
 .readme-app-surface {
-  height: 760px;
+  height: 700px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -110,8 +117,8 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 }
 
 .readme-app-surface .app-shell {
-  --sidebar-width: 240px;
-  --rail-width: 300px;
+  --sidebar-width: 210px;
+  --rail-width: 340px;
   width: 100%;
   height: 100%;
 }

@@ -4,18 +4,63 @@ import { CodexActivityTimelineView } from "../../../apps/desktop/src/components/
 import { RoomMainColumn } from "../../../apps/desktop/src/components/RoomMainColumn";
 import { SidebarAccountSection } from "../../../apps/desktop/src/components/SidebarAccountSection";
 import { SidebarTeamGroup, SidebarTeamsTitle } from "../../../apps/desktop/src/components/DesktopSidebarSections";
-import { readmeActivities, readmeChatProps } from "./readme-chat";
+import type { RoomChatMessageDisplay } from "../../../apps/desktop/src/components/RoomChatPanel";
+import type { CodexActivity } from "../../../apps/desktop/src/types";
+import { readmeChatProps } from "./readme-chat";
 
 export const description = "The production desktop shell shows a shared Codex room actively in use.";
 export const mockedBoundaries = ["relay workspace", "Codex app-server", "native project tools"] as const;
 
 const noop = () => undefined;
+const capturedAt = "2026-07-15T18:00:00.000Z";
+const appMessages: RoomChatMessageDisplay[] = [
+  {
+    id: "handoff-request",
+    author: "Maya",
+    role: "human",
+    body: "Ready to hand the project to Jordan after this pass?",
+    time: "11:42",
+    selected: false,
+    attachments: [],
+    reactions: [{ emoji: "👍", count: 2, reacted: true }]
+  },
+  {
+    id: "handoff-result",
+    author: "Codex via Avery",
+    role: "codex",
+    body: "Handoff checks are green. I added device verification and preserved the shared room history.",
+    time: "11:44",
+    selected: false,
+    attachments: [],
+    reactions: []
+  }
+];
+const appActivities: CodexActivity[] = [
+  {
+    eventType: "codex.activity",
+    activityId: "verified-handoff",
+    turnId: "app-readme-turn",
+    itemId: "verified-handoff",
+    kind: "file_change",
+    status: "completed",
+    title: "Prepared verified host handoff",
+    startedAt: capturedAt,
+    updatedAt: capturedAt,
+    host: "Avery",
+    hostUserId: "github:avery"
+  }
+];
+const appChatProps = {
+  ...readmeChatProps,
+  messages: appMessages,
+  codexActivities: appActivities
+};
 
 function ReadmeSidebar() {
   return (
     <aside className="sidebar">
       <SidebarAccountSection
-        currentUser={{ id: "github:avery", login: "avery", name: "Avery" }}
+        currentUser={{ id: "github:av", login: "av", name: "Avery" }}
         authBusy={false}
         authConfig={null}
         authError={null}
@@ -37,53 +82,20 @@ function ReadmeSidebar() {
         />
         <div className="team-list nested-team-list">
           <SidebarTeamGroup
-            team={{ id: "northstar", name: "Northstar", meta: "3 members", active: true, archived: false }}
+            team={{ id: "studio", name: "Studio", meta: "3 members", active: true, archived: false }}
             rooms={[
               {
-                id: "responsive-launch",
-                teamId: "northstar",
-                name: "Responsive launch",
-                detail: "Avery hosting",
+                id: "launch",
+                teamId: "studio",
+                name: "Launch",
+                detail: "Avery",
                 active: true,
                 attention: 0,
                 unread: 0,
                 archived: false
-              },
-              {
-                id: "api-review",
-                teamId: "northstar",
-                name: "API review",
-                detail: "Maya hosting",
-                active: false,
-                attention: 1,
-                unread: 2,
-                archived: false
               }
             ]}
             collapsed={false}
-            showArchived={false}
-            searchActive={false}
-            onToggleCollapsed={noop}
-            onSelectTeam={noop}
-            onSelectRoom={noop}
-            onSetTeamLifecycle={noop}
-            onSetRoomLifecycle={noop}
-          />
-          <SidebarTeamGroup
-            team={{ id: "studio", name: "Design studio", meta: "2 members", active: false, archived: false }}
-            rooms={[
-              {
-                id: "release-notes",
-                teamId: "studio",
-                name: "Release notes",
-                detail: "Jordan hosting",
-                active: false,
-                attention: 0,
-                unread: 0,
-                archived: false
-              }
-            ]}
-            collapsed
             showArchived={false}
             searchActive={false}
             onToggleCollapsed={noop}
@@ -110,9 +122,9 @@ export default function ReadmeAppScenario() {
         main={
           <RoomMainColumn
             headerProps={{
-              teams: [{ id: "northstar", name: "Northstar" }],
-              selectedTeamId: "northstar",
-              roomName: "Responsive launch",
+              teams: [{ id: "studio", name: "Studio" }],
+              selectedTeamId: "studio",
+              roomName: "Launch",
               hostStatus: "active",
               hostBusy: false,
               isActiveHost: true,
@@ -151,7 +163,7 @@ export default function ReadmeAppScenario() {
               onAcknowledgeSecretWarning: noop
             }}
             markdownFallbackProps={null}
-            chatProps={readmeChatProps}
+            chatProps={appChatProps}
           />
         }
         inspector={
@@ -160,11 +172,11 @@ export default function ReadmeAppScenario() {
               <span>Shared work</span>
               <strong>Live with 3 teammates</strong>
             </div>
-            <CodexActivityTimelineView activities={readmeActivities} />
+            <CodexActivityTimelineView activities={appActivities} />
             <section className="panel readme-project-summary">
               <span>Project</span>
-              <strong>northstar-web</strong>
-              <small>2 files changed · checks passed</small>
+              <strong>launch-kit</strong>
+              <small>3 files changed · checks passed</small>
             </section>
           </aside>
         }
