@@ -12,7 +12,6 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: false, browser: false },
   codexModel: "gpt-5.4",
   browserProfilePersistent: true,
   unread: 0
@@ -23,7 +22,6 @@ test("Codex approval requires an unlocked active host", () => {
   assert.equal(canApproveCodexTurn(room, host), true);
   assert.equal(canApproveCodexTurn(room, host, true), false);
   assert.equal(canApproveCodexTurn(room, { id: "github:peer", name: "Peer" }), false);
-  assert.equal(canApproveCodexTurn({ ...room, mode: { ...room.mode, code: false } }, host), true);
   assert.equal(canApproveCodexTurn({ ...room, approvalPolicy: "never_host" }, host), false);
 });
 
@@ -34,10 +32,6 @@ test("Codex approvals reset when room execution context changes", () => {
     true
   );
   assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, approvalPolicy: "never_host" }), true);
-  assert.equal(
-    shouldResetCodexApprovalForRoomUpdate(room, { ...room, mode: { ...room.mode, workspace: true } }),
-    false
-  );
   assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, browserProfilePersistent: false }), true);
   assert.equal(
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, host: "Jordan", hostUserId: "github:jordan" }),

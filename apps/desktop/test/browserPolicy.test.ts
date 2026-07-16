@@ -19,7 +19,6 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddiedreese",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
   browserProfilePersistent: true,
   unread: 0
@@ -27,7 +26,6 @@ const room: ClientRoomRecord = {
 
 test("browser access requests require an unlocked room", () => {
   assert.equal(canRequestBrowserAccess(room), true);
-  assert.equal(canRequestBrowserAccess({ ...room, mode: { ...room.mode, browser: false } }), true);
   assert.equal(canRequestBrowserAccess(room, true), false);
 });
 
@@ -43,10 +41,7 @@ test("browser host actions require active host access", () => {
 
 test("browser access gate messages explain missing browser access", () => {
   assert.equal(browserAccessGateMessage(room, true), "Unlock this room before using browser access.");
-  assert.equal(
-    browserAccessGateMessage({ ...room, mode: { ...room.mode, browser: false } }),
-    "Browser access is available for this room."
-  );
+  assert.equal(browserAccessGateMessage(room), "Browser access is available for this room.");
 });
 
 test("browser request actions require a request from the current room list", () => {

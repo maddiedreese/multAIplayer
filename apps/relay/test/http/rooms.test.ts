@@ -636,9 +636,7 @@ function hostBootstrapRoom(): RoomRecord {
     hostUserId: "github:maddiedreese",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: true },
-    browserProfilePersistent: false,
-    unread: 0
+    browserProfilePersistent: false
   };
 }
 

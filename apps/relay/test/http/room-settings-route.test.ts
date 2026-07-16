@@ -16,7 +16,6 @@ const room: RoomRecord = {
   hostUserId: "github:maddiedreese",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   browserProfilePersistent: false
 };
 
@@ -112,7 +111,6 @@ test("room settings reject host-local fields and invalid public settings with pr
       [{ name: "" }, "Room name is required and must be up to 160 characters"],
       [{ name: "x".repeat(161) }, "Room name is required and must be up to 160 characters"],
       [{ approvalPolicy: "sometimes" }, "approvalPolicy is invalid"],
-      [{ mode: { chat: true } }, "mode must include boolean chat, code, workspace, and browser fields"],
       [{ browserProfilePersistent: "yes" }, "browserProfilePersistent must be a boolean"]
     ];
     for (const [input, error] of invalidInputs) {
@@ -131,11 +129,9 @@ test("room settings reject host-local fields and invalid public settings with pr
 test("room settings normalize and persist every public setting while preserving omitted values", async () => {
   const harness = await startSettingsRouteHarness();
   try {
-    const mode = { chat: false, code: true, workspace: false, browser: true };
     const response = await harness.patch({
       name: "  Renamed room  ",
       approvalPolicy: "never",
-      mode,
       browserProfilePersistent: true
     });
     assert.equal(response.status, 200);
@@ -144,7 +140,6 @@ test("room settings normalize and persist every public setting while preserving 
       ...room,
       name: "Renamed room",
       approvalPolicy: "never",
-      mode,
       browserProfilePersistent: true
     });
     assert.deepEqual(harness.store.getRoom(room.id), updated);
@@ -211,11 +206,6 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
       return normalized && normalized.length <= maxChars ? normalized : null;
     },
     isApprovalPolicy: (value) => ["ask_every_turn", "never"].includes(value),
-    isRoomMode: (value): value is RoomRecord["mode"] => {
-      if (!value || typeof value !== "object") return false;
-      const candidate = value as Record<string, unknown>;
-      return ["chat", "code", "workspace", "browser"].every((key) => typeof candidate[key] === "boolean");
-    },
     scheduleStoreSave: () => saves++,
     broadcastRoomUpdated: () => broadcasts++,
     maxRoomNameChars: 160,

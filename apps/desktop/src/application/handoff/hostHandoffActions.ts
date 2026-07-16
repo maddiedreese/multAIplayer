@@ -29,7 +29,6 @@ import { queueForHandoff, resolveHandoffProject } from "./hostHandoffProject";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { ChatMessage, HostHandoffRecord } from "../../types";
 import type { UseHostHandoffActionsOptions } from "./hostHandoffActionTypes";
-import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { publishRoomConfigSnapshot } from "../mls/roomConfigSnapshot";
 import { publishHostHandoffAccepted } from "./hostHandoffAcceptedPublisher";
 
@@ -176,7 +175,7 @@ export function createHostHandoffActions(
       const hostUserId = localUser.id;
       if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroupWithHistorySettings(roomId);
       freshRoomHostState(selectedRoom, "Host claim");
-      const room = ensureRoomDefaults(await updateRoomHost(roomId, host, hostUserId, deviceId), selectedRoom);
+      const room = await updateRoomHost(roomId, host, hostUserId, deviceId);
       // The websocket may install the exact HTTP response before this await
       // resumes. Accept either the reviewed pre-claim tuple or that returned
       // tuple, but reject every third-party/intermediate authority state.

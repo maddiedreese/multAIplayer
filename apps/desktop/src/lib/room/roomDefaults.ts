@@ -13,6 +13,7 @@ import {
   type RoomRecord
 } from "@multaiplayer/protocol";
 
+/** Project relay room metadata into desktop state while retaining device-local read state. */
 export function ensureRoomDefaults(
   room: RoomRecord & Partial<RoomConfig>,
   previous?: ClientRoomRecord
@@ -27,7 +28,8 @@ export function ensureRoomDefaults(
     browserProfilePersistent:
       typeof room.browserProfilePersistent === "boolean"
         ? room.browserProfilePersistent
-        : defaultBrowserProfilePersistent
+        : defaultBrowserProfilePersistent,
+    unread: previous?.unread ?? 0
   };
 }
 

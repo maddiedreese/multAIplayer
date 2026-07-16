@@ -1,6 +1,6 @@
 import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import { nanoid } from "nanoid";
-import { defaultBrowserProfilePersistent, defaultRoomMode, type RoomRecord } from "@multaiplayer/protocol";
+import { defaultBrowserProfilePersistent, type RoomRecord } from "@multaiplayer/protocol";
 import { allowTotalRoomQuota } from "./room-validation.js";
 import {
   acquireDurableQuotaTransaction,
@@ -107,9 +107,7 @@ async function persistRoomCreation(
       hostUserId: session?.user.id,
       hostStatus: "offline",
       approvalPolicy: input.approvalPolicy,
-      mode: defaultRoomMode,
-      browserProfilePersistent: input.browserProfilePersistent,
-      unread: 0
+      browserProfilePersistent: input.browserProfilePersistent
     };
     store.setRoom(room);
     if (session) await saveRelayStore();

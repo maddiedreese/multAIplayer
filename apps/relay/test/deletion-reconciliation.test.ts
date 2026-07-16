@@ -119,9 +119,7 @@ test("offline resolution deletes only resources owned by the exact reported subj
     hostStatus: "active",
     acceptedMlsEpoch: 0,
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: true },
-    browserProfilePersistent: true,
-    unread: 0
+    browserProfilePersistent: true
   });
   store.rooms.set("collaborator-room", {
     ...store.rooms.get("room")!,

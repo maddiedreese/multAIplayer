@@ -40,7 +40,7 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
         "Host-local room configuration must be published through MLS."
       );
     const roomId = String(req.params.roomId ?? "");
-    const { name, approvalPolicy, mode, browserProfilePersistent } = normalizeRoomSettingsInput(req.body, {
+    const { name, approvalPolicy, browserProfilePersistent } = normalizeRoomSettingsInput(req.body, {
       normalizeMetadataText,
       maxRoomNameChars
     });
@@ -58,7 +58,6 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
       {
         name,
         approvalPolicy,
-        mode,
         browserProfilePersistent
       },
       options
@@ -66,14 +65,12 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
     if (inputError) return void sendRelayError(res, 400, "invalid_request", inputError);
 
     const validApprovalPolicy = approvalPolicy as RoomRecord["approvalPolicy"] | undefined;
-    const validMode = mode as RoomRecord["mode"] | undefined;
     const validBrowserProfilePersistent = browserProfilePersistent as boolean | undefined;
 
     const updated: RoomRecord = {
       ...room,
       name: name ?? room.name,
       approvalPolicy: validApprovalPolicy ?? room.approvalPolicy,
-      mode: validMode ?? room.mode,
       browserProfilePersistent: validBrowserProfilePersistent ?? room.browserProfilePersistent
     };
     store.setRoom(updated);
@@ -94,9 +91,6 @@ function roomSettingsInputError(
   if (input.approvalPolicy !== undefined && !options.isApprovalPolicy(input.approvalPolicy)) {
     return "approvalPolicy is invalid";
   }
-  if (input.mode !== undefined && !options.isRoomMode(input.mode)) {
-    return "mode must include boolean chat, code, workspace, and browser fields";
-  }
   if (input.browserProfilePersistent !== undefined && typeof input.browserProfilePersistent !== "boolean") {
     return "browserProfilePersistent must be a boolean";
   }
@@ -113,7 +107,6 @@ function normalizeRoomSettingsInput(
   return {
     name,
     approvalPolicy,
-    mode: body?.mode,
     browserProfilePersistent: body?.browserProfilePersistent
   };
 }

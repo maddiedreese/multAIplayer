@@ -86,16 +86,14 @@ export {
   defaultCodexRawReasoningEnabled,
   defaultCodexSandboxLevel,
   defaultCodexServiceTierPolicy,
-  defaultCodexSpeed,
-  defaultRoomMode
+  defaultCodexSpeed
 } from "./defaults-options.js";
 export type {
   ApprovalPolicy,
   CodexCatalogSelectionPolicy,
   CodexReasoningEffort,
   CodexSandboxLevel,
-  CodexSpeed,
-  RoomMode
+  CodexSpeed
 } from "./defaults-options.js";
 
 export {
@@ -104,7 +102,6 @@ export {
   InviteRecord,
   InviteJoinRequestRecord,
   InviteResponseRecord,
-  RoomModeSchema,
   RoomRecord,
   RoomConfig,
   ClientRoomRecord,

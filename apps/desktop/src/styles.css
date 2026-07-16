@@ -1644,33 +1644,6 @@ button:disabled {
   line-height: 1.4;
 }
 
-.mode-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-}
-
-.mode-options label {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 7px 8px;
-  border: 1px solid #dcdcdc;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #2e2e2e;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.mode-options label:has(input:checked) {
-  border-color: #dedede;
-  background: #f7f7f7;
-  color: #444444;
-}
-
 .model-options {
   display: grid;
   gap: 6px;
@@ -2841,7 +2814,6 @@ button:not(:disabled):active {
 }
 
 .actions-summary.green,
-.mode-options label:has(input:checked),
 .browser-request.approved,
 .terminal-request.approved {
   border-color: var(--border-strong);
@@ -3564,8 +3536,7 @@ select {
   line-height: 1.28;
 }
 
-.checkbox-row input[type="checkbox"],
-.mode-options input[type="checkbox"] {
+.checkbox-row input[type="checkbox"] {
   width: 16px;
   height: 16px;
   margin: 0;
@@ -6472,8 +6443,7 @@ details[open] > summary > .codex-disclosure-chevron {
 input[type="checkbox"],
 input[type="radio"],
 .message-select input,
-.checkbox-row input[type="checkbox"],
-.mode-options input[type="checkbox"] {
+.checkbox-row input[type="checkbox"] {
   accent-color: var(--text);
 }
 

@@ -12,7 +12,6 @@ import {
   type TeamRecord
 } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "../../lib/history/localHistory";
-import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import {
   planRoomCreation,
   planTeamCreation,
@@ -93,8 +92,7 @@ export async function createWorkspaceRoom(
     "createTeam" | "findTeam" | "upsertTeam" | "selectTeam" | "loadTeamHistorySettings"
   >
 ): Promise<ClientRoomRecord> {
-  const created = await runtime.createRoom(plan.teamId, plan.name, plan.projectPath, copyRoomSettings(settings));
-  const room = ensureRoomDefaults(created);
+  const room = await runtime.createRoom(plan.teamId, plan.name, plan.projectPath, copyRoomSettings(settings));
   runtime.upsertRoom(room);
   runtime.restoreRoomAccess(room.id);
   runtime.restoreTeamAccess(room.teamId);

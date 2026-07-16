@@ -1,5 +1,4 @@
 import { decodeNoSecretRoomInvite } from "../../lib/invite/noSecretRoomInvite";
-import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { buildFallbackInvitedRoom, parseInviteInput } from "../../lib/invite/inviteActionsHelpers";
 import { useAppStore, type AppStoreState } from "../../store/appStore";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
@@ -149,7 +148,7 @@ export function createInviteJoinActions(
     assertInviteHostDevice(invite, metadata);
 
     upsertTeam(metadata.team);
-    upsertRoom(ensureRoomDefaults(metadata.room));
+    upsertRoom(metadata.room);
     store.restoreWorkspaceAccess(invite.teamId, invite.roomId);
     store.setInviteAdmissionForRoom(invite.roomId, inviteId);
     store.initializeMessagesForRoom(invite.roomId);
@@ -330,7 +329,7 @@ export function createInviteJoinActions(
           },
           recover: (metadata, ownership) => {
             upsertTeam(metadata.team);
-            upsertRoom(ensureRoomDefaults(metadata.room));
+            upsertRoom(metadata.room);
             store.restoreWorkspaceAccess(pending.teamId, pending.roomId);
             store.setInviteAdmissionForRoom(pending.roomId, pending.inviteId);
             store.initializeMessagesForRoom(pending.roomId);

@@ -99,7 +99,6 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
     hostUserId: host.id,
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: true },
     codexModel: normalizeCodexModel("gpt-5.4-thinking") ?? "gpt-5.4",
     codexModelPolicy: "pinned",
     codexReasoningEffort: "medium",

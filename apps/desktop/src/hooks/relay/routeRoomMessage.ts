@@ -11,7 +11,7 @@ import {
   roomHostEnvelopeRejectionMessage
 } from "../../lib/access/roomHost";
 import { buildRoomSettingsSystemMessage } from "../../presentation/rooms/roomSettingsMessages";
-import { approvalPolicyLabels, roomModeLabels } from "../../appDefaults";
+import { approvalPolicyLabels } from "../../appDefaults";
 import type { AppStoreState } from "../../store/appStore";
 import type { MlsMessageRouteContext, MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
 import { applyRoomConfig } from "../../application/mls/roomConfigSnapshot";
@@ -194,13 +194,7 @@ async function routeRoomSettings(
   if (!parsed.success) return;
   const room = findEnvelopeRoom(context.roomsRef.current, envelope.roomId);
   if (!isEnvelopeFromActiveRoomHost(room, envelope) || parsed.data.changedByUserId !== envelope.senderUserId) return;
-  store.appendRoomMessage(
-    envelope.roomId,
-    buildRoomSettingsSystemMessage(parsed.data, {
-      approvalPolicyLabels,
-      roomModeLabels
-    })
-  );
+  store.appendRoomMessage(envelope.roomId, buildRoomSettingsSystemMessage(parsed.data, { approvalPolicyLabels }));
 }
 
 async function routeAcceptedHostHandoff(

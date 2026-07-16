@@ -16,20 +16,6 @@ export function markRoomUnreadForIncomingChat(
   return rooms.map((room) => (room.id === roomId ? { ...room, unread: room.unread + 1 } : room));
 }
 
-export function upsertRoomPreservingUnread(rooms: ClientRoomRecord[], room: ClientRoomRecord): ClientRoomRecord[] {
-  const existing = rooms.find((item) => item.id === room.id);
-  if (existing) {
-    return rooms.map((item) => (item.id === room.id ? { ...room, unread: existing.unread } : item));
-  }
-  return [...rooms, room];
-}
-
-export function replaceRoomPreservingUnread(rooms: ClientRoomRecord[], room: ClientRoomRecord): ClientRoomRecord[] {
-  const existing = rooms.find((item) => item.id === room.id);
-  if (!existing) return rooms;
-  return rooms.map((item) => (item.id === room.id ? { ...room, unread: existing.unread } : item));
-}
-
 export function applyLocalRoomReadState(
   rooms: ClientRoomRecord[],
   roomId: string,

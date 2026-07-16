@@ -1,4 +1,4 @@
-import type { ApprovalPolicy, RoomMode, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
+import type { ApprovalPolicy, RoomSettingsPlaintextPayload } from "@multaiplayer/protocol";
 import type { ChatMessage } from "../../types";
 import {
   formatCodexModel,
@@ -10,7 +10,6 @@ import {
 
 interface RoomSettingsMessageLabels {
   approvalPolicyLabels: Record<ApprovalPolicy, string>;
-  roomModeLabels: Record<keyof RoomMode, string>;
 }
 
 export function buildRoomSettingsSystemMessage(
@@ -36,8 +35,6 @@ export function buildRoomSettingsMessageBody(
       return `${event.changedBy} changed the room title from ${event.previousValue} to ${event.nextValue}.`;
     case "approvalPolicy":
       return `${event.changedBy} changed the approval policy from ${formatApprovalPolicy(event.previousValue, labels)} to ${formatApprovalPolicy(event.nextValue, labels)}.`;
-    case "roomMode":
-      return `${event.changedBy} ${formatRoomModeChange(event.nextValue, labels)}.`;
     case "codexModel":
       return `${event.changedBy} changed the Codex model from ${formatCodexModel(event.previousValue)} to ${formatCodexModel(event.nextValue)}.`;
     case "codexReasoningEffort":
@@ -57,12 +54,6 @@ export function buildRoomSettingsMessageBody(
 
 function formatApprovalPolicy(value: string, labels: RoomSettingsMessageLabels): string {
   return labels.approvalPolicyLabels[value as ApprovalPolicy] ?? value;
-}
-
-function formatRoomModeChange(value: string, labels: RoomSettingsMessageLabels): string {
-  const [mode, state] = value.split(":");
-  const label = labels.roomModeLabels[mode as keyof RoomMode] ?? mode;
-  return `${state === "enabled" ? "enabled" : "disabled"} ${label} mode`;
 }
 
 function formatBrowserProfilePersistence(value: string): string {
