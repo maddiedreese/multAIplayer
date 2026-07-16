@@ -8,6 +8,7 @@ description = "Exact public placeholders and deterministic cryptographic/test ve
 regexTarget = "secret"
 regexes = [
   '''^test-deletion-ledger-key-at-least-32-characters$''',
+  '''^test-secret-key-with-at-least-32-characters$''',
   '''^abcdefghijklmnopqrstuvwxzy123456$''',
   '''^2c14369ea984a7be95679b66e0f1a6f1d8faa6832da3f296c9167d9487267463$''',
   '''^AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=$''',
