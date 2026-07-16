@@ -1,6 +1,6 @@
 import test from "node:test";
 import Database from "better-sqlite3";
-import { copyFile, rm } from "node:fs/promises";
+import { access, copyFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   deleteAccountOwnedRelayData,
@@ -8,7 +8,9 @@ import {
   findAccountDeletionBlockers
 } from "../src/auth/account-deletion.js";
 import { createRelayStore } from "../src/state.js";
-import { assert, createDebugSession, startRelay, waitForStoredState } from "./support/relay.js";
+import { commitValidatedKeyPackages } from "../src/http/key-package-upload-transaction.js";
+import { acquireAccountMutationTurns } from "../src/auth/account-mutation-transaction.js";
+import { assert, createDebugSession, delay, startRelay, waitForStoredState } from "./support/relay.js";
 
 test("account deletion removes identity-owned records while preserving shared encrypted history", () => {
   const store = createRelayStore();
@@ -38,6 +40,18 @@ test("account deletion removes identity-owned records while preserving shared en
   store.devices.set(`${otherUserId}:device-two`, device(otherUserId, "device-two"));
   store.keyPackages.set("kp-leaving", keyPackage("kp-leaving", userId, "device-one"));
   store.keyPackages.set("kp-remaining", keyPackage("kp-remaining", otherUserId, "device-two"));
+  store.consumedKeyPackages.set(`sha256:${"1".repeat(64)}`, {
+    keyPackageHash: `sha256:${"1".repeat(64)}`,
+    userId,
+    deviceId: "device-one",
+    consumedAt: "2026-07-01T00:00:00.000Z"
+  });
+  store.consumedKeyPackages.set(`sha256:${"2".repeat(64)}`, {
+    keyPackageHash: `sha256:${"2".repeat(64)}`,
+    userId: otherUserId,
+    deviceId: "device-two",
+    consumedAt: "2026-07-01T00:00:00.000Z"
+  });
   store.dailyTeamCreationCounts.set(`daily_user_team_creations:${userId}`, { count: 1, resetAt: Date.now() + 60_000 });
   store.dailyRoomCreationCounts.set(`daily_user_room_creations:${userId}`, { count: 1, resetAt: Date.now() + 60_000 });
   store.attachmentBlobUploadByteCounts.set(userId, { bytes: 10, resetAt: Date.now() + 60_000 });
@@ -114,6 +128,7 @@ test("account deletion removes identity-owned records while preserving shared en
     deviceSessions: 0,
     devices: 1,
     keyPackages: 1,
+    consumedKeyPackagesDeattributed: 1,
     teamMemberships: 1,
     inviteArtifacts: 2,
     dailyTeamCreationQuotaRecords: 1,
@@ -130,6 +145,12 @@ test("account deletion removes identity-owned records while preserving shared en
   assert.equal(store.authSessions.has("session-remaining"), true);
   assert.equal(store.devices.has(`${otherUserId}:device-two`), true);
   assert.equal(store.keyPackages.has("kp-remaining"), true);
+  assert.equal(store.consumedKeyPackages.size, 2);
+  assert.deepEqual(store.consumedKeyPackages.get(`sha256:${"1".repeat(64)}`), {
+    keyPackageHash: `sha256:${"1".repeat(64)}`,
+    consumedAt: "2026-07-01T00:00:00.000Z"
+  });
+  assert.equal(store.consumedKeyPackages.get(`sha256:${"2".repeat(64)}`)?.userId, otherUserId);
   assert.equal(store.dailyTeamCreationCounts.size, 0);
   assert.equal(store.dailyRoomCreationCounts.size, 0);
   assert.equal(store.attachmentBlobUploadByteCounts.size, 0);
@@ -168,6 +189,13 @@ test("account deletion rollback preserves the session and concurrent unrelated m
     expiresAt: Date.now() + 60_000
   });
   store.devices.set(`${userId}:device-retry`, device(userId, "device-retry"));
+  const consumedHash = `sha256:${"3".repeat(64)}`;
+  store.consumedKeyPackages.set(consumedHash, {
+    keyPackageHash: consumedHash,
+    userId,
+    deviceId: "device-retry",
+    consumedAt: "2026-07-01T00:00:00.000Z"
+  });
   store.accountQuotaRecords.set(`daily_room_creations:${userId}`, {
     key: `daily_room_creations:${userId}`,
     userId,
@@ -194,6 +222,7 @@ test("account deletion rollback preserves the session and concurrent unrelated m
   assert.equal(store.teamMembers.get("team-retry")?.has(userId), true);
   assert.equal(store.teams.get("team-retry")?.members, 2);
   assert.equal(store.devices.has(`${userId}:device-retry`), true);
+  assert.equal(store.consumedKeyPackages.has(consumedHash), true);
   assert.equal(store.accountQuotaRecords.get(`daily_room_creations:${userId}`)?.used, 3);
   assert.equal(store.authSessions.has("session-concurrent"), true);
   assert.equal(store.teams.has("team-concurrent"), true);
@@ -202,12 +231,205 @@ test("account deletion rollback preserves the session and concurrent unrelated m
   assert.equal(result.authSessions, 1);
   assert.equal(result.teamMemberships, 1);
   assert.equal(result.devices, 1);
+  assert.equal(result.consumedKeyPackagesDeattributed, 1);
   assert.equal(result.durableQuotaRecords, 1);
   assert.equal(store.authSessions.has("session-retry"), false);
   assert.equal(store.teamMembers.get("team-retry")?.has(userId), false);
   assert.equal(store.accountQuotaRecords.has(`daily_room_creations:${userId}`), false);
+  assert.deepEqual(store.consumedKeyPackages.get(consumedHash), {
+    keyPackageHash: consumedHash,
+    consumedAt: "2026-07-01T00:00:00.000Z"
+  });
+  store.setDevice(device(userId, "device-retry"));
+  assert.deepEqual(
+    await commitValidatedKeyPackages({
+      store,
+      userId,
+      deviceId: "device-retry",
+      accepted: [{ ...keyPackage("kp-replayed", userId, "device-retry"), keyPackageHash: consumedHash }],
+      accountLimit: 50,
+      deviceLimit: 50,
+      authorizationRemainsValid: () => true,
+      persist: async () => assert.fail("a deattributed consumed hash must reject before persistence")
+    }),
+    { status: "already_consumed" }
+  );
   assert.equal(store.authSessions.has("session-concurrent"), true);
   assert.equal(store.teams.has("team-concurrent"), true);
+});
+
+test("a KeyPackage validated before account deletion cannot commit after deletion succeeds", async () => {
+  const store = createRelayStore();
+  const userId = "github:deletion-race";
+  const deviceId = "device-race";
+  store.setDevice(device(userId, deviceId));
+  const accepted = keyPackage("kp-race", userId, deviceId);
+  const validation = deferred<void>();
+  const uploading = validation.promise.then(() =>
+    commitValidatedKeyPackages({
+      store,
+      userId,
+      deviceId,
+      accepted: [accepted],
+      accountLimit: 100,
+      deviceLimit: 50,
+      authorizationRemainsValid: () => true,
+      persist: async () => undefined
+    })
+  );
+
+  const deleted = await deleteAccountOwnedRelayDataAtomically(store, userId, async () => undefined);
+  assert.equal(deleted.devices, 1);
+  validation.resolve();
+
+  assert.deepEqual(await uploading, { status: "authorization_changed" });
+  assert.equal(store.keyPackages.has(accepted.id), false);
+  assert.equal(store.getDevice(userId, deviceId), undefined);
+});
+
+test("account deletion holds its identity turn across the external ledger and rejects queued team and room creation", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+    MULTAIPLAYER_TEST_DEFER_DELETION_LEDGER_RECORD: "true"
+  });
+  try {
+    const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    const deletion = fetch(`${relay.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ confirmation: "delete my account" })
+    });
+    const recordingPath = `${relay.tempDir}/external-deletion-ledger.recording`;
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      if (
+        await access(recordingPath).then(
+          () => true,
+          () => false
+        )
+      )
+        break;
+      await delay(10);
+    }
+    await access(recordingPath);
+
+    let teamSettled = false;
+    let roomSettled = false;
+    const creatingTeam = fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ name: "Must not survive deletion" })
+    }).finally(() => {
+      teamSettled = true;
+    });
+    const creatingRoom = fetch(`${relay.baseUrl}/rooms`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ teamId: "team-core", name: "Must not survive deletion" })
+    }).finally(() => {
+      roomSettled = true;
+    });
+    await delay(75);
+    assert.equal(teamSettled, false);
+    assert.equal(roomSettled, false);
+
+    await writeFile(`${relay.tempDir}/external-deletion-ledger.release`, "release", "utf8");
+    assert.equal((await deletion).status, 200);
+    assert.equal((await creatingTeam).status, 401);
+    assert.equal((await creatingRoom).status, 401);
+
+    const stored = await waitForStoredState(
+      relay.dataPath,
+      (state) =>
+        Array.isArray(state.authSessions) &&
+        !state.authSessions.some((entry) => JSON.stringify(entry).includes("github:tester"))
+    );
+    assert.equal(JSON.stringify(stored.teams).includes("Must not survive deletion"), false);
+    assert.equal(JSON.stringify(stored.rooms).includes("Must not survive deletion"), false);
+    assert.equal(JSON.stringify(stored.teamMembers).includes("github:tester"), false);
+  } finally {
+    await relay.close();
+  }
+});
+
+test("team ownership cannot be transferred to an account while that account is being deleted", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+    MULTAIPLAYER_TEST_DEFER_DELETION_LEDGER_RECORD: "true"
+  });
+  try {
+    const targetCookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
+    const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const deletion = fetch(`${relay.baseUrl}/auth/account`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", cookie: targetCookie },
+      body: JSON.stringify({ confirmation: "delete my account" })
+    });
+    const recordingPath = `${relay.tempDir}/external-deletion-ledger.recording`;
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      if (
+        await access(recordingPath).then(
+          () => true,
+          () => false
+        )
+      )
+        break;
+      await delay(10);
+    }
+    await access(recordingPath);
+
+    let transferSettled = false;
+    const transfer = fetch(`${relay.baseUrl}/teams/team-core/members/github%3Atester/transfer-owner`, {
+      method: "POST",
+      headers: { cookie: ownerCookie }
+    }).finally(() => {
+      transferSettled = true;
+    });
+    await delay(75);
+    assert.equal(transferSettled, false);
+
+    await writeFile(`${relay.tempDir}/external-deletion-ledger.release`, "release", "utf8");
+    assert.equal((await deletion).status, 200);
+    assert.equal((await transfer).status, 404);
+
+    const stored = await waitForStoredState(relay.dataPath, (state) =>
+      JSON.stringify(state.teamMembers).includes('"role":"owner"')
+    );
+    const coreMembers = (
+      stored.teamMembers as Array<{
+        teamId: string;
+        members: Array<{ userId: string; role: string }>;
+      }>
+    ).find((entry) => entry.teamId === "team-core")?.members;
+    assert.deepEqual(
+      coreMembers?.filter((member) => member.role === "owner").map((member) => member.userId),
+      ["github:maddiedreese"]
+    );
+    assert.equal(
+      coreMembers?.some((member) => member.userId === "github:tester"),
+      false
+    );
+  } finally {
+    await relay.close();
+  }
+});
+
+test("multi-account mutation turns use one deterministic order", async () => {
+  const store = createRelayStore();
+  const completed: string[] = [];
+  const run = async (name: string, userIds: string[]) => {
+    const release = await acquireAccountMutationTurns(store, userIds);
+    try {
+      completed.push(name);
+      await Promise.resolve();
+    } finally {
+      release();
+    }
+  };
+  await Promise.race([
+    Promise.all([run("forward", ["github:a", "github:b"]), run("reverse", ["github:b", "github:a"])]),
+    delay(1_000).then(() => assert.fail("cross-ordered account turns deadlocked"))
+  ]);
+  assert.deepEqual(completed.sort(), ["forward", "reverse"]);
 });
 
 test("restoring a pre-deletion SQLite backup cannot restore the deleted identity's session", async () => {
@@ -286,4 +508,14 @@ function keyPackage(id: string, userId: string, deviceId: string) {
     credentialIdentity: userId,
     createdAt: "2026-07-01T00:00:00.000Z"
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

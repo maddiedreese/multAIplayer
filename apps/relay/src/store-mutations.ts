@@ -55,6 +55,9 @@ export function createStoredRelayMutationStream(options: {
       case "keyPackages":
         value = store.keyPackages.get(key);
         break;
+      case "consumedKeyPackages":
+        value = store.consumedKeyPackages.get(key);
+        break;
       case "attachmentBlobs": {
         value = liveAttachmentValue(store.attachmentBlobs.get(key), options.isExpiredAttachmentBlob);
         break;

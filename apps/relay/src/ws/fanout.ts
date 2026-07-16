@@ -25,7 +25,6 @@ interface Options {
   metrics: RelayMetrics;
   roomKey: (teamId: string, roomId: string) => RoomKey;
   pruneMlsBacklog: (messages: MlsRelayMessage[]) => MlsRelayMessage[];
-  addTeamMember: (teamId: string, userId: string) => void;
   reclaimDurableCapacity?: () => Promise<void>;
   saveMlsMessage: (roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) => Promise<void>;
   saveMlsCommit: (roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) => Promise<void>;
@@ -144,7 +143,6 @@ export function createRelayFanout(options: Options) {
     session.displayName = presence.displayName;
     if (presence.avatarUrl) session.avatarUrl = presence.avatarUrl;
     else delete session.avatarUrl;
-    options.addTeamMember(teamId, presence.userId);
     const registered = options.store.getDevice(presence.userId, presence.deviceId);
     const verified = {
       ...presence,

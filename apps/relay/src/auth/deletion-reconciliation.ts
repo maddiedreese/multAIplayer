@@ -124,6 +124,7 @@ export function relayIdentityIds(store: RelayStore): Set<string> {
   for (const session of store.deviceSessions.values()) ids.add(session.userId);
   for (const device of store.devices.values()) ids.add(device.userId);
   for (const keyPackage of store.keyPackages.values()) ids.add(keyPackage.userId);
+  for (const consumed of store.consumedKeyPackages.values()) if (consumed.userId) ids.add(consumed.userId);
   for (const quota of store.accountQuotaRecords.values()) ids.add(quota.userId);
   for (const members of store.teamMembers.values()) for (const userId of members.keys()) ids.add(userId);
   for (const room of store.rooms.values()) {

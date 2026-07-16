@@ -4,6 +4,11 @@ import { nanoid } from "nanoid";
 import type { RoomRecord, TeamMemberRecord, TeamRecord, TeamRole } from "@multaiplayer/protocol";
 import { RelayStoreCapacityError, type AuthSession, type RelayStore } from "../state.js";
 import { acquireDurableQuotaTransaction, reserveDurableQuota, rollbackDurableQuota } from "../auth/account-quotas.js";
+import {
+  acquireAccountMutationTurn,
+  acquireAccountMutationTurns,
+  isLiveAccountSession
+} from "../auth/account-mutation-transaction.js";
 
 interface RegisterTeamRoutesOptions {
   app: Express;
@@ -33,30 +38,27 @@ interface RegisterTeamRoutesOptions {
   dailyCreationCaps?: { teamsPerUser: number };
 }
 
-export function registerTeamRoutes({
-  app,
-  store,
-  getAuthSession,
-  allowRead,
-  allowMutation,
-  teamIdsForUser,
-  isTeamMember,
-  teamRoleRank,
-  canSetTeamMemberRole,
-  canRemoveTeamMember,
-  transferTeamOwnership,
-  revokeTeamInvites,
-  revokeTeamMemberSessions,
-  broadcastWorkspaceUpdated,
-  broadcastRoomUpdated,
-  scheduleStoreSave,
-  saveRelayStore,
-  recordQuotaRejection,
-  recordCapacityRejection,
-  normalizeMetadataText,
-  maxTeamNameChars,
-  dailyCreationCaps = { teamsPerUser: 25 }
-}: RegisterTeamRoutesOptions) {
+export function registerTeamRoutes(options: RegisterTeamRoutesOptions) {
+  const {
+    app,
+    store,
+    getAuthSession,
+    allowRead,
+    allowMutation,
+    teamIdsForUser,
+    isTeamMember,
+    teamRoleRank,
+    canSetTeamMemberRole,
+    canRemoveTeamMember,
+    transferTeamOwnership,
+    revokeTeamInvites,
+    revokeTeamMemberSessions,
+    broadcastWorkspaceUpdated,
+    broadcastRoomUpdated,
+    scheduleStoreSave,
+    normalizeMetadataText,
+    maxTeamNameChars
+  } = options;
   app.get("/teams", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
@@ -119,43 +121,53 @@ export function registerTeamRoutes({
     res.json({ member: updated, members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
-  app.post("/teams/:teamId/members/:userId/transfer-owner", (req, res) => {
+  app.post("/teams/:teamId/members/:userId/transfer-owner", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
 
     const teamId = String(req.params.teamId ?? "");
     const userId = String(req.params.userId ?? "");
-    if (!store.hasTeam(teamId)) {
-      sendRelayError(res, 404, "team_not_found", "Team not found");
-      return;
-    }
-    const members = store.getTeamMembers(teamId);
-    const target = store.getTeamMember(teamId, userId);
-    if (!members || !target) {
-      sendRelayError(res, 404, "team_member_not_found", "Team member not found");
-      return;
-    }
-    const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
-    if (requesterRole !== "owner") {
-      sendRelayError(res, 403, "forbidden", "Only the current team owner can transfer ownership.");
-      return;
-    }
-    if (session?.user.id && session.user.id === userId) {
-      sendRelayError(res, 400, "invalid_request", "Choose a different team member before transferring ownership.");
-      return;
-    }
-
-    const previousMembers = new Map(members);
-    const updatedMembers = transferTeamOwnership(members, userId);
-    const team = store.getTeam(teamId);
+    const releaseAccountMutations = session
+      ? await acquireAccountMutationTurns(store, [session.user.id, userId])
+      : null;
     try {
-      scheduleStoreSave();
-    } catch {
-      store.setTeamMembers(teamId, previousMembers);
-      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team ownership transfer.");
+      if (session && !isLiveAccountSession(store, session)) {
+        return void sendRelayError(res, 401, "authentication_required", "Sign in before transferring ownership.");
+      }
+      if (!store.hasTeam(teamId)) {
+        sendRelayError(res, 404, "team_not_found", "Team not found");
+        return;
+      }
+      const members = store.getTeamMembers(teamId);
+      const target = store.getTeamMember(teamId, userId);
+      if (!members || !target) {
+        sendRelayError(res, 404, "team_member_not_found", "Team member not found");
+        return;
+      }
+      const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
+      if (requesterRole !== "owner") {
+        sendRelayError(res, 403, "forbidden", "Only the current team owner can transfer ownership.");
+        return;
+      }
+      if (session?.user.id && session.user.id === userId) {
+        sendRelayError(res, 400, "invalid_request", "Choose a different team member before transferring ownership.");
+        return;
+      }
+
+      const previousMembers = new Map(members);
+      const updatedMembers = transferTeamOwnership(members, userId);
+      const team = store.getTeam(teamId);
+      try {
+        scheduleStoreSave();
+      } catch {
+        store.setTeamMembers(teamId, previousMembers);
+        return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team ownership transfer.");
+      }
+      if (team) broadcastWorkspaceUpdated(team);
+      res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId, store, teamRoleRank) });
+    } finally {
+      releaseAccountMutations?.();
     }
-    if (team) broadcastWorkspaceUpdated(team);
-    res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
   app.delete("/teams/:teamId/members/:userId", (req, res) => {
@@ -248,64 +260,106 @@ export function registerTeamRoutes({
       );
       return;
     }
-    const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+    const releaseAccountMutation = session ? await acquireAccountMutationTurn(store, session.user.id) : null;
     try {
-      const reservation = session
-        ? reserveDurableQuota({
-            store,
-            quota: "daily_team_creations",
-            userId: session.user.id,
-            limit: dailyCreationCaps.teamsPerUser,
-            resetAt: nextUtcMidnight(Date.now())
-          })
-        : null;
-      if (reservation && !reservation.allowed) {
-        recordQuotaRejection?.("daily_user_team_creations");
-        res.setHeader("Retry-After", Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)));
-        return void sendRelayError(res, 429, "quota_exceeded", "Daily team creation quota exceeded.", {
-          retryAfterSeconds: Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)),
-          quota: {
-            type: "daily_user_team_creations",
-            limit: dailyCreationCaps.teamsPerUser,
-            used: reservation.used,
-            remaining: 0,
-            resetsAt: new Date(reservation.resetAt).toISOString()
-          }
-        });
+      if (session && !isLiveAccountSession(store, session)) {
+        return void sendRelayError(res, 401, "authentication_required", "Sign in before creating a team.");
       }
-      const team: TeamRecord = {
-        id: `team_${nanoid(10)}`,
-        name,
-        members: session ? 1 : 0
-      };
-      try {
-        store.setTeam(team);
-        if (session) {
-          const members = new Map<string, TeamMemberRecord>([
+      await createTeamWithinAccountTurn({ session, name, res }, options);
+    } finally {
+      releaseAccountMutation?.();
+    }
+  });
+}
+
+interface TeamCreationRequest {
+  session: AuthSession | null;
+  name: string;
+  res: Response;
+}
+
+async function createTeamWithinAccountTurn(
+  { session, name, res }: TeamCreationRequest,
+  {
+    store,
+    saveRelayStore,
+    scheduleStoreSave,
+    broadcastWorkspaceUpdated,
+    recordQuotaRejection,
+    recordCapacityRejection,
+    dailyCreationCaps
+  }: RegisterTeamRoutesOptions
+): Promise<void> {
+  const teamsPerUser = dailyCreationCaps?.teamsPerUser ?? 25;
+  const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+  try {
+    const reservation = session
+      ? reserveDurableQuota({
+          store,
+          quota: "daily_team_creations",
+          userId: session.user.id,
+          limit: teamsPerUser,
+          resetAt: nextUtcMidnight(Date.now())
+        })
+      : null;
+    if (reservation && !reservation.allowed) {
+      recordQuotaRejection?.("daily_user_team_creations");
+      sendTeamCreationQuotaExceeded(res, reservation, teamsPerUser);
+      return;
+    }
+
+    const team: TeamRecord = { id: `team_${nanoid(10)}`, name, members: session ? 1 : 0 };
+    try {
+      store.setTeam(team);
+      if (session) {
+        store.setTeamMembers(
+          team.id,
+          new Map<string, TeamMemberRecord>([
             [
               session.user.id,
               { teamId: team.id, userId: session.user.id, role: "owner", joinedAt: new Date().toISOString() }
             ]
-          ]);
-          store.setTeamMembers(team.id, members);
-          await saveRelayStore();
-        } else {
-          scheduleStoreSave();
-        }
-      } catch (error) {
-        store.teams.delete(team.id);
-        store.teamMembers.delete(team.id);
-        if (reservation?.allowed) rollbackDurableQuota(store, reservation);
-        if (error instanceof RelayStoreCapacityError) {
-          recordCapacityRejection?.("durable_entries", error.teamId ? "team" : "relay");
-          return void sendRelayCapacityError(res, error);
-        }
-        return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team quota and team.");
+          ])
+        );
+        await saveRelayStore();
+      } else {
+        scheduleStoreSave();
       }
-      broadcastWorkspaceUpdated(team);
-      res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, store, session?.user.id) });
-    } finally {
-      releaseQuotaTransaction();
+    } catch (error) {
+      store.teams.delete(team.id);
+      store.teamMembers.delete(team.id);
+      if (reservation?.allowed) rollbackDurableQuota(store, reservation);
+      if (error instanceof RelayStoreCapacityError) {
+        recordCapacityRejection?.("durable_entries", error.teamId ? "team" : "relay");
+        sendRelayCapacityError(res, error);
+        return;
+      }
+      sendRelayError(res, 503, "persistence_unavailable", "Could not persist team quota and team.");
+      return;
+    }
+
+    broadcastWorkspaceUpdated(team);
+    res.status(201).json({ team: teamRecordForUser(store.getTeam(team.id) ?? team, store, session?.user.id) });
+  } finally {
+    releaseQuotaTransaction();
+  }
+}
+
+function sendTeamCreationQuotaExceeded(
+  res: Response,
+  reservation: { allowed: false; used: number; resetAt: number },
+  teamsPerUser: number
+): void {
+  const retryAfterSeconds = Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000));
+  res.setHeader("Retry-After", retryAfterSeconds);
+  sendRelayError(res, 429, "quota_exceeded", "Daily team creation quota exceeded.", {
+    retryAfterSeconds,
+    quota: {
+      type: "daily_user_team_creations",
+      limit: teamsPerUser,
+      used: reservation.used,
+      remaining: 0,
+      resetsAt: new Date(reservation.resetAt).toISOString()
     }
   });
 }

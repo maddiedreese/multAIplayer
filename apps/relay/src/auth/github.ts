@@ -5,9 +5,10 @@ import type { AuthSession, NewAuthSession } from "../state.js";
 import { fetchUpstream } from "../http/upstream.js";
 import {
   accountDeletionConfirmation,
-  deleteAccountOwnedRelayDataAtomically,
+  deleteAccountOwnedRelayDataWithinTurnAtomically,
   findAccountDeletionBlockers
 } from "./account-deletion.js";
+import { acquireAccountMutationTurn, isLiveAccountSession } from "./account-mutation-transaction.js";
 import type { RelayStore } from "../state.js";
 import type { DeletionLedger } from "./deletion-ledger.js";
 
@@ -178,50 +179,75 @@ export function registerGitHubAuthRoutes({
     }
 
     const userId = session.user.id;
-    const blockers = findAccountDeletionBlockers(store, userId);
-    if (blockers.ownedTeams.length > 0 || blockers.hostedRooms.length > 0) {
-      sendRelayError(
-        res,
-        409,
-        "account_deletion_blocked",
-        "Transfer or delete every owned team and hand off every hosted room before deleting your hosted data.",
-        { blockers }
-      );
-      return;
-    }
-
-    const memberTeamIds = Array.from(store.teamMembers.entries())
-      .filter(([, members]) => members.has(userId))
-      .map(([teamId]) => teamId);
-    const ledgerEntryIds = await recordDeletionProtection(userId);
-    if (!ledgerEntryIds) {
-      sendRelayError(
-        res,
-        503,
-        "persistence_unavailable",
-        "Hosted account deletion was not started because its external deletion record could not be committed."
-      );
-      return;
-    }
-    let deleted;
+    const releaseAccountMutation = await acquireAccountMutationTurn(store, userId);
     try {
-      deleted = await deleteAccountOwnedRelayDataAtomically(store, userId, saveRelayStore, ledgerEntryIds);
-    } catch {
+      if (!isLiveAccountSession(store, session)) {
+        return void sendRelayError(res, 401, "authentication_required", "Sign in before deleting hosted account data.");
+      }
+      const blockers = findAccountDeletionBlockers(store, userId);
+      if (hasAccountDeletionBlockers(blockers)) {
+        sendRelayError(
+          res,
+          409,
+          "account_deletion_blocked",
+          "Transfer or delete every owned team and hand off every hosted room before deleting your hosted data.",
+          { blockers }
+        );
+        return;
+      }
+
+      const memberTeamIds = Array.from(store.teamMembers.entries())
+        .filter(([, members]) => members.has(userId))
+        .map(([teamId]) => teamId);
+      const ledgerEntryIds = await recordDeletionProtection(userId);
+      if (!ledgerEntryIds) {
+        sendRelayError(
+          res,
+          503,
+          "persistence_unavailable",
+          "Hosted account deletion was not started because its external deletion record could not be committed."
+        );
+        return;
+      }
+      let deleted;
+      try {
+        deleted = await deleteAccountOwnedRelayDataWithinTurnAtomically(store, userId, saveRelayStore, ledgerEntryIds);
+      } catch {
+        for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
+        revokeUserPresence(userId);
+        for (const client of store.sessions.values()) {
+          if (client.authSession?.user.id === userId || client.userId === userId) {
+            client.socket.close(1008, "Hosted account deletion pending");
+          }
+        }
+        res.clearCookie("multaiplayer_session", authCookieOptions());
+        if (!deletionLedger) {
+          return void sendRelayError(res, 503, "persistence_unavailable", "Account deletion could not be persisted.");
+        }
+        res.status(202).json({
+          ok: true,
+          status: "pending",
+          deleted: null,
+          retainedSharedData: [
+            "team_and_room_records",
+            "mls_ciphertext_and_routing_metadata",
+            "encrypted_attachment_blobs",
+            "accepted_message_receipts"
+          ]
+        });
+        return;
+      }
       for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
       revokeUserPresence(userId);
       for (const client of store.sessions.values()) {
         if (client.authSession?.user.id === userId || client.userId === userId) {
-          client.socket.close(1008, "Hosted account deletion pending");
+          client.socket.close(1008, "Hosted account data deleted");
         }
       }
       res.clearCookie("multaiplayer_session", authCookieOptions());
-      if (!deletionLedger) {
-        return void sendRelayError(res, 503, "persistence_unavailable", "Account deletion could not be persisted.");
-      }
-      res.status(202).json({
+      res.json({
         ok: true,
-        status: "pending",
-        deleted: null,
+        deleted,
         retainedSharedData: [
           "team_and_room_records",
           "mls_ciphertext_and_routing_metadata",
@@ -229,25 +255,12 @@ export function registerGitHubAuthRoutes({
           "accepted_message_receipts"
         ]
       });
-      return;
+    } finally {
+      releaseAccountMutation();
     }
-    for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
-    revokeUserPresence(userId);
-    for (const client of store.sessions.values()) {
-      if (client.authSession?.user.id === userId || client.userId === userId) {
-        client.socket.close(1008, "Hosted account data deleted");
-      }
-    }
-    res.clearCookie("multaiplayer_session", authCookieOptions());
-    res.json({
-      ok: true,
-      deleted,
-      retainedSharedData: [
-        "team_and_room_records",
-        "mls_ciphertext_and_routing_metadata",
-        "encrypted_attachment_blobs",
-        "accepted_message_receipts"
-      ]
-    });
   });
+}
+
+function hasAccountDeletionBlockers(blockers: ReturnType<typeof findAccountDeletionBlockers>): boolean {
+  return blockers.ownedTeams.length > 0 || blockers.hostedRooms.length > 0;
 }

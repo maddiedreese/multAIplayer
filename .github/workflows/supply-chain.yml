@@ -140,7 +140,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      issues: write
+    outputs:
+      drift: ${{ steps.contract.outputs.drift }}
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -150,31 +151,98 @@ jobs:
         uses: ./.github/actions/setup-node-npm
       - name: Install repository dependencies
         run: npm ci
-      - name: Generate latest Codex app-server contract
-        id: contract
+      - name: Install Codex and generate its app-server contract
+        id: prepare
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/codex-schema"
+          npm install --prefix "$RUNNER_TEMP/latest-codex" --no-audit --no-fund @openai/codex@latest
+          codex="$RUNNER_TEMP/latest-codex/node_modules/.bin/codex"
+          version="$($codex --version | awk '{print $NF}')"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Codex returned an invalid version: $version" >&2
+            exit 1
+          fi
+          "$codex" app-server generate-json-schema --out "$RUNNER_TEMP/codex-schema"
+          node tools/codex/generate-schema-manifest.mjs --schema-dir "$RUNNER_TEMP/codex-schema" --codex-version "$version" --out "$RUNNER_TEMP/latest-codex-manifest.json"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Check the generated contract and installed runtime
+        id: contract
+        shell: bash
+        env:
+          CODEX_VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
           set +e
-          set -o pipefail
-          {
-            npm install --prefix "$RUNNER_TEMP/latest-codex" --no-audit --no-fund @openai/codex@latest
-            codex="$RUNNER_TEMP/latest-codex/node_modules/.bin/codex"
-            version="$($codex --version | awk '{print $NF}')"
-            echo "version=$version" >> "$GITHUB_OUTPUT"
-            "$codex" app-server generate-json-schema --out "$RUNNER_TEMP/codex-schema"
-            node tools/codex/generate-schema-manifest.mjs --schema-dir "$RUNNER_TEMP/codex-schema" --codex-version "$version" --out "$RUNNER_TEMP/latest-codex-manifest.json"
+          (
+            set -e
             node scripts/check-latest-codex-contract.mjs "$RUNNER_TEMP/latest-codex-manifest.json"
-            node scripts/check-latest-codex-runtime.mjs "$codex"
-          } 2>&1 | tee "$RUNNER_TEMP/codex-contract-result.txt"
-          status=${PIPESTATUS[0]}
+            node scripts/check-latest-codex-runtime.mjs "$RUNNER_TEMP/latest-codex/node_modules/.bin/codex"
+          )
+          status=$?
           set -e
-          echo "status=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 0 ]; then
+            drift=false
+          else
+            drift=true
+          fi
+          echo "drift=$drift" >> "$GITHUB_OUTPUT"
+          jq --null-input \
+            --arg version "$CODEX_VERSION" \
+            --argjson drift "$drift" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{schemaVersion: 1, version: $version, drift: $drift, runUrl: $run_url}' \
+            > "$RUNNER_TEMP/codex-contract-summary.json"
+      - name: Upload inert compatibility summary
+        if: always() && steps.contract.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codex-contract-summary
+          path: ${{ runner.temp }}/codex-contract-summary.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Fail on contract drift
+        if: steps.contract.outputs.drift == 'true'
+        run: exit 1
+
+  codex-contract-issue:
+    name: Report latest app-server incompatibility
+    needs: codex-contract
+    if: always() && needs.codex-contract.outputs.drift == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Download inert compatibility summary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: codex-contract-summary
+          path: ${{ runner.temp }}/codex-contract-summary
+      - name: Validate compatibility summary
+        id: summary
+        shell: bash
+        run: |
+          summary="$RUNNER_TEMP/codex-contract-summary/codex-contract-summary.json"
+          test "$(jq --raw-output '.schemaVersion' "$summary")" = "1"
+          test "$(jq --raw-output '.drift' "$summary")" = "true"
+          version="$(jq --raw-output '.version' "$summary")"
+          run_url="$(jq --raw-output '.runUrl' "$summary")"
+          if [[ ! "$version" =~ ^[0-9A-Za-z.+-]{1,64}$ ]]; then
+            echo "Invalid Codex version in compatibility summary." >&2
+            exit 1
+          fi
+          source_run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/${{ github.run_id }}"
+          if [ "$run_url" != "$source_run_url" ]; then
+            echo "Invalid run URL in compatibility summary." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "run_url=$run_url" >> "$GITHUB_OUTPUT"
       - name: File a deduplicated compatibility issue
-        if: steps.contract.outputs.status != '0'
         env:
           GH_TOKEN: ${{ github.token }}
-          CODEX_VERSION: ${{ steps.contract.outputs.version }}
+          CODEX_VERSION: ${{ steps.summary.outputs.version }}
+          SOURCE_RUN_URL: ${{ steps.summary.outputs.run_url }}
         shell: bash
         run: |
           marker="<!-- codex-app-server-contract-drift -->"
@@ -185,15 +253,8 @@ jobs:
           fi
           {
             echo "$marker"
-            echo "The scheduled contract check found that Codex $CODEX_VERSION no longer preserves the supported app-server contract."
+            echo "The compatibility check found that Codex $CODEX_VERSION no longer preserves the supported app-server contract."
             echo
-            echo '```text'
-            cat "$RUNNER_TEMP/codex-contract-result.txt"
-            echo '```'
-            echo
-            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Run: $SOURCE_RUN_URL"
           } > "$RUNNER_TEMP/codex-contract-issue.md"
           gh issue create --repo "$GITHUB_REPOSITORY" --title "Codex app-server contract drift: $CODEX_VERSION" --body-file "$RUNNER_TEMP/codex-contract-issue.md"
-      - name: Fail on contract drift
-        if: steps.contract.outputs.status != '0'
-        run: exit 1

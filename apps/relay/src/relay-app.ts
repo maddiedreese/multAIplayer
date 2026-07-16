@@ -271,7 +271,6 @@ export async function createRelayApp(
     metrics: relayMetrics,
     roomKey,
     pruneMlsBacklog,
-    addTeamMember,
     reclaimDurableCapacity: relayStorePersistence.reclaimDurableCapacity,
     saveMlsMessage: (roomKey, message, prunedIds) => relayStorePersistence.saveMlsMessage(roomKey, message, prunedIds),
     saveMlsCommit: (roomKey, message, prunedIds) => relayStorePersistence.saveMlsCommit(roomKey, message, prunedIds),

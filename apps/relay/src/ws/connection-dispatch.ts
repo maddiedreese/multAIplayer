@@ -2,6 +2,7 @@ import type { RelayClientMessage } from "@multaiplayer/protocol";
 import type { ClientSession, PresenceRecord } from "../state.js";
 import { socketConnectionQuotaError } from "./connection-admission.js";
 import type { RelayWebSocketConnectionOptions } from "./connection-types.js";
+import { acquireAccountMutationTurns } from "../auth/account-mutation-transaction.js";
 import {
   isBoundedSocketIdentity,
   isMlsMessageWithinLimits,
@@ -15,6 +16,8 @@ export async function dispatchRelayClientMessage(
   session: ClientSession,
   message: RelayClientMessage
 ): Promise<void> {
+  if (!isActiveQueuedClientSession(options, session)) return;
+  if (!hasLiveAuthenticationSession(options, session)) return;
   switch (message.type) {
     case "join":
       dispatchJoin(options, session, message);
@@ -33,6 +36,27 @@ export async function dispatchRelayClientMessage(
       return;
   }
   assertNever(message);
+}
+
+export function isActiveQueuedClientSession(
+  options: Pick<RelayWebSocketConnectionOptions, "state">,
+  session: ClientSession
+): boolean {
+  return session.socket.readyState === session.socket.OPEN && options.state.sessions.get(session.socket) === session;
+}
+
+function hasLiveAuthenticationSession(
+  options: Pick<RelayWebSocketConnectionOptions, "authentication" | "transport">,
+  session: ClientSession
+): boolean {
+  if (options.authentication.isLiveClientSession(session)) return true;
+  options.transport.send(session.socket, {
+    type: "error",
+    message: "Authentication session expired.",
+    code: "not_joined"
+  });
+  session.socket.close(1008, "Authentication session expired");
+  return false;
 }
 
 function assertNever(message: never): never {
@@ -213,8 +237,40 @@ async function dispatchMlsPublish(
     });
     return;
   }
-  await options.rooms.publishMlsMessage(message.message);
-  send(session.socket, { type: "published", messageId });
+  const authorityUserIds = [session.userId];
+  if (message.message.commitEffect === "host_handoff" && message.message.nextHostUserId) {
+    authorityUserIds.push(message.message.nextHostUserId);
+  }
+  const releaseAccountMutation = await acquireAccountMutationTurns(options.state.store, authorityUserIds);
+  try {
+    if (!isActiveQueuedClientSession(options, session)) return;
+    if (!hasLiveAuthenticationSession(options, session)) return;
+    if (
+      !options.rooms.hasDeviceSession(session.deviceSessionToken, session.userId, session.deviceId) ||
+      !options.rooms.canAccessRoom(message.message.teamId, message.message.roomId, session.userId) ||
+      !hostHandoffTargetRemainsAuthorized(options, message.message) ||
+      !options.rooms.canPublishMlsMessage(session, message.message)
+    ) {
+      send(session.socket, { type: "error", message: "Device session expired.", code: "not_joined", messageId });
+      return;
+    }
+    await options.rooms.publishMlsMessage(message.message);
+    send(session.socket, { type: "published", messageId });
+  } finally {
+    releaseAccountMutation();
+  }
+}
+
+function hostHandoffTargetRemainsAuthorized(
+  options: Pick<RelayWebSocketConnectionOptions, "state">,
+  message: Extract<RelayClientMessage, { type: "publish" }>["message"]
+): boolean {
+  if (message.commitEffect !== "host_handoff") return true;
+  if (!message.nextHostUserId || !message.nextHostDeviceId) return false;
+  return Boolean(
+    options.state.store.getTeamMember(message.teamId, message.nextHostUserId) &&
+    options.state.store.getDevice(message.nextHostUserId, message.nextHostDeviceId)
+  );
 }
 
 function dispatchPresence(

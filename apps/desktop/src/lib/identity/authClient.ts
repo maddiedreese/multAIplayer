@@ -34,7 +34,7 @@ export interface SignedInUser {
   avatarUrl?: string;
 }
 
-export interface GitHubOAuthPurposeSummary {
+interface GitHubOAuthPurposeSummary {
   identity: string;
   repositoryWorkflows: string;
 }

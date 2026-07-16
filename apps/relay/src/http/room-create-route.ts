@@ -11,6 +11,7 @@ import {
 import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
 import type { Response } from "express";
 import { RelayStoreCapacityError } from "../state.js";
+import { acquireAccountMutationTurn, isLiveAccountSession } from "../auth/account-mutation-transaction.js";
 
 const encryptedConfigFields = [
   "projectPath",
@@ -25,8 +26,7 @@ const encryptedConfigFields = [
 ] as const;
 
 export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
-  const { app, store, getAuthSession, allowMutation, teamIdsForUser, recordQuotaRejection } = options;
-  const totalRoomCapPerUser = options.totalRoomCapPerUser ?? 500;
+  const { app, getAuthSession, allowMutation } = options;
 
   app.post("/rooms", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
@@ -35,17 +35,6 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
     if (!allowRoomCreation(options, session, teamId, res)) return;
     const input = parseRoomCreationInput(options, req.body, res);
     if (!input) return;
-    if (
-      session &&
-      !allowTotalRoomQuota({
-        store,
-        teamIds: teamIdsForUser(session.user.id),
-        cap: totalRoomCapPerUser,
-        res,
-        recordQuotaRejection
-      })
-    )
-      return;
     await persistRoomCreation(options, session, teamId, input, res);
   });
 }
@@ -57,26 +46,31 @@ async function persistRoomCreation(
   input: NonNullable<ReturnType<typeof parseRoomCreationInput>>,
   res: Response
 ) {
-  const {
-    store,
-    scheduleStoreSave,
-    saveRelayStore,
-    broadcastRoomUpdated,
-    recordQuotaRejection,
-    recordCapacityRejection,
-    normalizeMetadataText,
-    displayNameForUser,
-    maxHostNameChars
-  } = options;
+  const releaseAccountMutation = session ? await acquireAccountMutationTurn(options.store, session.user.id) : null;
+  try {
+    if (!allowQueuedRoomCreation(options, session, teamId, res)) return;
+    await persistRoomWithinQuotaTransaction(options, session, teamId, input, res);
+  } finally {
+    releaseAccountMutation?.();
+  }
+}
+
+async function persistRoomWithinQuotaTransaction(
+  options: RegisterRoomRoutesOptions,
+  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>,
+  teamId: string,
+  input: NonNullable<ReturnType<typeof parseRoomCreationInput>>,
+  res: Response
+): Promise<void> {
   const dailyCreationCaps = options.dailyCreationCaps ?? { roomsPerUser: 100 };
-  const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+  const releaseQuotaTransaction = await acquireDurableQuotaTransaction(options.store);
   let reservation: ReturnType<typeof reserveDurableQuota> | null = null;
   let room: RoomRecord | null = null;
   let durableCommitCompleted = false;
   try {
     reservation = session
       ? reserveDurableQuota({
-          store,
+          store: options.store,
           quota: "daily_room_creations",
           userId: session.user.id,
           limit: dailyCreationCaps.roomsPerUser,
@@ -84,10 +78,11 @@ async function persistRoomCreation(
         })
       : null;
     if (reservation && !reservation.allowed) {
-      recordQuotaRejection?.("daily_user_room_creations");
-      res.setHeader("Retry-After", Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)));
-      return void sendRelayError(res, 429, "quota_exceeded", "Daily room creation quota exceeded.", {
-        retryAfterSeconds: Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)),
+      options.recordQuotaRejection?.("daily_user_room_creations");
+      const retryAfterSeconds = Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000));
+      res.setHeader("Retry-After", retryAfterSeconds);
+      sendRelayError(res, 429, "quota_exceeded", "Daily room creation quota exceeded.", {
+        retryAfterSeconds,
         quota: {
           type: "daily_user_room_creations",
           limit: dailyCreationCaps.roomsPerUser,
@@ -96,35 +91,59 @@ async function persistRoomCreation(
           resetsAt: new Date(reservation.resetAt).toISOString()
         }
       });
+      return;
     }
     room = {
       id: `room_${nanoid(10)}`,
       teamId,
       name: input.name,
       host: session
-        ? (normalizeMetadataText(displayNameForUser(session.user), maxHostNameChars) ?? "Reserved host")
+        ? (options.normalizeMetadataText(options.displayNameForUser(session.user), options.maxHostNameChars) ??
+          "Reserved host")
         : "No host",
       hostUserId: session?.user.id,
       hostStatus: "offline",
       approvalPolicy: input.approvalPolicy
     };
-    store.setRoom(room);
-    if (session) await saveRelayStore();
-    else scheduleStoreSave();
+    options.store.setRoom(room);
+    if (session) await options.saveRelayStore();
+    else options.scheduleStoreSave();
     durableCommitCompleted = true;
-    broadcastRoomUpdated(room);
+    options.broadcastRoomUpdated(room);
     res.status(201).json({ room });
   } catch (error) {
     if (durableCommitCompleted) throw error;
-    rollbackRoomCreation(store, room, reservation);
+    rollbackRoomCreation(options.store, room, reservation);
     if (error instanceof RelayStoreCapacityError) {
-      recordCapacityRejection?.("durable_entries", error.teamId ? "team" : "relay");
-      return void sendRelayCapacityError(res, error);
+      options.recordCapacityRejection?.("durable_entries", error.teamId ? "team" : "relay");
+      sendRelayCapacityError(res, error);
+      return;
     }
-    return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist room quota and room.");
+    sendRelayError(res, 503, "persistence_unavailable", "Could not persist room quota and room.");
   } finally {
     releaseQuotaTransaction();
   }
+}
+
+function allowQueuedRoomCreation(
+  options: RegisterRoomRoutesOptions,
+  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>,
+  teamId: string,
+  res: Response
+) {
+  if (session && !isLiveAccountSession(options.store, session)) {
+    sendRelayError(res, 401, "authentication_required", "Sign in before creating a room.");
+    return false;
+  }
+  if (!allowRoomCreation(options, session, teamId, res)) return false;
+  if (!session) return true;
+  return allowTotalRoomQuota({
+    store: options.store,
+    teamIds: options.teamIdsForUser(session.user.id),
+    cap: options.totalRoomCapPerUser ?? 500,
+    res,
+    recordQuotaRejection: options.recordQuotaRejection
+  });
 }
 
 function rollbackRoomCreation(

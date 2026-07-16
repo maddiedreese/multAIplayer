@@ -75,7 +75,10 @@ export function createRelayRoomSocketManager({
     deviceId: string,
     inviteId?: string
   ): boolean {
-    if (!mutationsRequireAuth) return true;
+    if (!mutationsRequireAuth) {
+      addTeamMember(teamId, userId);
+      return true;
+    }
     if (!session.authSession || session.authSession.user.id !== userId) return false;
     if (canAccessRoom(teamId, roomId, userId)) return true;
     const invite = inviteId ? approvedInviteForAdmission(inviteId, teamId, roomId, userId, deviceId) : null;
@@ -224,6 +227,7 @@ export function createRelayRoomSocketManager({
     canJoinRoom,
     canSubscribeTeam,
     canSubscribeWorkspace,
+    canAccessRoom,
     leaveRoom,
     leaveTeams,
     leaveWorkspace,

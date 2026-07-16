@@ -32,7 +32,8 @@ export default defineConfig({
       }
     },
     {
-      command: "vite --config e2e/harness/vite.config.ts",
+      command:
+        "vite build --config e2e/harness/vite.config.ts && vite preview --config e2e/harness/vite.config.ts --host 127.0.0.1 --port 1422 --strictPort",
       cwd: "..",
       url: "http://127.0.0.1:1422/e2e/harness/index.html",
       reuseExistingServer: false,

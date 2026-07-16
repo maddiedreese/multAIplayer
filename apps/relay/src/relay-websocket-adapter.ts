@@ -1,5 +1,6 @@
 import { isRecord } from "@multaiplayer/protocol";
 import type { createRelayAuthSessionManager } from "./auth/session.js";
+import { isLiveAccountSession } from "./auth/account-mutation-transaction.js";
 import type { loadRelayConfig } from "./config.js";
 import { hasDeviceSession } from "./http/device-auth.js";
 import type { createRelayRequestGuards } from "./http/middleware.js";
@@ -32,6 +33,9 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
     limits: options.limits,
     authentication: {
       getAuthSessionFromRequest: options.auth.getAuthSessionFromRequest,
+      isLiveClientSession: (session) =>
+        !config.mutationsRequireAuth ||
+        Boolean(session.authSession && isLiveAccountSession(store, session.authSession)),
       clientIdentityFromIncomingMessage: options.guards.clientIdentityFromIncomingMessage,
       clientRateLimitIdentitiesFromIncomingMessage: options.guards.clientRateLimitIdentitiesFromIncomingMessage
     },
@@ -64,6 +68,7 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
       canSubscribeWorkspace: roomManager.canSubscribeWorkspace,
       subscribeWorkspace: roomManager.subscribeWorkspace,
       canPublishMlsMessage,
+      canAccessRoom: options.roomManager.canAccessRoom,
       publishMlsMessage: fanout.publishMlsMessage,
       publishPresence: fanout.publishPresence,
       leaveRoom: roomManager.leaveRoom,

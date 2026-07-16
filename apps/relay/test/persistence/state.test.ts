@@ -21,6 +21,7 @@ test("SQLite initializes normalized MLS and KeyPackage tables", async () => {
       "relay_mls_messages",
       "relay_room_epochs",
       "relay_key_packages",
+      "relay_consumed_key_packages",
       "relay_invite_requests",
       "relay_invite_responses",
       "relay_invite_ack_receipts",

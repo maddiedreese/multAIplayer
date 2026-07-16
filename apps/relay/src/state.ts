@@ -35,6 +35,7 @@ export type RelayStoreMutationEntity =
   | "acceptedMessageReceipts"
   | "devices"
   | "keyPackages"
+  | "consumedKeyPackages"
   | "attachmentBlobs"
   | "appliedDeletionLedgerEntries"
   | "teamMembers"
@@ -136,6 +137,14 @@ export interface AppliedDeletionLedgerEntry {
   appliedAt: string;
 }
 
+export interface ConsumedKeyPackageRecord {
+  keyPackageHash: string;
+  /** Account deletion removes userId and deviceId; the stable hash remains for one-shot enforcement. */
+  userId?: string;
+  deviceId?: string;
+  consumedAt: string;
+}
+
 export interface AccountRestriction {
   userId: string;
   reasonCode: string;
@@ -170,6 +179,7 @@ export interface RelayStore {
   acceptedMessageReceipts: Map<string, AcceptedMessageReceipt>;
   devices: Map<string, DeviceRecord>;
   keyPackages: Map<string, KeyPackageRecord>;
+  consumedKeyPackages: Map<string, ConsumedKeyPackageRecord>;
   attachmentBlobs: Map<string, AttachmentBlobRecord>;
   teamMembers: Map<string, Map<string, TeamMemberRecord>>;
   rateLimitStore: Map<string, TokenBucketRecord>;
@@ -261,6 +271,7 @@ export class InMemoryRelayStore implements RelayStore {
   );
   readonly devices = this.trackedMap<string, DeviceRecord>("devices");
   readonly keyPackages = this.trackedMap<string, KeyPackageRecord>("keyPackages");
+  readonly consumedKeyPackages = this.trackedMap<string, ConsumedKeyPackageRecord>("consumedKeyPackages");
   readonly attachmentBlobs: Map<string, AttachmentBlobRecord>;
   readonly teamMembers: TeamMemberCollectionMap;
   readonly rateLimitStore = new Map<string, TokenBucketRecord>();

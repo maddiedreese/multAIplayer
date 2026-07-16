@@ -1,6 +1,6 @@
 import { RelayPublishError } from "./fanout.js";
 import { admitRelayWebSocketConnection } from "./connection-admission.js";
-import { dispatchRelayClientMessage } from "./connection-dispatch.js";
+import { dispatchRelayClientMessage, isActiveQueuedClientSession } from "./connection-dispatch.js";
 import type { RelayWebSocketConnectionOptions } from "./connection-types.js";
 import { parseRelayClientMessage } from "./connection-validation.js";
 import { RelayStoreByteCapacityError, RelayStoreCapacityError } from "../state.js";
@@ -14,6 +14,7 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
     let messageChain = Promise.resolve();
     socket.on("message", (raw) => {
       messageChain = messageChain.then(async () => {
+        if (!isActiveQueuedClientSession(options, session)) return;
         let publishMessageId: string | undefined;
         try {
           if (options.transport.isReady && !options.transport.isReady()) {

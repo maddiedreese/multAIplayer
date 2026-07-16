@@ -1,24 +1,25 @@
 import type { InviteJoinRequestRecord, InviteRecord, KeyPackageRecord } from "@multaiplayer/protocol";
 import { isActiveRoom } from "../relay-domain.js";
 import type { RelayStore } from "../state.js";
+import { acquireAccountMutationTurns } from "../auth/account-mutation-transaction.js";
 import { persistMutationOrRollback } from "./durable-mutation.js";
 
-export type KeyPackageConsumptionResult =
+type KeyPackageConsumptionResult =
   | { status: "accepted"; keyPackage: KeyPackageRecord }
   | { status: "already_consumed" }
   | { status: "authorization_changed" }
+  | { status: "requester_authorization_changed" }
   | { status: "invite_mismatch" }
+  | { status: "invite_expired" }
   | { status: "request_mismatch" }
   | { status: "key_package_unavailable" }
   | { status: "key_package_mismatch" }
   | { status: "persistence_unavailable" };
 
-const consumptionTurnTails = new WeakMap<object, Map<string, Promise<void>>>();
-
 /**
- * Serialize the check, mutation, durable write, and possible rollback for one
- * KeyPackage. A retry cannot observe the optimistic in-memory mutation until
- * the preceding persistence attempt has either committed or been restored.
+ * Serialize the check, mutation, durable write, and possible rollback across
+ * both affected accounts. Upload, deletion, and consumption therefore cannot
+ * invalidate either participant while a consumption commits.
  */
 export async function consumeKeyPackageForInvite(options: {
   store: RelayStore;
@@ -31,10 +32,15 @@ export async function consumeKeyPackageForInvite(options: {
   deviceId: string;
   keyPackageId: string;
   keyPackageHash: string;
+  authorizationRemainsValid: () => boolean;
   persist: () => Promise<void>;
 }): Promise<KeyPackageConsumptionResult> {
-  const release = await acquireConsumptionTurn(options.store, options.keyPackageId);
+  const release = await acquireAccountMutationTurns(options.store, [options.expectedHostUserId, options.userId]);
   try {
+    if (!options.authorizationRemainsValid()) return { status: "authorization_changed" };
+    if (!options.store.getDevice(options.userId, options.deviceId)) {
+      return { status: "requester_authorization_changed" };
+    }
     const room = options.store.getRoom(options.roomId);
     if (
       !room ||
@@ -48,6 +54,7 @@ export async function consumeKeyPackageForInvite(options: {
     }
     const invite = options.store.getInvite(options.inviteId);
     if (!inviteMatchesRoom(invite, options.teamId, options.roomId)) return { status: "invite_mismatch" };
+    if (invite.expiresAt && Date.parse(invite.expiresAt) <= Date.now()) return { status: "invite_expired" };
     const request = findMatchingInviteRequest(options.store, invite.id, options);
     if (!request) return { status: "request_mismatch" };
 
@@ -58,8 +65,16 @@ export async function consumeKeyPackageForInvite(options: {
         : { status: "key_package_unavailable" };
     }
     if (!keyPackageMatchesRequest(item, options)) return { status: "key_package_mismatch" };
+    if (options.store.consumedKeyPackages.has(item.keyPackageHash)) return { status: "key_package_unavailable" };
 
     options.store.deleteKeyPackage(item.id);
+    const consumed = {
+      keyPackageHash: item.keyPackageHash,
+      userId: item.userId,
+      deviceId: item.deviceId,
+      consumedAt: new Date().toISOString()
+    };
+    options.store.consumedKeyPackages.set(consumed.keyPackageHash, consumed);
     options.store.setInvite({
       ...invite,
       approvedUserId: item.userId,
@@ -69,32 +84,17 @@ export async function consumeKeyPackageForInvite(options: {
     const persisted = await persistMutationOrRollback({
       persist: options.persist,
       rollback: () => {
-        options.store.setKeyPackage(item);
-        options.store.setInvite(invite);
+        if (options.store.consumedKeyPackages.get(consumed.keyPackageHash) === consumed) {
+          options.store.consumedKeyPackages.delete(consumed.keyPackageHash);
+        }
+        if (!options.store.keyPackages.has(item.id)) options.store.setKeyPackage(item);
+        if (options.store.getInvite(invite.id)?.keyPackageHash === item.keyPackageHash) options.store.setInvite(invite);
       }
     });
     return persisted ? { status: "accepted", keyPackage: item } : { status: "persistence_unavailable" };
   } finally {
     release();
   }
-}
-
-async function acquireConsumptionTurn(store: object, keyPackageId: string): Promise<() => void> {
-  const tails = consumptionTurnTails.get(store) ?? new Map<string, Promise<void>>();
-  consumptionTurnTails.set(store, tails);
-  const previous = tails.get(keyPackageId) ?? Promise.resolve();
-  let releaseTurn!: () => void;
-  const turn = new Promise<void>((resolve) => {
-    releaseTurn = resolve;
-  });
-  const tail = previous.then(() => turn);
-  tails.set(keyPackageId, tail);
-  await previous;
-  return () => {
-    releaseTurn();
-    if (tails.get(keyPackageId) === tail) tails.delete(keyPackageId);
-    if (tails.size === 0 && consumptionTurnTails.get(store) === tails) consumptionTurnTails.delete(store);
-  };
 }
 
 function inviteMatchesRoom(

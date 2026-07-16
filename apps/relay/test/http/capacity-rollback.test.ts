@@ -10,11 +10,12 @@ import { createRelayStore } from "../../src/state.js";
 const session = {
   sessionIdHash: "a".repeat(64),
   user: { id: "github:capacity", login: "capacity" },
-  expiresAt: Date.now() + 60_000
+  expiresAt: Date.now() + 60 * 60_000
 };
 
 test("team creation rolls back its quota and team when member capacity is exhausted", async () => {
   const store = createRelayStore(2);
+  store.authSessions.set(session.sessionIdHash, session);
   const app = express();
   app.use(express.json());
   registerTeamRoutes({
@@ -69,6 +70,7 @@ test("ownership transfer rolls back and never broadcasts when persistence fails"
       ["github:next", { teamId: "team", userId: "github:next", role: "member", joinedAt: new Date().toISOString() }]
     ])
   );
+  store.authSessions.set(session.sessionIdHash, session);
   store.discardDurableMutations();
   const app = express();
   app.use(express.json());
@@ -118,6 +120,7 @@ test("ownership transfer rolls back and never broadcasts when persistence fails"
 
 test("room creation rolls back its durable quota when capacity rejects the room", async () => {
   const store = createRelayStore(2);
+  store.authSessions.set(session.sessionIdHash, session);
   store.setTeam({ id: "team-capacity", name: "Capacity", members: 1 });
   store.discardDurableMutations();
   const app = express();
@@ -170,6 +173,7 @@ test("attachment upload rolls back its byte quota when real retained bytes exhau
     mlsBacklog: { global: 1_000, perTeam: 1_000, perRoom: 1_000 },
     attachmentBlobs: { global: 1, perTeam: 1 }
   });
+  store.authSessions.set(session.sessionIdHash, session);
   store.setTeam({ id: "team-capacity", name: "Capacity", members: 1 });
   store.setRoom({
     id: "room-capacity",

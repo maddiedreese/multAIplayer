@@ -13,13 +13,17 @@ export interface RelayWebSocketConnectionOptions {
     isReady?: () => boolean;
   };
   state: {
-    store: Pick<RelayStore, "getInvite" | "getMlsBacklog" | "getRoom" | "inviteRequests" | "inviteResponses">;
+    store: Pick<
+      RelayStore,
+      "getDevice" | "getInvite" | "getMlsBacklog" | "getRoom" | "getTeamMember" | "inviteRequests" | "inviteResponses"
+    >;
     sessions: Map<ClientSession["socket"], ClientSession>;
     roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   };
   limits: RelayLimits;
   authentication: {
     getAuthSessionFromRequest: (request: IncomingMessage) => AuthSession | undefined;
+    isLiveClientSession: (session: ClientSession) => boolean;
     clientIdentityFromIncomingMessage: (request: IncomingMessage) => string;
     clientRateLimitIdentitiesFromIncomingMessage?: (request: IncomingMessage) => string[];
   };
@@ -56,6 +60,7 @@ export interface RelayWebSocketConnectionOptions {
     canSubscribeWorkspace: (session: ClientSession, userId: string) => boolean;
     subscribeWorkspace: (session: ClientSession) => void;
     canPublishMlsMessage: (session: ClientSession, message: MlsRelayMessage) => boolean;
+    canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
     publishMlsMessage: (message: MlsRelayMessage) => Promise<void>;
     publishPresence: (session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) => void;
     leaveRoom: (session: ClientSession) => void;

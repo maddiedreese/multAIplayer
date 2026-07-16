@@ -1,14 +1,15 @@
 import type { KeyPackageRecord } from "@multaiplayer/protocol";
 import type { RelayStore } from "../state.js";
+import { acquireAccountMutationTurn } from "../auth/account-mutation-transaction.js";
 
 export type KeyPackageUploadCommitResult =
   | { status: "accepted"; count: number }
   | { status: "account_quota"; used: number }
   | { status: "device_quota" }
   | { status: "conflict" }
+  | { status: "already_consumed" }
+  | { status: "authorization_changed" }
   | { status: "persistence_unavailable" };
-
-const uploadTurnTails = new WeakMap<object, Map<string, Promise<void>>>();
 
 export async function commitValidatedKeyPackages(options: {
   store: RelayStore;
@@ -17,18 +18,34 @@ export async function commitValidatedKeyPackages(options: {
   accepted: KeyPackageRecord[];
   accountLimit: number;
   deviceLimit: number;
+  authorizationRemainsValid: () => boolean;
   persist: () => Promise<void>;
 }): Promise<KeyPackageUploadCommitResult> {
-  const release = await acquireUploadTurn(options.store, options.userId, options.deviceId);
+  const release = await acquireAccountMutationTurn(options.store, options.userId);
   try {
+    if (!options.authorizationRemainsValid()) return { status: "authorization_changed" };
     const deviceUsed = options.store.keyPackagesForDevice(options.userId, options.deviceId).length;
     if (deviceUsed + options.accepted.length > options.deviceLimit) return { status: "device_quota" };
     const accountUsed = accountPackageCount(options.store, options.userId);
     if (accountUsed + options.accepted.length > options.accountLimit) {
       return { status: "account_quota", used: accountUsed };
     }
-    if (options.accepted.some((item) => options.store.keyPackages.has(item.id))) return { status: "conflict" };
-    for (const item of options.accepted) options.store.setKeyPackage(item);
+    if (options.accepted.some((item) => options.store.consumedKeyPackages.has(item.keyPackageHash))) {
+      return { status: "already_consumed" };
+    }
+    const liveHashes = new Set(Array.from(options.store.keyPackages.values(), (item) => item.keyPackageHash));
+    if (
+      options.accepted.some((item) => options.store.keyPackages.has(item.id) || liveHashes.has(item.keyPackageHash))
+    ) {
+      return { status: "conflict" };
+    }
+    if (!options.store.getDevice(options.userId, options.deviceId)) return { status: "authorization_changed" };
+    try {
+      for (const item of options.accepted) options.store.setKeyPackage(item);
+    } catch (error) {
+      rollbackContribution(options.store, options.accepted);
+      throw error;
+    }
     try {
       await options.persist();
     } catch {
@@ -42,25 +59,6 @@ export async function commitValidatedKeyPackages(options: {
   } finally {
     release();
   }
-}
-
-async function acquireUploadTurn(store: object, userId: string, deviceId: string) {
-  const tails = uploadTurnTails.get(store) ?? new Map<string, Promise<void>>();
-  uploadTurnTails.set(store, tails);
-  const key = `${userId}\0${deviceId}`;
-  const previous = tails.get(key) ?? Promise.resolve();
-  let releaseTurn!: () => void;
-  const turn = new Promise<void>((resolve) => {
-    releaseTurn = resolve;
-  });
-  const tail = previous.then(() => turn);
-  tails.set(key, tail);
-  await previous;
-  return () => {
-    releaseTurn();
-    if (tails.get(key) === tail) tails.delete(key);
-    if (tails.size === 0 && uploadTurnTails.get(store) === tails) uploadTurnTails.delete(store);
-  };
 }
 
 function accountPackageCount(store: RelayStore, userId: string): number {

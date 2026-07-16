@@ -22,6 +22,7 @@ export function loadNormalizedRelayState(db: Database.Database): unknown | null 
     invites: loadJsonRows(db, "relay_invites", "id"),
     devices: loadJsonRows(db, "relay_devices", "key"),
     keyPackages: loadJsonRows(db, "relay_key_packages", "id"),
+    consumedKeyPackages: loadJsonRows(db, "relay_consumed_key_packages", "key_package_hash"),
     inviteRequests: loadJsonRows(db, "relay_invite_requests", "id"),
     inviteResponses: loadJsonRows(db, "relay_invite_responses", "id"),
     inviteAckReceipts: loadJsonRows(db, "relay_invite_ack_receipts", "id"),
@@ -45,6 +46,7 @@ const relayEntityTables: Record<
   invites: { table: "relay_invites", keyColumn: "id" },
   devices: { table: "relay_devices", keyColumn: "key" },
   keyPackages: { table: "relay_key_packages", keyColumn: "id" },
+  consumedKeyPackages: { table: "relay_consumed_key_packages", keyColumn: "key_package_hash" },
   inviteRequests: { table: "relay_invite_requests", keyColumn: "id" },
   inviteResponses: { table: "relay_invite_responses", keyColumn: "id" },
   inviteAckReceipts: { table: "relay_invite_ack_receipts", keyColumn: "id" },
@@ -151,6 +153,9 @@ export function saveNormalizedRelayState(db: Database.Database, state: unknown) 
       return userId && deviceId ? `${userId}:${deviceId}` : null;
     });
     saveJsonRows(db, "relay_key_packages", "id", state.keyPackages, (item) => relayId(item, "id"));
+    saveJsonRows(db, "relay_consumed_key_packages", "key_package_hash", state.consumedKeyPackages, (item) =>
+      relayId(item, "keyPackageHash")
+    );
     saveJsonRows(db, "relay_invite_requests", "id", state.inviteRequests, (item) => relayId(item, "requestId"));
     saveJsonRows(db, "relay_invite_responses", "id", state.inviteResponses, (item) => relayId(item, "requestId"));
     saveJsonRows(db, "relay_invite_ack_receipts", "id", state.inviteAckReceipts, (item) => relayId(item, "requestId"));
@@ -183,6 +188,7 @@ function clearNormalizedRelayTables(db: Database.Database) {
     "relay_invites",
     "relay_devices",
     "relay_key_packages",
+    "relay_consumed_key_packages",
     "relay_invite_requests",
     "relay_invite_responses",
     "relay_invite_ack_receipts",
@@ -359,6 +365,7 @@ function storageKeyForRow(table: string, value: Record<string, unknown>): string
     relay_rooms: "id",
     relay_invites: "id",
     relay_key_packages: "id",
+    relay_consumed_key_packages: "keyPackageHash",
     relay_invite_requests: "requestId",
     relay_invite_responses: "requestId",
     relay_invite_ack_receipts: "requestId",
@@ -380,6 +387,7 @@ function relayDatabaseContainsDurableState(db: Database.Database): boolean {
     "relay_invites",
     "relay_devices",
     "relay_key_packages",
+    "relay_consumed_key_packages",
     "relay_invite_requests",
     "relay_invite_responses",
     "relay_invite_ack_receipts",

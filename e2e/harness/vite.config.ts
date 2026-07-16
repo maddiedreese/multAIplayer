@@ -1,10 +1,11 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { patchedMonacoDompurify } from "../../tools/vite/patched-monaco-dompurify";
 
 export default defineConfig({
   root: process.cwd(),
-  plugins: [react()],
+  plugins: [react(), patchedMonacoDompurify()],
   clearScreen: false,
   server: {
     host: "127.0.0.1",

@@ -11,10 +11,72 @@ import {
   waitForPublished
 } from "../support/relay.js";
 import { commitValidatedKeyPackages } from "../../src/http/key-package-upload-transaction.js";
-import { createRelayStore } from "../../src/state.js";
+import { createRelayStore, RelayStoreCapacityError } from "../../src/state.js";
+import { acquireAccountMutationTurn } from "../../src/auth/account-mutation-transaction.js";
 import type { KeyPackageRecord } from "@multaiplayer/protocol";
 
 const validatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
+
+test("expired invites cannot create KeyPackage requests", async () => {
+  const relay = await startRelayWithWorkspace({
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+    MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath
+  });
+  try {
+    const host = await device(relay.baseUrl, "github:maddiedreese", "expiry-host");
+    const peer = await device(relay.baseUrl, "github:tester", "expiry-peer");
+    const hostHeaders = { "content-type": "application/json", cookie: host.cookie, "x-device-session": host.token };
+    const peerHeaders = { "content-type": "application/json", cookie: peer.cookie, "x-device-session": peer.token };
+    const invite = (
+      (await (
+        await fetch(`${relay.baseUrl}/invites`, {
+          method: "POST",
+          headers: hostHeaders,
+          body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+        })
+      ).json()) as { invite: { id: string; expiresAt: string } }
+    ).invite;
+    const keyPackage = "AA==";
+    const keyPackageHash = `sha256:${createHash("sha256").update(Buffer.from(keyPackage, "base64")).digest("hex")}`;
+    assert.equal(
+      (
+        await fetch(`${relay.baseUrl}/devices/expiry-peer/key-packages`, {
+          method: "POST",
+          headers: peerHeaders,
+          body: JSON.stringify({
+            keyPackages: [{ id: "expiry-kp", keyPackage, keyPackageHash, ciphersuite: 2 }]
+          })
+        })
+      ).status,
+      201
+    );
+    assert.equal((await fetch(`${relay.baseUrl}/debug/invites/${invite.id}/expire`, { method: "POST" })).status, 204);
+    assert.equal(
+      (
+        await fetch(`${relay.baseUrl}/invites/${invite.id}/requests`, {
+          method: "POST",
+          headers: peerHeaders,
+          body: JSON.stringify({
+            requestId: "expired-request",
+            requesterDeviceId: "expiry-peer",
+            keyPackageId: "expiry-kp",
+            keyPackageHash,
+            sealedRequest: directedSealedRequest({
+              inviteId: invite.id,
+              keyPackageHash,
+              requestId: "expired-request",
+              expiresAt: invite.expiresAt
+            })
+          })
+        })
+      ).status,
+      410
+    );
+  } finally {
+    await relay.close();
+  }
+});
+
 test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
   const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
@@ -358,6 +420,21 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
       userId: "github:tester",
       deviceId: "peer-device-1"
     });
+    for (const replayId of ["kp-one", "kp-one-alternate-id"]) {
+      assert.equal(
+        (
+          await fetch(`${relay.baseUrl}/devices/peer-device-1/key-packages`, {
+            method: "POST",
+            headers: peerHeaders,
+            body: JSON.stringify({
+              keyPackages: [{ id: replayId, keyPackage, keyPackageHash, ciphersuite: 2 }]
+            })
+          })
+        ).status,
+        409,
+        "consumed KeyPackage bytes cannot be republished under the same or an alternate id"
+      );
+    }
     const decidedAt = new Date().toISOString();
     const responseBinding = {
       version: 3,
@@ -708,6 +785,7 @@ test("live KeyPackage ceilings apply across every device on an account", async (
 
 test("validated KeyPackage commits serialize the per-device ceiling after validation", async () => {
   const store = createRelayStore();
+  registerFixtureDevice(store);
   for (let index = 0; index < 49; index += 1) store.setKeyPackage(packageRecord(`seed-${index}`, index));
   const firstSave = deferred<void>();
   const first = commitValidatedKeyPackages({
@@ -717,6 +795,7 @@ test("validated KeyPackage commits serialize the per-device ceiling after valida
     accepted: [packageRecord("candidate-one", 50)],
     accountLimit: 250,
     deviceLimit: 50,
+    authorizationRemainsValid: () => true,
     persist: () => firstSave.promise
   });
   const second = commitValidatedKeyPackages({
@@ -726,6 +805,7 @@ test("validated KeyPackage commits serialize the per-device ceiling after valida
     accepted: [packageRecord("candidate-two", 51)],
     accountLimit: 250,
     deviceLimit: 50,
+    authorizationRemainsValid: () => true,
     persist: async () => {}
   });
   await Promise.resolve();
@@ -737,6 +817,7 @@ test("validated KeyPackage commits serialize the per-device ceiling after valida
 
 test("validated KeyPackage commits reject a concurrent same-id collision", async () => {
   const store = createRelayStore();
+  registerFixtureDevice(store);
   const firstSave = deferred<void>();
   const firstRecord = packageRecord("shared-id", 1);
   const secondRecord = packageRecord("shared-id", 2);
@@ -747,6 +828,7 @@ test("validated KeyPackage commits reject a concurrent same-id collision", async
     accepted: [firstRecord],
     accountLimit: 250,
     deviceLimit: 50,
+    authorizationRemainsValid: () => true,
     persist: () => firstSave.promise
   });
   const second = commitValidatedKeyPackages({
@@ -756,6 +838,7 @@ test("validated KeyPackage commits reject a concurrent same-id collision", async
     accepted: [secondRecord],
     accountLimit: 250,
     deviceLimit: 50,
+    authorizationRemainsValid: () => true,
     persist: async () => {}
   });
   await Promise.resolve();
@@ -765,8 +848,50 @@ test("validated KeyPackage commits reject a concurrent same-id collision", async
   assert.equal(store.keyPackages.get("shared-id"), firstRecord);
 });
 
+test("validated KeyPackage commits reject a live package hash under an alternate id", async () => {
+  const store = createRelayStore();
+  const original = packageRecord("original-id", 7);
+  store.setKeyPackage(original);
+  const result = await commitValidatedKeyPackages({
+    store,
+    userId: original.userId,
+    deviceId: original.deviceId,
+    accepted: [{ ...original, id: "alternate-id" }],
+    accountLimit: 250,
+    deviceLimit: 50,
+    authorizationRemainsValid: () => true,
+    persist: async () => assert.fail("duplicate hash must fail before persistence")
+  });
+  assert.deepEqual(result, { status: "conflict" });
+  assert.equal(store.keyPackages.size, 1);
+});
+
+test("validated KeyPackage commits reject a durable consumed hash under an alternate id", async () => {
+  const store = createRelayStore();
+  const consumed = packageRecord("consumed-id", 8);
+  store.consumedKeyPackages.set(consumed.keyPackageHash, {
+    keyPackageHash: consumed.keyPackageHash,
+    userId: consumed.userId,
+    deviceId: consumed.deviceId,
+    consumedAt: new Date().toISOString()
+  });
+  const result = await commitValidatedKeyPackages({
+    store,
+    userId: consumed.userId,
+    deviceId: consumed.deviceId,
+    accepted: [{ ...consumed, id: "alternate-id" }],
+    accountLimit: 250,
+    deviceLimit: 50,
+    authorizationRemainsValid: () => true,
+    persist: async () => assert.fail("consumed hash must fail before persistence")
+  });
+  assert.deepEqual(result, { status: "already_consumed" });
+  assert.equal(store.keyPackages.size, 0);
+});
+
 test("failed KeyPackage persistence rolls back only its contribution before the next winner", async () => {
   const store = createRelayStore();
+  registerFixtureDevice(store);
   const firstSave = deferred<void>();
   const failedRecord = packageRecord("retry-id", 1);
   const winningRecord = packageRecord("retry-id", 2);
@@ -777,6 +902,7 @@ test("failed KeyPackage persistence rolls back only its contribution before the 
     accepted: [failedRecord],
     accountLimit: 250,
     deviceLimit: 50,
+    authorizationRemainsValid: () => true,
     persist: () => firstSave.promise
   });
   const second = commitValidatedKeyPackages({
@@ -786,6 +912,7 @@ test("failed KeyPackage persistence rolls back only its contribution before the 
     accepted: [winningRecord],
     accountLimit: 250,
     deviceLimit: 50,
+    authorizationRemainsValid: () => true,
     persist: async () => {}
   });
   await Promise.resolve();
@@ -793,6 +920,54 @@ test("failed KeyPackage persistence rolls back only its contribution before the 
   assert.equal((await first).status, "persistence_unavailable");
   assert.equal((await second).status, "accepted");
   assert.equal(store.keyPackages.get("retry-id"), winningRecord);
+});
+
+test("a capacity failure partway through a KeyPackage batch leaves no partial contribution", async () => {
+  const store = createRelayStore(2);
+  registerFixtureDevice(store);
+  const accepted = [packageRecord("first-capacity", 41), packageRecord("second-capacity", 42)];
+  await assert.rejects(
+    commitValidatedKeyPackages({
+      store,
+      userId: "github:tester",
+      deviceId: "quota-device",
+      accepted,
+      accountLimit: 250,
+      deviceLimit: 50,
+      authorizationRemainsValid: () => true,
+      persist: async () => assert.fail("capacity rejection must happen before persistence")
+    }),
+    RelayStoreCapacityError
+  );
+  assert.equal(store.keyPackages.has(accepted[0]!.id), false);
+  assert.equal(store.keyPackages.has(accepted[1]!.id), false);
+});
+
+test("a queued KeyPackage upload rechecks session authorization before commit", async () => {
+  const store = createRelayStore();
+  registerFixtureDevice(store);
+  const release = await acquireAccountMutationTurn(store, "github:tester");
+  let authorized = true;
+  let persistCalls = 0;
+  const record = packageRecord("authorization-changed", 43);
+  const uploading = commitValidatedKeyPackages({
+    store,
+    userId: "github:tester",
+    deviceId: "quota-device",
+    accepted: [record],
+    accountLimit: 250,
+    deviceLimit: 50,
+    authorizationRemainsValid: () => authorized,
+    persist: async () => {
+      persistCalls += 1;
+    }
+  });
+  await Promise.resolve();
+  authorized = false;
+  release();
+  assert.deepEqual(await uploading, { status: "authorization_changed" });
+  assert.equal(persistCalls, 0);
+  assert.equal(store.keyPackages.has(record.id), false);
 });
 
 function packageRecord(id: string, value: number): KeyPackageRecord {
@@ -807,6 +982,20 @@ function packageRecord(id: string, value: number): KeyPackageRecord {
     credentialIdentity: "fixture",
     createdAt: new Date().toISOString()
   };
+}
+
+function registerFixtureDevice(store: ReturnType<typeof createRelayStore>) {
+  store.setDevice({
+    userId: "github:tester",
+    deviceId: "quota-device",
+    displayName: "Tester",
+    signaturePublicKey: "AA==",
+    signatureKeyFingerprint: `sha256:${"0".repeat(64)}`,
+    hpkePublicKey: "AA==",
+    hpkeKeyFingerprint: `sha256:${"1".repeat(64)}`,
+    registeredAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString()
+  });
 }
 
 function deferred<T>() {
