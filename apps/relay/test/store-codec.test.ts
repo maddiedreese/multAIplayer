@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+import Database from "better-sqlite3";
 import { MlsRelayMessage, RoomRecord } from "@multaiplayer/protocol";
 import { createRelayStoreCodec } from "../src/store-codec.js";
 import { createRelayAuthSessionPersistence } from "../src/auth/session.js";
+import { SqliteRelayPersistence } from "../src/sqlite-persistence.js";
 import { InMemoryRelayStore } from "../src/state.js";
+import { createRelayStorePersistenceCoordinator, RelayPersistenceLoadError } from "../src/store-persistence.js";
 
 const fixedNow = Date.parse("2026-07-11T12:00:00.000Z");
 const authSessionPersistence = createRelayAuthSessionPersistence({
@@ -218,17 +224,44 @@ test("malformed current account quotas fail startup while expired quotas are dis
     })
   );
   assert.equal(expired.store.accountQuotaRecords.size, 0);
+  assert.throws(
+    () =>
+      codec().codec.applyStoredRelayState({
+        version: 1,
+        accountQuotaRecords: [
+          {
+            key: "daily_room_creations:github:user",
+            userId: "github:user",
+            quota: "daily_room_creations",
+            used: 1,
+            resetAt: fixedNow,
+            legacyWindow: "daily"
+          }
+        ]
+      }),
+    /account-quota row failed validation/
+  );
 });
 
 test("malformed current accepted-message receipts fail startup while expired receipts are discarded", () => {
-  const base = input({
-    teamPart: "core",
-    roomPart: "desktop",
-    teamName: "Core",
-    roomName: "Desktop",
-    members: 1,
-    unread: 0
-  });
+  const base = {
+    version: 1,
+    teams: [{ id: "team-core", name: "Core", members: 1 }],
+    rooms: [currentRoom({ id: "room-desktop", teamId: "team-core", name: "Desktop" })],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [
+          {
+            teamId: "team-core",
+            userId: "github:host",
+            role: "owner",
+            joinedAt: "2026-07-11T11:00:00.000Z"
+          }
+        ]
+      }
+    ]
+  };
   const receipt = {
     roomKey: "team-core:room-desktop",
     messageId: "message-one",
@@ -258,6 +291,61 @@ test("malformed current accepted-message receipts fail startup while expired rec
     })
   );
   assert.equal(expired.store.acceptedMessageReceipts.size, 0);
+  assert.throws(
+    () =>
+      codec().codec.applyStoredRelayState({
+        ...base,
+        acceptedMessageReceipts: [
+          { ...receipt, acceptedAt: "2026-01-01T00:00:00.000Z", legacyDigestAlgorithm: "sha256" }
+        ]
+      }),
+    /accepted-message-receipt row failed validation/
+  );
+});
+
+test("SQLite startup fails closed on a malformed durable quota row", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "relay-malformed-quota-"));
+  const dataPath = join(directory, "relay.sqlite");
+  const initial = new SqliteRelayPersistence(dataPath);
+  try {
+    await initial.save({
+      version: 1,
+      savedAt: new Date(fixedNow).toISOString(),
+      teams: [],
+      rooms: [],
+      accountQuotaRecords: [
+        {
+          key: "daily_room_creations:github:user",
+          userId: "github:user",
+          quota: "daily_room_creations",
+          used: 1,
+          resetAt: fixedNow + 60_000
+        }
+      ],
+      mlsBacklog: []
+    });
+    initial.close();
+    const database = new Database(dataPath);
+    const row = database
+      .prepare("select data_json from relay_account_quota_records where quota_key = ?")
+      .get("daily_room_creations:github:user") as { data_json: string };
+    database
+      .prepare("update relay_account_quota_records set data_json = ? where quota_key = ?")
+      .run(JSON.stringify({ ...JSON.parse(row.data_json), legacyWindow: "daily" }), "daily_room_creations:github:user");
+    database.close();
+
+    const persistence = new SqliteRelayPersistence(dataPath);
+    const coordinator = createRelayStorePersistenceCoordinator({
+      dataPath,
+      persistence,
+      storeCodec: codec().codec
+    });
+    await assert.rejects(coordinator.loadRelayStore(), RelayPersistenceLoadError);
+    persistence.close();
+  } finally {
+    initial.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("invalid non-critical persistence rows are dropped independently of valid siblings", () => {

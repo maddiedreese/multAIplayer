@@ -65,7 +65,7 @@ export const StoredAcceptedMessageReceipt = z
     digest: hexDigest,
     acceptedAt: isoDateTime
   })
-  .strip();
+  .strict();
 
 export const StoredAccountRestriction = z
   .object({
@@ -84,7 +84,7 @@ export const StoredAccountQuotaRecord = z
     used: z.number().int().nonnegative(),
     resetAt: z.number().int().nonnegative()
   })
-  .strip()
+  .strict()
   .superRefine((value, context) => {
     if (value.key !== `${value.quota}:${value.userId}`) {
       context.addIssue({ code: "custom", path: ["key"], message: "Quota key must bind quota and user." });
