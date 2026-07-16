@@ -2,6 +2,8 @@ import { test } from "node:test";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
+import { acquireAccountMutationTurn } from "../../src/auth/account-mutation-transaction.js";
+import { registerRoomCreateRoute } from "../../src/http/room-create-route.js";
 import { registerRoomHostRoute } from "../../src/http/room-host-route.js";
 import { registerRoomLifecycleRoute } from "../../src/http/room-lifecycle-route.js";
 import type { RegisterRoomRoutesOptions } from "../../src/http/room-route-types.js";
@@ -236,6 +238,99 @@ test("relay enforces authenticated total room ceiling", async () => {
     assert.match(metricsBody, /type="total_user_rooms"} 1/);
   } finally {
     await relay.close();
+  }
+});
+
+test("concurrent room creation enforces the exact total-room boundary", async () => {
+  const app = express();
+  app.use(express.json());
+  const store = createRelayStore();
+  const userId = "github:boundary-user";
+  const session = {
+    sessionIdHash: "b".repeat(64),
+    user: { id: userId, login: "boundary-user" },
+    expiresAt: Date.now() + 60_000
+  };
+  store.authSessions.set(session.sessionIdHash, session);
+  store.setTeam({ id: "team-boundary", name: "Boundary team", ownerUserId: userId });
+  for (let index = 0; index < 499; index += 1) {
+    store.setRoom({
+      id: `room-boundary-${index}`,
+      teamId: "team-boundary",
+      name: `Existing room ${index}`,
+      host: "Boundary user",
+      hostUserId: userId,
+      hostStatus: "offline",
+      approvalPolicy: "ask_every_turn"
+    });
+  }
+
+  let initialMembershipChecks = 0;
+  let bothRequestsValidated!: () => void;
+  const bothRequestsValidatedPromise = new Promise<void>((resolve) => {
+    bothRequestsValidated = resolve;
+  });
+  let quotaRejections = 0;
+  registerRoomCreateRoute({
+    app,
+    store,
+    getAuthSession: () => session,
+    allowMutation: () => true,
+    teamIdsForUser: () => new Set(["team-boundary"]),
+    isTeamMember: () => {
+      initialMembershipChecks += 1;
+      if (initialMembershipChecks === 2) bothRequestsValidated();
+      return true;
+    },
+    scheduleStoreSave: () => undefined,
+    saveRelayStore: async () => undefined,
+    broadcastRoomUpdated: () => undefined,
+    recordQuotaRejection: () => quotaRejections++,
+    isApprovalPolicy: (value): value is RoomRecord["approvalPolicy"] => value === "ask_every_turn",
+    normalizeMetadataText: (value, maxChars) =>
+      typeof value === "string" && value.length > 0 && value.length <= maxChars ? value : null,
+    displayNameForUser: () => "Boundary user",
+    maxHostNameChars: 120,
+    maxRoomNameChars: 120,
+    dailyCreationCaps: { roomsPerUser: 100 },
+    totalRoomCapPerUser: 500
+  } as RegisterRoomRoutesOptions);
+  const server = app.listen(0);
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  const port = (server.address() as AddressInfo).port;
+  const releaseAccountTurn = await acquireAccountMutationTurn(store, userId);
+  let turnReleased = false;
+
+  try {
+    const create = (name: string) =>
+      fetch(`http://127.0.0.1:${port}/rooms`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ teamId: "team-boundary", name })
+      });
+    const first = create("Boundary contender one");
+    const second = create("Boundary contender two");
+    await bothRequestsValidatedPromise;
+    releaseAccountTurn();
+    turnReleased = true;
+
+    const responses = await Promise.all([first, second]);
+    assert.deepEqual(responses.map((response) => response.status).sort(), [201, 429]);
+    assert.equal(store.allRooms().length, 500);
+    assert.equal(quotaRejections, 1);
+    const rejected = responses.find((response) => response.status === 429);
+    assert.ok(rejected);
+    assert.deepEqual(await rejected.json(), {
+      error: "Total room quota exceeded.",
+      code: "quota_exceeded",
+      quota: { type: "total_user_rooms", limit: 500, used: 500, remaining: 0 }
+    });
+  } finally {
+    if (!turnReleased) releaseAccountTurn();
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
 

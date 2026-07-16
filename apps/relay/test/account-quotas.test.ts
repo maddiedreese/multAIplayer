@@ -318,6 +318,12 @@ test("attachment persistence failure rolls back both blob and byte reservation",
   const app = express();
   app.use(express.json());
   const store = createRelayStore();
+  const authenticatedSession = {
+    sessionIdHash: "hash",
+    user: { id: "github:user", login: "user" },
+    expiresAt: Date.now() + 60_000
+  };
+  store.authSessions.set(authenticatedSession.sessionIdHash, authenticatedSession);
   store.setTeam({ id: "team", name: "Team", members: 1 });
   store.setRoom({
     id: "room",
@@ -339,11 +345,7 @@ test("attachment persistence failure rolls back both blob and byte reservation",
     attachmentBlobTtlDays: 30,
     maxAttachmentBlobNameChars: 512,
     maxAttachmentBlobTypeChars: 160,
-    getAuthSession: () => ({
-      sessionIdHash: "hash",
-      user: { id: "github:user", login: "user" },
-      expiresAt: Date.now() + 60_000
-    }),
+    getAuthSession: () => authenticatedSession,
     allowRead: () => true,
     allowMutation: () => true,
     canAccessRoom: () => true,

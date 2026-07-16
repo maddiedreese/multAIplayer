@@ -1,4 +1,6 @@
 import {
+  isRecord,
+  InviteRecord,
   type MlsRelayMessage,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type DeviceRecord,
@@ -17,6 +19,7 @@ import type {
   AccountRestriction,
   AppliedDeletionLedgerEntry,
   AuthSession,
+  ConsumedKeyPackageRecord,
   InviteAckReceipt,
   RelayStore,
   RoomKey
@@ -41,6 +44,7 @@ export interface StoredRelayState {
   invites: InviteRecordType[];
   devices?: DeviceRecord[];
   keyPackages?: KeyPackageRecordType[];
+  consumedKeyPackages?: ConsumedKeyPackageRecord[];
   inviteRequests?: InviteJoinRequestRecord[];
   inviteResponses?: InviteResponseRecord[];
   inviteAckReceipts?: InviteAckReceipt[];
@@ -157,6 +161,12 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     applyStoredRows(stored.keyPackages, normalizeKeyPackage, (keyPackage) => {
       if (!store.keyPackages.has(keyPackage.id)) store.setKeyPackage(keyPackage);
     });
+    applyStoredRows(
+      stored.consumedKeyPackages,
+      (item) => normalizeConsumedKeyPackage(item, options.maxUserIdChars, options.maxDeviceIdChars),
+      (item) => store.consumedKeyPackages.set(item.keyPackageHash, item),
+      "consumed KeyPackage"
+    );
     applyStoredRows(stored.inviteRequests, normalizeRequest, (request) => {
       if (!store.inviteRequests.has(request.requestId)) store.inviteRequests.set(request.requestId, request);
     });
@@ -175,6 +185,7 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     applyStoredRows(stored.inviteAckReceipts, normalizeInviteAckReceipt, (receipt) => {
       store.inviteAckReceipts.set(receipt.requestId, receipt);
     });
+    backfillLegacyConsumedKeyPackages(stored.invites, stored.inviteAckReceipts);
     applyStoredRows(
       stored.acceptedMessageReceipts,
       normalizeAcceptedMessageReceipt,
@@ -218,7 +229,88 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     validateCriticalRelationships(restoredMembershipTeams);
   }
 
+  function backfillLegacyConsumedKeyPackages(storedInvites: unknown, storedReceipts: unknown): void {
+    for (const value of storedArray(storedInvites)) {
+      const parsed = InviteRecord.safeParse(value);
+      if (!parsed.success) continue;
+      const invite = parsed.data;
+      if (!invite.approvedUserId || !invite.approvedDeviceId || !invite.keyPackageHash) continue;
+      retainLegacyConsumedKeyPackage(
+        invite.keyPackageHash,
+        invite.approvedUserId,
+        invite.approvedDeviceId,
+        invite.createdAt
+      );
+    }
+    for (const value of storedArray(storedReceipts)) {
+      const receipt = legacyApprovedInviteAckAnchor(value);
+      if (!receipt) continue;
+      retainLegacyConsumedKeyPackage(
+        receipt.keyPackageHash,
+        receipt.requesterUserId,
+        receipt.requesterDeviceId,
+        receipt.acknowledgedAt
+      );
+    }
+  }
+
+  function legacyApprovedInviteAckAnchor(value: unknown): InviteAckReceipt | null {
+    if (!isRecord(value) || Array.isArray(value) || value.status !== "approved") return null;
+    const fields = {
+      inviteId: value.inviteId,
+      requestId: value.requestId,
+      teamId: value.teamId,
+      requesterUserId: value.requesterUserId,
+      requesterDeviceId: value.requesterDeviceId,
+      keyPackageHash: value.keyPackageHash,
+      acknowledgedAt: value.acknowledgedAt,
+      expiresAt: value.expiresAt
+    };
+    if (!isBoundedStoredText(fields.inviteId, options.maxEnvelopeIdChars)) return null;
+    if (!isBoundedStoredText(fields.requestId, options.maxEnvelopeIdChars)) return null;
+    if (!isBoundedStoredText(fields.teamId, options.maxTeamIdChars)) return null;
+    if (!isBoundedStoredText(fields.requesterUserId, options.maxUserIdChars)) return null;
+    if (!isBoundedStoredText(fields.requesterDeviceId, options.maxDeviceIdChars)) return null;
+    if (typeof fields.keyPackageHash !== "string" || !/^sha256:[0-9a-f]{64}$/.test(fields.keyPackageHash)) return null;
+    if (!isStoredTimestamp(fields.acknowledgedAt) || !isStoredTimestamp(fields.expiresAt)) return null;
+    return { ...fields, status: "approved" } as InviteAckReceipt;
+  }
+
+  function retainLegacyConsumedKeyPackage(
+    keyPackageHash: string,
+    userId: string,
+    deviceId: string,
+    consumedAt: string
+  ): void {
+    const existing = store.consumedKeyPackages.get(keyPackageHash);
+    if (existing) {
+      if ((existing.userId && existing.userId !== userId) || (existing.deviceId && existing.deviceId !== deviceId)) {
+        throw new Error("Stored relay consumed KeyPackage ownership failed validation.");
+      }
+      return;
+    }
+    store.consumedKeyPackages.set(keyPackageHash, {
+      keyPackageHash,
+      userId,
+      deviceId,
+      // The legacy state did not retain a separate consumption time. The
+      // invite creation time is a deterministic lower bound used only for
+      // operator inspection; the hash itself is the security invariant.
+      consumedAt
+    });
+  }
+
   function validateCriticalRelationships(restoredMembershipTeams: Set<string>): void {
+    const liveKeyPackageHashes = new Set<string>();
+    for (const keyPackage of store.keyPackages.values()) {
+      if (
+        liveKeyPackageHashes.has(keyPackage.keyPackageHash) ||
+        store.consumedKeyPackages.has(keyPackage.keyPackageHash)
+      ) {
+        throw new Error("Stored relay KeyPackage one-shot state failed validation.");
+      }
+      liveKeyPackageHashes.add(keyPackage.keyPackageHash);
+    }
     for (const [teamId, team] of store.teams) {
       const members = store.teamMembers.get(teamId);
       if (team.members === 0 && !members?.size) continue;
@@ -326,6 +418,7 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
         invites: Array.from(store.invites.values()).filter((invite) => !isExpiredInvite(invite)),
         devices: Array.from(store.devices.values()),
         keyPackages: Array.from(store.keyPackages.values()),
+        consumedKeyPackages: Array.from(store.consumedKeyPackages.values()),
         inviteRequests: Array.from(store.inviteRequests.values()),
         inviteResponses: Array.from(store.inviteResponses.values()),
         inviteAckReceipts: Array.from(store.inviteAckReceipts.values()),
@@ -349,6 +442,44 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
           .filter((item) => item.messages.length > 0)
       };
     }
+  };
+}
+
+function isBoundedStoredText(value: unknown, maxChars: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maxChars;
+}
+
+function isStoredTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function normalizeConsumedKeyPackage(
+  value: unknown,
+  maxUserIdChars: number,
+  maxDeviceIdChars: number
+): ConsumedKeyPackageRecord | null {
+  if (!isRecord(value) || Array.isArray(value)) return null;
+  const { keyPackageHash, userId, deviceId, consumedAt } = value;
+  const hasOwner = userId !== undefined || deviceId !== undefined;
+  if (
+    typeof keyPackageHash !== "string" ||
+    !/^sha256:[0-9a-f]{64}$/.test(keyPackageHash) ||
+    (hasOwner &&
+      (typeof userId !== "string" ||
+        userId.length < 1 ||
+        userId.length > maxUserIdChars ||
+        typeof deviceId !== "string" ||
+        deviceId.length < 1 ||
+        deviceId.length > maxDeviceIdChars)) ||
+    typeof consumedAt !== "string" ||
+    !Number.isFinite(Date.parse(consumedAt))
+  ) {
+    return null;
+  }
+  return {
+    keyPackageHash,
+    consumedAt,
+    ...(hasOwner ? { userId: userId as string, deviceId: deviceId as string } : {})
   };
 }
 

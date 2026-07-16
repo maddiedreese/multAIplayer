@@ -160,7 +160,7 @@ async function installMonaco(): Promise<typeof Monaco> {
   return monaco as unknown as typeof Monaco;
 }
 
-export type MonacoWorkerKind = "editor" | "json" | "css" | "html" | "typescript";
+type MonacoWorkerKind = "editor" | "json" | "css" | "html" | "typescript";
 
 /** Maps Monaco language-service labels to the worker bundle that implements them. */
 export function workerKindForLabel(label: string): MonacoWorkerKind {

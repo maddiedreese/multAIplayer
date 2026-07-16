@@ -15,8 +15,11 @@ import {
   parseStrictDirectedInviteRequestJson,
   type StrictDirectedInviteRequest
 } from "../opaque.js";
-import { isActiveInviteTarget, isActiveRoom } from "../relay-domain.js";
+import { isActiveInviteTarget } from "../relay-domain.js";
 import { persistMutationOrRollback } from "./durable-mutation.js";
+import { ackInviteResponseAtomically, inviteIsExpired } from "./invite-ack-transaction.js";
+
+export { ackInviteResponseAtomically } from "./invite-ack-transaction.js";
 
 const maxOpaqueChars = 1_400_000;
 interface Options {
@@ -64,6 +67,8 @@ export function registerInviteDeliveryRoutes({
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, requesterDeviceId))
       return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
     if (!invite) return void sendRelayError(res, 404, "invite_not_found", "Invite not found.");
+    if (invite.expiresAt && Date.parse(invite.expiresAt) <= Date.now())
+      return void sendRelayError(res, 410, "invite_expired", "Invite expired.");
     if (!isActiveInviteTarget(store, invite))
       return void sendRelayError(res, 409, "conflict", "Restore the team and room before using this invite.");
     const existingRequest = store.inviteRequests.get(requestId);
@@ -131,6 +136,7 @@ export function registerInviteDeliveryRoutes({
       return void sendRelayError(res, 403, "forbidden", "Only the active host device may read invite requests.");
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, room.activeHostDeviceId!))
       return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
+    if (inviteIsExpired(invite)) return void sendRelayError(res, 410, "invite_expired", "Invite expired.");
     const requests = Array.from(store.inviteRequests.values())
       .filter((item) => item.inviteId === invite.id)
       .map((item) => {
@@ -157,29 +163,16 @@ export function registerInviteDeliveryRoutes({
     const body = req.body as Record<string, unknown>;
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
-    const invite = store.getInvite(String(req.params.inviteId));
-    const room = invite && store.getRoom(invite.roomId);
-    const request = store.inviteRequests.get(String(body.requestId ?? ""));
-    const status = body.status;
-    const welcome = inviteResponseWelcome(body);
-    const expectedKeys = inviteResponseKeys(status);
-    if (!hasExactKeys(body, expectedKeys))
-      return void sendRelayError(res, 400, "invalid_request", "Invite response contains unsupported fields.");
-    if (!isActiveInviteHost(session, room, String(body.hostDeviceId ?? ""), isActiveInviteTarget(store, invite)))
-      return void sendRelayError(res, 403, "forbidden", "An active room and host device are required.");
-    if (!session || !room || !invite) return;
-    if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, room.activeHostDeviceId!))
-      return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
-    const existingWelcome = store.inviteResponses.get(String(body.requestId ?? ""));
-    if (existingWelcome) {
-      if (isSameInviteResponse(existingWelcome, invite.id, status, body.responseMac, body.responseBinding, welcome))
-        return void res.status(200).json({ requestId: existingWelcome.requestId, status: "ready" });
-      return void sendRelayError(res, 409, "conflict", "requestId is already bound to another invite response.");
-    }
-    const preconditionError = inviteResponsePreconditionError(invite, request, status, welcome);
-    if (preconditionError)
-      return void sendRelayError(res, preconditionError.status, preconditionError.code, preconditionError.message);
-    if (!request) return;
+    const context = prepareInviteResponse(
+      store,
+      String(req.params.inviteId),
+      body,
+      session,
+      req.get("x-device-session"),
+      res
+    );
+    if (!context) return;
+    const { invite, room, request, status, welcome, hostUserId } = context;
     const candidate = {
       requestId: request.requestId,
       inviteId: request.inviteId,
@@ -192,7 +185,7 @@ export function registerInviteDeliveryRoutes({
       welcome,
       createdAt: new Date().toISOString()
     };
-    const record = validInviteResponseRecord(candidate, invite, request, session.user.id, room);
+    const record = validInviteResponseRecord(candidate, invite, request, hostUserId, room);
     if (!record)
       return void sendRelayError(res, 400, "invalid_request", "Invite response binding does not match its request.");
     if (!membershipCommitAcceptedForWelcome(record, room)) {
@@ -224,6 +217,7 @@ export function registerInviteDeliveryRoutes({
       !session ||
       !record ||
       !invite ||
+      inviteIsExpired(invite) ||
       !isActiveInviteTarget(store, invite) ||
       record.inviteId !== String(req.params.inviteId) ||
       record.requesterUserId !== session.user.id ||
@@ -268,6 +262,7 @@ export function registerInviteDeliveryRoutes({
     )
       return void sendRelayError(res, 404, "invite_not_found", "Invite response not found.");
     const result = await ackInviteResponseAtomically(store, record, saveRelayStore);
+    if (result === "expired") return void sendRelayError(res, 410, "invite_expired", "Invite expired.");
     if (result === "missing_team")
       return void sendRelayError(res, 404, "invite_not_found", "Invite response team not found.");
     if (result === "revoked")
@@ -371,20 +366,97 @@ function membershipCommitAcceptedForWelcome(record: InviteResponseRecordType, ro
   return record.status !== "approved" || room.acceptedMlsEpoch === record.responseBinding.keyEpoch + 1;
 }
 
-function isSameInviteResponse(
-  existing: InviteResponseRecordType,
-  inviteId: string | undefined,
-  status: unknown,
-  responseMac: unknown,
-  responseBinding: unknown,
-  welcome: string | undefined
-): boolean {
+interface InviteResponseAttempt {
+  inviteId: string;
+  status: unknown;
+  responseMac: unknown;
+  responseBinding: unknown;
+  welcome: string | undefined;
+}
+
+interface PreparedInviteResponse {
+  invite: InviteRecord;
+  room: RoomRecord;
+  request: InviteJoinRequestRecord;
+  status: unknown;
+  welcome: string | undefined;
+  hostUserId: string;
+}
+
+function prepareInviteResponse(
+  store: RelayStore,
+  inviteId: string,
+  body: Record<string, unknown>,
+  session: AuthSession | null,
+  deviceSessionToken: string | undefined,
+  res: Response
+): PreparedInviteResponse | null {
+  const invite = store.getInvite(inviteId);
+  const room = invite && store.getRoom(invite.roomId);
+  const request = store.inviteRequests.get(String(body.requestId ?? ""));
+  const status = body.status;
+  const welcome = inviteResponseWelcome(body);
+  if (!hasExactKeys(body, inviteResponseKeys(status))) {
+    sendRelayError(res, 400, "invalid_request", "Invite response contains unsupported fields.");
+    return null;
+  }
+  if (!isActiveInviteHost(session, room, String(body.hostDeviceId ?? ""), isActiveInviteTarget(store, invite))) {
+    sendRelayError(res, 403, "forbidden", "An active room and host device are required.");
+    return null;
+  }
+  if (!session || !room || !invite) return null;
+  if (!hasDeviceSession(store, deviceSessionToken, session.user.id, room.activeHostDeviceId!)) {
+    sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
+    return null;
+  }
+  if (inviteIsExpired(invite)) {
+    sendRelayError(res, 410, "invite_expired", "Invite expired.");
+    return null;
+  }
+  const existing = store.inviteResponses.get(String(body.requestId ?? ""));
+  if (existing) {
+    respondToExistingInviteResponse({
+      existing,
+      attempt: {
+        inviteId: invite.id,
+        status,
+        responseMac: body.responseMac,
+        responseBinding: body.responseBinding,
+        welcome
+      },
+      res
+    });
+    return null;
+  }
+  const preconditionError = inviteResponsePreconditionError(invite, request, status, welcome);
+  if (preconditionError) {
+    sendRelayError(res, preconditionError.status, preconditionError.code, preconditionError.message);
+    return null;
+  }
+  return request ? { invite, room, request, status, welcome, hostUserId: session.user.id } : null;
+}
+
+interface ExistingInviteResponseContext {
+  existing: InviteResponseRecordType;
+  attempt: InviteResponseAttempt;
+  res: Response;
+}
+
+function respondToExistingInviteResponse({ existing, attempt, res }: ExistingInviteResponseContext): void {
+  if (isSameInviteResponse(existing, attempt)) {
+    res.status(200).json({ requestId: existing.requestId, status: "ready" });
+    return;
+  }
+  sendRelayError(res, 409, "conflict", "requestId is already bound to another invite response.");
+}
+
+function isSameInviteResponse(existing: InviteResponseRecordType, attempt: InviteResponseAttempt): boolean {
   return (
-    existing.inviteId === inviteId &&
-    existing.status === status &&
-    existing.responseMac === responseMac &&
-    JSON.stringify(existing.responseBinding) === JSON.stringify(responseBinding) &&
-    existing.welcome === welcome
+    existing.inviteId === attempt.inviteId &&
+    existing.status === attempt.status &&
+    existing.responseMac === attempt.responseMac &&
+    JSON.stringify(existing.responseBinding) === JSON.stringify(attempt.responseBinding) &&
+    existing.welcome === attempt.welcome
   );
 }
 
@@ -534,89 +606,6 @@ function validInviteResponseRecord(
   const parsed = InviteResponseRecord.safeParse(candidate);
   if (!parsed.success || !isCanonicalPaddedBase64(parsed.data.responseMac, 128)) return null;
   return inviteResponseBindingMatches(parsed.data, invite, request, hostUserId, room) ? parsed.data : null;
-}
-
-function inviteResponseRemainsAuthorized(
-  invite: InviteRecord | undefined,
-  record: InviteResponseRecordType
-): invite is InviteRecord {
-  if (!invite) return false;
-  const binding = record.responseBinding;
-  if (invite.teamId !== binding.teamId || invite.roomId !== binding.roomId) return false;
-  if (binding.inviteId !== record.inviteId || binding.requestId !== record.requestId) return false;
-  if (binding.requesterUserId !== record.requesterUserId || binding.requesterDeviceId !== record.requesterDeviceId) {
-    return false;
-  }
-  if (binding.keyPackageHash !== record.keyPackageHash || binding.status !== record.status) return false;
-  if (record.status !== "approved") return true;
-  return (
-    invite.approvedUserId === record.requesterUserId &&
-    invite.approvedDeviceId === record.requesterDeviceId &&
-    invite.keyPackageHash === record.keyPackageHash
-  );
-}
-
-export async function ackInviteResponseAtomically(
-  store: RelayStore,
-  record: InviteResponseRecordType,
-  saveRelayStore: () => Promise<void>
-): Promise<"ok" | "missing_team" | "inactive_target" | "revoked" | "persistence_failed"> {
-  const team = store.getTeam(record.responseBinding.teamId);
-  if (!team) return "missing_team";
-  if (!isActiveRoom(store, record.responseBinding.teamId, record.responseBinding.roomId)) return "inactive_target";
-  const previousMembers = new Map(store.getTeamMembers(team.id) ?? []);
-  const invite = store.getInvite(record.inviteId);
-  if (!inviteResponseRemainsAuthorized(invite, record)) return "revoked";
-  const previousReceipts = new Map(store.inviteAckReceipts);
-  if (record.status === "approved") {
-    const members = new Map(previousMembers);
-    if (!members.has(record.requesterUserId)) {
-      members.set(record.requesterUserId, {
-        teamId: team.id,
-        userId: record.requesterUserId,
-        role: "member",
-        joinedAt: new Date().toISOString()
-      });
-    }
-    store.setTeamMembers(team.id, members);
-    store.setTeam({ ...team, members: members.size });
-  }
-  store.deleteInvite(record.inviteId);
-  store.inviteResponses.delete(record.requestId);
-  store.inviteAckReceipts.set(record.requestId, {
-    inviteId: record.inviteId,
-    requestId: record.requestId,
-    teamId: team.id,
-    requesterUserId: record.requesterUserId,
-    requesterDeviceId: record.requesterDeviceId,
-    keyPackageHash: record.keyPackageHash,
-    status: record.status,
-    acknowledgedAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-  });
-  pruneInviteAckReceipts(store);
-  const persisted = await persistMutationOrRollback({
-    persist: saveRelayStore,
-    rollback: () => {
-      store.inviteResponses.set(record.requestId, record);
-      store.setTeamMembers(team.id, previousMembers);
-      store.setTeam(team);
-      if (invite) store.setInvite(invite);
-      store.inviteAckReceipts.clear();
-      for (const [id, receipt] of previousReceipts) store.inviteAckReceipts.set(id, receipt);
-    }
-  });
-  return persisted ? "ok" : "persistence_failed";
-}
-
-function pruneInviteAckReceipts(store: RelayStore) {
-  const now = Date.now();
-  const ordered = Array.from(store.inviteAckReceipts.entries()).sort(
-    (left, right) => Date.parse(left[1].acknowledgedAt) - Date.parse(right[1].acknowledgedAt)
-  );
-  for (const [id, receipt] of ordered) if (Date.parse(receipt.expiresAt) <= now) store.inviteAckReceipts.delete(id);
-  const retained = ordered.filter(([id]) => store.inviteAckReceipts.has(id));
-  for (const [id] of retained.slice(0, Math.max(0, retained.length - 4096))) store.inviteAckReceipts.delete(id);
 }
 
 function hasExactKeys(value: unknown, allowed: string[]): value is Record<string, unknown> {

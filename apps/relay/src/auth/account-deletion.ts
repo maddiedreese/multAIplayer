@@ -20,6 +20,8 @@ import type {
   TokenBucketRecord,
   RelayStore
 } from "../state.js";
+import type { ConsumedKeyPackageRecord } from "../state.js";
+import { acquireAccountMutationTurn } from "./account-mutation-transaction.js";
 
 export const accountDeletionConfirmation = "delete my account" as const;
 
@@ -33,6 +35,7 @@ export interface AccountDeletionSummary {
   deviceSessions: number;
   devices: number;
   keyPackages: number;
+  consumedKeyPackagesDeattributed: number;
   teamMemberships: number;
   inviteArtifacts: number;
   dailyTeamCreationQuotaRecords: number;
@@ -48,6 +51,7 @@ interface AccountDeletionStateSnapshot {
   deviceSessions: Map<string, DeviceSessionRecord>;
   devices: Map<string, DeviceRecord>;
   keyPackages: Map<string, KeyPackageRecord>;
+  consumedKeyPackages: Map<string, ConsumedKeyPackageRecord>;
   rooms: Map<string, RoomRecord>;
   invites: Map<string, InviteRecord>;
   inviteRequests: Map<string, InviteJoinRequestRecord>;
@@ -64,6 +68,27 @@ interface AccountDeletionStateSnapshot {
 }
 
 export async function deleteAccountOwnedRelayDataAtomically(
+  store: RelayStore,
+  userId: string,
+  persist: () => Promise<void>,
+  ledgerEntryIds: string[] = []
+): Promise<AccountDeletionSummary> {
+  const release = await acquireAccountMutationTurn(store, userId);
+  try {
+    return await deleteAccountOwnedRelayDataWithinTurnAtomically(store, userId, persist, ledgerEntryIds);
+  } finally {
+    release();
+  }
+}
+
+/**
+ * Delete one account while the caller already owns its mutation turn.
+ *
+ * Route-level deletion uses this form so the blocker decision and external
+ * deletion-ledger commit are protected by the same turn as the primary-store
+ * deletion. Other callers should use deleteAccountOwnedRelayDataAtomically.
+ */
+export async function deleteAccountOwnedRelayDataWithinTurnAtomically(
   store: RelayStore,
   userId: string,
   persist: () => Promise<void>,
@@ -112,6 +137,7 @@ export function deleteAccountOwnedRelayData(store: RelayStore, userId: string): 
     deviceSessions: deleteMatching(store.deviceSessions, (_token, session) => session.userId === userId),
     devices: deleteMatching(store.devices, (_key, device) => device.userId === userId),
     keyPackages: deleteMatching(store.keyPackages, (_id, keyPackage) => keyPackage.userId === userId),
+    consumedKeyPackagesDeattributed: removeConsumedKeyPackageOwnerFields(store, userId),
     teamMemberships: 0,
     inviteArtifacts: 0,
     dailyTeamCreationQuotaRecords: deleteMatching(
@@ -176,6 +202,19 @@ export function deleteAccountOwnedRelayData(store: RelayStore, userId: string): 
   return summary;
 }
 
+function removeConsumedKeyPackageOwnerFields(store: RelayStore, userId: string): number {
+  let deattributed = 0;
+  for (const [keyPackageHash, consumed] of store.consumedKeyPackages) {
+    if (consumed.userId !== userId) continue;
+    store.consumedKeyPackages.set(keyPackageHash, {
+      keyPackageHash,
+      consumedAt: consumed.consumedAt
+    });
+    deattributed += 1;
+  }
+  return deattributed;
+}
+
 function deleteMatching<Key, Value>(map: Map<Key, Value>, predicate: (key: Key, value: Value) => boolean): number {
   let deleted = 0;
   for (const [key, value] of map) {
@@ -212,6 +251,7 @@ function snapshotAccountDeletionState(
     deviceSessions: select(store.deviceSessions, (_key, session) => session.userId === userId),
     devices: select(store.devices, (_key, device) => device.userId === userId),
     keyPackages: select(store.keyPackages, (_key, keyPackage) => keyPackage.userId === userId),
+    consumedKeyPackages: select(store.consumedKeyPackages, (_key, consumed) => consumed.userId === userId),
     rooms: select(store.rooms, (_key, room) => Boolean(room.deletedAt) && room.hostUserId === userId),
     invites: select(
       store.invites,
@@ -266,6 +306,7 @@ function touchedMapKeys(
   if (source === store.deviceSessions) return touched.deviceSessions.keys();
   if (source === store.devices) return touched.devices.keys();
   if (source === store.keyPackages) return touched.keyPackages.keys();
+  if (source === store.consumedKeyPackages) return touched.consumedKeyPackages.keys();
   if (source === store.rooms) return touched.rooms.keys();
   if (source === store.invites) return touched.invites.keys();
   if (source === store.inviteRequests) return touched.inviteRequests.keys();
@@ -301,6 +342,7 @@ function restoreAccountDeletionState(
   restoreChangedEntries(store.deviceSessions, before.deviceSessions, after.deviceSessions);
   restoreChangedEntries(store.devices, before.devices, after.devices);
   restoreChangedEntries(store.keyPackages, before.keyPackages, after.keyPackages);
+  restoreChangedEntries(store.consumedKeyPackages, before.consumedKeyPackages, after.consumedKeyPackages);
   restoreChangedEntries(store.rooms, before.rooms, after.rooms);
   restoreChangedEntries(store.invites, before.invites, after.invites);
   restoreChangedEntries(store.inviteRequests, before.inviteRequests, after.inviteRequests);

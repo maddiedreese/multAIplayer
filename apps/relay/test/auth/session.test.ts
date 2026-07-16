@@ -122,7 +122,7 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
         deviceId: "device-bad-cookie"
       })
     );
-    assert.match(await error, /Sign in and use a valid invite/);
+    assert.match(await error, /Authentication session expired/);
     socket.close();
 
     socket = new WebSocket(relay.wsUrl, {
@@ -139,7 +139,7 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
         deviceId: "device-oversized-cookie"
       })
     );
-    assert.match(await oversizedCookieError, /Sign in and use a valid invite/);
+    assert.match(await oversizedCookieError, /Authentication session expired/);
   } finally {
     socket?.close();
     await relay.close();

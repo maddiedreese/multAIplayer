@@ -138,6 +138,16 @@ test("invite ACK cannot add membership while its room is archived", async () => 
   assert.equal(store.inviteResponses.has(response.requestId), true);
 });
 
+test("invite ACK cannot admit after the invite expires", async () => {
+  const { store, invite, response } = seededStore();
+  store.setInvite({ ...invite, expiresAt: "2020-01-01T00:00:00.000Z" });
+
+  assert.equal(await ackInviteResponseAtomically(store, response, async () => undefined), "expired");
+  assert.equal(store.hasTeamMember("team-core", "github:joiner"), false);
+  assert.equal(store.inviteResponses.has(response.requestId), true);
+  assert.equal(store.getInvite(invite.id)?.id, invite.id);
+});
+
 interface PersistedFixture {
   teams: TeamRecord[];
   rooms: RoomRecord[];

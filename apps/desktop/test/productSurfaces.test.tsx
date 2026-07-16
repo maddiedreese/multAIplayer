@@ -207,7 +207,7 @@ test("Codex account view renders native capabilities and dispatches account acti
   assert.match(view.getByText("Drive").parentElement?.textContent ?? "", /Sign-in needed/);
 });
 
-test("Monaco routes supported files and language services to their complete implementations", () => {
+test("Monaco maps supported file extensions and worker labels", () => {
   assert.equal(languageForPath("src/App.TSX"), "typescript");
   assert.equal(languageForPath("src/legacy.cjs"), "javascript");
   assert.equal(languageForPath("styles/theme.scss"), "scss");

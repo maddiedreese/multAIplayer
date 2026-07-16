@@ -13,6 +13,7 @@ import {
 } from "../state.js";
 import { isStrictExporterCiphertextJson } from "../opaque.js";
 import { acquireDurableQuotaTransaction, reserveDurableQuota, rollbackDurableQuota } from "../auth/account-quotas.js";
+import { acquireAccountMutationTurn, isLiveAccountSession } from "../auth/account-mutation-transaction.js";
 import { isActiveRoom } from "../relay-domain.js";
 
 interface RegisterAttachmentRoutesOptions {
@@ -109,8 +110,27 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
 async function persistAttachmentUpload(
   options: RegisterAttachmentRoutesOptions,
   session: AuthSession | null,
-  target: { teamId: string; roomId: string; blobId: string },
-  payload: NonNullable<ReturnType<typeof validateAttachmentPayload>>,
+  target: AttachmentTarget,
+  payload: AttachmentPayload,
+  res: Response
+) {
+  const releaseAccountMutation = session ? await acquireAccountMutationTurn(options.store, session.user.id) : null;
+  try {
+    if (session && !isLiveAccountSession(options.store, session)) {
+      return void sendRelayError(res, 401, "authentication_required", "Sign in before uploading an attachment.");
+    }
+    if (!attachmentTargetRemainsAuthorized(options, target, session, res)) return;
+    await persistAttachmentWithinQuotaTransaction(options, session, target, payload, res);
+  } finally {
+    releaseAccountMutation?.();
+  }
+}
+
+async function persistAttachmentWithinQuotaTransaction(
+  options: RegisterAttachmentRoutesOptions,
+  session: AuthSession | null,
+  target: AttachmentTarget,
+  payload: AttachmentPayload,
   res: Response
 ) {
   const {
@@ -128,10 +148,10 @@ async function persistAttachmentUpload(
   } = options;
   const { teamId, roomId, blobId } = target;
   const { name, type, size, epoch, sealedBlob, storageBytes } = payload;
-  const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
   let reservation: ReturnType<typeof reserveAttachmentQuota> | null = null;
   let blob: AttachmentBlobRecordType | null = null;
   let durableCommitCompleted = false;
+  const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
   try {
     reservation = session
       ? reserveAttachmentQuota({
@@ -195,8 +215,40 @@ async function persistAttachmentUpload(
   }
 }
 
+type AttachmentTarget = { teamId: string; roomId: string; blobId: string };
+type AttachmentPayload = NonNullable<ReturnType<typeof validateAttachmentPayload>>;
+
 function attachmentUploader(session: AuthSession | null): { uploadedByUserId?: string } {
   return session ? { uploadedByUserId: session.user.id } : {};
+}
+
+function attachmentTargetRemainsAuthorized(
+  options: RegisterAttachmentRoutesOptions,
+  target: { teamId: string; roomId: string; blobId: string },
+  session: AuthSession | null,
+  res: Response
+): boolean {
+  if (!options.store.hasTeam(target.teamId)) {
+    sendRelayError(res, 404, "team_not_found", "Team not found");
+    return false;
+  }
+  if (options.store.getRoom(target.roomId)?.teamId !== target.teamId) {
+    sendRelayError(res, 404, "room_not_found", "Room not found");
+    return false;
+  }
+  if (!isActiveRoom(options.store, target.teamId, target.roomId)) {
+    sendRelayError(res, 409, "conflict", "Restore the team and room before uploading attachments.");
+    return false;
+  }
+  if (options.store.getAttachmentBlob(target.blobId)) {
+    sendRelayError(res, 409, "conflict", "blobId already exists.");
+    return false;
+  }
+  if (session && !options.canAccessRoom(target.teamId, target.roomId, session.user.id)) {
+    sendRelayError(res, 403, "forbidden", "Join this room before uploading attachment blobs.");
+    return false;
+  }
+  return true;
 }
 
 function validateAttachmentTarget(

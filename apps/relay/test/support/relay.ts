@@ -32,6 +32,7 @@ export interface StoredRelayStateFixture {
   invites: unknown;
   teamMembers?: unknown[];
   devices?: unknown[];
+  consumedKeyPackages?: unknown[];
   authSessions?: unknown[];
   accountRestrictions?: unknown[];
   attachmentBlobs?: unknown[];

@@ -12,7 +12,7 @@ export interface DeviceFingerprintComparisonRecord {
   comparedAt: string;
 }
 
-export interface DeviceFingerprintMarkdownInput {
+interface DeviceFingerprintMarkdownInput {
   roomName: string;
   displayName: string;
   deviceId: string;
@@ -53,7 +53,12 @@ export function loadDeviceFingerprintComparisons(): DeviceFingerprintComparisonR
 
   // Write-before-delete makes migration retryable if localStorage rejects the
   // new value (for example because storage is unavailable or full).
-  localStorage.setItem(deviceFingerprintComparisonsStorageKey, JSON.stringify(migrated));
+  try {
+    localStorage.setItem(deviceFingerprintComparisonsStorageKey, JSON.stringify(migrated));
+  } catch {
+    reportNonFatal("persist migrated device-fingerprint comparison storage");
+    return migrated;
+  }
   localStorage.removeItem(legacyDeviceFingerprintComparisonsStorageKey);
   return migrated;
 }

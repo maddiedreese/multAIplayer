@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import type { Express, Response } from "express";
 import { KeyPackageUpload, pinnedMlsCiphersuite, type KeyPackageRecord, type RoomRecord } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
+import { isLiveAccountSession } from "../auth/account-mutation-transaction.js";
 import type { KeyPackageValidator } from "../mls/key-package-validator.js";
 import { isCanonicalPaddedBase64 } from "../opaque.js";
 import { hasDeviceSession } from "./device-auth.js";
@@ -85,6 +86,7 @@ export function registerKeyPackageRoutes({
       res
     );
     if (!accepted) return;
+    const deviceSessionToken = req.get("x-device-session");
     const committed = await commitValidatedKeyPackages({
       store,
       userId: session.user.id,
@@ -92,6 +94,8 @@ export function registerKeyPackageRoutes({
       accepted,
       accountLimit: liveKeyPackageCapPerUser,
       deviceLimit: maxLivePackagesPerDevice,
+      authorizationRemainsValid: () =>
+        isLiveAccountSession(store, session) && hasDeviceSession(store, deviceSessionToken, session.user.id, deviceId),
       persist: saveRelayStore
     });
     respondToKeyPackageCommit(committed, liveKeyPackageCapPerUser, res, recordQuotaRejection);
@@ -124,6 +128,7 @@ export function registerKeyPackageRoutes({
     }
     const keyPackageId = String(body.keyPackageId ?? "");
     const keyPackageHash = String(body.keyPackageHash ?? "");
+    const deviceSessionToken = req.get("x-device-session");
     const result = await consumeKeyPackageForInvite({
       store,
       teamId: room.teamId,
@@ -135,32 +140,49 @@ export function registerKeyPackageRoutes({
       deviceId: String(req.params.deviceId),
       keyPackageId,
       keyPackageHash,
+      authorizationRemainsValid: () =>
+        isLiveAccountSession(store, session) &&
+        hasDeviceSession(store, deviceSessionToken, session.user.id, hostDeviceId),
       persist: saveRelayStore
     });
-    if (result.status === "authorization_changed")
-      return void sendRelayError(res, 403, "forbidden", "Active host authority changed before KeyPackage consumption.");
-    if (result.status === "invite_mismatch")
-      return void sendRelayError(res, 403, "forbidden", "A valid room invite approval is required.");
-    if (result.status === "request_mismatch")
-      return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
-    if (result.status === "key_package_unavailable")
-      return void sendRelayError(res, 404, "key_package_unavailable", "No KeyPackage is available.");
-    if (result.status === "key_package_mismatch")
-      return void sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
-    if (result.status === "persistence_unavailable") {
-      return void sendRelayError(res, 503, "persistence_unavailable", "Could not consume KeyPackage durably.");
-    }
-    if (result.status === "already_consumed") {
-      return void res.json({
-        alreadyConsumed: true,
+    if (
+      respondToKeyPackageConsumption(result, res, {
         keyPackageId,
         keyPackageHash,
         userId: String(req.params.userId),
         deviceId: String(req.params.deviceId)
-      });
-    }
+      })
+    )
+      return;
     res.json({ keyPackage: result.keyPackage });
   });
+}
+
+type KeyPackageConsumptionResult = Awaited<ReturnType<typeof consumeKeyPackageForInvite>>;
+
+function respondToKeyPackageConsumption(
+  result: KeyPackageConsumptionResult,
+  res: Response,
+  key: { keyPackageId: string; keyPackageHash: string; userId: string; deviceId: string }
+): result is Exclude<KeyPackageConsumptionResult, { status: "accepted" }> {
+  if (result.status === "accepted") return false;
+  if (result.status === "already_consumed") {
+    res.json({ alreadyConsumed: true, ...key });
+    return true;
+  }
+  if (result.status === "authorization_changed")
+    sendRelayError(res, 403, "forbidden", "Active host authority changed before KeyPackage consumption.");
+  else if (result.status === "requester_authorization_changed")
+    sendRelayError(res, 409, "conflict", "Requester device identity changed before consumption.");
+  else if (result.status === "invite_mismatch")
+    sendRelayError(res, 403, "forbidden", "A valid room invite approval is required.");
+  else if (result.status === "invite_expired") sendRelayError(res, 410, "invite_expired", "Invite expired.");
+  else if (result.status === "key_package_unavailable")
+    sendRelayError(res, 404, "key_package_unavailable", "No KeyPackage is available.");
+  else if (result.status === "persistence_unavailable")
+    sendRelayError(res, 503, "persistence_unavailable", "Could not consume KeyPackage durably.");
+  else sendRelayError(res, 409, "conflict", "KeyPackage does not match the pending invite request.");
+  return true;
 }
 
 function respondToKeyPackageCommit(
@@ -175,6 +197,12 @@ function respondToKeyPackageCommit(
   }
   if (result.status === "conflict") {
     return void sendRelayError(res, 409, "conflict", "KeyPackage id already exists.");
+  }
+  if (result.status === "already_consumed") {
+    return void sendRelayError(res, 409, "conflict", "KeyPackage was already consumed and cannot be published again.");
+  }
+  if (result.status === "authorization_changed") {
+    return void sendRelayError(res, 403, "device_auth_required", "Registered device identity changed before commit.");
   }
   if (result.status === "persistence_unavailable") {
     return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist KeyPackages.");
@@ -199,9 +227,19 @@ async function validateKeyPackageBatch(
   res: Response
 ): Promise<KeyPackageRecord[] | null> {
   const accepted: KeyPackageRecord[] = [];
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenHashes = new Set<string>();
   for (const candidate of candidates) {
-    const item = await validateUploadedKeyPackage(candidate, seen, store, validator, session, deviceId, res);
+    const item = await validateUploadedKeyPackage(
+      candidate,
+      seenIds,
+      seenHashes,
+      store,
+      validator,
+      session,
+      deviceId,
+      res
+    );
     if (!item) return null;
     accepted.push(item);
   }
@@ -210,7 +248,8 @@ async function validateKeyPackageBatch(
 
 async function validateUploadedKeyPackage(
   candidate: unknown,
-  seen: Set<string>,
+  seenIds: Set<string>,
+  seenHashes: Set<string>,
   store: RelayStore,
   validator: KeyPackageValidator,
   session: AuthSession,
@@ -221,11 +260,13 @@ async function validateUploadedKeyPackage(
   if (
     !parsed.success ||
     parsed.data.keyPackage.length > maxEncodedKeyPackageChars ||
-    seen.has(parsed.success ? parsed.data.id : "")
+    seenIds.has(parsed.success ? parsed.data.id : "") ||
+    seenHashes.has(parsed.success ? parsed.data.keyPackageHash : "")
   ) {
     return keyPackageUploadError(res, 400, "key_package_invalid", "Invalid or duplicate KeyPackage.");
   }
-  seen.add(parsed.data.id);
+  seenIds.add(parsed.data.id);
+  seenHashes.add(parsed.data.keyPackageHash);
   if (
     parsed.data.ciphersuite !== pinnedMlsCiphersuite ||
     !isCanonicalPaddedBase64(parsed.data.keyPackage, maxEncodedKeyPackageChars)
@@ -237,6 +278,10 @@ async function validateUploadedKeyPackage(
   }
   if (store.keyPackages.has(parsed.data.id))
     return keyPackageUploadError(res, 409, "conflict", "KeyPackage id already exists.");
+  if (Array.from(store.keyPackages.values()).some((item) => item.keyPackageHash === parsed.data.keyPackageHash))
+    return keyPackageUploadError(res, 409, "conflict", "KeyPackage was already published.");
+  if (store.consumedKeyPackages.has(parsed.data.keyPackageHash))
+    return keyPackageUploadError(res, 409, "conflict", "KeyPackage was already consumed.");
   const device = store.getDevice(session.user.id, deviceId);
   if (!device) return keyPackageUploadError(res, 400, "key_package_invalid", "Registered device identity is required.");
   const validated = await validator.validate(parsed.data, {

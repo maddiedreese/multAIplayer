@@ -3,6 +3,7 @@ import test from "node:test";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
+  private rejectedSetKey: string | null = null;
 
   get length(): number {
     return this.values.size;
@@ -10,6 +11,7 @@ class MemoryStorage {
 
   clear(): void {
     this.values.clear();
+    this.rejectedSetKey = null;
   }
 
   getItem(key: string): string | null {
@@ -25,7 +27,15 @@ class MemoryStorage {
   }
 
   setItem(key: string, value: string): void {
+    if (key === this.rejectedSetKey) {
+      this.rejectedSetKey = null;
+      throw new DOMException("Storage quota exceeded", "QuotaExceededError");
+    }
     this.values.set(key, value);
+  }
+
+  rejectNextSetItem(key: string): void {
+    this.rejectedSetKey = key;
   }
 }
 
@@ -141,6 +151,32 @@ test("loadDeviceFingerprintComparisons migrates the legacy trust-named key once"
   assert.notEqual(migrated[0]?.comparedAt, "2026-07-04T12:00:00.000Z");
   assert.equal(localStorage.getItem(legacyComparisonStorageKey), null);
   assert.deepEqual(JSON.parse(localStorage.getItem(comparisonStorageKey)!), migrated);
+});
+
+test("a failed migration write returns comparisons and retains the legacy key for retry", () => {
+  localStorage.setItem(
+    legacyComparisonStorageKey,
+    JSON.stringify([
+      {
+        roomId: "room-a",
+        deviceId: "device-a",
+        fingerprint: fingerprintA,
+        trustedAt: "2026-07-04T12:00:00.000Z"
+      }
+    ])
+  );
+  localStorage.rejectNextSetItem(comparisonStorageKey);
+
+  const migrated = loadDeviceFingerprintComparisons();
+
+  assert.equal(isDeviceFingerprintCompared(migrated, "room-a", "device-a", fingerprintA), true);
+  assert.notEqual(localStorage.getItem(legacyComparisonStorageKey), null);
+  assert.equal(localStorage.getItem(comparisonStorageKey), null);
+
+  const retried = loadDeviceFingerprintComparisons();
+  assert.equal(isDeviceFingerprintCompared(retried, "room-a", "device-a", fingerprintA), true);
+  assert.equal(localStorage.getItem(legacyComparisonStorageKey), null);
+  assert.deepEqual(JSON.parse(localStorage.getItem(comparisonStorageKey)!), retried);
 });
 
 test("the current comparison key is authoritative and clears a stale legacy key", () => {

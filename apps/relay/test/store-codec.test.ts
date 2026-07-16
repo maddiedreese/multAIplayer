@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +11,8 @@ import { createRelayAuthSessionPersistence } from "../src/auth/session.js";
 import { SqliteRelayPersistence } from "../src/sqlite-persistence.js";
 import { InMemoryRelayStore } from "../src/state.js";
 import { createRelayStorePersistenceCoordinator, RelayPersistenceLoadError } from "../src/store-persistence.js";
+import { commitValidatedKeyPackages } from "../src/http/key-package-upload-transaction.js";
+import { deleteAccountOwnedRelayData } from "../src/auth/account-deletion.js";
 
 const fixedNow = Date.parse("2026-07-11T12:00:00.000Z");
 const authSessionPersistence = createRelayAuthSessionPersistence({
@@ -57,6 +60,195 @@ function currentRoom(overrides: Partial<RoomRecord> & Pick<RoomRecord, "id" | "t
     ...overrides
   };
 }
+
+test("account deletion preserves consumed KeyPackage hashes across restart and rejects alternate-id reuse", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "relay-consumed-key-package-"));
+  const dataPath = join(directory, "relay.sqlite");
+  const keyPackageHash = `sha256:${"a".repeat(64)}`;
+  try {
+    const first = codec();
+    first.store.setDevice({
+      userId: "github:joiner",
+      deviceId: "joiner-device",
+      displayName: "Joiner",
+      signaturePublicKey: "AA==",
+      signatureKeyFingerprint: `sha256:${"1".repeat(64)}`,
+      hpkePublicKey: "AA==",
+      hpkeKeyFingerprint: `sha256:${"2".repeat(64)}`,
+      registeredAt: new Date(fixedNow - 2).toISOString(),
+      lastSeenAt: new Date(fixedNow - 1).toISOString()
+    });
+    first.store.consumedKeyPackages.set(keyPackageHash, {
+      keyPackageHash,
+      userId: "github:joiner",
+      deviceId: "joiner-device",
+      consumedAt: new Date(fixedNow - 1).toISOString()
+    });
+    assert.equal(deleteAccountOwnedRelayData(first.store, "github:joiner").consumedKeyPackagesDeattributed, 1);
+    assert.deepEqual(first.store.consumedKeyPackages.get(keyPackageHash), {
+      keyPackageHash,
+      consumedAt: new Date(fixedNow - 1).toISOString()
+    });
+    const persistence = new SqliteRelayPersistence(dataPath);
+    await persistence.save(first.codec.toStoredRelayState());
+    persistence.close();
+
+    const reopened = new SqliteRelayPersistence(dataPath);
+    const stored = await reopened.load();
+    reopened.close();
+    assert.ok(stored && typeof stored === "object" && !Array.isArray(stored));
+    const restarted = codec();
+    restarted.codec.applyStoredRelayState(stored as Record<string, unknown>);
+    assert.deepEqual(restarted.store.consumedKeyPackages.get(keyPackageHash), {
+      keyPackageHash,
+      consumedAt: new Date(fixedNow - 1).toISOString()
+    });
+    restarted.store.setDevice({
+      userId: "github:joiner",
+      deviceId: "replacement-device",
+      displayName: "Joiner",
+      signaturePublicKey: "AA==",
+      signatureKeyFingerprint: `sha256:${"3".repeat(64)}`,
+      hpkePublicKey: "AA==",
+      hpkeKeyFingerprint: `sha256:${"4".repeat(64)}`,
+      registeredAt: new Date(fixedNow).toISOString(),
+      lastSeenAt: new Date(fixedNow).toISOString()
+    });
+
+    const result = await commitValidatedKeyPackages({
+      store: restarted.store,
+      userId: "github:joiner",
+      deviceId: "replacement-device",
+      accepted: [
+        {
+          id: "alternate-id",
+          keyPackage: "AA==",
+          keyPackageHash,
+          ciphersuite: 2,
+          userId: "github:joiner",
+          deviceId: "replacement-device",
+          credentialIdentity: "fixture",
+          createdAt: new Date(fixedNow).toISOString()
+        }
+      ],
+      accountLimit: 100,
+      deviceLimit: 50,
+      authorizationRemainsValid: () => true,
+      persist: async () => assert.fail("consumed hash must fail before persistence")
+    });
+    assert.deepEqual(result, { status: "already_consumed" });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("legacy approved invites and ACK receipts backfill consumed hashes before expiry pruning", () => {
+  const consumedHash = `sha256:${"c".repeat(64)}`;
+  const acknowledgedHash = `sha256:${"d".repeat(64)}`;
+  const target = codec();
+  target.codec.applyStoredRelayState({
+    version: 1,
+    savedAt: new Date(fixedNow).toISOString(),
+    teams: [],
+    rooms: [],
+    invites: [
+      {
+        id: "legacy-approved",
+        teamId: "team-legacy",
+        roomId: "room-legacy",
+        approvedUserId: "github:legacy",
+        approvedDeviceId: "device-legacy",
+        keyPackageHash: consumedHash,
+        createdAt: "2026-06-01T00:00:00.000Z",
+        expiresAt: "2026-06-02T00:00:00.000Z"
+      }
+    ],
+    inviteAckReceipts: [
+      {
+        inviteId: "legacy-acknowledged",
+        requestId: "legacy-request",
+        teamId: "team-legacy",
+        requesterUserId: "github:acknowledged",
+        requesterDeviceId: "device-acknowledged",
+        keyPackageHash: acknowledgedHash,
+        status: "approved",
+        acknowledgedAt: "2026-05-01T00:00:00.000Z",
+        expiresAt: "2026-05-31T00:00:00.000Z"
+      }
+    ],
+    consumedKeyPackages: [],
+    mlsBacklog: []
+  });
+
+  assert.equal(target.store.getInvite("legacy-approved"), undefined);
+  assert.deepEqual(target.store.consumedKeyPackages.get(consumedHash), {
+    keyPackageHash: consumedHash,
+    userId: "github:legacy",
+    deviceId: "device-legacy",
+    consumedAt: "2026-06-01T00:00:00.000Z"
+  });
+  assert.deepEqual(target.store.consumedKeyPackages.get(acknowledgedHash), {
+    keyPackageHash: acknowledgedHash,
+    userId: "github:acknowledged",
+    deviceId: "device-acknowledged",
+    consumedAt: "2026-05-01T00:00:00.000Z"
+  });
+});
+
+test("startup fails closed for malformed or contradictory consumed KeyPackage state", () => {
+  const minimal = {
+    version: 1,
+    savedAt: new Date(fixedNow).toISOString(),
+    teams: [],
+    rooms: [],
+    invites: [],
+    mlsBacklog: []
+  };
+  assert.throws(
+    () =>
+      codec().codec.applyStoredRelayState({
+        ...minimal,
+        consumedKeyPackages: [
+          {
+            keyPackageHash: "not-a-hash",
+            userId: "github:joiner",
+            deviceId: "joiner-device",
+            consumedAt: new Date(fixedNow).toISOString()
+          }
+        ]
+      }),
+    /consumed KeyPackage row failed validation/
+  );
+
+  const keyPackage = "AA==";
+  const keyPackageHash = `sha256:${createHash("sha256").update(Buffer.from(keyPackage, "base64")).digest("hex")}`;
+  const contradictory = codec();
+  contradictory.store.setKeyPackage({
+    id: "live-id",
+    keyPackage,
+    keyPackageHash,
+    ciphersuite: 2,
+    userId: "github:joiner",
+    deviceId: "joiner-device",
+    credentialIdentity: "fixture",
+    createdAt: new Date(fixedNow).toISOString()
+  });
+  assert.throws(
+    () =>
+      contradictory.codec.applyStoredRelayState({
+        ...minimal,
+        consumedKeyPackages: [
+          {
+            keyPackageHash,
+            userId: "github:joiner",
+            deviceId: "joiner-device",
+            consumedAt: new Date(fixedNow).toISOString()
+          }
+        ]
+      }),
+    /KeyPackage one-shot state failed validation/
+  );
+});
 
 function pendingInviteState({
   acceptedMlsEpoch,

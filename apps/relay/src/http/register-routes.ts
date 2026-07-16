@@ -15,7 +15,7 @@ import { registerTeamRoutes } from "./teams.js";
  * This keeps adding a dependency to one route family from silently making it
  * available to every other HTTP handler.
  */
-export interface RelayRouteRegistrations {
+interface RelayRouteRegistrations {
   github: Parameters<typeof registerGitHubRoutes>[0];
   debug: Parameters<typeof registerDebugRoutes>[0];
   attachments: Parameters<typeof registerAttachmentRoutes>[0];

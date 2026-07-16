@@ -14,6 +14,7 @@ export function openRelayDatabase(dataPath: string, walAutoCheckpointPages = 1_0
     create table if not exists relay_invites (id text primary key, data_json text not null);
     create table if not exists relay_devices (key text primary key, data_json text not null);
     create table if not exists relay_key_packages (id text primary key, data_json text not null);
+    create table if not exists relay_consumed_key_packages (key_package_hash text primary key, data_json text not null);
     create table if not exists relay_invite_requests (id text primary key, data_json text not null);
     create table if not exists relay_invite_responses (id text primary key, data_json text not null);
     create table if not exists relay_invite_ack_receipts (id text primary key, data_json text not null);

@@ -343,7 +343,6 @@ function fanoutFor(
     metrics,
     roomKey: () => key,
     pruneMlsBacklog: (items) => items,
-    addTeamMember: () => undefined,
     reclaimDurableCapacity,
     saveMlsMessage,
     saveMlsCommit,

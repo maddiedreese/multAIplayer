@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to release, such as v0.1.0-alpha.0"
+        description: "Existing release tag, such as vX.Y.Z-alpha.N"
         required: true
         type: string
 
@@ -108,7 +108,6 @@ jobs:
     permissions:
       contents: read
     outputs:
-      commit: ${{ steps.release.outputs.commit }}
       prerelease: ${{ steps.release.outputs.prerelease }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
@@ -166,7 +165,6 @@ jobs:
             *alpha*|*beta*|*rc*) prerelease=true ;;
           esac
           {
-            echo "commit=$commit"
             echo "prerelease=$prerelease"
             echo "tag=$tag"
           } >> "$GITHUB_OUTPUT"
@@ -183,7 +181,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-          ref: ${{ needs.resolve.outputs.commit }}
+          ref: ${{ github.sha }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Install repository Rust toolchain
@@ -218,10 +216,9 @@ jobs:
     permissions:
       contents: read
       issues: write
-      security-events: write
     uses: ./.github/workflows/supply-chain.yml
     with:
-      commit: ${{ needs.resolve.outputs.commit }}
+      commit: ${{ github.sha }}
 
   build:
     name: Build signed macOS artifacts
@@ -232,7 +229,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      commit: ${{ needs.resolve.outputs.commit }}
+      commit: ${{ github.sha }}
       prerelease: ${{ needs.resolve.outputs.prerelease }}
       tag: ${{ needs.resolve.outputs.tag }}
     env:
@@ -244,7 +241,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-          ref: ${{ needs.resolve.outputs.commit }}
+          ref: ${{ github.sha }}
 
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
