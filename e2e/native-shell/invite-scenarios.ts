@@ -157,7 +157,7 @@ async function collectPendingInviteFailureDiagnostics(host: Browser) {
             deviceSessionTokenPresent: Boolean(state.deviceSessionToken),
             room: roomSnapshot(room),
             invite: inviteSnapshot(invite),
-            hostMessage: state.hostMessagesByRoom[roomId]?.slice(0, 300) ?? "",
+            hostMessage: state.roomSettingsByRoom[roomId]?.hostMessage?.slice(0, 300) ?? "",
             nativeMlsEpoch,
             directRequestList,
             diagnostics: loadDiagnosticEntries().slice(-12)
