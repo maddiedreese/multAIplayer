@@ -23,10 +23,8 @@ const validProductionEnvironment: NodeJS.ProcessEnv = {
   MULTAIPLAYER_RELAY_DEBUG: "false",
   MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON: "true",
   MULTAIPLAYER_RELAY_RATE_LIMITS: "true",
-  MULTAIPLAYER_RELAY_STORAGE: "sqlite",
   MULTAIPLAYER_RELAY_STRUCTURED_LOGS: "true",
   MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "false",
-  MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "false",
   MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
   MULTAIPLAYER_MLS_VALIDATOR_PATH: process.execPath
 };
@@ -82,10 +80,11 @@ test("production doctor requires distinct S3 transport and HMAC keys in restore-
 });
 
 test("production doctor warns when the single trusted-proxy opt-in is enabled", () => {
-  const output = runDoctor({
+  const { status, output } = runDoctor({
     MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
     MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "true"
   });
+  assert.equal(status, 0, output);
   assert.match(
     output,
     /\[ok\] production trusted-proxy configuration: WARNING: forwarded headers are trusted; ensure the relay is unreachable except through a proxy that overwrites client forwarding headers/
