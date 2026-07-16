@@ -1,6 +1,12 @@
 name: Supply-chain security
 
 on:
+  workflow_call:
+    inputs:
+      commit:
+        description: Exact commit to verify before release publication.
+        required: true
+        type: string
   schedule:
     - cron: "47 8 * * 4"
   release:
@@ -21,6 +27,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
+          ref: ${{ inputs.commit || github.sha }}
       - name: Install checksum-pinned Gitleaks 8.30.1
         run: |
           archive="$RUNNER_TEMP/gitleaks.tar.gz"
@@ -40,6 +47,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
       - name: Build relay image
         run: docker build --tag multaiplayer-relay:scan --file apps/relay/Dockerfile .
       - name: Verify minimal relay runtime contents
@@ -63,6 +72,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
       - name: Install pinned Rust toolchain and native updater test dependencies
         run: |
           rustup toolchain install 1.89.0 --profile minimal
@@ -78,6 +89,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Install locked dependencies
@@ -92,6 +105,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
       - name: Install locked audit tools
         run: |
           cargo install cargo-audit --version 0.22.0 --locked
@@ -113,6 +128,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
       - name: Initialize CodeQL
         uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
         with:
@@ -131,6 +148,8 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ inputs.commit || github.sha }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Install repository dependencies

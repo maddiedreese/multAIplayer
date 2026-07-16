@@ -1,11 +1,7 @@
-import {
-  useRoomMainColumnComposition,
-  type RoomMainColumnCapabilities,
-  type RoomMainColumnSources
-} from "../hooks/useRoomMainColumnComposition";
+import { useRoomMainColumnComposition, type RoomMainColumnSources } from "../hooks/useRoomMainColumnComposition";
 import { useAppStore } from "../store/appStore";
 
-export type { RoomMainColumnCapabilities, RoomMainColumnSources };
+export type { RoomMainColumnSources };
 
 export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSources }) {
   const selectedRoom = useAppStore((state) => state.rooms.find((room) => room.id === state.selectedRoomId));

@@ -276,8 +276,7 @@ export interface BrowserOpenResult {
   profilePath: string;
   persistent: boolean;
   downloadsBlocked: boolean;
-  clipboardBlocked: boolean;
-  fileUploadsBlocked: boolean;
+  pageGuardInstalled: boolean;
 }
 
 export interface BrowserProfileResult {

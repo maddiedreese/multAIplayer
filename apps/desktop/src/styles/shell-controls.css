@@ -1,0 +1,641 @@
+/* Application shell and shared controls. */
+body {
+  margin: 0;
+  min-width: 980px;
+  min-height: 680px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-color: color-mix(in srgb, var(--text-soft) 58%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-soft) 58%, transparent);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+button,
+input,
+textarea,
+select {
+  color: var(--text);
+}
+
+button {
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.brand strong {
+  color: var(--text);
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.brand span {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.github-button,
+.team-button,
+.sidebar-footer button,
+.ghost,
+.composer button,
+.approval-actions button,
+.header-copy,
+.host-controls button,
+.section-title button,
+.sidebar-create-form > button,
+.path-create-row button,
+.message-meta button,
+.attachment button,
+.browser-request button,
+.terminal-request button,
+.terminal-launcher button,
+.terminal-input-row button,
+.ghost-wide {
+  border-color: var(--border);
+  background: var(--button-bg);
+  color: var(--text);
+}
+
+.github-button,
+.profile-card,
+.search-box,
+.sidebar-create-form input,
+.path-create-row input,
+.message-hit-list button,
+.sidebar-empty,
+.workspace-error,
+.device-flow,
+.auth-error {
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text);
+}
+
+.github-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  border-radius: 8px;
+  font-weight: 640;
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.profile-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.profile-card button {
+  min-height: 28px;
+  padding: 5px 7px;
+  border: 1px solid #dcdcdc;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 680;
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.search-box input,
+.file-search input,
+.project-path-editor input,
+.browser-panel input,
+.browser-panel textarea,
+.terminal-launcher input,
+.terminal-input-row input,
+.model-panel input,
+.model-panel select,
+.git-approval-panel input[type="text"],
+.git-approval-panel input:not([type]),
+.custom-model-row input,
+.invite-panel textarea,
+.history-retention input,
+.history-retention select,
+.relay-config-section input {
+  border-color: var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.section-title button[aria-expanded="true"] {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.sidebar-create-form {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.sidebar-create-form > button {
+  min-height: 32px;
+  border: 1px solid #d5d5d5;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 760;
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .sidebar-create-form > button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #121212;
+}
+
+.sidebar-create-form > button:disabled,
+:root[data-theme="dark"] .sidebar-create-form > button:disabled {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.team-button svg {
+  display: none;
+}
+
+.team-button.active,
+.room-button.active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--surface-strong) 84%, var(--accent) 16%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.room-button strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.room-button span,
+.team-button small,
+.message-hit-list span,
+.profile-card span,
+.sidebar-empty,
+.browser-profile-state span,
+.member-row small,
+.action-run small,
+.actions-summary span {
+  color: var(--text-muted);
+}
+
+.room-indicators b,
+.tab-badge {
+  background: var(--accent);
+  color: #1b1b1b;
+}
+
+.room-indicators b.attention {
+  background: var(--red);
+  color: #ffffff;
+}
+
+.sidebar-footer button.active {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
+}
+
+.drawer-header,
+.drawer-section,
+.account-section img,
+.drawer-avatar {
+  border-color: var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.drawer-header strong,
+.drawer-section-title,
+.info-row strong {
+  color: var(--text);
+}
+
+.drawer-header span,
+.info-row span,
+.account-section span {
+  color: var(--text-muted);
+}
+
+.crumb select {
+  max-width: 260px;
+  min-height: 28px;
+  padding: 0 22px 0 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumb svg {
+  position: absolute;
+  right: 0;
+  pointer-events: none;
+}
+
+.room-title-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: clamp(21px, 2vw, 27px);
+  font-weight: 760;
+}
+
+.room-title-input:disabled {
+  opacity: 1;
+}
+
+.room-title-input:focus {
+  box-shadow: inset 0 -2px 0 var(--text);
+}
+
+.host-controls button:first-child:not(:disabled) {
+  background: var(--surface-strong);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.room-notice-stack {
+  display: grid;
+  gap: 6px;
+  padding: 10px clamp(24px, 4vw, 58px) 0;
+  background: var(--surface);
+}
+
+.room-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  max-width: 780px;
+  min-height: 32px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-muted) 72%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.room-notice strong {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.room-notice span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-notice button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.room-notice button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.host-message,
+.workflow-message {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
+  color: var(--text-muted);
+}
+
+.workflow-message {
+  padding: 9px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #454545;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.warning-banner,
+.inline-secret-warning,
+.handoff-row.available,
+.policy-options button.active,
+.actions-summary.yellow {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--border));
+  background: var(--accent-soft);
+  color: color-mix(in srgb, var(--text) 82%, var(--accent));
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--surface-muted) !important;
+  color: var(--text-muted) !important;
+  font-weight: 620;
+}
+
+.status-pill svg {
+  display: none;
+}
+
+.message.system .avatar {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.message.codex .bubble {
+  border-color: #d8d8d8;
+  border: 0;
+  background: transparent;
+}
+
+.message.selected .bubble {
+  border-color: #a1a1a1;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.message-meta strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.message-meta span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.message-meta button {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #dcdcdc;
+  border-radius: 7px;
+  width: 26px;
+  height: 26px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.message-meta button:hover {
+  border-color: var(--border);
+  background: var(--surface-muted);
+}
+
+.attachment,
+.pending-attachments span,
+.invite-link {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.attachment small,
+.pending-attachments small {
+  color: var(--text-muted);
+}
+
+.reaction-row button.active,
+.reaction-row button:hover {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.approval-item,
+.project-card,
+.member-row,
+.browser-profile-state,
+.browser-request,
+.handoff-row,
+.diff-row,
+.file-row,
+.git-approval-preview,
+.git-approval-step,
+.history-defaults,
+.actions-summary,
+.action-run,
+.checkbox-row,
+.panel {
+  border-color: var(--border);
+  background: var(--surface-strong);
+}
+
+.approval-actions .primary,
+.composer .send,
+.primary-wide,
+.custom-model-row button {
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .approval-actions .primary,
+:root[data-theme="dark"] .composer .send,
+:root[data-theme="dark"] .primary-wide,
+:root[data-theme="dark"] .custom-model-row button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #121212;
+}
+
+.composer button {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 11px;
+}
+
+.project-card,
+.member-row,
+.browser-request,
+.terminal-request,
+.handoff-row,
+.action-run,
+.actions-summary,
+.history-defaults,
+.git-approval-step,
+.attachment {
+  min-width: 0;
+}
+
+.panel-title-actions {
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.panel-state,
+.panel-count {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.panel-state {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-state.available {
+  color: color-mix(in srgb, var(--green) 72%, var(--text));
+}
+
+.panel-state.attention {
+  color: color-mix(in srgb, var(--accent) 82%, var(--text));
+}
+
+.panel-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.file-row.active,
+.model-options button.active,
+.terminal-tabs button.active {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.diff-preview pre,
+.diff-code,
+.terminal-output {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--code-bg);
+  color: var(--code-text);
+}
+
+.preview-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.browser-policy-state span::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 7px 1px 0;
+  border-radius: 99px;
+  background: var(--green);
+}
+
+.browser-policy-state strong {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  font-weight: 700;
+}
+
+.browser-request.denied,
+.terminal-request.denied,
+.workflow-message.danger,
+.actions-summary.red,
+.ghost.danger,
+.ghost-wide.danger {
+  border-color: color-mix(in srgb, var(--red) 50%, var(--border));
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.empty-state,
+.sidebar-empty {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--text-muted);
+}
+
+@media (max-width: 1180px) {
+  .header-actions {
+    flex-wrap: wrap;
+  }
+}

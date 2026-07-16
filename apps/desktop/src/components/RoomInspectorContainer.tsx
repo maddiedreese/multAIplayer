@@ -1,11 +1,7 @@
-import {
-  useRoomInspectorComposition,
-  type RoomInspectorCapabilities,
-  type RoomInspectorSources
-} from "../hooks/useRoomInspectorComposition";
+import { useRoomInspectorComposition, type RoomInspectorSources } from "../hooks/useRoomInspectorComposition";
 import { useAppStore } from "../store/appStore";
 
-export type { RoomInspectorCapabilities, RoomInspectorSources };
+export type { RoomInspectorSources };
 
 export function RoomInspectorContainer({ sources }: { sources: RoomInspectorSources }) {
   const selectedRoom = useAppStore((state) => state.rooms.find((room) => room.id === state.selectedRoomId));

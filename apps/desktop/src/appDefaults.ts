@@ -9,10 +9,7 @@ export const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
 export const maxTerminalActivityLines = 1000;
 
 export const defaultBrowserStatus: BrowserStatus = {
-  profilePath: null,
-  downloadsBlocked: false,
-  clipboardBlocked: false,
-  fileUploadsBlocked: false
+  profilePath: null
 };
 
 export const defaultBrowserUrl = "";

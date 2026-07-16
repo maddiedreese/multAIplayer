@@ -1,0 +1,506 @@
+/* Account, room, chat, and approval surfaces. */
+.account-section img,
+.drawer-avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  background: #ededed;
+  color: #2e2e2e;
+  font-weight: 780;
+}
+
+.account-section img {
+  object-fit: cover;
+}
+
+.account-section strong,
+.account-section span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-section strong {
+  font-size: 14px;
+}
+
+.account-section span {
+  margin-top: 3px;
+  color: #727272;
+  font-size: 12px;
+}
+
+.codex-account-panel {
+  gap: 10px;
+}
+
+.codex-account-panel .panel-title,
+.codex-host-row,
+.codex-approval-mode > span {
+  display: flex;
+  align-items: center;
+}
+
+.codex-account-panel .panel-title > div,
+.codex-host-row > span {
+  display: grid;
+  min-width: 0;
+}
+
+.codex-account-panel .panel-title small,
+.codex-approval-mode small,
+.codex-host-row small {
+  color: #727272;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.codex-account-actions,
+.codex-host-list,
+.codex-approval-mode {
+  display: grid;
+  gap: 7px;
+}
+
+.codex-approval-mode > span {
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.codex-approval-mode select {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid #dcdcdc;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #2e2e2e;
+}
+
+.codex-host-list {
+  padding-top: 8px;
+  border-top: 1px solid #e8e8e8;
+}
+
+.codex-host-list > strong {
+  font-size: 12px;
+}
+
+.codex-host-row {
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.codex-host-row > span {
+  gap: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+
+.info-row span {
+  color: #727272;
+}
+
+.drawer-modes {
+  gap: 7px;
+}
+
+.relay-config-section label {
+  display: grid;
+  gap: 5px;
+  color: #5f5f5f;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.relay-config-section input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: #1e1e1e;
+  font-size: 12px;
+}
+
+.drawer-button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.drawer-flow {
+  margin: 0;
+}
+
+.room-header h1 {
+  margin: 3px 0 0;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.host-controls button:first-child {
+  border-color: #d0d0d0;
+  background: #f5f5f5;
+  color: #414141;
+}
+
+.host-message {
+  margin: 12px 18px 0;
+  padding: 9px 11px;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  background: #f7f7f7;
+  color: #444444;
+  font-size: 13px;
+}
+
+.status-pill.green {
+  color: #444444;
+  background: #f2f2f2;
+}
+
+.status-pill.blue {
+  color: #414141;
+  background: #f0f0f0;
+}
+
+.status-pill.yellow {
+  color: #4d4d4d;
+  background: #f4f4f4;
+}
+
+.status-pill.red {
+  color: #414141;
+  background: #f3f3f3;
+}
+
+.status-pill.dark {
+  color: #f9f9f9;
+  background: #2d2d2d;
+}
+
+.status-pill.muted {
+  color: #727272;
+  background: #f0f0f0;
+}
+
+.warning-banner button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.markdown-fallback {
+  display: grid;
+  gap: 9px;
+  margin: 14px 18px 0;
+  padding: 10px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #f9f9f9;
+}
+
+.markdown-fallback > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.markdown-fallback strong {
+  color: #2e2e2e;
+  font-size: 13px;
+}
+
+.markdown-fallback span {
+  color: #727272;
+  font-size: 12px;
+}
+
+.markdown-fallback textarea {
+  width: 100%;
+  min-height: 118px;
+  max-height: 220px;
+  resize: vertical;
+  padding: 9px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2e2e2e;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.markdown-fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.markdown-fallback-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2e2e2e;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.message-meta button:first-of-type {
+  margin-left: auto;
+}
+
+.attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 6px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 7px;
+  background: #f9f9f9;
+  color: inherit;
+  font-size: 12px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.attachment span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment small {
+  color: #727272;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.attachment:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.reaction-row button.active {
+  border-color: #ababab;
+  background: #f5f5f5;
+}
+
+.reaction-row small {
+  color: #646464;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.codex-server-request-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(620px, calc(100vw - 32px));
+}
+
+.codex-server-request-dialog label {
+  display: grid;
+  gap: 6px;
+}
+
+.codex-request-detail {
+  overflow: auto;
+  max-height: 220px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.codex-request-url {
+  display: inline-flex;
+  width: fit-content;
+  font-weight: 600;
+}
+
+.codex-background-request-indicator {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 0.78rem;
+}
+
+.approval-title,
+.approval-title div,
+.approval-actions,
+.panel-title,
+.project-card,
+.inspector-tabs {
+  display: flex;
+  align-items: center;
+}
+
+.approval-title {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.approval-title div {
+  gap: 8px;
+}
+
+.approval-item {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.approval-item span,
+.approval-item strong {
+  display: block;
+}
+
+.approval-item span {
+  color: #6f6f6f;
+  font-size: 12px;
+}
+
+.approval-risk-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #f6f6f6;
+}
+
+.approval-risk-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #111111;
+}
+
+.approval-risk-item {
+  padding: 8px 10px;
+  border: 1px solid #dcdcdc;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #3f3f3f;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.approval-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.approval-actions button,
+.composer button,
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-weight: 680;
+}
+
+.ghost.danger,
+.ghost-wide.danger {
+  border-color: #bdbdbd;
+  background: #f3f3f3;
+  color: #393939;
+}
+
+.approval-actions .primary,
+.composer .send {
+  border-color: #444444;
+  background: #444444;
+  color: #ffffff;
+}
+
+.approval-actions .secondary {
+  color: #343434;
+}
+
+.pending-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pending-attachments span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 7px;
+  border: 1px solid #dedede;
+  border-radius: 7px;
+  background: #f7f7f7;
+  color: #444444;
+  font-size: 12px;
+}
+
+.pending-attachments button {
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #444444;
+}
+
+.pending-attachments small {
+  display: inline-flex;
+  align-items: center;
+  color: #707070;
+  font-size: 11px;
+}
+
+.tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #505050;
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.inspector-tabs button.active .tab-badge {
+  background: #d6d6d6;
+  color: #161616;
+}

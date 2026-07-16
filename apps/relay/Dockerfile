@@ -1,5 +1,5 @@
 ARG NODE_IMAGE=node:24-bookworm-slim@sha256:cb4e8f7c443347358b7875e717c29e27bf9befc8f5a26cf18af3c3dec80e58c5
-ARG RUST_IMAGE=rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0
+ARG RUST_IMAGE=rust:1.89-bookworm@sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff
 ARG SOURCE_DATE_EPOCH=0
 FROM ${RUST_IMAGE} AS mls-validator
 WORKDIR /src/apps/desktop/src-tauri
@@ -63,4 +63,4 @@ EXPOSE 4321
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || '4321') + '/readyz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-CMD ["node", "apps/relay/dist/index.js"]
+CMD ["node", "apps/relay/dist/production-entrypoint.js"]

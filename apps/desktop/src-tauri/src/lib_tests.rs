@@ -507,12 +507,8 @@ fn browser_profile_scope_is_separate_per_project() {
 }
 
 #[test]
-fn room_browser_guard_script_blocks_clipboard_and_file_inputs() {
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("navigator.clipboard"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("writeText"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("input[type=file]"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("dragover"));
-    assert!(ROOM_BROWSER_GUARD_SCRIPT.contains("drop"));
+fn room_browser_guard_script_is_packaged_from_the_tested_source() {
+    assert_eq!(ROOM_BROWSER_GUARD_SCRIPT, include_str!("browser_guard.js"));
 }
 
 #[test]

@@ -61,9 +61,9 @@ console.log(
 function checkNode() {
   const major = Number(process.versions.node.split(".")[0]);
   checks.push({
-    ok: Number.isFinite(major) && major >= 22,
+    ok: Number.isFinite(major) && major >= 24,
     label: "node",
-    detail: `found ${process.version}; Node 22 or newer is expected`
+    detail: `found ${process.version}; Node 24 or newer is expected`
   });
 }
 
@@ -287,7 +287,7 @@ function checkCoreRelayConfig(config) {
     detail: !allowedOrigins
       ? "required: set exact app origins for credentialed CORS and browser WebSocket upgrades"
       : allowedOriginErrors.length === 0
-        ? "configured with exact http(s) origins"
+        ? "configured with exact browser or desktop origins"
         : `invalid: ${allowedOriginErrors.join("; ")}`
   });
   checks.push({
@@ -492,10 +492,11 @@ function validateAllowedOrigins(value) {
     }
     try {
       const parsed = new URL(origin);
-      if (!["http:", "https:"].includes(parsed.protocol)) {
-        errors.push(`${origin} must use http or https`);
+      const supportedDesktopOrigin = parsed.protocol === "tauri:" && parsed.hostname === "localhost" && !parsed.port;
+      if (!["http:", "https:"].includes(parsed.protocol) && !supportedDesktopOrigin) {
+        errors.push(`${origin} must use http, https, or the exact tauri://localhost desktop origin`);
       }
-      if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      if (!["", "/"].includes(parsed.pathname) || parsed.search || parsed.hash) {
         errors.push(`${origin} must be a bare origin without path, query, or hash`);
       }
       if (parsed.username || parsed.password) {

@@ -1,4 +1,4 @@
-import React, { useMemo, type ComponentProps } from "react";
+import React, { useMemo } from "react";
 import {
   defaultCodexSandboxLevel,
   maxEmbeddedAttachmentBytesPerMessage,
@@ -6,11 +6,14 @@ import {
 } from "@multaiplayer/protocol";
 import { RoomMainColumn } from "../components/RoomMainColumn";
 import { GuidedFirstTurn, type GuidedActivityKind, type GuidedFirstTurnPhase } from "../components/GuidedFirstTurn";
-import { useAppStore } from "../store/appStore";
-import { useShallow } from "zustand/react/shallow";
+import { useAppStore, type AppStoreState } from "../store/appStore";
 import { loadOrCreateDeviceId } from "../application/runtime/appRuntime";
 import { canApproveCodexTurn } from "../lib/codex/codexApproval";
-import { formatApprovalAttachments, formatApprovalMessages } from "../presentation/codex/codexApprovalSummary";
+import {
+  buildHighPrivilegeLabels,
+  formatApprovalAttachments,
+  formatApprovalMessages
+} from "../presentation/codex/codexApprovalSummary";
 import {
   embeddedAttachmentBytes,
   formatBytes,
@@ -34,9 +37,6 @@ import {
 } from "../presentation/chat/chatDisplayRows";
 import { detectCodexTurnRiskFlags } from "../lib/codex/codexTurn";
 import { buildRoomNotices } from "./roomNotices";
-import { selectRoomMainColumnView } from "../application/views/containerViewSelectors";
-import { buildRoomMainColumnCapabilities } from "./containerCapabilities";
-import { buildHighPrivilegeLabels, buildQueuedCodexTurnRows } from "../presentation/containers/containerPropBuilders";
 import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
 import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibilityWarning";
 import type { createAppRoomPanelActions } from "./appRoomPanelActions";
@@ -52,46 +52,8 @@ import {
 import { useRoomMainColumnInteractions } from "./useRoomMainColumnInteractions";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
-type MainColumnProps = ComponentProps<typeof RoomMainColumn>;
-type HeaderProps = MainColumnProps["headerProps"];
-type ChatProps = MainColumnProps["chatProps"];
-
-export interface RoomMainColumnCapabilities {
-  header: Pick<
-    HeaderProps,
-    | "onSetHost"
-    | "onRenameRoom"
-    | "onSelectModel"
-    | "onSelectReasoningEffort"
-    | "onSelectSpeed"
-    | "onCopyRoomMarkdown"
-    | "onCopySelectedMarkdown"
-    | "onShareLocalPreview"
-  > & { onOpenRoomBrowser: () => void };
-  chat: Pick<
-    ChatProps,
-    | "onCopyMessageMarkdown"
-    | "onOpenAttachment"
-    | "onToggleReaction"
-    | "onEditMessage"
-    | "onDeleteMessage"
-    | "onDenyApproval"
-    | "onApproveApproval"
-    | "onInvokeCodex"
-    | "onRemovePendingAttachment"
-    | "onPauseGoal"
-    | "onResumeGoal"
-    | "onEditGoal"
-    | "onDeleteGoal"
-    | "onTickGoalElapsed"
-    | "onOpenLocalPreview"
-    | "onCopyLocalPreviewLink"
-    | "onStopLocalPreview"
-    | "onCancelQueuedCodexTurn"
-    | "onSendMessage"
-  >;
-  retryMarkdownCopy: (title: string, markdown: string, roomId: string) => void;
-}
+const noMessages: NonNullable<AppStoreState["messagesByRoom"][string]> = [];
+const noPreviews: NonNullable<NonNullable<AppStoreState["localPreviewByRoom"][string]>["previews"]> = [];
 
 type RoomRuntime = ReturnType<typeof useRoomRuntimeContext>;
 type WorkspaceFlow = ReturnType<typeof useWorkspaceFlowContext>;
@@ -124,26 +86,24 @@ export function useRoomMainColumnComposition({
   sources: RoomMainColumnSources;
   selectedRoom: ClientRoomRecord;
 }) {
-  const capabilities = useMemo(() => buildRoomMainColumnCapabilities(sources), [sources]);
-  const {
-    teams,
-    selectedTeam,
-    selectedRoomId,
-    selectedRoom: _storeSelectedRoom,
-    hasSelectedRoom,
-    messages,
-    chat,
-    settings,
-    codex,
-    previews,
-    fallback,
-    inspectorTab,
-    forgotten,
-    revoked,
-    codexProbe,
-    currentUser
-  } = useAppStore(useShallow(selectRoomMainColumnView));
   const roomId = selectedRoom.id;
+  const teams = useAppStore((state) => state.teams);
+  const selectedTeam = useAppStore((state) => state.selectedTeam);
+  const selectedRoomId = useAppStore((state) => state.selectedRoomId);
+  const hasSelectedRoom = selectedRoomId != null;
+  const messages = useAppStore((state) => state.messagesByRoom[roomId] ?? noMessages);
+  const chat = useAppStore((state) => state.roomChatByRoom[roomId]);
+  const settings = useAppStore((state) => state.roomSettingsByRoom[roomId]);
+  const codex = useAppStore((state) => state.codexRuntimeByRoom[roomId]);
+  const previews = useAppStore((state) => state.localPreviewByRoom[roomId]?.previews ?? noPreviews);
+  const fallback = useAppStore((state) => state.filePanelByRoom[roomId]?.markdownCopyFallback ?? null);
+  const inspectorTab = useAppStore((state) => state.historyPresenceByRoom[roomId]?.inspectorTab ?? "files");
+  const forgotten = useAppStore((state) => state.forgottenRoomIds.has(roomId));
+  const revoked = useAppStore(
+    (state) => state.revokedRoomIds.has(roomId) || state.revokedTeamIds.has(selectedRoom.teamId)
+  );
+  const codexProbe = useAppStore((state) => state.codexProbe);
+  const currentUser = useAppStore((state) => state.currentUser);
   const onboarding = useAppStore((state) => state.onboarding);
 
   const localDeviceId = React.useMemo(() => loadOrCreateDeviceId(), []);
@@ -163,16 +123,13 @@ export function useRoomMainColumnComposition({
   } = deriveMainColumnValues(chat, codex, messages);
   const resolvedSettings = resolveCodexRunSettings(selectedRoom, codexProbe);
 
-  const { onOpenRoomBrowser, ...headerCapabilities } = capabilities.header;
+  const onOpenRoomBrowser = sources.roomRuntime.openRoomBrowserNow;
   const {
     onSelectTeam,
     onSelectInspectorTab,
     onToggleMarkdownSelection,
     onClearSelectedMessages,
     onToggleMessageSelection,
-    onOpenFileSelector,
-    onReplyToMessage,
-    onCancelReply,
     onDraftChange,
     onAcknowledgeSecretWarning,
     onDismissMarkdownFallback,
@@ -182,7 +139,14 @@ export function useRoomMainColumnComposition({
     selectedRoomId,
     fallback,
     onOpenRoomBrowser,
-    retryMarkdownCopy: capabilities.retryMarkdownCopy
+    retryMarkdownCopy: (title, markdown, retryRoomId) => {
+      void sources.workspaceFlow.copyMarkdownWithFallback(
+        title,
+        markdown,
+        (message) => useAppStore.getState().setChatMessageForRoom(retryRoomId, message),
+        retryRoomId
+      );
+    }
   });
   const chatMessageRows = useMemo(
     () =>
@@ -224,7 +188,14 @@ export function useRoomMainColumnComposition({
       onSelectInspectorTab,
       onToggleMarkdownSelection,
       onClearSelectedMessages,
-      ...headerCapabilities
+      onSetHost: sources.hostHandoff.setRoomHost,
+      onRenameRoom: sources.roomRuntime.renameRoom,
+      onSelectModel: sources.roomRuntime.setCodexModel,
+      onSelectReasoningEffort: sources.roomRuntime.setCodexReasoningEffort,
+      onSelectSpeed: sources.roomRuntime.setCodexSpeed,
+      onCopyRoomMarkdown: sources.workspaceFlow.copyRoomMarkdown,
+      onCopySelectedMarkdown: sources.workspaceFlow.copySelectedMessagesMarkdown,
+      onShareLocalPreview: sources.roomRuntime.openLocalPreviewDialog
     };
   }
   const headerProps = composeHeaderProps();
@@ -279,7 +250,7 @@ export function useRoomMainColumnComposition({
       replyTarget: composeReplyTarget(),
       roomGoal: codex?.goal ?? null,
       pendingAttachments: pendingAttachmentRows,
-      queuedCodexTurns: buildQueuedCodexTurnRows(
+      queuedCodexTurns: queuedCodexTurnRows(
         queuedApprovals,
         currentMessagesSinceLastCodex,
         roomLocked,
@@ -292,11 +263,9 @@ export function useRoomMainColumnComposition({
         `${formatBytes(embeddedAttachmentBytes(pendingAttachments))}/${formatBytes(maxEmbeddedAttachmentBytesPerMessage)}`,
       markdownSelectionMode,
       onToggleMessageSelection,
-      onOpenFileSelector,
-      onReplyToMessage,
-      onCancelReply,
-      onDraftChange,
-      ...capabilities.chat,
+      ...sources.chatActions,
+      onRemovePendingAttachment: sources.workspaceFlow.removePendingAttachment,
+      onSendMessage: sources.roomRuntime.sendMessage,
       guidedFirstTurn
     };
   }
@@ -354,4 +323,17 @@ function focusApprovalCard() {
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     block: "center"
   });
+}
+
+function queuedCodexTurnRows<
+  T extends { turnId: string; requestedBy: string; requestedByUserId: string; queuedAt: string }
+>(turns: T[], messagesSinceLastCodex: number, roomLocked: boolean, localUserId: string, hostUserId?: string) {
+  return turns.map((turn) => ({
+    turnId: turn.turnId,
+    requestedBy: turn.requestedBy,
+    requestedByUserId: turn.requestedByUserId,
+    queuedAt: turn.queuedAt,
+    messagesSinceLastCodex,
+    canCancel: !roomLocked && (turn.requestedByUserId === localUserId || hostUserId === localUserId)
+  }));
 }

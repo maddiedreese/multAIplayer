@@ -105,11 +105,10 @@ fn host_responses_are_reduced_to_safe_display_fields() {
         json!({ "accountType": "chatgpt", "email": "dev@example.com", "planType": "plus" })
     );
     let apps = parse_apps(&json!({ "data": [{ "id": "drive", "name": "Drive", "isEnabled": true, "isAccessible": true, "installUrl": "https://secret.invalid" }] })).expect("apps");
-    assert!(serde_json::to_value(apps)
+    assert!(!serde_json::to_value(apps)
         .expect("serialize apps")
         .to_string()
-        .find("installUrl")
-        .is_none());
+        .contains("installUrl"));
 }
 
 #[test]

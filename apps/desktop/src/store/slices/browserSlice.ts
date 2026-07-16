@@ -124,10 +124,7 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
           activeTabId: activeTab.id,
           activeUrl: activeTab.url,
           status: {
-            profilePath: "Embedded in this room",
-            downloadsBlocked: false,
-            clipboardBlocked: false,
-            fileUploadsBlocked: false
+            profilePath: "Embedded in this room"
           }
         };
       })
@@ -177,10 +174,7 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
         return {
           ...nextRoom,
           status: {
-            profilePath,
-            downloadsBlocked: false,
-            clipboardBlocked: false,
-            fileUploadsBlocked: false
+            profilePath
           }
         };
       })

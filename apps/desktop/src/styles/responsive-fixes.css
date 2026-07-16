@@ -1,0 +1,91 @@
+/* Settings drawers must remain fully usable at every supported native width. */
+.sidebar-drawer .drawer-content {
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 16px 18px 48px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.sidebar-drawer .drawer-section,
+.sidebar-drawer .drawer-section * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.sidebar-drawer .history-retention {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.sidebar-drawer .drawer-section :where(input:not([type="checkbox"]), select, textarea, button) {
+  width: 100%;
+}
+
+.sidebar-drawer :where(.checkbox-row, .history-defaults) :where(span, strong),
+.model-options button span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Keep native browser content below the complete tab strip. */
+.browser-panel :where(.browser-tabs) {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding-block: 4px 10px;
+  overflow-y: visible;
+}
+
+.browser-panel :where(.browser-tab) {
+  height: 34px;
+  flex-basis: min(220px, calc(100% - 12px));
+}
+
+.browser-panel :where(.browser-viewport) {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+}
+
+/* Reply is one stable text control; icon actions remain compact squares. */
+.message-meta :where(.message-reply-button) {
+  width: auto;
+  min-width: 64px;
+  height: 32px;
+  padding-inline: 12px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.app-shell .xterm,
+.app-shell .xterm * {
+  font-family: var(--font-mono) !important;
+}
+
+/* Native room settings use the same fluid sizing as the drawer. */
+.inspector :where(.history-panel, .model-panel),
+.inspector :where(.history-panel, .model-panel) * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.inspector .history-retention {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.inspector .history-retention :where(input, select),
+.inspector .model-panel :where(input, select) {
+  width: 100%;
+}
+
+.inspector .history-panel {
+  padding-bottom: 32px;
+}

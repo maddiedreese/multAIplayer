@@ -1,0 +1,361 @@
+/* Narrow inspector forms and controls. */
+
+.inspector .panel,
+.history-panel,
+.git-approval-panel,
+.members-panel {
+  font-size: 13px;
+}
+
+.ghost-wide,
+.primary-wide {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.primary-wide svg,
+.ghost-wide svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.checkbox-row {
+  border: 1px solid #e4e4e4;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-color: var(--border);
+  border-radius: 9px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 520;
+  line-height: 1.28;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #7f7f7f;
+}
+
+.checkbox-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.model-panel .checkbox-row input[type="checkbox"] {
+  width: 16px;
+  min-height: 16px;
+  padding: 0;
+}
+
+.model-panel .checkbox-row small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-weight: 450;
+}
+
+.history-panel .panel-title,
+.members-panel .panel-title,
+.git-approval-panel .panel-title {
+  margin-bottom: 2px;
+}
+
+.history-retention input,
+.history-retention select {
+  box-sizing: border-box;
+  border: 1px solid #dcdcdc;
+  outline: none;
+  min-width: 0;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border-color: var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: 520 13px/1.2 var(--font-sans);
+}
+
+.history-retention select,
+.model-panel select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 30px;
+}
+
+.history-defaults .ghost-wide {
+  width: 100%;
+}
+
+.browser-panel textarea,
+.invite-panel textarea {
+  width: 100%;
+  min-height: 74px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: 12px/1.35 var(--font-mono);
+  resize: vertical;
+}
+
+.member-row strong,
+.member-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-row strong {
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.member-row small {
+  margin-top: 2px;
+  color: #727272;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.member-row i {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--text);
+  display: none;
+}
+
+.git-approval-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.git-approval-preview {
+  display: grid;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  gap: 10px;
+  padding: 12px;
+  border-color: var(--border);
+  background: var(--surface-strong);
+}
+
+.git-approval-preview > strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.git-approval-step {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 10px;
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.git-approval-step span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.git-approval-step small {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-approval-step code {
+  font-size: 11px;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  font: 11px/1.35 var(--font-mono);
+  white-space: pre;
+}
+
+.project-card {
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 13px 14px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.project-card > div {
+  min-width: 0;
+}
+
+.project-card strong,
+.project-card span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-path-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.project-path-editor label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.project-path-editor input {
+  outline: none;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: 12px/1.2 var(--font-mono);
+}
+
+.project-path-editor > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-path-editor .ghost-wide,
+.project-path-editor .primary-wide {
+  min-width: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.project-path-editor .ghost-wide {
+  min-height: 40px;
+  padding-inline: 12px;
+}
+
+.project-path-editor .primary-wide {
+  grid-column: 1 / -1;
+}
+
+.file-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  min-width: 0;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.file-search input,
+.search-box input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-row,
+.diff-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 8px 9px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  font-size: 12px;
+  text-align: left;
+}
+
+.file-row span,
+.diff-row span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row small,
+.diff-row small {
+  white-space: nowrap;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #ffffff;
+  height: 42px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  box-shadow: none;
+  min-width: 0;
+  padding-inline: 12px;
+}
+
+.team-button strong,
+.team-button span,
+.sidebar-room strong,
+.sidebar-room span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

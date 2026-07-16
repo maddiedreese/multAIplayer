@@ -23,18 +23,11 @@ type AppStoreActionName = {
   [Key in keyof AppStoreState]: AppStoreState[Key] extends (...args: never[]) => unknown ? Key : never;
 }[keyof AppStoreState];
 
-const storeActionCache = new Map<AppStoreActionName, AppStoreState[AppStoreActionName]>();
-
 function storeAction<Key extends AppStoreActionName>(name: Key): AppStoreState[Key] {
-  const cached = storeActionCache.get(name);
-  if (cached) return cached as AppStoreState[Key];
-
-  const action = ((...args: unknown[]) => {
+  return ((...args: unknown[]) => {
     const action = useAppStore.getState()[name] as (...actionArgs: unknown[]) => unknown;
     return action(...args);
   }) as AppStoreState[Key];
-  storeActionCache.set(name, action);
-  return action;
 }
 
 export function createRoomActions({

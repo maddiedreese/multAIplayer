@@ -12,7 +12,7 @@ hosted relay. The [documentation map](docs/README.md) routes deeper reading.
 ## First pull request
 
 Use the Dev Container for the shortest reproducible setup. For a local checkout,
-install Node.js 22 or newer (`nvm use` uses the same version family as CI), then:
+install Node.js 24 or newer (`nvm use` uses the same version family as CI) and Rust 1.89 (`rustup` reads the repository's `rust-toolchain.toml`), then:
 
 ```sh
 npm install --global npm@11.16.0 --ignore-scripts
@@ -182,8 +182,12 @@ and removal condition.
 
 Release artifacts come only from a validated tag through `release.yml`. The
 workflow keeps the GitHub Release in draft state until the blocking native
-two-client journey, signed/notarized build, authenticated metadata and updater
-archive, checksums, and release-asset contract all pass. The protected
+two-client journey, full supply-chain workflow against the exact tagged commit,
+signed/notarized build, authenticated metadata and updater archive, checksums,
+and release-asset contract all pass. `CHANGELOG.md` is curated under
+`Unreleased`; release automation versions that reviewed section and uses it as
+the public GitHub Release body instead of synthesizing notes from internal
+commits. The protected
 `public-alpha-release` environment gates the
 publishing deployment. GitHub records deployment status, timestamps, and reviewer
 identity when required reviewers are configured; it does not durably capture the

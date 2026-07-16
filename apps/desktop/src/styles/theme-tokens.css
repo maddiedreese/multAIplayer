@@ -1,0 +1,341 @@
+/* Theme tokens and core monochrome surfaces. */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #f4f4f4;
+  background: #0f0f0f;
+  --bg: #0f0f0f;
+  --sidebar: #141414;
+  --surface: #101010;
+  --surface-strong: #181818;
+  --surface-muted: #1f1f1f;
+  --text: #f4f4f4;
+  --text-muted: #a7a7a7;
+  --text-soft: #767676;
+  --border: #303030;
+  --border-strong: #4a4a4a;
+  --accent: #f4f4f4;
+  --accent-soft: #242424;
+  --green: #f4f4f4;
+  --green-soft: #202020;
+  --red: #d7d7d7;
+  --red-soft: #242424;
+  --shadow: none;
+  --button-bg: #151515;
+  --code-bg: #050505;
+  --code-text: #f4f4f4;
+}
+
+.sidebar,
+.inspector {
+  background: var(--sidebar);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  color: #fdfdfd;
+  font-weight: 760;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+}
+
+.github-button,
+.profile-card,
+.search-box,
+.team-button,
+.sidebar-room,
+.sidebar-footer button,
+.panel,
+.composer textarea,
+.composer button,
+.room-header select,
+.header-copy,
+.host-controls,
+.room-tool-nav button,
+.inspector-tabs,
+.workflow-message,
+.warning-banner,
+.project-card,
+.member-row,
+.terminal-request,
+.browser-request,
+.actions-summary,
+.empty-state,
+.sidebar-empty {
+  box-shadow: none !important;
+}
+
+.room-subtitle span {
+  color: var(--text-muted);
+}
+
+.room-tool-nav button:hover,
+.room-tool-nav button.active {
+  opacity: 1;
+}
+
+.host-controls button,
+.header-copy,
+.header-model-switcher select {
+  font-size: 13px;
+}
+
+.host-controls button:first-child:not(:disabled),
+.composer .send,
+.primary-wide {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
+}
+
+.warning-banner,
+.actions-summary.yellow {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.bubble {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-width: 0;
+}
+
+.message.codex .avatar {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.bubble,
+.message.codex .bubble,
+.message.selected .bubble {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.reaction-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  min-width: 30px;
+  min-height: 24px;
+  border-color: transparent;
+  color: var(--text-muted);
+  border: 0;
+  background: transparent;
+}
+
+.room-goal {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.room-goal-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.room-goal-status span {
+  color: var(--text-muted);
+}
+
+.room-goal p {
+  grid-column: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-goal-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.room-goal-actions button,
+.room-goal-edit button {
+  display: inline-flex;
+  min-width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 7px;
+}
+
+.room-goal-edit {
+  grid-column: 1;
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+}
+
+.room-goal-edit input {
+  min-width: 0;
+  flex: 1;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+}
+
+.composer-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.codex-follow-up-behavior {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 640;
+}
+
+.codex-follow-up-behavior select {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.composer .send {
+  border-radius: 7px;
+}
+
+.inspector-tabs {
+  display: grid;
+  border: 1px solid var(--border);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.inspector-tabs button {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 680;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  gap: 5px;
+  justify-content: center;
+  padding: 9px 5px;
+  border-radius: 6px;
+  text-transform: none;
+}
+
+.inspector-tabs button.active {
+  border-color: #161616;
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(33, 33, 33, 0.08);
+  background: var(--surface-strong);
+}
+
+.tab-badge,
+.sidebar-room .attention,
+.sidebar-room .unread,
+.panel-count {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.primary-wide,
+.composer .send {
+  color: var(--bg) !important;
+}
+
+.actions-summary.green,
+.browser-request.approved,
+.terminal-request.approved {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.diff-code {
+  overflow: auto;
+  max-height: 420px;
+  padding: 8px 0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  background: var(--code-bg);
+  color: var(--code-text);
+}
+
+.diff-code-line.add,
+.diff-row b {
+  color: var(--text);
+}
+
+.diff-code-line.remove,
+.diff-row i {
+  color: var(--text-muted);
+}
+
+@media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 260px minmax(420px, 1fr) 360px;
+  }
+
+  .room-header {
+    grid-template-columns: 1fr;
+  }
+
+  .room-tool-nav {
+    justify-content: flex-start;
+  }
+}

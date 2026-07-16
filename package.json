@@ -7,7 +7,7 @@
   "type": "module",
   "packageManager": "npm@11.16.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true,
@@ -27,11 +27,11 @@
     "build:apps": "npm run build -w @multaiplayer/relay && npm run build -w @multaiplayer/desktop",
     "check": "npm run build:packages && npm run check --workspaces --if-present",
     "lint": "eslint eslint.config.mjs \"{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs}\"",
-    "format": "prettier --write eslint.config.mjs \"{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs}\"",
-    "format:check": "prettier --check eslint.config.mjs \"{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs}\"",
+    "format": "prettier --write eslint.config.mjs \"{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs,css}\"",
+    "format:check": "prettier --check eslint.config.mjs \"{apps,packages,scripts,e2e,tools}/**/*.{ts,tsx,mjs,css}\"",
     "test:error-handling-lint": "node --test tools/eslint/*.test.mjs",
     "test:workspaces": "npm run test --workspaces --if-present",
-    "test:release-tools": "node --test tools/release/release-assets.test.mjs tools/release/release-publication.test.mjs tools/release/sync-release-metadata.test.mjs",
+    "test:release-tools": "node --test tools/release/*.test.mjs",
     "audit:npm": "npm audit --audit-level=high",
     "test": "npm run build:packages && npm run test:error-handling-lint && npm run test:workspaces",
     "test:e2e": "node scripts/run-e2e.mjs",
@@ -49,6 +49,7 @@
     "check:release-versions": "node scripts/check-release-versions.mjs",
     "doctor": "node scripts/doctor.mjs",
     "sync:release-versions": "node tools/release/sync-release-metadata.mjs",
+    "finalize:release-changelog": "node tools/release/finalize-changelog.mjs",
     "license:check": "node scripts/license-check.mjs",
     "sqlite:backup-restore-drill": "node --import tsx e2e/relay/sqlite-backup-restore-drill.mjs --fixture",
     "verify:release-assets": "node tools/release/check-release-assets.mjs",

@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import "../../apps/desktop/src/styles.css";
+import "../../apps/desktop/src/styles/index.css";
 import "./styles.css";
 
 export interface UiContractScenarioModule {

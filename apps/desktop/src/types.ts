@@ -105,9 +105,6 @@ export interface WorkspaceFileSaveRequest extends WorkspaceFileSaveRequestPlaint
 
 export interface BrowserStatus {
   profilePath: string | null;
-  downloadsBlocked: boolean;
-  clipboardBlocked: boolean;
-  fileUploadsBlocked: boolean;
 }
 
 export interface InviteJoinRequest {

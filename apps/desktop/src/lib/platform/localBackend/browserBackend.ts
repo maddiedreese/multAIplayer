@@ -24,8 +24,7 @@ export async function openBrowserView(
     profilePath: "Preview browser opens outside the native room profile.",
     persistent,
     downloadsBlocked: false,
-    clipboardBlocked: false,
-    fileUploadsBlocked: false
+    pageGuardInstalled: false
   };
 }
 

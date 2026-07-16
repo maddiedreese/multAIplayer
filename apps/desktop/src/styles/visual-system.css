@@ -1,0 +1,730 @@
+/* Final visual-system pass: one neutral palette, one typeface, and one control language. */
+.app-shell,
+.app-shell *,
+.modal-backdrop,
+.modal-backdrop * {
+  font-family: var(--font-sans) !important;
+}
+
+/* Terminal cells require monospaced metrics to stay aligned and readable. */
+.xterm,
+.xterm * {
+  font-family: var(--font-mono) !important;
+}
+
+input[type="checkbox"],
+input[type="radio"],
+.message-select input,
+.checkbox-row input[type="checkbox"] {
+  accent-color: var(--text);
+}
+
+.update-banner,
+.update-banner.security,
+.device-flow,
+.auth-error,
+.workspace-error,
+.warning-banner,
+.actions-summary,
+.workflow-message,
+.browser-request,
+.terminal-request,
+.room-notice,
+.approval-card {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.device-flow a,
+.panel-state.available,
+.panel-state.attention,
+.browser-policy-state strong,
+.actions-summary.green,
+.actions-summary.red,
+.actions-summary.yellow,
+.workflow-message.danger,
+.ghost.danger,
+.ghost-wide.danger,
+.browser-request.approved,
+.browser-request.denied,
+.terminal-request.approved,
+.terminal-request.denied {
+  color: var(--text);
+}
+
+.browser-policy-state span::before,
+.codex-activity-marker,
+.codex-activity-timeline li[data-status="completed"] .codex-activity-marker {
+  background: var(--text);
+}
+
+.terminal-command-line input::selection {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.codex-tree-icon {
+  display: inline-grid;
+  width: 16px;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.app-shell button,
+.modal button,
+.app-shell input,
+.app-shell textarea,
+.app-shell select {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.app-shell button,
+.modal button {
+  border-radius: 8px;
+}
+
+.app-shell button:hover:not(:disabled),
+.modal button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.icon-only,
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+}
+
+.icon-only svg,
+.icon-button svg,
+button svg {
+  stroke-width: 1.8;
+}
+
+/* Canonical UI typography: sentence case, one scale, and three semantic weights. */
+.app-shell :where(button, input, textarea, select, option, label, p, li, dt, dd, span, strong, small),
+.modal-backdrop :where(button, input, textarea, select, option, label, p, li, dt, dd, span, strong, small) {
+  font-family: var(--font-sans) !important;
+  font-style: normal;
+  text-transform: none;
+}
+
+.app-shell :where(button, input, textarea, select, option, label),
+.modal-backdrop :where(button, input, textarea, select, option, label) {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.app-shell :where(strong, dt, .panel-title, .drawer-section-title, .section-title),
+.modal-backdrop :where(strong, dt) {
+  font-weight: 650;
+}
+
+.app-shell :where(small, .panel-state, .panel-count),
+.modal-backdrop :where(small) {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Resumable first-run setup and in-room guidance. */
+.onboarding-assistant {
+  min-height: 100vh;
+  overflow: auto;
+  padding: clamp(18px, 4vw, 48px);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.onboarding-shell {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.onboarding-topbar,
+.onboarding-brand,
+.onboarding-actions,
+.onboarding-input-action,
+.onboarding-readiness-row,
+.onboarding-recovery,
+.onboarding-join-state,
+.guided-first-turn > header,
+.guided-approval,
+.setup-checklist > header {
+  display: flex;
+  align-items: center;
+}
+
+.onboarding-topbar {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.onboarding-brand {
+  gap: 9px;
+  font-weight: 700;
+}
+
+.onboarding-brand-mark,
+.onboarding-hero-icon,
+.onboarding-intent-icon,
+.onboarding-status-icon,
+.onboarding-safety-list > div > span,
+.guided-first-turn-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.onboarding-brand-mark,
+.onboarding-status-icon,
+.onboarding-safety-list > div > span,
+.guided-first-turn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.onboarding-brand-mark {
+  display: block;
+  border: 0;
+  background: transparent;
+  object-fit: contain;
+}
+
+.onboarding-text-button,
+.onboarding-back {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.onboarding-text-button:hover:not(:disabled),
+.onboarding-back:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.onboarding-progress,
+.setup-checklist-meter {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.onboarding-progress > span,
+.setup-checklist-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text);
+  transition: width 180ms ease;
+}
+
+.onboarding-card {
+  margin-top: 14px;
+  padding: clamp(24px, 6vw, 54px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.07);
+}
+
+.onboarding-step {
+  display: grid;
+  gap: 18px;
+}
+
+.onboarding-welcome {
+  text-align: center;
+}
+
+.onboarding-hero-icon {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 15px;
+  background: transparent;
+}
+
+.onboarding-hero-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.onboarding-heading > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.onboarding-heading h1 {
+  margin: 5px 0 0;
+  color: var(--text);
+  font-size: clamp(26px, 5vw, 38px);
+  line-height: 1.08;
+  outline: none;
+}
+
+.onboarding-lede {
+  max-width: 580px;
+  margin: 0 auto;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.onboarding-form-note {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.onboarding-intents,
+.onboarding-readiness,
+.onboarding-safety-list,
+.guided-starters,
+.guided-activity ul {
+  display: grid;
+  gap: 10px;
+}
+
+.onboarding-intents button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 13px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.onboarding-intents button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.onboarding-intent-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.onboarding-intents strong,
+.onboarding-intents small,
+.onboarding-readiness-row strong,
+.onboarding-readiness-row small,
+.onboarding-safety-list strong,
+.onboarding-safety-list small,
+.onboarding-join-state strong,
+.onboarding-join-state small,
+.guided-first-turn header strong,
+.guided-first-turn header small,
+.guided-approval strong,
+.guided-approval small,
+.setup-checklist header strong,
+.setup-checklist header small,
+.setup-checklist li small {
+  display: block;
+}
+
+.onboarding-intents small,
+.onboarding-readiness-row small,
+.onboarding-safety-list small,
+.onboarding-field small,
+.onboarding-join-state small,
+.guided-first-turn small,
+.setup-checklist small {
+  margin-top: 3px;
+  color: var(--text-muted);
+}
+
+.onboarding-explore {
+  justify-self: center;
+}
+
+.onboarding-readiness-row {
+  min-height: 62px;
+  gap: 12px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.onboarding-readiness-row > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.onboarding-readiness-row > button,
+.guided-approval button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.onboarding-readiness-row[data-status="ready"] .onboarding-status-icon,
+.onboarding-safety-list > div > span,
+.guided-first-turn-icon {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.onboarding-auth-explainer,
+.onboarding-auth-flow,
+.onboarding-recovery,
+.onboarding-join-state,
+.onboarding-message,
+.guided-approval {
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.onboarding-auth-flow {
+  display: grid;
+  gap: 12px;
+}
+
+.onboarding-auth-flow small,
+.onboarding-auth-code span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+}
+
+.onboarding-auth-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 12px;
+  align-items: center;
+}
+
+.onboarding-auth-code span {
+  flex-basis: 100%;
+}
+
+.onboarding-auth-code strong {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.09em;
+  user-select: text;
+}
+
+.onboarding-auth-code button,
+.onboarding-auth-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.onboarding-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.onboarding-auth-actions a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.onboarding-auth-fallback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--danger);
+}
+
+.onboarding-auth-explainer p,
+.onboarding-safety-list p,
+.guided-first-turn p,
+.guided-activity p {
+  margin: 0;
+}
+
+.onboarding-auth-explainer p + p {
+  margin-top: 7px;
+}
+
+.onboarding-actions {
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 5px;
+}
+
+.onboarding-actions > :only-child {
+  margin-left: auto;
+}
+
+.onboarding-actions button,
+.onboarding-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+}
+
+.onboarding-primary {
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.onboarding-field {
+  display: grid;
+  gap: 7px;
+}
+
+.onboarding-field > label {
+  font-weight: 650;
+}
+
+.onboarding-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.onboarding-input-action {
+  gap: 8px;
+}
+
+.onboarding-input-action input {
+  flex: 1;
+}
+
+.onboarding-input-action button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.onboarding-recovery,
+.onboarding-join-state,
+.guided-approval {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.onboarding-join-state > span,
+.guided-approval > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.onboarding-safety-list > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+}
+
+.onboarding-advanced {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.onboarding-advanced summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.onboarding-advanced p {
+  margin: 9px 0 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.setup-checklist,
+.guided-first-turn {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.setup-checklist {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.setup-checklist > header,
+.guided-first-turn > header {
+  gap: 9px;
+}
+
+.setup-checklist > header > span,
+.guided-first-turn > header > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.setup-checklist > header > button,
+.guided-first-turn > header > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.setup-checklist ol,
+.guided-activity ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-checklist li,
+.guided-activity li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--text-muted);
+}
+
+.setup-checklist li[data-complete="true"],
+.guided-activity li[data-active="true"] {
+  color: var(--text);
+}
+
+.setup-checklist li > span,
+.guided-activity li > span {
+  flex: 1;
+}
+
+.setup-checklist-actions {
+  display: grid;
+  gap: 7px;
+}
+
+.guided-first-turn {
+  display: grid;
+  gap: 13px;
+  margin: 12px 16px;
+  padding: 14px;
+}
+
+.guided-starters button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: left;
+}
+
+.guided-activity li small {
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .onboarding-assistant {
+    padding: 0;
+    background: var(--bg);
+  }
+
+  .onboarding-topbar {
+    padding: 14px 16px 0;
+  }
+
+  .onboarding-progress {
+    margin: 0 16px;
+  }
+
+  .onboarding-card {
+    margin-top: 8px;
+    padding: 24px 16px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .onboarding-readiness-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .onboarding-readiness-row > button {
+    width: 100%;
+    margin-left: 44px;
+  }
+
+  .onboarding-actions {
+    align-items: stretch;
+  }
+
+  .onboarding-actions button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-progress > span,
+  .setup-checklist-meter > span {
+    transition: none;
+  }
+}
+
+.app-shell :where(h1) {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.app-shell :where(h2) {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.app-shell :where(h3) {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.3;
+}

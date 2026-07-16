@@ -135,7 +135,7 @@ The Browser panel opens a room/project-scoped in-app browser surface on the acti
 
 The browser profile persists by default so signed-in sites can work inside that isolated room/project context. Hosts can reset the profile or use refresh mode, which clears the room/project browser profile before each approved open.
 
-Browser opens requested by Codex or other room events go through the host approval boundary. The browser blocks downloads, page Clipboard API access, file inputs, and drag/drop uploads where the native platform allows it. Signed-in pages can still expose sensitive content to the room if the host shares or approves that context.
+Browser opens requested by Codex or other room events go through the host approval boundary. The native download callback denies downloads. A tested initialization guard rejects page Clipboard API calls and cancels file-input and drag/drop events, but that script is best-effort where WebKit or a page prevents injection. Signed-in pages can still expose sensitive content to the room if the host shares or approves that context.
 
 For sharing a running localhost web app through a public URL, see [local-preview-sharing.md](local-preview-sharing.md).
 

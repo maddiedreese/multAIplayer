@@ -11,7 +11,7 @@
     ".": {
       "package-name": "multAIplayer",
       "include-component-in-tag": false,
-      "changelog-path": "CHANGELOG.md",
+      "skip-changelog": true,
       "prerelease-type": "alpha",
       "draft": true,
       "force-tag-creation": true,

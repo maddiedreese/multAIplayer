@@ -1,6 +1,6 @@
 # Changelog
 
-All notable user-visible and security-relevant changes are recorded here. Release Please maintains future release sections from Conventional Commit messages.
+All notable user-visible and security-relevant changes are curated here. Release automation versions the reviewed `Unreleased` section without synthesizing notes from internal commits.
 
 ## [Unreleased]
 

@@ -418,9 +418,9 @@ function normalizeConfiguredOrigin(value: string): string | null {
   try {
     const parsed = new URL(value);
     if (!["", "/"].includes(parsed.pathname) || parsed.search || parsed.hash) return null;
+    if (parsed.username || parsed.password) return null;
     if (["http:", "https:"].includes(parsed.protocol)) return parsed.origin;
-    if (!/^[a-z][a-z0-9+.-]*:$/i.test(parsed.protocol) || !parsed.hostname) return null;
-    return `${parsed.protocol}//${parsed.host}`;
+    return parsed.protocol === "tauri:" && parsed.hostname === "localhost" && !parsed.port ? "tauri://localhost" : null;
   } catch {
     return null;
   }

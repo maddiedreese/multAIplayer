@@ -3,11 +3,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import React, { createElement } from "react";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { JSDOM } from "jsdom";
-import {
-  RoomMainColumnContainer,
-  type RoomMainColumnCapabilities,
-  type RoomMainColumnSources
-} from "../src/components/RoomMainColumnContainer";
+import { RoomMainColumnContainer, type RoomMainColumnSources } from "../src/components/RoomMainColumnContainer";
 import { useAppStore } from "../src/store/appStore";
 import { seededRooms, seededTeams } from "./support/workspaceFixtures";
 import type { ChatAttachment, ChatMessage, LocalPreviewRecord } from "../src/types";
@@ -63,7 +59,7 @@ const capabilities = {
     onSendMessage: noop
   },
   retryMarkdownCopy: noop
-} as RoomMainColumnCapabilities;
+};
 const sources = {
   roomRuntime: {
     renameRoom: capabilities.header.onRenameRoom,

@@ -7,47 +7,7 @@ use tauri::{webview::DownloadEvent, AppHandle, Manager, WebviewUrl, WebviewWindo
 
 use crate::validation::{ensure_room_id, validate_browser_url};
 
-pub(crate) const ROOM_BROWSER_GUARD_SCRIPT: &str = r#"
-(() => {
-  const blocked = () => Promise.reject(new DOMException("multAIplayer blocks room browser clipboard access by default.", "NotAllowedError"));
-  try {
-    if (navigator.clipboard) {
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: false,
-        enumerable: true,
-        value: Object.freeze({
-          read: blocked,
-          readText: blocked,
-          write: blocked,
-          writeText: blocked
-        })
-      });
-    }
-  } catch (_) {}
-
-  const isFileInput = (target) => {
-    if (!target || !target.closest) return false;
-    const input = target.closest("input[type=file]");
-    return Boolean(input);
-  };
-  const block = (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-
-  window.addEventListener("click", (event) => {
-    if (isFileInput(event.target)) block(event);
-  }, true);
-  window.addEventListener("change", (event) => {
-    if (isFileInput(event.target)) {
-      try { event.target.value = ""; } catch (_) {}
-      block(event);
-    }
-  }, true);
-  window.addEventListener("drop", block, true);
-  window.addEventListener("dragover", block, true);
-})();
-"#;
+pub(crate) const ROOM_BROWSER_GUARD_SCRIPT: &str = include_str!("browser_guard.js");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,8 +28,7 @@ pub(crate) struct BrowserOpenResult {
     profile_path: String,
     persistent: bool,
     downloads_blocked: bool,
-    clipboard_blocked: bool,
-    file_uploads_blocked: bool,
+    page_guard_installed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,8 +97,7 @@ pub(crate) fn open_browser_view(
                 profile_path: profile_dir.to_string_lossy().to_string(),
                 persistent,
                 downloads_blocked: true,
-                clipboard_blocked: true,
-                file_uploads_blocked: true,
+                page_guard_installed: true,
             });
         }
     }
@@ -168,8 +126,7 @@ pub(crate) fn open_browser_view(
         profile_path: profile_dir.to_string_lossy().to_string(),
         persistent,
         downloads_blocked: true,
-        clipboard_blocked: true,
-        file_uploads_blocked: true,
+        page_guard_installed: true,
     })
 }
 
