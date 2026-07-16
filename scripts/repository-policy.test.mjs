@@ -35,6 +35,11 @@ test("Rust advisory exceptions have an unexpired owner-reviewed policy that matc
   assert.match(policy.reviewBy, /^\d{4}-\d{2}-\d{2}$/);
   const reviewDeadline = Date.parse(`${policy.reviewBy}T23:59:59.999Z`);
   assert.ok(Number.isFinite(reviewDeadline), "Rust advisory reviewBy must be a valid UTC calendar date");
+  assert.equal(
+    new Date(reviewDeadline).toISOString().slice(0, 10),
+    policy.reviewBy,
+    "Rust advisory reviewBy must not normalize an impossible calendar date"
+  );
   assert.ok(Date.now() <= reviewDeadline, `Rust advisory exceptions expired on ${policy.reviewBy}`);
 
   const configuredExceptions = [
@@ -46,9 +51,15 @@ test("Rust advisory exceptions have an unexpired owner-reviewed policy that matc
   assert.deepEqual([...policy.denyExceptions].sort(), configuredExceptions);
 
   const documentedAdvisories = new Set(policy.advisoryGroups.flatMap((group) => group.advisoryIds));
+  const documentedPackages = new Set(policy.advisoryGroups.flatMap((group) => group.packages));
   for (const exception of policy.denyExceptions) {
     if (exception.startsWith("RUSTSEC-")) {
       assert.ok(documentedAdvisories.has(exception), `${exception} lacks structured ownership and reachability`);
+    } else if (exception.startsWith("crate:")) {
+      const packageIdentity = exception.slice("crate:".length).replace("@", " ");
+      assert.ok(documentedPackages.has(packageIdentity), `${exception} lacks structured ownership and reachability`);
+    } else {
+      assert.fail(`Unsupported Rust deny exception identity: ${exception}`);
     }
   }
   for (const group of policy.advisoryGroups) {
