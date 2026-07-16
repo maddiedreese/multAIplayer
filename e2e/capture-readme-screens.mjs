@@ -40,11 +40,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 940 }, deviceScaleFactor: 1 });
   await page.emulateMedia({ reducedMotion: "reduce" });
 
-  await page.goto(scenarioUrl("codex-chat-parity"));
-  await page.getByText("Codex worked", { exact: true }).click();
-  await page.getByText("Thinking", { exact: true }).click();
-  await settlePage(page);
-  await captureFeature(page, "codex-room.png");
+  await capture(page, "readme-chat", "room-chat.png");
   await capture(page, "readme-browser", "room-browser.png");
   await capture(page, "readme-terminal", "room-terminal.png");
 } finally {
@@ -65,6 +61,11 @@ async function captureFeature(page, filename) {
       .frameLocator('iframe[title="Room browser"]')
       .getByRole("heading", { name: /Ship the work/ })
       .waitFor();
+  }
+  if (filename === "room-terminal.png") {
+    await page.waitForFunction(() =>
+      globalThis.document.querySelector(".xterm-rows")?.textContent?.includes("VITE ready")
+    );
   }
   await settlePage(page);
   const dimensions = await feature.evaluate((element) => ({

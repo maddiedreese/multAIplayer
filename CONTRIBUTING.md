@@ -171,6 +171,14 @@ declare the same minimum window and record any reset.
 
 `ci.yml` contains fast blocking checks: workspace lint/type/test/build, relay authorization coverage, per-file desktop invite and host-handoff coverage floors, and Rust formatting/Clippy/tests. `journeys.yml` runs UI, deterministic security, native two-client, and macOS package evidence on `main`, tags, schedules, and pull requests that change executable product or journey code. Documentation-only edits do not start product journeys, and generated prose is not a merge gate. Coverage and journey jobs are controls that can fail; CI does not create report-only or routing-only jobs that look like verification.
 
+Desktop source files have an advisory 400-line ESLint ceiling. A warning names the
+specific file and overage so the next related change can extract a cohesive
+component or application action; warnings are visible but do not fail CI. Do not
+silence the warning by excluding or renaming a file. Journey path filters stay
+broad for executable product changes: timing failures are fixed at their
+polling/state boundary rather than worked around by narrowing triggers or blind
+reruns.
+
 Mutation testing, parser fuzzing, extended supply-chain scans, reproducibility comparisons, soak/restore drills, and the scheduled macOS two-client run are advisory or scheduled evidence. The relay mutation policy preserves the measured `authz.ts` 100%/zero-survivor baseline and the existing 60% score/survivor ceilings for session, WebSocket-admission, and room-route decisions, with an explicit 80% target. Each weekly shard fails visibly on tooling errors or regression below its checked-in baseline. The first run each month emits a reviewable candidate that advances score floors in five-point steps and never increases a survivor ceiling; maintainers review and commit justified advances rather than letting automation rewrite policy silently. Investigate regressions; do not turn them into a Tuesday bugfix blocker without deleting or demoting an existing blocking check. No new blocking check may be added without removing or demoting another one.
 
 The deterministic security journey fails if its Rust production boundary or
