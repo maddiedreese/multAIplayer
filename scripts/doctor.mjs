@@ -167,6 +167,7 @@ function checkProductionRelayEnv() {
 
 function readProductionRelayConfig() {
   return {
+    deletionLedgerFilePath: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH"),
     deletionLedgerEndpoint: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT"),
     deletionLedgerBucket: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET"),
     deletionLedgerRegion: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION"),
@@ -207,6 +208,7 @@ function readProductionRelayConfig() {
 
 function checkDeletionLedger(config) {
   const {
+    deletionLedgerFilePath,
     deletionLedgerEndpoint,
     deletionLedgerBucket,
     deletionLedgerRegion,
@@ -218,13 +220,13 @@ function checkDeletionLedger(config) {
     deletionLedgerProtectionSeconds
   } = config;
   const ledgerUnset =
+    !deletionLedgerFilePath &&
     !deletionLedgerEndpoint &&
     !deletionLedgerBucket &&
     !deletionLedgerRegion &&
     !deletionLedgerAccessKey &&
     !deletionLedgerSecretKey &&
-    !deletionLedgerHmacKey &&
-    !deletionLedgerUrlStyle;
+    !deletionLedgerHmacKey;
   const effectiveProtection = deletionProtection || (ledgerUnset ? "primary_only" : "restore_safe");
   if (effectiveProtection === "primary_only") {
     checks.push({

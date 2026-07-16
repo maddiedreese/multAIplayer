@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const doctorPath = fileURLToPath(new URL("../../../scripts/doctor.mjs", import.meta.url));
 const repositoryRoot = dirname(dirname(doctorPath));
 const ledgerEnvironmentNames = [
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
   "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
   "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
   "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
@@ -33,6 +34,12 @@ test("production doctor accepts primary-only deletion without external ledger cr
   const output = runDoctor({ MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only" });
   assert.match(output, /\[ok\] production account deletion protection: primary-only deletion configured/);
   assert.doesNotMatch(output, /\[fail\] production external deletion ledger/);
+
+  const fileLedgerOutput = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH: "/tmp/deletion-ledger.json"
+  });
+  assert.match(fileLedgerOutput, /\[fail\] production account deletion protection/);
 });
 
 test("production doctor requires distinct S3 transport and HMAC keys in restore-safe mode", () => {
