@@ -1,5 +1,6 @@
 import type { TeamMemberRecord, TeamRole } from "@multaiplayer/protocol";
 import type { RelayStore } from "./state.js";
+import { isActiveRoom } from "./relay-domain.js";
 
 export interface RelayAuthz {
   teamIdsForUser(userId: string): Set<string>;
@@ -48,7 +49,7 @@ export function createRelayAuthz(store: RelayStore): RelayAuthz {
       return members;
     },
     canAccessRoom(teamId, roomId, userId) {
-      return store.getRoom(roomId)?.teamId === teamId && isTeamMember(teamId, userId);
+      return isActiveRoom(store, teamId, roomId) && isTeamMember(teamId, userId);
     }
   };
 }

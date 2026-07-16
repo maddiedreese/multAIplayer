@@ -19,7 +19,7 @@ import { useFileTerminalDisplay } from "./useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "./useGitHubWorkflowState";
 import { useLocalIdentity } from "./useLocalIdentity";
 import { useRoomAccess } from "./useRoomAccess";
-import { approvalDelegationPolicyLabels, approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
+import { approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import { useAppStore } from "../store/appStore";
 import type { RoomInspectorSources } from "./roomInspectorCompositionTypes";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -243,15 +243,12 @@ export function useRoomInspectorComposition({
       encryptedInvite: composeEncryptedInviteProps(),
       approvalPolicy: {
         labels: approvalPolicyLabels,
-        delegationLabels: approvalDelegationPolicyLabels,
         sandboxOptions: codexSandboxLevelOptions,
         message: roomSettings.settingsMessage ?? null,
         selectedPolicy: selectedRoom.approvalPolicy,
-        selectedDelegationPolicy: selectedRoom.approvalDelegationPolicy,
         selectedSandboxLevel: model.selectedSandboxLevel,
         disabled: settingsDisabled,
         onSelectPolicy: capabilities.settings.selectApprovalPolicy,
-        onSelectDelegationPolicy: capabilities.settings.selectApprovalDelegationPolicy,
         onSelectSandboxLevel: capabilities.settings.selectSandboxLevel
       },
       model: {

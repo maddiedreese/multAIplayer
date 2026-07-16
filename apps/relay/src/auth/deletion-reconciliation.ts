@@ -5,6 +5,7 @@ import {
 } from "./account-deletion.js";
 import type { DeletionLedger, DeletionLedgerEntry } from "./deletion-ledger.js";
 import type { RelayStore } from "../state.js";
+import { revokeRoomInvites, revokeTeamInviteArtifacts } from "../relay-domain.js";
 
 export class DeletionReconciliationBlockedError extends Error {
   override readonly name = "DeletionReconciliationBlockedError";
@@ -12,7 +13,9 @@ export class DeletionReconciliationBlockedError extends Error {
     readonly subject: string,
     readonly blockers: AccountDeletionBlockers
   ) {
-    super("A restored identity owns active relay resources; keep the relay isolated and resolve the restore manually.");
+    super(
+      `Deletion reconciliation blocked for subject ${subject}: the restored identity owns active relay resources; keep the relay isolated and resolve the restore manually.`
+    );
   }
 }
 
@@ -21,7 +24,14 @@ export async function reconcileDeletionLedger(options: {
   store: RelayStore;
   persist: () => Promise<void>;
   now?: () => Date;
-}): Promise<{ entries: number; pending: number; identitiesDeleted: number; markersPruned: number }> {
+  deleteOwnedResourcesForSubject?: string;
+}): Promise<{
+  entries: number;
+  pending: number;
+  identitiesDeleted: number;
+  markersPruned: number;
+  conflictsResolved: number;
+}> {
   // Authenticate and reconcile the complete ledger before expiry collection.
   // An expired entry can still represent a deletion whose primary commit never
   // succeeded; purging it first would resurrect that identity permanently.
@@ -30,12 +40,27 @@ export async function reconcileDeletionLedger(options: {
   const entriesBySubject = groupBySubject(entries);
   const entriesApplied = [...entries];
   let identitiesDeleted = 0;
+  let conflictsResolved = 0;
   for (const userId of relayIdentityIds(options.store)) {
     const subject = options.ledger.subjectFor(userId);
     if (!entriesBySubject.has(subject)) continue;
     const blockers = findAccountDeletionBlockers(options.store, userId);
     if (blockers.ownedTeams.length > 0 || blockers.hostedRooms.length > 0) {
-      throw new DeletionReconciliationBlockedError(subject, blockers);
+      if (options.deleteOwnedResourcesForSubject !== subject) {
+        throw new DeletionReconciliationBlockedError(subject, blockers);
+      }
+      const deletedAt = (options.now ?? (() => new Date()))().toISOString();
+      for (const team of blockers.ownedTeams) {
+        deleteOwnedTeam(options.store, team.id, deletedAt);
+      }
+      for (const room of blockers.hostedRooms) {
+        const record = options.store.getRoom(room.id);
+        if (record) {
+          options.store.setRoom({ ...record, deletedAt, hostStatus: "offline" });
+          revokeRoomInvites(options.store, room.teamId, room.id);
+        }
+      }
+      conflictsResolved += 1;
     }
     // Extend protection from the actual cleanup attempt, not merely the
     // original request. A failed/delayed primary commit may have allowed newer
@@ -54,8 +79,11 @@ export async function reconcileDeletionLedger(options: {
     await options.persist();
   }
 
-  await options.ledger.purgeExpired();
-  const activeEntryIds = new Set((await options.ledger.list()).map((entry) => entry.id));
+  await options.ledger.purgeExpired(entriesApplied);
+  const now = (options.now ?? (() => new Date()))().getTime();
+  const activeEntryIds = new Set(
+    entriesApplied.filter((entry) => Date.parse(entry.protectUntil) > now).map((entry) => entry.id)
+  );
   let markersPruned = 0;
   for (const entryId of options.store.appliedDeletionLedgerEntries.keys()) {
     if (activeEntryIds.has(entryId)) continue;
@@ -63,7 +91,24 @@ export async function reconcileDeletionLedger(options: {
   }
   if (markersPruned > 0) await options.persist();
 
-  return { entries: entriesApplied.length, pending: pending.length, identitiesDeleted, markersPruned };
+  return {
+    entries: entriesApplied.length,
+    pending: pending.length,
+    identitiesDeleted,
+    markersPruned,
+    conflictsResolved
+  };
+}
+
+function deleteOwnedTeam(store: RelayStore, teamId: string, deletedAt: string): void {
+  const team = store.getTeam(teamId);
+  if (team) store.setTeam({ ...team, archivedAt: undefined, deletedAt });
+  for (const room of store.allRooms()) {
+    if (room.teamId === teamId && !room.deletedAt) {
+      store.setRoom({ ...room, archivedAt: undefined, deletedAt });
+    }
+  }
+  revokeTeamInviteArtifacts(store, teamId);
 }
 
 function groupBySubject(entries: DeletionLedgerEntry[]): Map<string, DeletionLedgerEntry[]> {
@@ -79,10 +124,10 @@ export function relayIdentityIds(store: RelayStore): Set<string> {
   for (const session of store.deviceSessions.values()) ids.add(session.userId);
   for (const device of store.devices.values()) ids.add(device.userId);
   for (const keyPackage of store.keyPackages.values()) ids.add(keyPackage.userId);
+  for (const quota of store.accountQuotaRecords.values()) ids.add(quota.userId);
   for (const members of store.teamMembers.values()) for (const userId of members.keys()) ids.add(userId);
   for (const room of store.rooms.values()) {
     if (room.hostUserId) ids.add(room.hostUserId);
-    for (const userId of room.trustedApproverUserIds) ids.add(userId);
   }
   for (const invite of store.invites.values()) {
     if (invite.creatorUserId) ids.add(invite.creatorUserId);

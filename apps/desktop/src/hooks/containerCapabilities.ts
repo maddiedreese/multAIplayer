@@ -30,7 +30,6 @@ export function buildRoomInspectorCapabilities(sources: RoomInspectorSources): R
     },
     settings: {
       selectApprovalPolicy: sources.roomRuntime.setApprovalPolicy,
-      selectApprovalDelegationPolicy: sources.roomRuntime.setApprovalDelegationPolicy,
       selectSandboxLevel: sources.roomRuntime.setCodexSandboxLevel,
       selectModel: sources.roomRuntime.setCodexModel,
       selectReasoningEffort: sources.roomRuntime.setCodexReasoningEffort,

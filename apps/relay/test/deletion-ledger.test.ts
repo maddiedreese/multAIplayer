@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { FileDeletionLedger, S3DeletionLedger } from "../src/auth/deletion-ledger.js";
+import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
+import { FileDeletionLedger, maxDeletionLedgerEntries, S3DeletionLedger } from "../src/auth/deletion-ledger.js";
 
 const key = "test-deletion-ledger-hmac-key-with-more-than-32-characters";
 
@@ -45,27 +46,25 @@ test("file ledger rejects tampering and safely purges after the protection horiz
   }
 });
 
-test("S3 ledger signs Railway-compatible virtual-host requests", async () => {
-  const requests: Array<{ url: URL; init: RequestInit }> = [];
+test("S3 ledger delegates object transport to the maintained client and authenticates listed entries", async () => {
+  const requests: unknown[] = [];
   let storedBody = "";
-  let putCount = 0;
-  const fetchImpl: typeof fetch = async (input, init = {}) => {
-    const url = new URL(String(input));
-    requests.push({ url, init });
-    if (init.method === "PUT") {
-      putCount += 1;
-      storedBody = String(init.body);
-      return new Response("", { status: putCount === 1 ? 200 : 412 });
+  const client = {
+    async send(command: unknown): Promise<unknown> {
+      requests.push(command);
+      if (command instanceof PutObjectCommand) {
+        storedBody = String(command.input.Body);
+        return {};
+      }
+      if (command instanceof ListObjectsV2Command) {
+        const id = JSON.parse(storedBody).id as string;
+        return { IsTruncated: false, Contents: [{ Key: `relay-deletions/v1/${id}.json` }] };
+      }
+      if (command instanceof GetObjectCommand) {
+        return { Body: { transformToString: async () => storedBody } };
+      }
+      throw new Error("Unexpected command");
     }
-    if (url.searchParams.get("list-type") === "2") {
-      const id = JSON.parse(storedBody).id as string;
-      return new Response(
-        `<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>relay-deletions/v1/${id}.json</Key></Contents></ListBucketResult>`,
-        { status: 200 }
-      );
-    }
-    if (init.method === "GET") return new Response(storedBody, { status: 200 });
-    return new Response("", { status: 200 });
   };
   const ledger = new S3DeletionLedger({
     endpoint: "https://t3.storageapi.dev",
@@ -77,31 +76,36 @@ test("S3 ledger signs Railway-compatible virtual-host requests", async () => {
     prefix: "relay-deletions/v1",
     protectionSeconds: 7_776_000,
     urlStyle: "virtual-host",
-    fetchImpl,
+    client,
     now: () => new Date("2026-07-14T12:00:00.000Z"),
     randomId: () => "fixed-random-id"
   });
   const first = await ledger.record("github:77");
-  assert.deepEqual(await ledger.record("github:77"), first);
   assert.deepEqual(await ledger.list(), [first]);
-  assert.equal(requests.length, 5);
-  assert.equal(requests[0]?.url.host, "generated-bucket-name.t3.storageapi.dev");
-  assert.match(requests[0]?.url.pathname ?? "", /^\/relay-deletions\/v1\/[a-f0-9]{64}\.[0-9]+\.fixed-random-id\.json$/);
-  const headers = requests[0]?.init.headers as Record<string, string>;
-  assert.match(headers.authorization, /Credential=test-access-key\/20260714\/auto\/s3\/aws4_request/);
-  assert.match(headers.authorization, /SignedHeaders=content-type;host;if-none-match;x-amz-content-sha256;x-amz-date/);
-  assert.doesNotMatch(String(requests[0]?.init.body), /github:77/);
-  assert.equal(
-    requests
-      .filter((request) => request.init.method !== "PUT")
-      .every((request) => !Object.hasOwn(request.init, "body")),
-    true
-  );
-  assert.equal(requests[3]?.url.searchParams.get("prefix"), "relay-deletions/v1/");
+  assert.equal(requests.length, 3);
+  const put = requests[0] as PutObjectCommand;
+  assert.equal(put.input.Bucket, "generated-bucket-name");
+  assert.match(put.input.Key ?? "", /^relay-deletions\/v1\/[a-f0-9]{64}\.[0-9]+\.fixed-random-id\.json$/);
+  assert.equal(put.input.IfNoneMatch, "*");
+  assert.doesNotMatch(String(put.input.Body), /github:77/);
 });
 
-test("S3 ledger keeps bucket in the canonical path when path URL style is configured", async () => {
-  let requestUrl: URL | null = null;
+test("S3 ledger refuses an unbounded startup scan before fetching object bodies", async () => {
+  let gets = 0;
+  const client = {
+    async send(command: unknown): Promise<unknown> {
+      if (command instanceof ListObjectsV2Command) {
+        return {
+          IsTruncated: false,
+          Contents: Array.from({ length: maxDeletionLedgerEntries + 1 }, (_, index) => ({
+            Key: `deletions/${index}.json`
+          }))
+        };
+      }
+      if (command instanceof GetObjectCommand) gets += 1;
+      return {};
+    }
+  };
   const ledger = new S3DeletionLedger({
     endpoint: "https://storage.example.test/base",
     bucket: "relay-ledger",
@@ -112,14 +116,95 @@ test("S3 ledger keeps bucket in the canonical path when path URL style is config
     prefix: "deletions",
     protectionSeconds: 7_776_000,
     urlStyle: "path",
-    fetchImpl: async (input) => {
-      requestUrl = new URL(String(input));
-      return new Response("", { status: 200 });
-    },
+    client,
     now: () => new Date("2026-07-14T12:00:00.000Z"),
     randomId: () => "fixed-random-id"
   });
-  await ledger.record("github:88");
-  assert.equal(requestUrl!.host, "storage.example.test");
-  assert.match(requestUrl!.pathname, /^\/base\/relay-ledger\/deletions\/[a-f0-9]{64}\./);
+  await assert.rejects(() => ledger.list(), /10000-entry startup reconciliation bound/);
+  assert.equal(gets, 0);
+});
+
+test("S3 ledger fails closed on a truncated page without a continuation token before reading objects", async () => {
+  let gets = 0;
+  const client = {
+    async send(command: unknown): Promise<unknown> {
+      if (command instanceof ListObjectsV2Command) {
+        return { IsTruncated: true, Contents: [{ Key: "deletions/unread.json" }] };
+      }
+      if (command instanceof GetObjectCommand) gets += 1;
+      return {};
+    }
+  };
+  const ledger = new S3DeletionLedger({
+    endpoint: "https://storage.example.test",
+    bucket: "relay-ledger",
+    region: "auto",
+    accessKeyId: "test-access-key",
+    secretAccessKey: "test-secret-access-key-with-at-least-32-characters",
+    hmacKey: key,
+    prefix: "deletions",
+    protectionSeconds: 7_776_000,
+    urlStyle: "path",
+    client
+  });
+  await assert.rejects(() => ledger.list(), /truncated page without a continuation token/);
+  assert.equal(gets, 0);
+});
+
+test("S3 ledger reads a bounded object batch concurrently", async () => {
+  let activeReads = 0;
+  let maximumActiveReads = 0;
+  const entries = Array.from({ length: 33 }, (_, index) => {
+    const subject = "a".repeat(64);
+    const requestedAt = "2026-07-14T12:00:00.000Z";
+    const id = `${subject}.${Date.parse(requestedAt)}.fixed-id-${index}`;
+    return { id, key: `deletions/${id}.json` };
+  });
+  const source = new S3DeletionLedger({
+    endpoint: "https://storage.example.test",
+    bucket: "relay-ledger",
+    region: "auto",
+    accessKeyId: "test-access-key",
+    secretAccessKey: "test-secret-key",
+    hmacKey: key,
+    prefix: "deletions",
+    protectionSeconds: 7_776_000,
+    urlStyle: "path",
+    client: { send: async () => ({}) },
+    now: () => new Date("2026-07-14T12:00:00.000Z")
+  });
+  const authenticated = await Promise.all(entries.map((entry, index) => source.record(`github:${index}`)));
+  const byKey = new Map(authenticated.map((entry) => [`deletions/${entry.id}.json`, JSON.stringify(entry)]));
+  const ledger = new S3DeletionLedger({
+    endpoint: "https://storage.example.test",
+    bucket: "relay-ledger",
+    region: "auto",
+    accessKeyId: "test-access-key",
+    secretAccessKey: "test-secret-key",
+    hmacKey: key,
+    prefix: "deletions",
+    protectionSeconds: 7_776_000,
+    urlStyle: "path",
+    client: {
+      async send(command: unknown): Promise<unknown> {
+        if (command instanceof ListObjectsV2Command) {
+          return {
+            IsTruncated: false,
+            Contents: authenticated.map((entry) => ({ Key: `deletions/${entry.id}.json` }))
+          };
+        }
+        if (command instanceof GetObjectCommand) {
+          activeReads += 1;
+          maximumActiveReads = Math.max(maximumActiveReads, activeReads);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          activeReads -= 1;
+          return { Body: { transformToString: async () => byKey.get(command.input.Key!)! } };
+        }
+        throw new Error("Unexpected command");
+      }
+    }
+  });
+  assert.equal((await ledger.list()).length, 33);
+  assert.ok(maximumActiveReads > 1);
+  assert.ok(maximumActiveReads <= 16);
 });

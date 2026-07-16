@@ -1,7 +1,6 @@
 import {
   BrowserRequestPlaintextPayload,
   CodexActivityPlaintextPayload,
-  CodexApprovalPlaintextPayload,
   CodexEventPlaintextPayload,
   CodexQueuePlaintextPayload,
   GitHubActionsEventPlaintextPayload,
@@ -40,12 +39,7 @@ export async function routeActivityMessage(
     await routeGitEvent(envelope, store, decrypt);
     return true;
   }
-  if (
-    envelope.kind === "codex.event" ||
-    envelope.kind === "codex.activity" ||
-    envelope.kind === "codex.approval" ||
-    envelope.kind === "codex.queue"
-  ) {
+  if (envelope.kind === "codex.event" || envelope.kind === "codex.activity" || envelope.kind === "codex.queue") {
     await routeCodexActivity(envelope, store, decrypt);
     return true;
   }
@@ -147,15 +141,6 @@ async function routeCodexActivity(
     const parsed = CodexActivityPlaintextPayload.safeParse(plaintext);
     if (parsed.success && plaintextUserMatchesEnvelope(envelope, parsed.data.hostUserId))
       store.upsertCodexActivity(envelope.roomId, parsed.data);
-    return;
-  }
-  if (envelope.kind === "codex.approval") {
-    const parsed = CodexApprovalPlaintextPayload.safeParse(plaintext);
-    if (parsed.success && plaintextUserMatchesEnvelope(envelope, parsed.data.approverUserId))
-      store.setHostMessageForRoom(
-        envelope.roomId,
-        "Ignored delegated Codex approval. Only the active host can authorize Codex turns."
-      );
     return;
   }
   const parsed = CodexQueuePlaintextPayload.safeParse(plaintext);

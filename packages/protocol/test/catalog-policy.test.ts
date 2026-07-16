@@ -20,8 +20,6 @@ test("room protocol derives its reasoning enum from the shared options", () => {
     host: "No host",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: false },
     codexModel: "fallback-model",
     codexModelPolicy: "auto",

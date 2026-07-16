@@ -137,13 +137,16 @@ function workspace(host: DeviceIdentity, guest: DeviceIdentity): StoredRelayStat
         id: "room-desktop",
         teamId: "team-core",
         name: "Desktop app",
-        projectPath: "/tmp/multaiplayer",
         host: "Host",
         hostUserId: host.userId,
         activeHostDeviceId: host.deviceId,
         hostStatus: "active",
-        unread: 0,
-        acceptedMlsEpoch: 0
+        acceptedMlsEpoch: 0,
+        approvalPolicy: "ask_every_turn",
+        mode: { chat: true, code: true, workspace: true, browser: false },
+        browserAllowedOrigins: [],
+        browserProfilePersistent: false,
+        unread: 0
       }
     ],
     invites: [],
@@ -151,17 +154,24 @@ function workspace(host: DeviceIdentity, guest: DeviceIdentity): StoredRelayStat
       {
         teamId: "team-core",
         members: [
-          { userId: host.userId, role: "owner", joinedAt: createdAt },
-          { userId: guest.userId, role: "admin", joinedAt: createdAt }
+          { teamId: "team-core", userId: host.userId, role: "owner", joinedAt: createdAt },
+          { teamId: "team-core", userId: guest.userId, role: "admin", joinedAt: createdAt }
         ]
       }
     ],
-    devices: [host, guest].map((device) => ({
-      ...device,
-      displayName: device.deviceId,
-      registeredAt: createdAt,
-      lastSeenAt: createdAt
-    })),
+    devices: [host, guest].map(
+      ({ userId, deviceId, signaturePublicKey, signatureKeyFingerprint, hpkePublicKey, hpkeKeyFingerprint }) => ({
+        userId,
+        deviceId,
+        displayName: deviceId,
+        signaturePublicKey,
+        signatureKeyFingerprint,
+        hpkePublicKey,
+        hpkeKeyFingerprint,
+        registeredAt: createdAt,
+        lastSeenAt: createdAt
+      })
+    ),
     inviteRequests: [],
     inviteResponses: [],
     mlsBacklog: [],

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createRelayLimits,
-  isApprovalDelegationPolicy,
   isApprovalPolicy,
   isJsonStringifiableWithin,
   isMlsMessageWithinLimits,
@@ -171,8 +170,6 @@ test("scalar and policy normalizers fail closed", () => {
   assert.equal(maxCiphertextCharactersForBlob(0), 1430);
   assert.equal(isApprovalPolicy("ask_every_turn"), true);
   assert.equal(isApprovalPolicy("bad"), false);
-  assert.equal(isApprovalDelegationPolicy("trusted_members_only"), true);
-  assert.equal(isApprovalDelegationPolicy("bad"), false);
   assert.equal(isRoomMode({ chat: true, code: false, workspace: true, browser: false }), true);
   assert.equal(isRoomMode(null), false);
   assert.equal(isRoomMode({ chat: true }), false);

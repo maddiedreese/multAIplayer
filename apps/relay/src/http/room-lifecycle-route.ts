@@ -1,6 +1,7 @@
 import { sendRelayError } from "./errors.js";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
+import { revokeRoomInvites } from "../relay-domain.js";
 
 export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
   const {
@@ -8,7 +9,7 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
     store,
     getAuthSession,
     allowMutation,
-    canAccessRoom,
+    isTeamMember,
     requesterFromRequest,
     isRoomHost,
     scheduleStoreSave,
@@ -24,7 +25,7 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
     const room = store.getRoom(roomId);
     if (!room || room.deletedAt || store.getTeam(room.teamId)?.deletedAt)
       return void sendRelayError(res, 404, "room_not_found", "Room not found");
-    if (session && !canAccessRoom(room.teamId, room.id, session.user.id))
+    if (session && !isTeamMember(room.teamId, session.user.id))
       return void sendRelayError(res, 403, "forbidden", "Join this room before changing its archive state.");
     if (!isRoomLifecycleAction(action))
       return void sendRelayError(res, 400, "invalid_request", "action must be archive, restore, or delete");
@@ -42,10 +43,15 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
 
     const updated = roomAfterLifecycleAction(room, action, new Date().toISOString());
     store.setRoom(updated);
+    revokeDeletedRoomInvites(store, updated);
     scheduleStoreSave();
     broadcastRoomUpdated(updated);
     res.json({ room: updated });
   });
+}
+
+function revokeDeletedRoomInvites(store: RegisterRoomRoutesOptions["store"], room: RoomRecord): void {
+  if (room.deletedAt) revokeRoomInvites(store, room.teamId, room.id);
 }
 
 function canManageRoomLifecycle(

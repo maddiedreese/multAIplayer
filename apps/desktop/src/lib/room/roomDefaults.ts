@@ -1,7 +1,6 @@
 import {
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
-  defaultApprovalDelegationPolicy,
   defaultCodexModel,
   defaultCodexReasoningEffort,
   defaultCodexRawReasoningEnabled,
@@ -25,8 +24,6 @@ export function ensureRoomDefaults(
     ...room,
     ...roomMlsConfig(config),
     configPending: hasMlsConfig ? (room.configPending ?? false) : (previous?.configPending ?? true),
-    approvalDelegationPolicy: room.approvalDelegationPolicy ?? defaultApprovalDelegationPolicy,
-    trustedApproverUserIds: Array.isArray(room.trustedApproverUserIds) ? room.trustedApproverUserIds : [],
     browserAllowedOrigins:
       normalizeBrowserAllowedOrigins(room.browserAllowedOrigins ?? defaultBrowserAllowedOrigins) ??
       defaultBrowserAllowedOrigins,

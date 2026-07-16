@@ -24,8 +24,6 @@ export interface WorkspaceSnapshot {
 
 export interface RoomCreationSettings {
   approvalPolicy?: ApprovalPolicy;
-  approvalDelegationPolicy?: ClientRoomRecord["approvalDelegationPolicy"];
-  trustedApproverUserIds?: string[];
   codexModel?: string;
   codexModelPolicy?: ClientRoomRecord["codexModelPolicy"];
   codexReasoningEffort?: ClientRoomRecord["codexReasoningEffort"];
@@ -286,8 +284,6 @@ export async function updateRoomSettings(
   settings: {
     name?: string;
     approvalPolicy?: ClientRoomRecord["approvalPolicy"];
-    approvalDelegationPolicy?: ClientRoomRecord["approvalDelegationPolicy"];
-    trustedApproverUserIds?: string[];
     mode?: ClientRoomRecord["mode"];
     codexModel?: string;
     codexModelPolicy?: ClientRoomRecord["codexModelPolicy"];

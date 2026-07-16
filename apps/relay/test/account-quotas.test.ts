@@ -185,7 +185,7 @@ test("quota transactions wait for failed persistence rollback before taking the 
 test("daily team and room quotas survive a SQLite relay restart", async () => {
   const env = {
     MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP: "1",
     MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP: "1"
   };
@@ -232,7 +232,7 @@ test("daily team and room quotas survive a SQLite relay restart", async () => {
 test("simultaneous team creations serialize through the single SQLite writer", async () => {
   const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP: "1"
   });
   try {
@@ -252,7 +252,7 @@ test("simultaneous team creations serialize through the single SQLite writer", a
 
 test("live invite ceilings are global to an account", async () => {
   const relay = await startRelayWithWorkspace({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER: "1"
   });
   try {
@@ -275,7 +275,7 @@ test("live invite ceilings are global to an account", async () => {
 test("attachment upload byte windows survive a SQLite relay restart", async () => {
   const env = {
     MULTAIPLAYER_RELAY_STORAGE: "sqlite",
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "40",
     MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "200",
     MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW: "100"

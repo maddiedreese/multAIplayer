@@ -167,16 +167,18 @@ function checkProductionRelayEnv() {
 
 function readProductionRelayConfig() {
   return {
+    deletionLedgerFilePath: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH"),
     deletionLedgerEndpoint: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT"),
     deletionLedgerBucket: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET"),
     deletionLedgerRegion: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION"),
     deletionLedgerAccessKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID"),
     deletionLedgerSecretKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY"),
     deletionLedgerHmacKey: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"),
+    deletionProtection: envValue("MULTAIPLAYER_RELAY_DELETION_PROTECTION"),
     deletionLedgerUrlStyle: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE"),
     deletionLedgerProtectionSeconds: envInteger("MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS", 7_776_000),
     allowedOrigins: envValue("MULTAIPLAYER_RELAY_ALLOWED_ORIGINS"),
-    requireAuth: envBoolean("MULTAIPLAYER_RELAY_REQUIRE_AUTH", true),
+    requireAuth: !envBoolean("MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH", false),
     debug: envBoolean("MULTAIPLAYER_RELAY_DEBUG", false),
     rateLimits: envBoolean("MULTAIPLAYER_RELAY_RATE_LIMITS", true),
     structuredLogs: envBoolean("MULTAIPLAYER_RELAY_STRUCTURED_LOGS", true),
@@ -206,15 +208,44 @@ function readProductionRelayConfig() {
 
 function checkDeletionLedger(config) {
   const {
+    deletionLedgerFilePath,
     deletionLedgerEndpoint,
     deletionLedgerBucket,
     deletionLedgerRegion,
     deletionLedgerAccessKey,
     deletionLedgerSecretKey,
     deletionLedgerHmacKey,
+    deletionProtection,
     deletionLedgerUrlStyle,
     deletionLedgerProtectionSeconds
   } = config;
+  const ledgerUnset =
+    !deletionLedgerFilePath &&
+    !deletionLedgerEndpoint &&
+    !deletionLedgerBucket &&
+    !deletionLedgerRegion &&
+    !deletionLedgerAccessKey &&
+    !deletionLedgerSecretKey &&
+    !deletionLedgerHmacKey;
+  const effectiveProtection = deletionProtection || (ledgerUnset ? "primary_only" : "restore_safe");
+  if (effectiveProtection === "primary_only") {
+    checks.push({
+      ok: ledgerUnset,
+      label: "production account deletion protection",
+      detail: ledgerUnset
+        ? "primary-only deletion configured; do not restore backups containing deleted identities"
+        : "primary_only must not configure external deletion ledger credentials"
+    });
+    return;
+  }
+  if (effectiveProtection !== "restore_safe") {
+    checks.push({
+      ok: false,
+      label: "production account deletion protection",
+      detail: "must be primary_only or restore_safe"
+    });
+    return;
+  }
   const deletionLedgerEndpointIsHttps = (() => {
     try {
       return new URL(deletionLedgerEndpoint).protocol === "https:";
@@ -230,6 +261,7 @@ function checkDeletionLedger(config) {
       Boolean(deletionLedgerAccessKey) &&
       deletionLedgerSecretKey.length >= 32 &&
       deletionLedgerHmacKey.length >= 32 &&
+      deletionLedgerSecretKey !== deletionLedgerHmacKey &&
       ["path", "virtual-host"].includes(deletionLedgerUrlStyle) &&
       deletionLedgerProtectionSeconds >= 7_776_000,
     label: "production external deletion ledger",
@@ -240,6 +272,7 @@ function checkDeletionLedger(config) {
       deletionLedgerAccessKey &&
       deletionLedgerSecretKey.length >= 32 &&
       deletionLedgerHmacKey.length >= 32 &&
+      deletionLedgerSecretKey !== deletionLedgerHmacKey &&
       ["path", "virtual-host"].includes(deletionLedgerUrlStyle) &&
       deletionLedgerProtectionSeconds >= 7_776_000
         ? "S3-compatible ledger configured with a protection horizon of at least 90 days"
@@ -261,7 +294,7 @@ function checkCoreRelayConfig(config) {
   });
   checks.push({
     ok: requireAuth,
-    label: "production MULTAIPLAYER_RELAY_REQUIRE_AUTH",
+    label: "production authentication",
     detail: requireAuth ? "auth required" : "must not be false for a hosted production relay"
   });
   checks.push({

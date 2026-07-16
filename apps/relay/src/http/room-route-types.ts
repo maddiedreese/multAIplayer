@@ -1,5 +1,5 @@
 import type { Express, Response } from "express";
-import type { ApprovalDelegationPolicy, RoomRecord } from "@multaiplayer/protocol";
+import type { RoomRecord } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
 
 export interface RegisterRoomRoutesOptions {
@@ -18,7 +18,6 @@ export interface RegisterRoomRoutesOptions {
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
   isRoomHost: (room: RoomRecord, requester: { id: string; name: string }) => boolean;
   isApprovalPolicy: (value: string) => value is RoomRecord["approvalPolicy"];
-  isApprovalDelegationPolicy: (value: string) => value is ApprovalDelegationPolicy;
   isRoomMode: (value: unknown) => value is RoomRecord["mode"];
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   normalizeOptionalMetadataText: (value: unknown, maxChars: number) => string | null;

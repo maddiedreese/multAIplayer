@@ -27,8 +27,6 @@ export function buildFallbackInvitedRoom({
     host: "No host",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     mode: defaultRoomMode,
     codexModel: defaultCodexModel,
     browserAllowedOrigins: defaultBrowserAllowedOrigins,

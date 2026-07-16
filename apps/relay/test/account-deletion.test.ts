@@ -22,8 +22,8 @@ test("account deletion removes identity-owned records while preserving shared en
       [otherUserId, { teamId: "team-shared", userId: otherUserId, role: "owner", joinedAt: "2026-07-01T00:00:00.000Z" }]
     ])
   );
-  store.rooms.set("room-live", room("room-live", otherUserId, [userId]));
-  store.rooms.set("room-deleted", { ...room("room-deleted", userId, [userId]), deletedAt: "2026-07-02T00:00:00.000Z" });
+  store.rooms.set("room-live", room("room-live", otherUserId));
+  store.rooms.set("room-deleted", { ...room("room-deleted", userId), deletedAt: "2026-07-02T00:00:00.000Z" });
   store.authSessions.set("session-leaving", {
     sessionIdHash: "session-leaving",
     user: { id: userId, login: "leaving" },
@@ -125,7 +125,6 @@ test("account deletion removes identity-owned records while preserving shared en
   });
   assert.equal(store.teamMembers.get("team-shared")?.has(userId), false);
   assert.equal(store.teams.get("team-shared")?.members, 1);
-  assert.deepEqual(store.rooms.get("room-live")?.trustedApproverUserIds, []);
   assert.equal(store.rooms.get("room-deleted")?.host, "Deleted user");
   assert.equal(store.rooms.get("room-deleted")?.hostUserId, undefined);
   assert.equal(store.authSessions.has("session-remaining"), true);
@@ -247,7 +246,7 @@ test("restoring a pre-deletion SQLite backup cannot restore the deleted identity
   }
 });
 
-function room(id: string, hostUserId: string, trustedApproverUserIds: string[]) {
+function room(id: string, hostUserId: string) {
   return {
     id,
     teamId: "team-shared",
@@ -258,8 +257,6 @@ function room(id: string, hostUserId: string, trustedApproverUserIds: string[]) 
     activeHostDeviceId: "device-one",
     hostStatus: "active" as const,
     approvalPolicy: "ask_every_turn" as const,
-    approvalDelegationPolicy: "host_only" as const,
-    trustedApproverUserIds,
     mode: { chat: true, code: true, workspace: true, browser: false },
     codexModel: "gpt-5.4",
     browserAllowedOrigins: [],

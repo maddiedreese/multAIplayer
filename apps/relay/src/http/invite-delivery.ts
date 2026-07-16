@@ -15,6 +15,7 @@ import {
   parseStrictDirectedInviteRequestJson,
   type StrictDirectedInviteRequest
 } from "../opaque.js";
+import { isActiveInviteTarget, isActiveRoom } from "../relay-domain.js";
 
 const maxOpaqueChars = 1_400_000;
 interface Options {
@@ -62,6 +63,8 @@ export function registerInviteDeliveryRoutes({
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, requesterDeviceId))
       return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
     if (!invite) return void sendRelayError(res, 404, "invite_not_found", "Invite not found.");
+    if (!isActiveInviteTarget(store, invite))
+      return void sendRelayError(res, 409, "conflict", "Restore the team and room before using this invite.");
     const existingRequest = store.inviteRequests.get(requestId);
     if (existingRequest) {
       return void (await respondToExistingInviteRequest({
@@ -118,6 +121,8 @@ export function registerInviteDeliveryRoutes({
     const room = invite && store.getRoom(invite.roomId);
     if (
       !session ||
+      !invite ||
+      !isActiveInviteTarget(store, invite) ||
       !room ||
       room.hostUserId !== session.user.id ||
       room.activeHostDeviceId !== String(req.query.hostDeviceId ?? "")
@@ -159,8 +164,8 @@ export function registerInviteDeliveryRoutes({
     const expectedKeys = inviteResponseKeys(status);
     if (!hasExactKeys(body, expectedKeys))
       return void sendRelayError(res, 400, "invalid_request", "Invite response contains unsupported fields.");
-    if (!isActiveInviteHost(session, room, String(body.hostDeviceId ?? "")))
-      return void sendRelayError(res, 403, "forbidden", "Only the active host device may publish an invite response.");
+    if (!isActiveInviteHost(session, room, String(body.hostDeviceId ?? ""), isActiveInviteTarget(store, invite)))
+      return void sendRelayError(res, 403, "forbidden", "An active room and host device are required.");
     if (!session || !room || !invite) return;
     if (!hasDeviceSession(store, req.get("x-device-session"), session.user.id, room.activeHostDeviceId!))
       return void sendRelayError(res, 403, "device_auth_required", "A device-authenticated session is required.");
@@ -207,6 +212,7 @@ export function registerInviteDeliveryRoutes({
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
     const record = store.inviteResponses.get(String(req.params.requestId ?? ""));
+    const invite = record && store.getInvite(record.inviteId);
     if (
       session &&
       record &&
@@ -216,6 +222,8 @@ export function registerInviteDeliveryRoutes({
     if (
       !session ||
       !record ||
+      !invite ||
+      !isActiveInviteTarget(store, invite) ||
       record.inviteId !== String(req.params.inviteId) ||
       record.requesterUserId !== session.user.id ||
       record.requesterDeviceId !== String(req.query.requesterDeviceId ?? "")
@@ -263,6 +271,8 @@ export function registerInviteDeliveryRoutes({
       return void sendRelayError(res, 404, "invite_not_found", "Invite response team not found.");
     if (result === "revoked")
       return void sendRelayError(res, 409, "conflict", "Invite approval was revoked before ACK.");
+    if (result === "inactive_target")
+      return void sendRelayError(res, 409, "conflict", "Restore the team and room before acknowledging this invite.");
     if (result === "persistence_failed") {
       return void sendRelayError(res, 503, "persistence_unavailable", "Could not acknowledge invite response durably.");
     }
@@ -485,9 +495,12 @@ function pendingInviteConflict(store: RelayStore, invite: InviteRecord): string 
 function isActiveInviteHost(
   session: AuthSession | null,
   room: RoomRecord | null | undefined,
-  hostDeviceId: string
+  hostDeviceId: string,
+  targetIsActive: boolean
 ): session is AuthSession {
-  return Boolean(session && room && room.hostUserId === session.user.id && room.activeHostDeviceId === hostDeviceId);
+  return Boolean(
+    targetIsActive && session && room && room.hostUserId === session.user.id && room.activeHostDeviceId === hostDeviceId
+  );
 }
 
 function inviteResponsePreconditionError(
@@ -547,9 +560,10 @@ export async function ackInviteResponseAtomically(
   store: RelayStore,
   record: InviteResponseRecordType,
   saveRelayStore: () => Promise<void>
-): Promise<"ok" | "missing_team" | "revoked" | "persistence_failed"> {
+): Promise<"ok" | "missing_team" | "inactive_target" | "revoked" | "persistence_failed"> {
   const team = store.getTeam(record.responseBinding.teamId);
   if (!team) return "missing_team";
+  if (!isActiveRoom(store, record.responseBinding.teamId, record.responseBinding.roomId)) return "inactive_target";
   const previousMembers = new Map(store.getTeamMembers(team.id) ?? []);
   const invite = store.getInvite(record.inviteId);
   if (!inviteResponseRemainsAuthorized(invite, record)) return "revoked";

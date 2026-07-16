@@ -118,9 +118,7 @@ function storedTeamMembersValue(
   key: string,
   members: RelayStore["teamMembers"] extends Map<string, infer T> ? T | undefined : never
 ) {
-  return members
-    ? { teamId: key, members: Array.from(members.values()), userIds: Array.from(members.keys()) }
-    : undefined;
+  return members ? { teamId: key, members: Array.from(members.values()) } : undefined;
 }
 
 function storedBacklogValue(

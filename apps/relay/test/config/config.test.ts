@@ -71,6 +71,42 @@ test("relay bounds the trusted-network rate-limit multiplier", () => {
   }
 });
 
+test("authentication defaults on and only the explicit unsafe opt-out disables it", () => {
+  const previous = process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH;
+  try {
+    delete process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH;
+    assert.equal(loadRelayConfig().mutationsRequireAuth, true);
+    process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH = "true";
+    assert.equal(loadRelayConfig().mutationsRequireAuth, false);
+  } finally {
+    restoreEnv("MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH", previous);
+  }
+});
+
+test("production supports primary-only deletion but restore-safe mode requires an external ledger", () => {
+  const names = [
+    "NODE_ENV",
+    "MULTAIPLAYER_RELAY_DELETION_PROTECTION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"
+  ] as const;
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  try {
+    for (const name of names) delete process.env[name];
+    process.env.NODE_ENV = "production";
+    assert.equal(loadRelayConfig().deletionProtection, "primary_only");
+    process.env.MULTAIPLAYER_RELAY_DELETION_PROTECTION = "restore_safe";
+    assert.throws(() => loadRelayConfig(), /requires a complete external deletion ledger/);
+  } finally {
+    for (const name of names) restoreEnv(name, previous.get(name));
+  }
+});
+
 test("production fail-stop exits for supervisor restart unless explicitly overridden", () => {
   const keys = [
     "NODE_ENV",
@@ -99,6 +135,32 @@ test("production fail-stop exits for supervisor restart unless explicitly overri
     assert.equal(loadRelayConfig().exitOnPersistencePoison, false);
   } finally {
     for (const key of keys) restoreEnv(key, previous.get(key));
+  }
+});
+
+test("S3 deletion ledger requires independent transport and HMAC keys", () => {
+  const names = [
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"
+  ] as const;
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  const reusedKey = "test-reused-key-with-at-least-32-characters";
+  try {
+    delete process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH;
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = "https://ledger.example.test";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET = "relay";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION = "us-test-1";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID = "test-access-key";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY = reusedKey;
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = reusedKey;
+    assert.throws(() => loadRelayConfig(), /HMAC key must differ from the S3 secret access key/);
+  } finally {
+    for (const name of names) restoreEnv(name, previous.get(name));
   }
 });
 
@@ -165,13 +227,13 @@ test("relay loads configuration from env files without overriding process env", 
     envPath,
     [
       "MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://env-file.example/ # normalized",
-      "MULTAIPLAYER_RELAY_REQUIRE_AUTH=true"
+      "MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH=false"
     ].join("\n"),
     "utf8"
   );
   const relay = await startRelay({
     MULTAIPLAYER_RELAY_ENV_FILE: envPath,
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "false"
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "true"
   });
   try {
     const response = await fetch(`${relay.baseUrl}/auth/config`);

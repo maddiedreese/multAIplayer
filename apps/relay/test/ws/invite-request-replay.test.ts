@@ -1,7 +1,7 @@
 import test from "node:test";
 import { WebSocket, assert, delay, onceOpen, startRelay, waitForJoined } from "../support/relay.js";
 
-const createdAt = "2026-07-13T12:00:00.000Z";
+const createdAt = new Date().toISOString();
 const expiresAt = "2099-07-13T12:00:00.000Z";
 const keyPackageHash = `sha256:${"a".repeat(64)}`;
 
@@ -165,16 +165,13 @@ function room(id: string) {
     id,
     teamId: "team-core",
     name: id,
-    projectPath: "/tmp/replay",
     host: "Host",
     hostUserId: "github:host",
     activeHostDeviceId: "host-device-1",
     hostStatus: "active",
+    acceptedMlsEpoch: 0,
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: false },
-    codexModel: "gpt-5.4",
     browserAllowedOrigins: [],
     browserProfilePersistent: false,
     unread: 0

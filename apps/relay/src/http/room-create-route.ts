@@ -1,13 +1,12 @@
 import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import { nanoid } from "nanoid";
 import {
-  defaultApprovalDelegationPolicy,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultRoomMode,
   type RoomRecord
 } from "@multaiplayer/protocol";
-import { allowTotalRoomQuota, normalizeTrustedApproverUserIds } from "./room-validation.js";
+import { allowTotalRoomQuota } from "./room-validation.js";
 import {
   acquireDurableQuotaTransaction,
   nextUtcMidnight,
@@ -113,8 +112,6 @@ async function persistRoomCreation(
       hostUserId: session?.user.id,
       hostStatus: "offline",
       approvalPolicy: input.approvalPolicy,
-      approvalDelegationPolicy: input.approvalDelegationPolicy,
-      trustedApproverUserIds: input.trustedApproverUserIds,
       mode: defaultRoomMode,
       browserAllowedOrigins: input.browserAllowedOrigins,
       browserProfilePersistent: input.browserProfilePersistent,
@@ -186,25 +183,10 @@ function parseRoomCreationInput(options: RegisterRoomRoutesOptions, body: unknow
     );
     return null;
   }
-  const policies = parseRoomPolicies(options, record, res);
-  if (!policies) return null;
-  const browser = parseBrowserPreferences(options, record, res);
-  return browser ? { name, ...policies, ...browser } : null;
-}
-
-function parseRoomPolicies(options: RegisterRoomRoutesOptions, record: Record<string, unknown>, res: Response) {
   const approvalPolicy = record.approvalPolicy === undefined ? "ask_every_turn" : String(record.approvalPolicy);
-  const approvalDelegationPolicy =
-    record.approvalDelegationPolicy === undefined
-      ? defaultApprovalDelegationPolicy
-      : String(record.approvalDelegationPolicy);
-  const trustedApproverUserIds = normalizeTrustedApproverUserIds(record.trustedApproverUserIds, options.maxUserIdChars);
   if (!options.isApprovalPolicy(approvalPolicy)) return sendInvalidRoomField(res, "approvalPolicy is invalid");
-  if (!options.isApprovalDelegationPolicy(approvalDelegationPolicy))
-    return sendInvalidRoomField(res, "approvalDelegationPolicy is invalid");
-  if (trustedApproverUserIds === null)
-    return sendInvalidRoomField(res, "trustedApproverUserIds must be up to 50 user ids");
-  return { approvalPolicy, approvalDelegationPolicy, trustedApproverUserIds };
+  const browser = parseBrowserPreferences(options, record, res);
+  return browser ? { name, approvalPolicy, ...browser } : null;
 }
 
 function parseBrowserPreferences(options: RegisterRoomRoutesOptions, record: Record<string, unknown>, res: Response) {

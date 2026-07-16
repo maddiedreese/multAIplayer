@@ -1,7 +1,6 @@
 import {
   isRecord,
   maxCodexActivitiesPerRoom,
-  CodexApprovalPlaintextPayload as CodexApprovalPlaintextPayloadSchema,
   CodexActivityPlaintextPayload as CodexActivityPlaintextPayloadSchema,
   CodexQueuePlaintextPayload as CodexQueuePlaintextPayloadSchema,
   CodexEventPlaintextPayload as CodexEventPlaintextPayloadSchema,
@@ -13,7 +12,6 @@ import {
   ChatEditPlaintextPayload as ChatEditPlaintextPayloadSchema,
   type ChatDeletePlaintextPayload,
   type ChatEditPlaintextPayload,
-  type CodexApprovalPlaintextPayload,
   type CodexActivityPlaintextPayload,
   type CodexEventPlaintextPayload,
   type CodexQueuePlaintextPayload,
@@ -218,10 +216,6 @@ export function isChatEditPlaintextPayload(value: unknown): value is ChatEditPla
 
 export function isChatDeletePlaintextPayload(value: unknown): value is ChatDeletePlaintextPayload {
   return ChatDeletePlaintextPayloadSchema.safeParse(value).success;
-}
-
-export function isCodexApprovalPlaintextPayload(value: unknown): value is CodexApprovalPlaintextPayload {
-  return CodexApprovalPlaintextPayloadSchema.safeParse(value).success;
 }
 
 export function isCodexQueuePlaintextPayload(value: unknown): value is CodexQueuePlaintextPayload {

@@ -17,7 +17,7 @@ import type { KeyPackageRecord } from "@multaiplayer/protocol";
 const validatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
 test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
   const relay = await startRelayWithWorkspace({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath
   });
   try {
@@ -667,7 +667,7 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
 
 test("live KeyPackage ceilings apply across every device on an account", async () => {
   const relay = await startRelayWithWorkspace({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath,
     MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER: "1"
   });

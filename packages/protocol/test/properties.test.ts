@@ -26,8 +26,6 @@ const room = {
   activeHostDeviceId: "device-1",
   hostStatus: "active" as const,
   approvalPolicy: "ask_every_turn" as const,
-  approvalDelegationPolicy: "host_only" as const,
-  trustedApproverUserIds: [],
   mode: { chat: true, code: true, workspace: true, browser: false },
   browserAllowedOrigins: [],
   browserProfilePersistent: false,

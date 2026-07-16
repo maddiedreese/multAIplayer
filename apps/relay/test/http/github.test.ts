@@ -13,7 +13,7 @@ import {
 
 test("relay advertises native OAuth configuration without a secret", async () => {
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://multaiplayer.com,tauri://localhost"
   });
   try {
@@ -29,6 +29,19 @@ test("relay advertises native OAuth configuration without a secret", async () =>
       sessionPersistence: "identity_only",
       accountDeletion: "external_ledger_protected"
     });
+  } finally {
+    await relay.close();
+  }
+});
+
+test("primary-only self-hosts expose account deletion without claiming backup restore protection", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false"
+  });
+  try {
+    const config = (await (await fetch(`${relay.baseUrl}/auth/config`)).json()) as { accountDeletion: string };
+    assert.equal(config.accountDeletion, "primary_store_only");
   } finally {
     await relay.close();
   }
@@ -86,7 +99,7 @@ globalThis.fetch = async (input, init = {}) => {
     "utf8"
   );
   const relay = await startRelay({
-    MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${mockPath}`.trim()
   });
   let restarted: Awaited<ReturnType<typeof startRelay>> | null = null;
@@ -117,7 +130,7 @@ globalThis.fetch = async (input, init = {}) => {
       assert.equal(bytes.includes(Buffer.from(token)), false, path);
     }
     await relay.close({ preserveData: true });
-    restarted = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" }, undefined, relay.dataPath);
+    restarted = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" }, undefined, relay.dataPath);
     const me = await fetch(`${restarted.baseUrl}/auth/me`, { headers: { cookie } });
     assert.equal(me.status, 200);
     assert.equal((await me.json()).user.id, "github:42");
@@ -144,7 +157,7 @@ globalThis.fetch = async (input, init = {}) =>
   );
   const relay = await startRelay(
     {
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true",
+      MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
       NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${mockPath}`.trim()
     },
     {

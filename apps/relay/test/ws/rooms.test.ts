@@ -2,6 +2,8 @@ import test from "node:test";
 import { assert, patchHostStatus, startRelayWithWorkspace } from "../support/relay.js";
 import { createRelayRoomSocketManager } from "../../src/ws/rooms.js";
 import { InMemoryRelayStore } from "../../src/state.js";
+import { createRelayAuthz } from "../../src/authz.js";
+import { revokeRoomInvites } from "../../src/relay-domain.js";
 
 test("direct host release and reclaim cannot bypass signed MLS handoff", async () => {
   const relay = await startRelayWithWorkspace();
@@ -42,8 +44,6 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     host: "Host",
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: false },
     codexModel: "gpt-5.4",
     codexModelPolicy: "pinned",
@@ -77,6 +77,7 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     subscribedTeamIds: new Set<string>(),
     workspaceSubscribed: false
   };
+  const authz = createRelayAuthz(store);
   const manager = createRelayRoomSocketManager({
     store,
     roomSockets: new Map(),
@@ -86,8 +87,8 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     sessions: new Map(),
     mutationsRequireAuth: true,
     roomKey: (teamId, roomId) => `${teamId}:${roomId}`,
-    canAccessRoom: (teamId, _roomId, userId) => store.hasTeamMember(teamId, userId),
-    isTeamMember: (teamId, userId) => store.hasTeamMember(teamId, userId),
+    canAccessRoom: authz.canAccessRoom,
+    isTeamMember: authz.isTeamMember,
     addTeamMember: (teamId, userId) => {
       store.setTeamMembers(
         teamId,
@@ -115,4 +116,38 @@ test("invite admission requires the exact durable Welcome, approved user, and de
   assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-approved", "invite"), true);
   assert.equal(store.getInvite("invite"), undefined);
   assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-approved"), true);
+
+  store.setTeam({ ...store.getTeam("team")!, archivedAt: new Date().toISOString() });
+  assert.equal(manager.isKnownRoom("team", "room"), false);
+  assert.equal(manager.canSubscribeTeam(session, "team", "github:joiner"), false);
+  store.setTeam({ ...store.getTeam("team")!, archivedAt: undefined, deletedAt: new Date().toISOString() });
+  assert.equal(manager.canSubscribeTeam(session, "team", "github:joiner"), false);
+  store.setTeam({ ...store.getTeam("team")!, deletedAt: undefined });
+
+  store.setTeamMembers("team", new Map());
+  store.setInvite(invite);
+  store.inviteRequests.set("request", {
+    requestId: "request",
+    inviteId: "invite",
+    requesterUserId: "github:joiner",
+    requesterDeviceId: "device-approved"
+  } as never);
+  store.inviteResponses.set("request", {
+    requestId: "request",
+    inviteId: "invite",
+    requesterUserId: "github:joiner",
+    requesterDeviceId: "device-approved",
+    keyPackageHash,
+    status: "approved",
+    welcome: "AA==",
+    responseBinding: { teamId: "team" }
+  } as never);
+  store.setRoom({ ...store.getRoom("room")!, deletedAt: new Date().toISOString() });
+  assert.equal(revokeRoomInvites(store, "team", "room"), true);
+  assert.equal(store.getInvite("invite"), undefined);
+  assert.equal(store.inviteRequests.size, 0);
+  assert.equal(store.inviteResponses.size, 0);
+  assert.equal(manager.isKnownRoom("team", "room"), false);
+  assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-approved"), false);
+  assert.equal(store.hasTeamMember("team", "github:joiner"), false);
 });

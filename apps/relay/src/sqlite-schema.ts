@@ -8,7 +8,6 @@ export function openRelayDatabase(dataPath: string, walAutoCheckpointPages = 1_0
   db.pragma(`wal_autocheckpoint = ${walAutoCheckpointPages}`);
   db.pragma("foreign_keys = ON");
   db.exec(`
-    create table if not exists relay_snapshots (id text primary key, state_json text not null, saved_at text not null);
     create table if not exists relay_meta (key text primary key, value text not null);
     create table if not exists relay_teams (id text primary key, data_json text not null);
     create table if not exists relay_rooms (id text primary key, data_json text not null);

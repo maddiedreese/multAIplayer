@@ -25,11 +25,13 @@ import type { StoredRelayMutation } from "./persistence-types.js";
 import { createStoredRelayMutationStream } from "./store-mutations.js";
 import { createRelayStoreNormalizers } from "./store-codec-normalizers.js";
 import {
-  applyStoredAccountQuotaRecords,
+  isExpiredStoredAcceptedMessageReceipt,
+  isExpiredStoredAccountQuotaRecord,
   normalizeAccountRestriction,
+  isExpiredStoredAccountRestriction,
+  normalizeAccountQuotaRecord,
   normalizeDeletionLedgerEntry
 } from "./store-codec-normalizers.js";
-import { migrateStoredRelayDocument } from "./store-codec-migrations.js";
 
 export interface StoredRelayState {
   version: 1;
@@ -45,8 +47,7 @@ export interface StoredRelayState {
   acceptedMessageReceipts?: AcceptedMessageReceipt[];
   teamMembers?: Array<{
     teamId: string;
-    members?: TeamMemberRecord[];
-    userIds?: string[];
+    members: TeamMemberRecord[];
   }>;
   authSessions?: StoredAuthSession[];
   accountRestrictions?: AccountRestriction[];
@@ -126,42 +127,44 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     value: unknown,
     normalize: (candidate: unknown) => T | null,
     apply: (normalized: T) => void,
-    criticalEntity?: string
+    criticalEntity?: string,
+    intentionallyDiscardable?: (candidate: unknown) => boolean
   ): void {
     for (const candidate of storedArray(value)) {
       const normalized = normalize(candidate);
       if (normalized) apply(normalized);
-      else if (criticalEntity) throw new Error(`Stored relay ${criticalEntity} row failed validation.`);
+      else if (criticalEntity && !intentionallyDiscardable?.(candidate)) {
+        throw new Error(`Stored relay ${criticalEntity} row failed validation.`);
+      }
     }
   }
 
   function applyStoredState(stored: Record<string, unknown>): void {
-    const migrated = migrateStoredRelayDocument(stored);
-    if (!migrated) return;
-    applyStoredRows(migrated.teams, normalizeTeam, (team) => store.teams.set(team.id, team), "team");
-    applyStoredRows(migrated.rooms, normalizeRoom, (room) => store.rooms.set(room.id, room), "room");
-    applyStoredRows(migrated.invites, normalizeInvite, (invite) => {
+    if (stored.version !== 1) throw new Error("Stored relay state has an unsupported version.");
+    applyStoredRows(stored.teams, normalizeTeam, (team) => store.teams.set(team.id, team), "team");
+    applyStoredRows(stored.rooms, normalizeRoom, (room) => store.rooms.set(room.id, room), "room");
+    applyStoredRows(stored.invites, normalizeInvite, (invite) => {
       if (!isExpiredInvite(invite)) store.invites.set(invite.id, invite);
     });
     applyStoredRows(
-      migrated.devices,
+      stored.devices,
       normalizeDevice,
       (device) => {
         store.devices.set(deviceKey(device.userId, device.deviceId), device);
       },
       "device"
     );
-    applyStoredRows(migrated.keyPackages, normalizeKeyPackage, (keyPackage) => {
+    applyStoredRows(stored.keyPackages, normalizeKeyPackage, (keyPackage) => {
       if (!store.keyPackages.has(keyPackage.id)) store.setKeyPackage(keyPackage);
     });
-    applyStoredRows(migrated.inviteRequests, normalizeRequest, (request) => {
+    applyStoredRows(stored.inviteRequests, normalizeRequest, (request) => {
       if (!store.inviteRequests.has(request.requestId)) store.inviteRequests.set(request.requestId, request);
     });
-    applyStoredRows(migrated.inviteResponses, normalizeWelcome, (response) => {
+    applyStoredRows(stored.inviteResponses, normalizeWelcome, (response) => {
       if (!store.inviteResponses.has(response.requestId)) store.inviteResponses.set(response.requestId, response);
     });
     const restoredMembershipTeams = new Set<string>();
-    for (const item of storedArray(migrated.teamMembers)) {
+    for (const item of storedArray(stored.teamMembers)) {
       const teamId = storedTeamMembershipKey(item);
       if (!teamId || restoredMembershipTeams.has(teamId)) {
         throw new Error("Stored relay team-member row failed validation.");
@@ -169,29 +172,43 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
       if (!applyStoredTeamMembers(item)) throw new Error("Stored relay team-member row failed validation.");
       restoredMembershipTeams.add(teamId);
     }
-    applyStoredRows(migrated.inviteAckReceipts, normalizeInviteAckReceipt, (receipt) => {
+    applyStoredRows(stored.inviteAckReceipts, normalizeInviteAckReceipt, (receipt) => {
       store.inviteAckReceipts.set(receipt.requestId, receipt);
     });
-    applyStoredRows(migrated.acceptedMessageReceipts, normalizeAcceptedMessageReceipt, (receipt) => {
-      store.acceptedMessageReceipts.set(`${receipt.roomKey}\0${receipt.messageId}`, receipt);
-    });
-    applyStoredRows(migrated.attachmentBlobs, normalizeAttachmentBlob, (blob) => {
+    applyStoredRows(
+      stored.acceptedMessageReceipts,
+      normalizeAcceptedMessageReceipt,
+      (receipt) => {
+        store.acceptedMessageReceipts.set(`${receipt.roomKey}\0${receipt.messageId}`, receipt);
+      },
+      "accepted-message-receipt",
+      (candidate) => isExpiredStoredAcceptedMessageReceipt(candidate, now())
+    );
+    applyStoredRows(stored.attachmentBlobs, normalizeAttachmentBlob, (blob) => {
       if (!isExpiredAttachmentBlob(blob)) store.attachmentBlobs.set(blob.id, blob);
     });
-    applyStoredRows(migrated.authSessions, options.normalizeStoredAuthSession, (session) => {
+    applyStoredRows(stored.authSessions, options.normalizeStoredAuthSession, (session) => {
       store.authSessions.set(session.sessionIdHash, session.session);
     });
     applyStoredRows(
-      migrated.accountRestrictions,
+      stored.accountRestrictions,
       (item) => normalizeAccountRestriction(item, now(), options.maxUserIdChars),
-      (restriction) => store.accountRestrictions.set(restriction.userId, restriction)
+      (restriction) => store.accountRestrictions.set(restriction.userId, restriction),
+      "account-restriction",
+      (candidate) => isExpiredStoredAccountRestriction(candidate, now())
     );
-    applyStoredAccountQuotaRecords(store, migrated.accountQuotaRecords, now());
-    applyStoredRows(migrated.appliedDeletionLedgerEntries, normalizeDeletionLedgerEntry, (entry) => {
+    applyStoredRows(
+      stored.accountQuotaRecords,
+      (item) => normalizeAccountQuotaRecord(item, now()),
+      (quota) => store.accountQuotaRecords.set(quota.key, quota),
+      "account-quota",
+      (candidate) => isExpiredStoredAccountQuotaRecord(candidate, now())
+    );
+    applyStoredRows(stored.appliedDeletionLedgerEntries, normalizeDeletionLedgerEntry, (entry) => {
       store.appliedDeletionLedgerEntries.set(entry.entryId, entry);
     });
     applyStoredRows(
-      migrated.mlsBacklog,
+      stored.mlsBacklog,
       normalizeStoredBacklog,
       (backlog) => {
         if (backlog.messages.length > 0) store.mlsBacklog.set(backlog.key, backlog.messages);

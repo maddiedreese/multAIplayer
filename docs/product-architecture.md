@@ -77,7 +77,7 @@ npm run verify
 
 Pull requests run blocking workspace checks and an always-present product-journey aggregate; executable changes run UI, native two-client, and packaged macOS journeys. Scheduled workflows run focused fuzz, relay churn/restore, supply-chain, container, compatibility, and native checks. Releases verify signing, notarization, authenticated updater metadata, checksums, and the required asset set. [CONTRIBUTING.md](../CONTRIBUTING.md) owns the current workflow and check policy.
 
-Generated evidence should be preferred over prose sentinels. A test that supports a threat-model claim emits a machine-readable claim record; CI then regenerates or verifies the evidence table. A green check must correspond to verification that actually executed.
+Tests that support security or release claims must assert behavior that actually executed. A green check is not evidence when it only matches output from an otherwise failing command.
 
 The desktop production build also inventories emitted web assets and enforces a 7 MiB total / 3 MiB per-file budget. Monaco is loaded only when the file editor opens, with the languages and workers the product uses. Update the budget only after documenting an intentional product need; do not raise it merely to absorb an accidental dependency or eager import.
 

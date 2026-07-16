@@ -18,8 +18,6 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: "host_only",
-  trustedApproverUserIds: [],
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.6-sol",
   browserAllowedOrigins: ["https://github.com"],
@@ -110,8 +108,6 @@ test("first workspace sends the exact reviewed safe room settings and initialize
   ]);
   assert.deepEqual(fixture.roomSettings[0], {
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     codexModel: "gpt-5.6-sol",
     codexModelPolicy: "auto",
     codexReasoningEffort: "medium",

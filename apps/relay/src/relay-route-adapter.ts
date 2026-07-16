@@ -23,7 +23,6 @@ import type { createRelayAuthz } from "./authz.js";
 import type { loadRelayConfig } from "./config.js";
 import { registerRelayRoutes } from "./http/register-routes.js";
 import {
-  isApprovalDelegationPolicy,
   isApprovalPolicy,
   isRoomMode,
   maxCiphertextCharactersForBlob,
@@ -164,7 +163,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     requesterFromRequest: options.requesterFromRequest,
     isRoomHost,
     isApprovalPolicy,
-    isApprovalDelegationPolicy,
     isRoomMode,
     normalizeBrowserAllowedOrigins,
     maxHostNameChars,

@@ -8,7 +8,6 @@ export interface RelayConfig {
   dataPath: string;
   minimumDiskHeadroomBytes: number;
   sqliteWalAutoCheckpointPages: number;
-  legacyJsonImportPath: string | null;
   mlsBacklogLimit: number;
   mlsBacklogRetentionDays: number;
   inviteTtlDays: number;
@@ -40,6 +39,7 @@ export interface RelayConfig {
         protectionSeconds: number;
       }
     | null;
+  deletionProtection: "primary_only" | "restore_safe";
   metricsToken: string | null;
   debugEndpointsEnabled: boolean;
   allowedCorsOrigins: string[];
@@ -87,9 +87,6 @@ export function loadRelayConfig(): RelayConfig {
 
   const nodeEnv = process.env.NODE_ENV ?? "development";
   validateStorageBackend(process.env.MULTAIPLAYER_RELAY_STORAGE);
-  const storageWasExplicit = process.env.MULTAIPLAYER_RELAY_STORAGE !== undefined;
-  const dataPathWasExplicit = process.env.MULTAIPLAYER_RELAY_DATA_PATH !== undefined;
-  const defaultLegacyJsonPath = resolve(".multaiplayer/relay-store.json");
   const attachmentBlobMaxBytes = parseIntegerEnv(
     process.env.MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES,
     5_000_000,
@@ -105,10 +102,11 @@ export function loadRelayConfig(): RelayConfig {
   const jsonBodyLimitBytes = Math.ceil(Math.max(1_000_000, attachmentBlobMaxBytes * 1.5 + 100_000));
 
   const deletionLedger = parseDeletionLedgerConfig();
-  if (nodeEnv === "production" && !deletionLedger) {
-    throw new Error("Production relay requires a complete external deletion ledger configuration.");
+  const deletionProtection = parseDeletionProtection(deletionLedger);
+  if (deletionProtection === "restore_safe" && !deletionLedger) {
+    throw new Error("Restore-safe account deletion requires a complete external deletion ledger configuration.");
   }
-  if (nodeEnv === "production" && deletionLedger?.backend === "file") {
+  if (nodeEnv === "production" && deletionProtection === "restore_safe" && deletionLedger?.backend === "file") {
     throw new Error(
       "Production relay requires an external S3-compatible deletion ledger; the file backend is development-only."
     );
@@ -120,7 +118,12 @@ export function loadRelayConfig(): RelayConfig {
       "MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS and MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED must be enabled or disabled together."
     );
   }
-  if (nodeEnv === "production" && deletionLedger && deletionLedger.protectionSeconds < 7_776_000) {
+  if (
+    nodeEnv === "production" &&
+    deletionProtection === "restore_safe" &&
+    deletionLedger &&
+    deletionLedger.protectionSeconds < 7_776_000
+  ) {
     throw new Error("Production deletion ledger protection must be at least 7776000 seconds (90 days).");
   }
 
@@ -140,11 +143,6 @@ export function loadRelayConfig(): RelayConfig {
       50,
       10_000
     ),
-    legacyJsonImportPath: process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH
-      ? resolve(process.env.MULTAIPLAYER_RELAY_LEGACY_JSON_IMPORT_PATH)
-      : !storageWasExplicit && !dataPathWasExplicit && existsSync(defaultLegacyJsonPath)
-        ? defaultLegacyJsonPath
-        : null,
     mlsBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
     mlsBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
     inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
@@ -182,10 +180,11 @@ export function loadRelayConfig(): RelayConfig {
       5_000_000
     ),
     deletionLedger,
+    deletionProtection,
     metricsToken: normalizeMetricsToken(process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN),
     debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
-    mutationsRequireAuth: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH, nodeEnv === "production"),
+    mutationsRequireAuth: !parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH, false),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
     trustProxyHeaders: trustProxyHeadersRequested && trustedProxyConfigured,
     structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
@@ -270,6 +269,18 @@ export function loadRelayConfig(): RelayConfig {
   };
 }
 
+function parseDeletionProtection(ledger: RelayConfig["deletionLedger"]): RelayConfig["deletionProtection"] {
+  const configured = process.env.MULTAIPLAYER_RELAY_DELETION_PROTECTION?.trim();
+  if (configured === undefined || configured === "") return ledger ? "restore_safe" : "primary_only";
+  if (configured !== "primary_only" && configured !== "restore_safe") {
+    throw new Error("MULTAIPLAYER_RELAY_DELETION_PROTECTION must be primary_only or restore_safe.");
+  }
+  if (configured === "primary_only" && ledger) {
+    throw new Error("Primary-only account deletion must not configure an external deletion ledger.");
+  }
+  return configured;
+}
+
 function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
   const settings = deletionLedgerSettings();
   const { filePath, endpoint, bucket, region, accessKeyId, secretAccessKey, hmacKey } = settings;
@@ -289,6 +300,9 @@ function parseDeletionLedgerConfig(): RelayConfig["deletionLedger"] {
   if (configured === 0) return null;
   if (configured !== 6 || secretAccessKey.length < 32 || hmacKey.length < 32) {
     throw new Error("Deletion ledger configuration is incomplete or uses a key shorter than 32 characters.");
+  }
+  if (secretAccessKey === hmacKey) {
+    throw new Error("Deletion ledger HMAC key must differ from the S3 secret access key.");
   }
   if (urlStyle !== "path" && urlStyle !== "virtual-host") {
     throw new Error("Deletion ledger S3 URL style must be path or virtual-host.");

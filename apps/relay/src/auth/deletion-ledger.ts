@@ -1,6 +1,16 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, open, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+  S3ServiceException,
+  type S3ClientConfig
+} from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 export interface DeletionLedgerEntry {
   version: 1;
@@ -14,7 +24,7 @@ export interface DeletionLedgerEntry {
 export interface DeletionLedger {
   record(userId: string): Promise<DeletionLedgerEntry>;
   list(): Promise<DeletionLedgerEntry[]>;
-  purgeExpired(): Promise<number>;
+  purgeExpired(entries?: readonly DeletionLedgerEntry[]): Promise<number>;
   subjectFor(userId: string): string;
   isProtected(userId: string): boolean;
 }
@@ -29,10 +39,13 @@ export interface S3DeletionLedgerOptions {
   urlStyle: "path" | "virtual-host";
   hmacKey: string;
   protectionSeconds: number;
-  fetchImpl?: typeof fetch;
+  client?: Pick<S3Client, "send">;
   now?: () => Date;
   randomId?: () => string;
 }
+
+export const maxDeletionLedgerEntries = 10_000;
+const deletionLedgerReadConcurrency = 16;
 
 export class FileDeletionLedger implements DeletionLedger {
   private readonly protectedSubjects = new Set<string>();
@@ -96,11 +109,12 @@ export class FileDeletionLedger implements DeletionLedger {
     return entries;
   }
 
-  async purgeExpired(): Promise<number> {
+  async purgeExpired(entries?: readonly DeletionLedgerEntry[]): Promise<number> {
     const { unlink } = await import("node:fs/promises");
     const now = this.now().getTime();
     let purged = 0;
-    for (const entry of await this.list()) {
+    entries ??= await this.list();
+    for (const entry of entries) {
       if (Date.parse(entry.protectUntil) > now) continue;
       await unlink(join(this.directory, `${entry.id}.json`));
       purged += 1;
@@ -113,29 +127,31 @@ export class FileDeletionLedger implements DeletionLedger {
         await directoryHandle.close();
       }
     }
-    if (purged > 0) await this.list();
+    if (purged > 0) {
+      this.protectedSubjects.clear();
+      for (const entry of entries) if (Date.parse(entry.protectUntil) > now) this.protectedSubjects.add(entry.subject);
+    }
     return purged;
   }
 }
 
 /**
- * An append-only deletion ledger backed by an S3-compatible bucket. Objects are
+ * A write-once deletion ledger backed by an S3-compatible bucket. Objects are
  * immutable and contain no GitHub id, login, access token, or record inventory.
  */
 export class S3DeletionLedger implements DeletionLedger {
   private readonly protectedSubjects = new Set<string>();
-  private readonly fetchImpl: typeof fetch;
+  private readonly client: Pick<S3Client, "send">;
   private readonly now: () => Date;
-  private readonly endpoint: URL;
   private readonly prefix: string;
   private readonly randomId: () => string;
 
   constructor(private readonly options: S3DeletionLedgerOptions) {
-    this.endpoint = new URL(options.endpoint);
-    if (this.endpoint.protocol !== "https:" && this.endpoint.hostname !== "localhost") {
+    const endpoint = new URL(options.endpoint);
+    if (endpoint.protocol !== "https:" && endpoint.hostname !== "localhost") {
       throw new Error("Deletion ledger endpoint must use HTTPS.");
     }
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.client = options.client ?? createS3Client(options);
     this.now = options.now ?? (() => new Date());
     this.randomId = options.randomId ?? randomUUID;
     this.prefix = options.prefix.replace(/^\/+|\/+$/g, "") || "relay-deletions/v1";
@@ -158,18 +174,22 @@ export class S3DeletionLedger implements DeletionLedger {
       this.randomId()
     );
     const { id } = entry;
-    const response = await this.request("PUT", this.objectPath(id), undefined, JSON.stringify(entry), {
-      "content-type": "application/json",
-      "if-none-match": "*"
-    });
-    if (response.status === 412) {
-      const existing = await this.request("GET", this.objectPath(id));
-      if (!existing.ok) throw new Error(`Deletion ledger idempotency read failed with status ${existing.status}.`);
-      const stored = parseDeletionLedgerEntry(this.options.hmacKey, await existing.text(), id);
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.options.bucket,
+          Key: this.objectKey(id),
+          Body: JSON.stringify(entry),
+          ContentType: "application/json",
+          IfNoneMatch: "*"
+        })
+      );
+    } catch (error) {
+      if (!(error instanceof S3ServiceException) || error.$metadata.httpStatusCode !== 412) throw error;
+      const stored = await this.readEntry(this.objectKey(id), id);
       this.protectedSubjects.add(stored.subject);
       return stored;
     }
-    if (!response.ok) throw new Error(`Deletion ledger write failed with status ${response.status}.`);
     this.protectedSubjects.add(entry.subject);
     return entry;
   }
@@ -179,33 +199,45 @@ export class S3DeletionLedger implements DeletionLedger {
     let continuationToken: string | undefined;
     const seenTokens = new Set<string>();
     do {
-      const query = new URLSearchParams({ "list-type": "2", prefix: `${this.prefix}/` });
-      if (continuationToken) query.set("continuation-token", continuationToken);
-      const response = await this.request("GET", this.bucketPath(), query);
-      if (!response.ok) throw new Error(`Deletion ledger listing failed with status ${response.status}.`);
-      const xml = await response.text();
-      keys.push(
-        ...xmlElements(xml, "Key")
-          .map(decodeXml)
-          .filter((key) => key.endsWith(".json"))
+      const response = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.options.bucket,
+          Prefix: `${this.prefix}/`,
+          ContinuationToken: continuationToken
+        })
       );
-      continuationToken =
-        xmlElement(xml, "IsTruncated") === "true" ? decodeXml(xmlElement(xml, "NextContinuationToken")) : undefined;
-      if (continuationToken === "")
+      keys.push(...(response.Contents ?? []).flatMap((object) => (object.Key?.endsWith(".json") ? [object.Key] : [])));
+      if (keys.length > maxDeletionLedgerEntries) {
+        throw new Error(
+          `Deletion ledger exceeds the ${maxDeletionLedgerEntries}-entry startup reconciliation bound; archive expired entries before restarting.`
+        );
+      }
+      if (
+        response.IsTruncated &&
+        (typeof response.NextContinuationToken !== "string" || response.NextContinuationToken.trim().length === 0)
+      ) {
         throw new Error("Deletion ledger returned a truncated page without a continuation token.");
+      }
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
       if (continuationToken && seenTokens.has(continuationToken)) {
         throw new Error("Deletion ledger returned a repeated continuation token.");
       }
       if (continuationToken) seenTokens.add(continuationToken);
     } while (continuationToken);
 
+    const sortedKeys = keys.sort();
     const entries: DeletionLedgerEntry[] = [];
-    for (const key of keys.sort()) {
-      if (!key.startsWith(`${this.prefix}/`)) throw new Error("Deletion ledger returned an object outside its prefix.");
-      const response = await this.request("GET", this.pathForKey(key));
-      if (!response.ok) throw new Error(`Deletion ledger object read failed with status ${response.status}.`);
+    for (let offset = 0; offset < sortedKeys.length; offset += deletionLedgerReadConcurrency) {
+      const batch = sortedKeys.slice(offset, offset + deletionLedgerReadConcurrency);
       entries.push(
-        parseDeletionLedgerEntry(this.options.hmacKey, await response.text(), key.slice(this.prefix.length + 1, -5))
+        ...(await Promise.all(
+          batch.map((key) => {
+            if (!key.startsWith(`${this.prefix}/`)) {
+              throw new Error("Deletion ledger returned an object outside its prefix.");
+            }
+            return this.readEntry(key, key.slice(this.prefix.length + 1, -5));
+          })
+        ))
       );
     }
     this.protectedSubjects.clear();
@@ -213,110 +245,52 @@ export class S3DeletionLedger implements DeletionLedger {
     return entries;
   }
 
-  async purgeExpired(): Promise<number> {
+  async purgeExpired(entries?: readonly DeletionLedgerEntry[]): Promise<number> {
+    entries ??= await this.list();
     const now = this.now().getTime();
-    let purged = 0;
-    for (const entry of await this.list()) {
-      if (Date.parse(entry.protectUntil) > now) continue;
-      const response = await this.request("DELETE", this.objectPath(entry.id));
-      if (!response.ok && response.status !== 404) {
-        throw new Error(`Deletion ledger expiry failed with status ${response.status}.`);
-      }
-      purged += 1;
+    const expired = entries.filter((entry) => Date.parse(entry.protectUntil) <= now);
+    for (let offset = 0; offset < expired.length; offset += deletionLedgerReadConcurrency) {
+      await Promise.all(
+        expired
+          .slice(offset, offset + deletionLedgerReadConcurrency)
+          .map((entry) =>
+            this.client.send(new DeleteObjectCommand({ Bucket: this.options.bucket, Key: this.objectKey(entry.id) }))
+          )
+      );
     }
-    if (purged > 0) await this.list();
-    return purged;
+    if (expired.length > 0) {
+      this.protectedSubjects.clear();
+      for (const entry of entries) if (Date.parse(entry.protectUntil) > now) this.protectedSubjects.add(entry.subject);
+    }
+    return expired.length;
   }
 
-  private bucketPath(): string {
-    return this.options.urlStyle === "path"
-      ? `${this.endpoint.pathname.replace(/\/$/, "")}/${encodeURIComponent(this.options.bucket)}`
-      : this.endpoint.pathname.replace(/\/$/, "");
+  private objectKey(id: string): string {
+    return `${this.prefix}/${id}.json`;
   }
 
-  private objectPath(id: string): string {
-    return this.pathForKey(`${this.prefix}/${id}.json`);
+  private async readEntry(key: string, id: string): Promise<DeletionLedgerEntry> {
+    const response = await this.client.send(new GetObjectCommand({ Bucket: this.options.bucket, Key: key }));
+    if (!response.Body) throw new Error("Deletion ledger object has no body.");
+    return parseDeletionLedgerEntry(this.options.hmacKey, await response.Body.transformToString(), id);
   }
-
-  private pathForKey(key: string): string {
-    return `${this.bucketPath()}/${key.split("/").map(encodeURIComponent).join("/")}`;
-  }
-
-  private async request(
-    method: string,
-    path: string,
-    query?: URLSearchParams,
-    body = "",
-    extraHeaders: Record<string, string> = {}
-  ): Promise<Response> {
-    const url = new URL(this.endpoint);
-    if (this.options.urlStyle === "virtual-host") url.hostname = `${this.options.bucket}.${url.hostname}`;
-    url.pathname = path;
-    url.search = query?.toString() ?? "";
-    const timestamp = this.now();
-    const amzDate = timestamp.toISOString().replace(/[:-]|\.\d{3}/g, "");
-    const date = amzDate.slice(0, 8);
-    const payloadHash = sha256(body);
-    const headers: Record<string, string> = {
-      host: url.host,
-      "x-amz-content-sha256": payloadHash,
-      "x-amz-date": amzDate,
-      ...extraHeaders
-    };
-    const signedHeaderNames = Object.keys(headers)
-      .map((key) => key.toLowerCase())
-      .sort();
-    const canonicalHeaders = signedHeaderNames.map((key) => `${key}:${headers[key]!.trim()}\n`).join("");
-    const canonicalQuery = Array.from(url.searchParams.entries())
-      .sort(
-        ([leftKey, leftValue], [rightKey, rightValue]) =>
-          leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue)
-      )
-      .map(([key, value]) => `${awsEncode(key)}=${awsEncode(value)}`)
-      .join("&");
-    const canonicalRequest = [
-      method,
-      url.pathname,
-      canonicalQuery,
-      canonicalHeaders,
-      signedHeaderNames.join(";"),
-      payloadHash
-    ].join("\n");
-    const scope = `${date}/${this.options.region}/s3/aws4_request`;
-    const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, sha256(canonicalRequest)].join("\n");
-    const signingKey = hmac(
-      hmac(hmac(hmac(`AWS4${this.options.secretAccessKey}`, date), this.options.region), "s3"),
-      "aws4_request"
-    );
-    const signature = hmac(signingKey, stringToSign).toString("hex");
-    headers.authorization = `AWS4-HMAC-SHA256 Credential=${this.options.accessKeyId}/${scope}, SignedHeaders=${signedHeaderNames.join(";")}, Signature=${signature}`;
-    return this.fetchImpl(url, {
-      method,
-      headers,
-      ...(body ? { body } : {}),
-      signal: AbortSignal.timeout(10_000)
-    });
-  }
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function hmac(key: string | Buffer, value: string): Buffer {
-  return createHmac("sha256", key).update(value).digest();
-}
-
-function awsEncode(value: string): string {
-  return encodeURIComponent(value).replace(
-    /[!'()*]/g,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
-  );
 }
 
 function safeEqualHex(left: string, right: string): boolean {
   if (!/^[a-f0-9]{64}$/.test(left) || left.length !== right.length) return false;
   return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
+}
+
+function createS3Client(options: S3DeletionLedgerOptions): S3Client {
+  const clientConfig: S3ClientConfig = {
+    endpoint: options.endpoint,
+    region: options.region,
+    forcePathStyle: options.urlStyle === "path",
+    maxAttempts: 3,
+    requestHandler: new NodeHttpHandler({ connectionTimeout: 5_000, requestTimeout: 10_000 }),
+    credentials: { accessKeyId: options.accessKeyId, secretAccessKey: options.secretAccessKey }
+  };
+  return new S3Client(clientConfig);
 }
 
 export function deletionSubject(hmacKey: string, userId: string): string {
@@ -387,23 +361,6 @@ function entryMac(hmacKey: string, entry: Omit<DeletionLedgerEntry, "mac">): str
     .update("multaiplayer-deletion-ledger-entry-v1\0")
     .update(JSON.stringify([entry.version, entry.id, entry.subject, entry.requestedAt, entry.protectUntil]))
     .digest("hex");
-}
-
-function xmlElements(xml: string, name: string): string[] {
-  return Array.from(xml.matchAll(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, "g")), (match) => match[1] ?? "");
-}
-
-function xmlElement(xml: string, name: string): string {
-  return xmlElements(xml, name)[0] ?? "";
-}
-
-function decodeXml(value: string): string {
-  return value
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

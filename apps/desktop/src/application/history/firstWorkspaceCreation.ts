@@ -1,5 +1,4 @@
 import {
-  defaultApprovalDelegationPolicy,
   defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
@@ -50,11 +49,7 @@ export interface LocalRoomCreationDefaults {
   historySettings: LocalHistorySettings;
 }
 
-export type RequestedRoomCreationSettings = Omit<
-  Readonly<RoomCreationSettings>,
-  "trustedApproverUserIds" | "browserAllowedOrigins"
-> & {
-  readonly trustedApproverUserIds?: readonly string[];
+export type RequestedRoomCreationSettings = Omit<Readonly<RoomCreationSettings>, "browserAllowedOrigins"> & {
   readonly browserAllowedOrigins?: readonly string[];
 };
 
@@ -71,8 +66,6 @@ export type FirstWorkspaceCreationResult =
 
 export const firstWorkspaceSafeRoomSettings: RequestedRoomCreationSettings = Object.freeze({
   approvalPolicy: "ask_every_turn",
-  approvalDelegationPolicy: defaultApprovalDelegationPolicy,
-  trustedApproverUserIds: Object.freeze([]),
   codexModel: defaultCodexModel,
   codexModelPolicy: defaultCodexModelPolicy,
   codexReasoningEffort: defaultCodexReasoningEffort,
@@ -160,10 +153,9 @@ function requireExistingTeam(teamId: string, runtime: Pick<WorkspaceCreationRunt
 }
 
 function copyRoomSettings(settings: RequestedRoomCreationSettings): RoomCreationSettings {
-  const { trustedApproverUserIds, browserAllowedOrigins, ...scalarSettings } = settings;
+  const { browserAllowedOrigins, ...scalarSettings } = settings;
   return {
     ...scalarSettings,
-    ...(trustedApproverUserIds ? { trustedApproverUserIds: [...trustedApproverUserIds] } : {}),
     ...(browserAllowedOrigins ? { browserAllowedOrigins: [...browserAllowedOrigins] } : {})
   };
 }

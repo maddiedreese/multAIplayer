@@ -67,10 +67,144 @@ test("reconciliation fails closed when an older restore resurrects active owners
   const userId = "github:owner";
   store.teams.set("team", { id: "team", name: "Team", members: 1, createdAt: "2026-01-01T00:00:00.000Z" });
   store.teamMembers.set("team", new Map([[userId, { userId, role: "owner", joinedAt: "2026-01-01T00:00:00.000Z" }]]));
+  const subject = ledgerFor(userId).subjectFor(userId);
   await assert.rejects(
     () => reconcileDeletionLedger({ ledger: ledgerFor(userId), store, persist: async () => undefined }),
-    DeletionReconciliationBlockedError
+    (error: unknown) => {
+      assert.ok(error instanceof DeletionReconciliationBlockedError);
+      assert.equal(error.subject, subject);
+      assert.match(error.message, new RegExp(subject));
+      return true;
+    }
   );
+});
+
+test("reconciliation discovers an identity represented only by a durable quota row", async () => {
+  const store = createRelayStore();
+  const userId = "github:quota-only-restore";
+  store.accountQuotaRecords.set(`daily_team_creations:${userId}`, {
+    key: `daily_team_creations:${userId}`,
+    userId,
+    quota: "daily_team_creations",
+    used: 1,
+    resetAt: Date.now() + 60_000
+  });
+
+  const result = await reconcileDeletionLedger({
+    ledger: ledgerFor(userId),
+    store,
+    persist: async () => undefined
+  });
+
+  assert.equal(result.identitiesDeleted, 1);
+  assert.equal(store.accountQuotaRecords.size, 0);
+});
+
+test("offline resolution deletes only resources owned by the exact reported subject", async () => {
+  const store = createRelayStore();
+  const userId = "github:owner";
+  const ledger = ledgerFor(userId);
+  store.teams.set("team", { id: "team", name: "Team", members: 1 });
+  store.teamMembers.set(
+    "team",
+    new Map([[userId, { teamId: "team", userId, role: "owner", joinedAt: "2026-01-01T00:00:00.000Z" }]])
+  );
+  store.rooms.set("room", {
+    id: "room",
+    teamId: "team",
+    name: "Room",
+    host: "Owner",
+    hostUserId: userId,
+    activeHostDeviceId: "device",
+    hostStatus: "active",
+    acceptedMlsEpoch: 0,
+    approvalPolicy: "ask_every_turn",
+    mode: { chat: true, code: true, workspace: true, browser: true },
+    browserAllowedOrigins: [],
+    browserProfilePersistent: true,
+    unread: 0
+  });
+  store.rooms.set("collaborator-room", {
+    ...store.rooms.get("room")!,
+    id: "collaborator-room",
+    name: "Collaborator room",
+    host: "Collaborator",
+    hostUserId: "github:collaborator",
+    activeHostDeviceId: "collaborator-device"
+  });
+  store.invites.set("team-invite", {
+    id: "team-invite",
+    teamId: "team",
+    roomId: "collaborator-room",
+    creatorUserId: "github:collaborator",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2099-01-01T00:00:00.000Z"
+  });
+  const result = await reconcileDeletionLedger({
+    ledger,
+    store,
+    deleteOwnedResourcesForSubject: ledger.subjectFor(userId),
+    persist: async () => undefined
+  });
+  assert.equal(result.conflictsResolved, 1);
+  assert.ok(store.teams.get("team")?.deletedAt);
+  assert.ok(store.rooms.get("room")?.deletedAt);
+  assert.ok(store.rooms.get("collaborator-room")?.deletedAt);
+  assert.equal(store.invites.has("team-invite"), false);
+  assert.equal(store.teamMembers.get("team")?.has(userId), false);
+});
+
+test("offline resolution revokes invite artifacts for a restored hosted room", async () => {
+  const store = createRelayStore();
+  const userId = "github:host";
+  const ledger = ledgerFor(userId);
+  store.teams.set("team", { id: "team", name: "Team", members: 2 });
+  store.teamMembers.set(
+    "team",
+    new Map([
+      ["github:owner", { teamId: "team", userId: "github:owner", role: "owner", joinedAt: "2026-01-01T00:00:00.000Z" }],
+      [userId, { teamId: "team", userId, role: "member", joinedAt: "2026-01-01T00:00:00.000Z" }]
+    ])
+  );
+  store.rooms.set("room", {
+    id: "room",
+    teamId: "team",
+    name: "Room",
+    host: "Host",
+    hostUserId: userId,
+    hostStatus: "active",
+    approvalPolicy: "ask_every_turn",
+    mode: { chat: true, code: true, workspace: true, browser: false },
+    browserAllowedOrigins: [],
+    browserProfilePersistent: false,
+    unread: 0
+  });
+  store.invites.set("invite", {
+    id: "invite",
+    teamId: "team",
+    roomId: "room",
+    createdAt: "2026-01-01T00:00:00.000Z"
+  });
+  store.inviteResponses.set("request", {
+    requestId: "request",
+    inviteId: "invite",
+    requesterUserId: "github:joiner",
+    requesterDeviceId: "device",
+    status: "approved",
+    responseBinding: { teamId: "team", hostUserId: userId }
+  } as never);
+
+  const result = await reconcileDeletionLedger({
+    ledger,
+    store,
+    deleteOwnedResourcesForSubject: ledger.subjectFor(userId),
+    persist: async () => undefined
+  });
+
+  assert.equal(result.conflictsResolved, 1);
+  assert.ok(store.rooms.get("room")?.deletedAt);
+  assert.equal(store.invites.size, 0);
+  assert.equal(store.inviteResponses.size, 0);
 });
 
 test("reconciliation removes only markers whose external protection has expired", async () => {
@@ -142,6 +276,7 @@ test("restart after the original horizon deletes the identity before purging and
     const result = await reconcileDeletionLedger({
       ledger,
       store,
+      now: () => current,
       persist: async () => {
         persistCalls += 1;
         if (persistCalls !== 1) return;

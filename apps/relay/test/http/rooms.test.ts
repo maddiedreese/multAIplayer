@@ -423,7 +423,7 @@ test("relay bounds user-visible metadata strings", async () => {
 });
 
 test("relay lets authorized users archive restore and delete rooms", async () => {
-  const relay = await startRelay({ MULTAIPLAYER_RELAY_REQUIRE_AUTH: "true" });
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
   const memberCookie = await createDebugSession(relay.baseUrl, "github:design", "design");
   try {
@@ -453,6 +453,13 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
     };
     assert.ok(archivedWorkspace.rooms.find((room) => room.id === "room-desktop")?.archivedAt);
 
+    const inviteWhileArchived = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(inviteWhileArchived.status, 409);
+
     const restoreResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
       method: "PATCH",
       headers: { "content-type": "application/json", cookie: ownerCookie },
@@ -462,6 +469,14 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
     const restored = (await restoreResponse.json()) as { room: { id: string; archivedAt?: string } };
     assert.equal(restored.room.archivedAt, undefined);
 
+    const inviteResponse = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(inviteResponse.status, 201);
+    const { invite } = (await inviteResponse.json()) as { invite: { id: string } };
+
     const deleteResponse = await fetch(`${relay.baseUrl}/rooms/room-desktop/lifecycle`, {
       method: "PATCH",
       headers: { "content-type": "application/json", cookie: ownerCookie },
@@ -470,6 +485,14 @@ test("relay lets authorized users archive restore and delete rooms", async () =>
     assert.equal(deleteResponse.status, 200);
     const deleted = (await deleteResponse.json()) as { room: { id: string; deletedAt?: string } };
     assert.ok(deleted.room.deletedAt);
+
+    const rejectedInvite = await fetch(`${relay.baseUrl}/invites`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ teamId: "team-core", roomId: "room-desktop" })
+    });
+    assert.equal(rejectedInvite.status, 404);
+    assert.equal((await fetch(`${relay.baseUrl}/invites/${invite.id}`)).status, 404);
 
     const workspaceAfterDelete = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie: ownerCookie } });
     const deletedWorkspace = (await workspaceAfterDelete.json()) as { rooms: Array<{ id: string }> };
@@ -629,8 +652,6 @@ function hostBootstrapRoom(): RoomRecord {
     hostUserId: "github:maddiedreese",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    approvalDelegationPolicy: "host_only",
-    trustedApproverUserIds: [],
     mode: { chat: true, code: true, workspace: true, browser: true },
     browserAllowedOrigins: [],
     browserProfilePersistent: false,
@@ -844,6 +865,7 @@ async function startLifecycleRouteHarness(initialRoom: RoomRecord) {
       return false;
     },
     canAccessRoom: () => canAccess,
+    isTeamMember: () => canAccess,
     requesterFromRequest: () => ({ id: session.user.id, name: "Maddie" }),
     isRoomHost: () => isHost,
     scheduleStoreSave: () => saves++,

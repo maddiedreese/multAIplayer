@@ -2,7 +2,6 @@ import { z } from "zod";
 import { codexReasoningEffortIds } from "./defaults-options.js";
 import {
   DeviceId,
-  RoomId,
   UserId,
   maxCodexModelChars,
   maxCodexQueueSize,
@@ -249,17 +248,6 @@ export const CodexActivityPlaintextPayload = z.object({
   hostUserId: z.string().min(1).max(maxUserIdChars)
 });
 
-export const CodexApprovalPlaintextPayload = z.object({
-  eventType: z.literal("codex.approval"),
-  approvalId: z.string().min(1).max(maxEnvelopeIdChars),
-  roomId: RoomId,
-  approver: z.string().min(1).max(maxDisplayNameChars),
-  approverUserId: z.string().min(1).max(maxUserIdChars),
-  approvedAt: z.string().datetime(),
-  delegationPolicy: z.enum(["members_can_approve", "trusted_members_only"]),
-  message: z.string().max(maxMediumTextChars).optional()
-});
-
 export const CodexQueuePlaintextPayload = z
   .object({
     eventType: z.literal("codex.queue"),
@@ -439,8 +427,6 @@ export const RoomSettingsPlaintextPayload = z.object({
   setting: z.enum([
     "roomName",
     "approvalPolicy",
-    "approvalDelegationPolicy",
-    "trustedApprovers",
     "roomMode",
     "codexModel",
     "codexReasoningEffort",
@@ -486,7 +472,6 @@ export type RequestStatusPlaintextPayload = z.infer<typeof RequestStatusPlaintex
 export type CodexTurnRiskFlagPayload = z.infer<typeof CodexTurnRiskFlagPayload>;
 export type CodexEventPlaintextPayload = z.infer<typeof CodexEventPlaintextPayload>;
 export type CodexActivityPlaintextPayload = z.infer<typeof CodexActivityPlaintextPayload>;
-export type CodexApprovalPlaintextPayload = z.infer<typeof CodexApprovalPlaintextPayload>;
 export type CodexQueuePlaintextPayload = z.infer<typeof CodexQueuePlaintextPayload>;
 export type TerminalResultPlaintextPayload = z.infer<typeof TerminalResultPlaintextPayload>;
 export type GitWorkflowEventPlaintextPayload = z.infer<typeof GitWorkflowEventPlaintextPayload>;

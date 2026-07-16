@@ -1,0 +1,82 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const doctorPath = fileURLToPath(new URL("../../../scripts/doctor.mjs", import.meta.url));
+const repositoryRoot = dirname(dirname(doctorPath));
+const ledgerEnvironmentNames = [
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY",
+  "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE"
+] as const;
+
+const validProductionEnvironment: NodeJS.ProcessEnv = {
+  MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "https://app.example.test",
+  MULTAIPLAYER_RELAY_DATA_PATH: `${repositoryRoot}/doctor-test.sqlite`,
+  MULTAIPLAYER_RELAY_DEBUG: "false",
+  MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON: "true",
+  MULTAIPLAYER_RELAY_RATE_LIMITS: "true",
+  MULTAIPLAYER_RELAY_STORAGE: "sqlite",
+  MULTAIPLAYER_RELAY_STRUCTURED_LOGS: "true",
+  MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS: "false",
+  MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED: "false",
+  MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+  MULTAIPLAYER_MLS_VALIDATOR_PATH: process.execPath
+};
+
+function runDoctor(extraEnv: NodeJS.ProcessEnv): { status: number | null; output: string } {
+  const env = { ...process.env, NODE_ENV: "production", ...validProductionEnvironment, ...extraEnv };
+  for (const name of ledgerEnvironmentNames) {
+    if (!(name in extraEnv)) delete env[name];
+  }
+  const result = spawnSync(process.execPath, [doctorPath, "--production-relay"], {
+    cwd: repositoryRoot,
+    env,
+    encoding: "utf8"
+  });
+  return { status: result.status, output: `${result.stdout}\n${result.stderr}` };
+}
+
+test("production doctor accepts primary-only deletion without external ledger credentials", () => {
+  const { status, output } = runDoctor({ MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only" });
+  assert.equal(status, 0, output);
+  assert.match(output, /\[ok\] production account deletion protection: primary-only deletion configured/);
+  assert.doesNotMatch(output, /\[fail\] production external deletion ledger/);
+
+  const fileLedgerResult = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH: "/tmp/deletion-ledger.json"
+  });
+  assert.notEqual(fileLedgerResult.status, 0);
+  assert.match(fileLedgerResult.output, /\[fail\] production account deletion protection/);
+});
+
+test("production doctor requires distinct S3 transport and HMAC keys in restore-safe mode", () => {
+  const reusedKey = "test-reused-key-with-at-least-32-characters";
+  const restoreSafeEnvironment = {
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "restore_safe",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT: "https://ledger.example.test",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET: "relay",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION: "us-test-1",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID: "test-access-key",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY: reusedKey,
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY: "independent-hmac-key-with-at-least-32-characters",
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE: "path"
+  };
+  const validResult = runDoctor(restoreSafeEnvironment);
+  assert.equal(validResult.status, 0, validResult.output);
+  assert.match(validResult.output, /\[ok\] production external deletion ledger: S3-compatible ledger configured/);
+  const invalidResult = runDoctor({
+    ...restoreSafeEnvironment,
+    MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY: reusedKey
+  });
+  assert.notEqual(invalidResult.status, 0);
+  assert.match(invalidResult.output, /\[fail\] production external deletion ledger/);
+});

@@ -97,6 +97,5 @@ function isApprovalPolicy(value: unknown): value is ApprovalPolicy {
 }
 
 function sanitizeApprovalPolicy(value: unknown): ApprovalPolicy {
-  if (value === "auto_chat_only" || value === "auto_browser_allowed_sites") return "ask_every_turn";
   return isApprovalPolicy(value) ? value : defaultTeamRoomDefaults.approvalPolicy;
 }

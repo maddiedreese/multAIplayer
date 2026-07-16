@@ -1,6 +1,6 @@
 import { isRecord, type MlsRelayMessage } from "@multaiplayer/protocol";
 import { logRelayEvent } from "./observability.js";
-import { RelayPersistenceMigrationError, RelayStaleEpochError, type RelayPersistence } from "./persistence.js";
+import { RelayStaleEpochError, type RelayPersistence } from "./persistence.js";
 import { RelayStoreByteCapacityError, RelayStoreCapacityError, type RoomKey } from "./state.js";
 import type { RelayStoreCodec } from "./store-codec.js";
 
@@ -63,11 +63,7 @@ export function createRelayStorePersistenceCoordinator(options: {
     collectPendingChanges();
     if (pendingChanges.length === 0) return;
     const changes = pendingChanges;
-    persistenceWrite(() => {
-      if (!options.persistence.saveChanges(changes)) {
-        throw new Error("Relay persistence rejected a durable mutation batch.");
-      }
-    });
+    persistenceWrite(() => options.persistence.saveChanges(changes));
     if (pendingChanges === changes) pendingChanges = [];
   }
 
@@ -76,33 +72,23 @@ export function createRelayStorePersistenceCoordinator(options: {
       const stored = await options.persistence.load();
       if (stored === null) return;
       if (!isRecord(stored) || stored.version !== 1) {
-        logRelayEvent("warn", "unsupported_store_version_quarantined");
-        await options.persistence.quarantine("unsupported-version");
-        throw new RelayPersistenceLoadError(
-          "Relay store version is unsupported; quarantined evidence requires operator recovery."
-        );
+        logRelayEvent("warn", "unsupported_store_version");
+        throw new RelayPersistenceLoadError("Relay store version is unsupported; operator recovery is required.");
       }
       options.storeCodec.applyStoredRelayState(stored);
-      await options.persistence.finalizeLoad?.(() => options.storeCodec.toStoredRelayState());
-      if (hasLegacyAuthSessionFields(stored)) {
-        await options.persistence.save(options.storeCodec.toStoredRelayState());
-        logRelayEvent("info", "legacy_auth_session_fields_purged");
-      }
       options.storeCodec.discardStoredRelayMutations();
       pendingChanges = [];
       logRelayEvent("info", "relay_store_loaded");
     } catch (error) {
       if (
-        error instanceof RelayPersistenceMigrationError ||
         error instanceof RelayStoreCapacityError ||
         error instanceof RelayStoreByteCapacityError ||
         error instanceof RelayPersistenceLoadError
       )
         throw error;
       logRelayEvent("warn", "relay_store_load_failed");
-      await options.persistence.quarantine("unreadable");
       throw new RelayPersistenceLoadError(
-        "Relay store could not be read and was quarantined; refusing to start with replacement state.",
+        "Relay store could not be read; refusing to start with replacement state.",
         error
       );
     }
@@ -113,18 +99,14 @@ export function createRelayStorePersistenceCoordinator(options: {
   }
 
   function saveMlsBacklog(roomKey: RoomKey, messages: MlsRelayMessage[]) {
-    persistenceWrite(() => {
-      if (!options.persistence.saveMlsBacklog(roomKey, messages)) {
-        throw new Error("Relay persistence rejected an MLS backlog write.");
-      }
-    });
+    persistenceWrite(() => options.persistence.saveMlsBacklog(roomKey, messages));
     savePendingChanges();
   }
 
   function saveKeyPackages() {
     collectPendingChanges();
     const changes = pendingChanges;
-    persistenceWrite(() => options.persistence.saveKeyPackages(changes, () => options.storeCodec.toStoredRelayState()));
+    persistenceWrite(() => options.persistence.saveKeyPackages(changes));
     if (pendingChanges === changes) pendingChanges = [];
     return Promise.resolve();
   }
@@ -132,15 +114,7 @@ export function createRelayStorePersistenceCoordinator(options: {
   function saveMlsMessage(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
     collectPendingChanges();
     const changes = pendingChanges;
-    persistenceWrite(() => {
-      if (
-        !options.persistence.saveMlsMessage(roomKey, message, prunedIds, changes, () =>
-          options.storeCodec.toStoredRelayState()
-        )
-      ) {
-        throw new Error("Relay persistence rejected an MLS message write.");
-      }
-    });
+    persistenceWrite(() => options.persistence.saveMlsMessage(roomKey, message, prunedIds, changes));
     if (pendingChanges === changes) pendingChanges = [];
     return Promise.resolve();
   }
@@ -148,11 +122,7 @@ export function createRelayStorePersistenceCoordinator(options: {
   function saveMlsCommit(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) {
     collectPendingChanges();
     const changes = pendingChanges;
-    persistenceWrite(() =>
-      options.persistence.saveMlsCommit(roomKey, message, prunedIds, changes, () =>
-        options.storeCodec.toStoredRelayState()
-      )
-    );
+    persistenceWrite(() => options.persistence.saveMlsCommit(roomKey, message, prunedIds, changes));
     if (pendingChanges === changes) pendingChanges = [];
     return Promise.resolve();
   }
@@ -208,12 +178,4 @@ export class RelayPersistenceLoadError extends Error {
   constructor(message: string, cause?: unknown) {
     super(message, { cause });
   }
-}
-
-function hasLegacyAuthSessionFields(stored: Record<string, unknown>): boolean {
-  if (!Array.isArray(stored.authSessions)) return false;
-  return stored.authSessions.some(
-    (session) =>
-      isRecord(session) && ("sessionId" in session || "accessToken" in session || "encryptedAccessToken" in session)
-  );
 }

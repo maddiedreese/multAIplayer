@@ -11,7 +11,6 @@ import type { Response } from "express";
 
 const persistence = createRelayAuthSessionPersistence({
   authSessionMaxAgeMs: 1000 * 60 * 60,
-  maxAuthSessionIdChars: 128,
   maxDisplayNameChars: 100,
   maxRoomProjectPathChars: 4096,
   maxUserIdChars: 128
@@ -238,25 +237,6 @@ test("stored sessions reject malformed, expired, and overlong-lived records", ()
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, login: "" } }), null);
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, name: "" } }), null);
   assert.equal(persistence.normalizeStoredAuthSession({ ...valid, user: { ...validUser, avatarUrl: "" } }), null);
-});
-
-test("stored sessions migrate bounded legacy bearer ids to digests", () => {
-  const expiresAt = Date.now() + 30_000;
-  const normalized = persistence.normalizeStoredAuthSession({
-    sessionId: "legacy-token",
-    user: { id: "github:legacy", login: "legacy" },
-    expiresAt
-  });
-  assert.equal(normalized?.sessionIdHash, hashAuthSessionId("legacy-token"));
-  assert.equal(normalized?.session.expiresAt, expiresAt);
-  assert.equal(
-    persistence.normalizeStoredAuthSession({
-      sessionId: "x".repeat(129),
-      user: { id: "github:legacy", login: "legacy" },
-      expiresAt
-    }),
-    null
-  );
 });
 
 test("session serialization drops expired and malformed digest entries", () => {

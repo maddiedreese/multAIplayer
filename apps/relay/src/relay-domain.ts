@@ -5,6 +5,7 @@ import {
   maxHostNameChars,
   maxRoomProjectPathChars,
   maxUserIdChars,
+  type InviteRecord,
   type MlsRelayMessage,
   type RoomRecord,
   type TeamMemberRecord,
@@ -23,6 +24,20 @@ import type { AuthSession, ClientSession, RelayStore, RoomKey } from "./state.js
 
 export function roomKey(teamId: string, roomId: string): RoomKey {
   return `${teamId}:${roomId}`;
+}
+
+export function isActiveTeam(store: Pick<RelayStore, "getTeam">, teamId: string): boolean {
+  const team = store.getTeam(teamId);
+  return Boolean(team && !team.archivedAt && !team.deletedAt);
+}
+
+export function isActiveRoom(store: Pick<RelayStore, "getTeam" | "getRoom">, teamId: string, roomId: string): boolean {
+  const room = store.getRoom(roomId);
+  return isActiveTeam(store, teamId) && Boolean(room && room.teamId === teamId && !room.archivedAt && !room.deletedAt);
+}
+
+export function isActiveInviteTarget(store: RelayStore, invite: InviteRecord | undefined): boolean {
+  return Boolean(invite && isActiveRoom(store, invite.teamId, invite.roomId));
 }
 
 export function normalizeAuthSessionId(value: unknown): string {
@@ -80,19 +95,7 @@ export function createTeamMutationHelpers(options: {
   broadcastWorkspaceUpdated: (team: TeamRecord) => void;
 }) {
   function revokeTeamInvites(teamId: string) {
-    let revoked = false;
-    for (const [inviteId, invite] of options.store.invites.entries()) {
-      if (invite.teamId !== teamId) continue;
-      options.store.invites.delete(inviteId);
-      for (const [requestId, request] of options.store.inviteRequests) {
-        if (request.inviteId === inviteId) options.store.inviteRequests.delete(requestId);
-      }
-      for (const [requestId, response] of options.store.inviteResponses) {
-        if (response.inviteId === inviteId) options.store.inviteResponses.delete(requestId);
-      }
-      revoked = true;
-    }
-    if (revoked) options.scheduleStoreSave();
+    if (revokeTeamInviteArtifacts(options.store, teamId)) options.scheduleStoreSave();
   }
 
   function addTeamMember(teamId: string, userId: string, role: TeamRole = "member") {
@@ -110,6 +113,33 @@ export function createTeamMutationHelpers(options: {
   }
 
   return { addTeamMember, revokeTeamInvites };
+}
+
+export function revokeRoomInvites(store: RelayStore, teamId: string, roomId: string): boolean {
+  return revokeInviteArtifactsWhere(store, (invite) => invite.teamId === teamId && invite.roomId === roomId);
+}
+
+export function revokeTeamInviteArtifacts(store: RelayStore, teamId: string): boolean {
+  return revokeInviteArtifactsWhere(store, (invite) => invite.teamId === teamId);
+}
+
+function revokeInviteArtifactsWhere(store: RelayStore, matches: (invite: InviteRecord) => boolean): boolean {
+  const revokedInviteIds = new Set<string>();
+  for (const [inviteId, invite] of store.invites) {
+    if (!matches(invite)) continue;
+    store.invites.delete(inviteId);
+    revokedInviteIds.add(inviteId);
+  }
+  for (const [requestId, request] of store.inviteRequests) {
+    if (revokedInviteIds.has(request.inviteId)) store.inviteRequests.delete(requestId);
+  }
+  for (const [requestId, response] of store.inviteResponses) {
+    if (revokedInviteIds.has(response.inviteId)) store.inviteResponses.delete(requestId);
+  }
+  for (const [requestId, receipt] of store.inviteAckReceipts) {
+    if (revokedInviteIds.has(receipt.inviteId)) store.inviteAckReceipts.delete(requestId);
+  }
+  return revokedInviteIds.size > 0;
 }
 
 export function createMlsBacklogPruner(options: {

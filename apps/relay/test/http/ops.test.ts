@@ -200,7 +200,7 @@ test("relay starts with an empty workspace when auth is explicitly disabled", as
   const relay = await startRelay(
     {
       NODE_ENV: "production",
-      MULTAIPLAYER_RELAY_REQUIRE_AUTH: "false"
+      MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "true"
     },
     emptyWorkspaceFixture()
   );

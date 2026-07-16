@@ -9,11 +9,6 @@ import {
   RoomRecord as RoomRecordSchema,
   TeamMemberRecord as TeamMemberRecordSchema,
   TeamRecord as TeamRecordSchema,
-  defaultApprovalDelegationPolicy,
-  defaultBrowserAllowedOrigins,
-  defaultBrowserProfilePersistent,
-  defaultRoomMode,
-  isRecord,
   type AttachmentBlobRecord as AttachmentBlobRecordType,
   type InviteJoinRequestRecord as InviteJoinRequestRecordType,
   type InviteRecord as InviteRecordType,
@@ -25,16 +20,7 @@ import {
 } from "@multaiplayer/protocol";
 import { z } from "zod";
 import { fingerprintPublicKey, validP256HpkeKey, validP256Spki } from "./http/devices.js";
-import {
-  maxCiphertextCharactersForBlob,
-  isApprovalDelegationPolicy,
-  isApprovalPolicy,
-  isRoomMode,
-  normalizeBrowserAllowedOrigins,
-  normalizeMetadataText,
-  normalizeOptionalMetadataText,
-  normalizeRelayId
-} from "./limits.js";
+import { maxCiphertextCharactersForBlob, normalizeMetadataText, normalizeRelayId } from "./limits.js";
 import {
   isCanonicalPaddedBase64,
   isStrictExporterCiphertextJson,
@@ -46,7 +32,6 @@ import type {
   AccountRestriction,
   AppliedDeletionLedgerEntry,
   InviteAckReceipt,
-  RelayStore,
   RoomKey
 } from "./state.js";
 import type { RelayStoreCodecOptions } from "./store-codec.js";
@@ -80,7 +65,7 @@ export const StoredAcceptedMessageReceipt = z
     digest: hexDigest,
     acceptedAt: isoDateTime
   })
-  .strip();
+  .strict();
 
 export const StoredAccountRestriction = z
   .object({
@@ -99,7 +84,7 @@ export const StoredAccountQuotaRecord = z
     used: z.number().int().nonnegative(),
     resetAt: z.number().int().nonnegative()
   })
-  .strip()
+  .strict()
   .superRefine((value, context) => {
     if (value.key !== `${value.quota}:${value.userId}`) {
       context.addIssue({ code: "custom", path: ["key"], message: "Quota key must bind quota and user." });
@@ -116,10 +101,9 @@ export const StoredDeletionLedgerEntry = z
 const StoredTeamMembers = z
   .object({
     teamId: z.string(),
-    members: z.array(z.unknown()).optional(),
-    userIds: z.array(z.unknown()).optional()
+    members: z.array(z.unknown())
   })
-  .strip();
+  .strict();
 
 const StoredMlsBacklog = z
   .object({
@@ -136,7 +120,7 @@ function parseStoredRecord<T>(schema: z.ZodType<T>, value: unknown): T | null {
 export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
   // Persistence is a separate trust boundary from live protocol parsing. Reuse
   // protocol schemas where a stored record has the same shape, then apply
-  // store-specific limits, referential checks, expiry, and legacy defaults.
+  // store-specific limits, referential checks, and expiry.
   // Non-authoritative rows may return null for documented recovery. Team,
   // device, membership, and MLS backlog restoration are fail-closed because
   // silently repairing or dropping them can change authorization or history.
@@ -144,23 +128,12 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
   const now = options.now ?? Date.now;
 
   function normalizeTeam(team: unknown): TeamRecord | null {
-    if (!isRecord(team)) return null;
-    const id = normalizeRelayId(team.id, options.maxTeamIdChars);
-    const name = normalizeMetadataText(team.name, options.maxTeamNameChars);
-    if (!id || !name) return null;
-    const candidate = {
-      id,
-      name,
-      members: validCounter(team.members) ? team.members : 0,
-      archivedAt: validDate(team.archivedAt),
-      deletedAt: validDate(team.deletedAt)
-    };
-    const parsed = TeamRecordSchema.safeParse(candidate);
+    const parsed = TeamRecordSchema.strict().safeParse(team);
     return parsed.success ? parsed.data : null;
   }
 
   function normalizeDevice(device: unknown): DeviceRecord | null {
-    const parsed = DeviceRecordSchema.safeParse(device);
+    const parsed = DeviceRecordSchema.strict().safeParse(device);
     if (!parsed.success) return null;
     const normalized = parsed.data;
     if (
@@ -175,45 +148,15 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
   }
 
   function normalizeRoom(room: unknown): RoomRecord | null {
-    if (!isRecord(room)) return null;
-    const id = normalizeRelayId(room.id, options.maxRoomIdChars);
-    const teamId = normalizeRelayId(room.teamId, options.maxTeamIdChars);
-    if (!id || !teamId || !store.teams.has(teamId)) return null;
-    const hostStatus = normalizeHostStatus(room.hostStatus);
-    const hostUserId = normalizeOptionalMetadataText(room.hostUserId, options.maxUserIdChars) || undefined;
-    const candidate = {
-      id,
-      teamId,
-      acceptedMlsEpoch: normalizeAcceptedEpoch(room.acceptedMlsEpoch, hostStatus),
-      name: normalizeMetadataText(room.name, options.maxRoomNameChars) ?? "Untitled room",
-      host: hostUserId ? (normalizeMetadataText(room.host, options.maxHostNameChars) ?? "Reserved host") : "No host",
-      hostUserId,
-      activeHostDeviceId:
-        hostStatus === "offline"
-          ? undefined
-          : normalizeOptionalMetadataText(room.activeHostDeviceId, options.maxDeviceIdChars) || undefined,
-      hostStatus,
-      approvalPolicy:
-        typeof room.approvalPolicy === "string" && isApprovalPolicy(room.approvalPolicy)
-          ? room.approvalPolicy
-          : "ask_every_turn",
-      approvalDelegationPolicy:
-        typeof room.approvalDelegationPolicy === "string" && isApprovalDelegationPolicy(room.approvalDelegationPolicy)
-          ? room.approvalDelegationPolicy
-          : defaultApprovalDelegationPolicy,
-      trustedApproverUserIds: normalizeTrustedApprovers(room.trustedApproverUserIds, options.maxUserIdChars),
-      mode: isRoomMode(room.mode) ? room.mode : defaultRoomMode,
-      browserAllowedOrigins: normalizeBrowserAllowedOrigins(room.browserAllowedOrigins) ?? defaultBrowserAllowedOrigins,
-      browserProfilePersistent:
-        typeof room.browserProfilePersistent === "boolean"
-          ? room.browserProfilePersistent
-          : defaultBrowserProfilePersistent,
-      unread: validCounter(room.unread) ? room.unread : 0,
-      archivedAt: validDate(room.archivedAt),
-      deletedAt: validDate(room.deletedAt)
-    };
-    const parsed = RoomRecordSchema.safeParse(candidate);
-    return parsed.success ? parsed.data : null;
+    const parsed = RoomRecordSchema.strict().safeParse(room);
+    if (!parsed.success || !store.teams.has(parsed.data.teamId)) return null;
+    if (
+      parsed.data.hostStatus === "active" &&
+      (!parsed.data.hostUserId || !parsed.data.activeHostDeviceId || parsed.data.acceptedMlsEpoch === undefined)
+    )
+      return null;
+    if (parsed.data.hostStatus === "offline" && parsed.data.activeHostDeviceId) return null;
+    return parsed.data;
   }
 
   function applyStoredTeamMembers(item: unknown): boolean {
@@ -222,40 +165,10 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
     const teamId = normalizeRelayId(parsed.teamId, options.maxTeamIdChars);
     if (!teamId || !store.teams.has(teamId)) return false;
     const members = new Map<string, TeamMemberRecord>();
-    if (parsed.members === undefined && parsed.userIds !== undefined) {
-      return applyUserIdsOnlyMembership(members, teamId, parsed.userIds);
-    }
-    for (const member of parsed.members ?? []) {
+    for (const member of parsed.members) {
       if (!addStoredMember(members, teamId, member, options.maxUserIdChars)) return false;
     }
-    for (const userId of parsed.userIds ?? []) {
-      if (!validateLegacyMemberProjection(members, userId, options.maxUserIdChars)) return false;
-    }
     if (members.size === 0) return true;
-    store.teamMembers.set(teamId, members);
-    return true;
-  }
-
-  function applyUserIdsOnlyMembership(
-    members: Map<string, TeamMemberRecord>,
-    teamId: string,
-    userIds: unknown[]
-  ): boolean {
-    if (userIds.length === 0) return false;
-    // Before role-bearing rows existed, team creation inserted the creator into
-    // a Set first and invite admissions only appended. The v1 writer preserved
-    // that Set insertion order in userIds, so the first exact identity is the
-    // historical owner; assigning any other owner would invent authority.
-    for (const [index, value] of userIds.entries()) {
-      const userId = normalizeMetadataText(value, options.maxUserIdChars);
-      if (!userId || members.has(userId)) return false;
-      members.set(userId, {
-        teamId,
-        userId,
-        role: index === 0 ? "owner" : "member",
-        joinedAt: new Date(now()).toISOString()
-      });
-    }
     store.teamMembers.set(teamId, members);
     return true;
   }
@@ -277,9 +190,9 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
     if (!parsed.success) return null;
     const id = normalizeRelayId(parsed.data.id, options.maxEnvelopeIdChars);
     if (!id) return null;
-    if (!store.teams.has(parsed.data.teamId)) return null;
-    if (!store.rooms.has(parsed.data.roomId) || store.rooms.get(parsed.data.roomId)?.teamId !== parsed.data.teamId)
-      return null;
+    const team = store.teams.get(parsed.data.teamId);
+    const room = store.rooms.get(parsed.data.roomId);
+    if (!team || team.deletedAt || !room || room.deletedAt || room.teamId !== team.id) return null;
     return { ...parsed.data, id };
   }
 
@@ -494,10 +407,7 @@ function addStoredMember(
   value: unknown,
   maxUserIdChars: number
 ): boolean {
-  // Early v1 rows scoped nested members by the outer teamId and omitted the
-  // repeated field. Preserve only that structural legacy default.
-  const candidate = isRecord(value) && value.teamId === undefined ? { ...value, teamId } : value;
-  const parsed = TeamMemberRecordSchema.safeParse(candidate);
+  const parsed = TeamMemberRecordSchema.strict().safeParse(value);
   if (
     !parsed.success ||
     parsed.data.teamId !== teamId ||
@@ -507,45 +417,6 @@ function addStoredMember(
     return false;
   members.set(parsed.data.userId, parsed.data);
   return true;
-}
-
-function validateLegacyMemberProjection(
-  members: Map<string, TeamMemberRecord>,
-  value: unknown,
-  maxUserIdChars: number
-): boolean {
-  const userId = normalizeMetadataText(value, maxUserIdChars);
-  if (!userId) return false;
-  // Transitional v1 writers emitted both explicit members and a userIds
-  // compatibility projection. Accept it only when an explicit role-bearing
-  // row already establishes the same identity; userIds alone cannot recover
-  // ownership safely.
-  return members.has(userId);
-}
-
-function normalizeTrustedApprovers(value: unknown, maxUserIdChars: number): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => normalizeMetadataText(item, maxUserIdChars))
-    .filter((item): item is string => Boolean(item))
-    .slice(0, 50);
-}
-
-function normalizeHostStatus(value: unknown): RoomRecord["hostStatus"] {
-  return value === "active" || value === "handoff" || value === "offline" ? value : "offline";
-}
-
-function normalizeAcceptedEpoch(value: unknown, hostStatus: RoomRecord["hostStatus"]): number | undefined {
-  return validCounter(value) ? value : hostStatus === "active" ? 0 : undefined;
-}
-
-function validCounter(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-}
-
-function validDate(value: unknown): string | undefined {
-  const parsed = z.string().datetime({ offset: true }).safeParse(value);
-  return parsed.success ? parsed.data : undefined;
 }
 
 export function normalizeAccountRestriction(
@@ -565,22 +436,26 @@ export function normalizeAccountRestriction(
   };
 }
 
+export function isExpiredStoredAccountRestriction(value: unknown, now: number): boolean {
+  const parsed = StoredAccountRestriction.safeParse(value);
+  return parsed.success && parsed.data.expiresAt !== undefined && Date.parse(parsed.data.expiresAt) <= now;
+}
+
 export function normalizeAccountQuotaRecord(value: unknown, now: number): AccountQuotaRecord | null {
   const parsed = parseStoredRecord(StoredAccountQuotaRecord, value);
   return parsed && parsed.resetAt > now ? parsed : null;
 }
 
+export function isExpiredStoredAccountQuotaRecord(value: unknown, now: number): boolean {
+  const parsed = StoredAccountQuotaRecord.safeParse(value);
+  return parsed.success && parsed.data.resetAt <= now;
+}
+
+export function isExpiredStoredAcceptedMessageReceipt(value: unknown, now: number): boolean {
+  const parsed = StoredAcceptedMessageReceipt.safeParse(value);
+  return parsed.success && Date.parse(parsed.data.acceptedAt) < now - 180 * 24 * 60 * 60 * 1000;
+}
+
 export function normalizeDeletionLedgerEntry(value: unknown): AppliedDeletionLedgerEntry | null {
   return parseStoredRecord(StoredDeletionLedgerEntry, value);
-}
-
-export function applyStoredAccountQuotaRecords(store: RelayStore, value: unknown, now: number): void {
-  for (const item of storedArray(value)) {
-    const quota = normalizeAccountQuotaRecord(item, now);
-    if (quota) store.accountQuotaRecords.set(quota.key, quota);
-  }
-}
-
-function storedArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
 }

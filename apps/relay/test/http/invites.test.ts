@@ -112,7 +112,6 @@ test("relay rejects expired invite metadata loaded from store", async () => {
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
           mode: { chat: true, code: true, workspace: true, browser: false },
-          codexModel: "gpt-5.4",
           browserAllowedOrigins: ["https://github.com"],
           browserProfilePersistent: true,
           unread: 0
@@ -145,7 +144,10 @@ test("relay drops invalid persisted invite metadata", async () => {
     {
       version: 1,
       savedAt: new Date().toISOString(),
-      teams: [{ id: "team-core", name: "Core Team", members: 1 }],
+      teams: [
+        { id: "team-core", name: "Core Team", members: 1 },
+        { id: "team-deleted", name: "Deleted Team", members: 0, deletedAt: new Date().toISOString() }
+      ],
       rooms: [
         {
           id: "room-desktop",
@@ -155,8 +157,32 @@ test("relay drops invalid persisted invite metadata", async () => {
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
           mode: { chat: true, code: true, workspace: true, browser: false },
-          codexModel: "gpt-5.4",
           browserAllowedOrigins: ["https://github.com"],
+          browserProfilePersistent: true,
+          unread: 0
+        },
+        {
+          id: "room-deleted",
+          teamId: "team-core",
+          name: "Deleted room",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          browserAllowedOrigins: [],
+          browserProfilePersistent: true,
+          unread: 0,
+          deletedAt: new Date().toISOString()
+        },
+        {
+          id: "room-in-deleted-team",
+          teamId: "team-deleted",
+          name: "Room in deleted team",
+          host: "No host",
+          hostStatus: "offline",
+          approvalPolicy: "ask_every_turn",
+          mode: { chat: true, code: true, workspace: true, browser: false },
+          browserAllowedOrigins: [],
           browserProfilePersistent: true,
           unread: 0
         }
@@ -190,6 +216,20 @@ test("relay drops invalid persisted invite metadata", async () => {
           roomId: "room-desktop",
           createdAt: "not a date",
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: "invite_deleted_room",
+          teamId: "team-core",
+          roomId: "room-deleted",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: "invite_deleted_team",
+          teamId: "team-deleted",
+          roomId: "room-in-deleted-team",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         }
       ],
       encryptedBacklog: []
@@ -207,6 +247,10 @@ test("relay drops invalid persisted invite metadata", async () => {
     assert.equal(orphan.status, 404);
     const badTime = await fetch(`${relay.baseUrl}/invites/invite_bad_time`);
     assert.equal(badTime.status, 404);
+    const deletedRoom = await fetch(`${relay.baseUrl}/invites/invite_deleted_room`);
+    assert.equal(deletedRoom.status, 404);
+    const deletedTeam = await fetch(`${relay.baseUrl}/invites/invite_deleted_team`);
+    assert.equal(deletedTeam.status, 404);
   } finally {
     await relay.close();
   }
@@ -228,7 +272,6 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
           mode: { chat: true, code: true, workspace: true, browser: false },
-          codexModel: "gpt-5.4",
           browserAllowedOrigins: ["https://github.com"],
           browserProfilePersistent: true,
           unread: 0

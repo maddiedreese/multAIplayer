@@ -11,7 +11,6 @@ import {
   maxAttachmentBlobIdChars,
   maxAttachmentBlobNameChars,
   maxAttachmentBlobTypeChars,
-  maxAuthSessionIdChars,
   maxDeviceIdChars,
   maxDisplayNameChars,
   maxEnvelopeIdChars,
@@ -63,7 +62,11 @@ import type { KeyPackageValidator } from "./mls/key-package-validator.js";
 export { configuredKeyPackageValidator } from "./mls/configured-validator.js";
 
 export async function createRelayApp(
-  options: { keyPackageValidator?: KeyPackageValidator; deletionLedgerForTests?: DeletionLedger } = {}
+  options: {
+    keyPackageValidator?: KeyPackageValidator;
+    deletionLedgerForTests?: DeletionLedger;
+    deleteOwnedResourcesForDeletionSubject?: string;
+  } = {}
 ) {
   const relayConfig = loadRelayConfig();
   const keyPackageValidator = options.keyPackageValidator ?? configuredKeyPackageValidator(relayConfig.nodeEnv);
@@ -71,7 +74,6 @@ export async function createRelayApp(
     nodeEnv,
     port,
     dataPath,
-    legacyJsonImportPath,
     mlsBacklogLimit,
     mlsBacklogRetentionDays,
     attachmentBlobMaxBytes,
@@ -90,9 +92,8 @@ export async function createRelayApp(
     shutdown: shutdownConfig
   } = relayConfig;
   const relayMetrics = createRelayMetrics();
-  // Tests may inject an in-process ledger explicitly. The production entry
-  // point never supplies this option, so no environment variable can weaken
-  // the production requirement for an external S3-compatible ledger.
+  // Tests may inject an in-process ledger explicitly. Runtime deletion
+  // protection otherwise comes only from the validated relay configuration.
   const deletionLedger =
     options.deletionLedgerForTests ??
     (relayConfig.deletionLedger
@@ -106,7 +107,6 @@ export async function createRelayApp(
       : null);
   const relayPersistence = createRelayPersistence({
     dataPath,
-    legacyJsonImportPath,
     sqliteWalAutoCheckpointPages: relayConfig.sqliteWalAutoCheckpointPages,
     recordSqliteWriteDuration: relayMetrics.recordSqliteWriteDuration
   });
@@ -182,7 +182,6 @@ export async function createRelayApp(
   const { authSessionMaxAgeMs, getAuthSession } = authSessionManager;
   const authSessionPersistence = createRelayAuthSessionPersistence({
     authSessionMaxAgeMs,
-    maxAuthSessionIdChars,
     maxDisplayNameChars,
     maxRoomProjectPathChars,
     maxUserIdChars
@@ -265,6 +264,7 @@ export async function createRelayApp(
     workspaceSockets,
     sessions,
     roomPresence,
+    mutationsRequireAuth,
     metrics: relayMetrics,
     roomKey,
     pruneMlsBacklog,
@@ -349,9 +349,12 @@ export async function createRelayApp(
     ? await reconcileDeletionLedger({
         ledger: deletionLedger,
         store: relayStore,
-        persist: () => relayStorePersistence.saveRelayStore()
+        persist: () => relayStorePersistence.saveRelayStore(),
+        ...(options.deleteOwnedResourcesForDeletionSubject
+          ? { deleteOwnedResourcesForSubject: options.deleteOwnedResourcesForDeletionSubject }
+          : {})
       })
-    : { entries: 0, pending: 0, identitiesDeleted: 0, markersPruned: 0 };
+    : { entries: 0, pending: 0, identitiesDeleted: 0, markersPruned: 0, conflictsResolved: 0 };
   if (deletionLedger) {
     logRelayEvent("info", "deletion_ledger_reconciled", deletionReconciliation);
   }

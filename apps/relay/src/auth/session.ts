@@ -4,7 +4,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { parseCookie } from "cookie";
 import { isRecord } from "@multaiplayer/protocol";
-import { normalizeMetadataText, normalizeRelayId } from "../limits.js";
+import { normalizeMetadataText } from "../limits.js";
 import type { AuthSession, NewAuthSession } from "../state.js";
 
 interface RelayAuthSessionManagerOptions {
@@ -41,7 +41,6 @@ export interface NormalizedStoredAuthSession {
 
 interface RelayAuthSessionPersistenceOptions {
   authSessionMaxAgeMs: number;
-  maxAuthSessionIdChars: number;
   maxDisplayNameChars: number;
   maxRoomProjectPathChars: number;
   maxUserIdChars: number;
@@ -154,7 +153,6 @@ function sessionIdHashesEqual(left: string, right: string): boolean {
 
 export function createRelayAuthSessionPersistence({
   authSessionMaxAgeMs,
-  maxAuthSessionIdChars,
   maxDisplayNameChars,
   maxRoomProjectPathChars,
   maxUserIdChars
@@ -181,8 +179,12 @@ export function createRelayAuthSessionPersistence({
     },
     normalizeStoredAuthSession(stored) {
       if (!isRecord(stored)) return null;
+      if (!hasOnlyKeys(stored, ["sessionIdHash", "user", "expiresAt"])) return null;
       const now = Date.now();
-      const sessionIdHash = normalizeStoredSessionIdHash(stored, maxAuthSessionIdChars);
+      const sessionIdHash =
+        typeof stored.sessionIdHash === "string" && isAuthSessionIdHash(stored.sessionIdHash)
+          ? stored.sessionIdHash
+          : null;
       const user = normalizeStoredSessionUser(stored.user, {
         maxDisplayNameChars,
         maxRoomProjectPathChars,
@@ -216,6 +218,7 @@ function normalizeStoredSessionUser(
   limits: Pick<RelayAuthSessionPersistenceOptions, "maxDisplayNameChars" | "maxRoomProjectPathChars" | "maxUserIdChars">
 ): AuthSession["user"] | null {
   if (!isRecord(value)) return null;
+  if (!hasOnlyKeys(value, ["id", "login", "name", "avatarUrl"])) return null;
   const id = normalizeMetadataText(value.id, limits.maxUserIdChars);
   const login = normalizeMetadataText(value.login, limits.maxDisplayNameChars);
   const name = value.name === undefined ? undefined : normalizeMetadataText(value.name, limits.maxDisplayNameChars);
@@ -227,14 +230,11 @@ function normalizeStoredSessionUser(
   return { id, login, ...(name ? { name } : {}), ...(avatarUrl ? { avatarUrl } : {}) };
 }
 
-function normalizeStoredSessionIdHash(stored: Record<string, unknown>, maxAuthSessionIdChars: number): string | null {
-  if (typeof stored.sessionIdHash === "string" && isAuthSessionIdHash(stored.sessionIdHash)) {
-    return stored.sessionIdHash;
-  }
-  const legacySessionId = normalizeRelayId(stored.sessionId, maxAuthSessionIdChars);
-  return legacySessionId ? hashAuthSessionId(legacySessionId) : null;
-}
-
 function isAuthSessionIdHash(value: string): boolean {
   return /^[a-f0-9]{64}$/.test(value);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const keys = new Set(allowed);
+  return Object.keys(value).every((key) => keys.has(key));
 }
