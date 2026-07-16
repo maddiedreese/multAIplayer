@@ -26,7 +26,6 @@ test("relay accepts public room metadata and rejects host-local configuration", 
         teamId: "team-core",
         name: "Approval room",
         approvalPolicy: "ask_every_turn",
-        browserAllowedOrigins: ["https://github.com", "https://example.com"],
         browserProfilePersistent: false
       })
     });
@@ -34,14 +33,12 @@ test("relay accepts public room metadata and rejects host-local configuration", 
     const body = (await response.json()) as {
       room: {
         approvalPolicy: string;
-        browserAllowedOrigins: string[];
         browserProfilePersistent: boolean;
       };
     };
     assert.equal(body.room.approvalPolicy, "ask_every_turn");
     assert.equal("projectPath" in body.room, false);
     assert.equal("codexModel" in body.room, false);
-    assert.deepEqual(body.room.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
     assert.equal(body.room.browserProfilePersistent, false);
 
     assert.equal(
@@ -57,14 +54,6 @@ test("relay accepts public room metadata and rejects host-local configuration", 
         teamId: "team-core",
         name: "Leaking raw reasoning setting",
         codexRawReasoningEnabled: "yes"
-      }),
-      400
-    );
-    assert.equal(
-      await postJsonStatus(relay.baseUrl, "/rooms", {
-        teamId: "team-core",
-        name: "Bad browser room",
-        browserAllowedOrigins: ["ftp://example.com"]
       }),
       400
     );
@@ -522,6 +511,8 @@ test("host bootstrap requires exact identity, device proof, and pristine host st
       ["missing device", { ...validBody, hostDeviceId: undefined }, 409],
       ["empty device", { ...validBody, hostDeviceId: "" }, 400],
       ["invalid status", { ...validBody, hostStatus: "ready" }, 400],
+      ["offline status", { ...validBody, hostStatus: "offline" }, 400],
+      ["handoff status", { ...validBody, hostStatus: "handoff" }, 400],
       ["extra key", { ...validBody, requesterName: "Maddie" }, 409],
       ["wrong host", { ...validBody, host: "Mallory" }, 409],
       ["wrong requested user", { ...validBody, hostUserId: "github:mallory" }, 409],
@@ -536,13 +527,6 @@ test("host bootstrap requires exact identity, device proof, and pristine host st
       const response = await harness.patch(body);
       assert.equal(response.status, status, label);
     }
-    for (const requestedStatus of ["offline", "handoff"] as const) {
-      harness.reset();
-      const response = await harness.patch({ ...validBody, hostStatus: requestedStatus });
-      assert.equal(response.status, 200, requestedStatus);
-      assert.equal(((await response.json()) as { room: RoomRecord }).room.hostStatus, "active");
-    }
-
     for (const [label, mutate] of [
       ["already active", (value: RoomRecord) => ({ ...value, hostStatus: "active" as const })],
       ["epoch already established", (value: RoomRecord) => ({ ...value, acceptedMlsEpoch: 0 })],
@@ -652,10 +636,7 @@ function hostBootstrapRoom(): RoomRecord {
     hostUserId: "github:maddiedreese",
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: true },
-    browserAllowedOrigins: [],
-    browserProfilePersistent: false,
-    unread: 0
+    browserProfilePersistent: false
   };
 }
 

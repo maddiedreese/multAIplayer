@@ -151,10 +151,7 @@ export function useSelectedRoomRuntime({
           selectedRoom?.codexSandboxLevel ?? defaultCodexSandboxLevel
         )
       : [],
-    riskFlags:
-      activeCodexApproval && selectedRoom
-        ? detectCodexTurnRiskFlags(approvalTranscriptMessages, selectedRoom, browserRequests, null)
-        : []
+    riskFlags: activeCodexApproval ? detectCodexTurnRiskFlags(approvalTranscriptMessages, null) : []
   };
   const currentMessagesSinceLastCodex = messagesSinceLastCodex(messages).length;
   const queuedCodexTurnRows = queuedCodexApprovals.map((turn) => ({

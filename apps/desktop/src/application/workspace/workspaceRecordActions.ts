@@ -2,7 +2,6 @@ import type { ClientRoomRecord, RelayServerMessage, TeamRecord } from "@multaipl
 import { useAppStore } from "../../store/appStore";
 import { shouldResetCodexApprovalForRoomUpdate } from "../../lib/codex/codexApproval";
 import { isMembershipRemovedRelayError, membershipRemovedRoomMessage } from "../../lib/relay/relayAccess";
-import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { currentLocalIdentity } from "./selectedWorkspace";
 import { reportNonFatal } from "../../lib/core/nonFatalReporting";
 
@@ -42,21 +41,19 @@ export function createWorkspaceRecordActions({
   }
 
   function upsertRoom(room: ClientRoomRecord) {
-    const nextRoom = ensureRoomDefaults(room);
-    const previousRoom = useAppStore.getState().rooms.find((existing) => existing.id === nextRoom.id);
-    if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
-      resetCodexApprovalForRoom(nextRoom.id);
+    const previousRoom = useAppStore.getState().rooms.find((existing) => existing.id === room.id);
+    if (previousRoom && shouldResetCodexApprovalForRoomUpdate(previousRoom, room)) {
+      resetCodexApprovalForRoom(room.id);
     }
-    upsertRoomRecord(nextRoom);
+    upsertRoomRecord(room);
   }
 
   function replaceRoom(room: ClientRoomRecord) {
-    const nextRoom = ensureRoomDefaults(room);
-    const previousRoom = useAppStore.getState().rooms.find((existing) => existing.id === nextRoom.id);
-    if (previousRoom && shouldResetCodexApprovalForRoomUpdate(ensureRoomDefaults(previousRoom), nextRoom)) {
-      resetCodexApprovalForRoom(nextRoom.id);
+    const previousRoom = useAppStore.getState().rooms.find((existing) => existing.id === room.id);
+    if (previousRoom && shouldResetCodexApprovalForRoomUpdate(previousRoom, room)) {
+      resetCodexApprovalForRoom(room.id);
     }
-    replaceRoomRecord(nextRoom);
+    replaceRoomRecord(room);
   }
 
   function handleRelayError(error: Extract<RelayServerMessage, { type: "error" }>) {

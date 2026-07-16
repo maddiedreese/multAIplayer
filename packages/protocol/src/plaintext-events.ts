@@ -358,7 +358,7 @@ export const HostHandoffPlaintextPayload = z.object({
   id: z.string().min(1).max(maxEnvelopeIdChars),
   fromHost: z.string().min(1).max(maxDisplayNameChars),
   fromUserId: z.string().min(1).max(maxUserIdChars),
-  reason: z.enum(["manual", "usage_limit"]).optional(),
+  reason: z.enum(["manual", "usage_limit"]),
   projectPath: z.string().min(1).max(maxProjectPathChars),
   gitRemoteUrl: z.string().min(1).max(maxUrlChars).optional(),
   gitRepoOwner: z.string().min(1).max(maxShortTextChars).optional(),
@@ -368,15 +368,13 @@ export const HostHandoffPlaintextPayload = z.object({
   gitPatch: z.string().max(maxLongTextChars).optional(),
   gitPatchTruncated: z.boolean().optional(),
   codexModel: z.string().min(1).max(maxCodexModelChars),
-  codexModelPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexReasoningEffort: z.enum(codexReasoningEffortIds).optional(),
-  codexReasoningEffortPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexRawReasoningEnabled: z.boolean().optional(),
-  codexSpeed: z.enum(["standard", "fast"]).optional(),
-  codexServiceTierPolicy: z.enum(["auto", "pinned"]).optional(),
-  codexSandboxLevel: z
-    .enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"])
-    .optional(),
+  codexModelPolicy: z.enum(["auto", "pinned"]),
+  codexReasoningEffort: z.enum(codexReasoningEffortIds),
+  codexReasoningEffortPolicy: z.enum(["auto", "pinned"]),
+  codexRawReasoningEnabled: z.boolean(),
+  codexSpeed: z.enum(["standard", "fast"]),
+  codexServiceTierPolicy: z.enum(["auto", "pinned"]),
+  codexSandboxLevel: z.enum(["read_only", "workspace_write", "workspace_write_network", "danger_full_access"]),
   approvalPolicy: z.string().min(1).max(maxShortTextChars),
   messagesSinceLastCodex: z.number().int().nonnegative(),
   queuedCodexTurns: z
@@ -389,13 +387,12 @@ export const HostHandoffPlaintextPayload = z.object({
         triggerMessageId: z.string().min(1).max(maxEnvelopeIdChars).optional()
       })
     )
-    .max(5)
-    .optional(),
+    .max(5),
   attachmentNames: z.array(z.string().min(1).max(maxShortTextChars)).max(maxMessageAttachments),
   terminals: z.array(z.string().min(1).max(maxShortTextChars)).max(maxTerminalSnapshots),
   continuationSummary: z.string().max(maxMediumTextChars).optional(),
   createdAt: z.string().datetime(),
-  status: z.enum(["available", "requested", "accepted"]).optional(),
+  status: z.enum(["available", "requested", "accepted"]),
   candidateUserId: UserId.optional(),
   candidateDeviceId: DeviceId.optional(),
   candidateLeaf: z.number().int().nonnegative().optional(),
@@ -427,14 +424,12 @@ export const RoomSettingsPlaintextPayload = z.object({
   setting: z.enum([
     "roomName",
     "approvalPolicy",
-    "roomMode",
     "codexModel",
     "codexReasoningEffort",
     "codexRawReasoningEnabled",
     "codexSpeed",
     "codexSandboxLevel",
     "projectPath",
-    "browserAllowedOrigins",
     "browserProfilePersistent"
   ]),
   previousValue: z.string().max(maxMediumTextChars),

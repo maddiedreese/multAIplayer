@@ -32,7 +32,7 @@ export interface MarkdownChatMessage {
 
 const approvalPolicyLabels: Record<ApprovalPolicy, string> = {
   ask_every_turn: "Ask every Codex turn",
-  never_host: "Never host this room"
+  never_host: "Disable Codex in this room"
 };
 
 export function buildPullRequestBody(
@@ -282,7 +282,6 @@ function normalizeMarkdownText(value: string): string {
 
 function formatHostStatus(room: ClientRoomRecord): string {
   if (room.hostStatus === "active") return `Hosted by ${room.host}`;
-  if (room.hostStatus === "handoff") return `Handoff from ${room.host}`;
   return "No active host";
 }
 

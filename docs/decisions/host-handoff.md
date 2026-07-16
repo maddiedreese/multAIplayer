@@ -28,20 +28,11 @@ Old approvals, repeat-command grants, native session bindings, pending invite ap
 
 The authority-transfer commit advances the MLS epoch using the RFC 9420 key schedule. The authenticated GroupContext extension names the new host leaf and device, and every client rejects a commit whose author was not the host designated for its parent epoch. The relay independently rejects stale epochs and commits from the wrong authenticated device. After acknowledgement, the old host cannot publish further commits; the new host's next honest commit can provide post-compromise recovery for future live traffic, provided the attacker no longer retains authorized membership or current endpoint access.
 
-Room authority remains `active` while offers and candidate requests are pending. Offer state is separate from authority state. Legacy persisted `handoff` room status remains commit-capable only as a recovery bridge; successful transfer returns it to `active`. New code must not use that status to represent an open offer.
+Room authority remains `active` while offers and candidate requests are pending. Offer state is separate from authority state, and persisted room status has no handoff value. A successful transfer atomically replaces the active host binding while leaving the room `active`.
 
-## Model and invariants
+## Verification
 
-The dependency-free bounded exploration in `apps/desktop/test/hostHandoffModel.test.ts` enumerates offer, concurrent-request, commit, outgoing-process crash, optional accepted-event delivery, reconnect recovery, patch approval, and old-host-action interleavings. Its candidate-requested, transfer-committed, and patch-applied record transitions run the same pure reducer used by the production store; candidate ordering and authenticated commit correlation are also production helpers exercised directly by the test. The surrounding authority, crash, delivery, and recovery scheduler is intentionally an abstract finite model, not a TLA+/stateright proof or an execution of the React and relay wiring. Native state-machine and end-to-end tests cover those separate boundaries.
-
-The checked invariants are:
-
-- one user/device/leaf binding owns each accepted epoch;
-- an accepted successor always has an authenticated committed transfer;
-- the outgoing host cannot run a host action after the authority epoch changes;
-- duplicate or reordered candidate requests converge;
-- a durable transfer can recover after the outgoing process crashes without an accepted event; and
-- a staged patch cannot be applied before the successor explicitly approves it.
+Focused unit tests exercise the production record transitions, deterministic candidate selection, and exact correlation between an authenticated native transfer and its offer. Separate native state-machine and end-to-end tests exercise the native transfer, relay authority, application wiring, and reconnect boundaries.
 
 Room history from earlier epochs remains readable only to devices that already retained the corresponding exporter-derived history secrets. Handoff does not re-encrypt history and cannot revoke copies already delivered. If the outgoing host's retained credentials, repository access, or other external capabilities are no longer appropriate, their owners must revoke or rotate them in the relevant external systems; an MLS commit cannot do that.
 

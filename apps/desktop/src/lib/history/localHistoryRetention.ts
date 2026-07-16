@@ -15,11 +15,11 @@ export function pruneLocalRoomHistory(
     messages: retainNewest(
       payload.messages.filter((message) => isWithinRetention(message.createdAt ?? message.time, cutoffMs))
     ),
-    chatEdits: retainNewest((payload.chatEdits ?? []).filter((edit) => isWithinRetention(edit.editedAt, cutoffMs))),
+    chatEdits: retainNewest(payload.chatEdits.filter((edit) => isWithinRetention(edit.editedAt, cutoffMs))),
     chatDeletes: retainNewest(
-      (payload.chatDeletes ?? []).filter((deletion) => isWithinRetention(deletion.deletedAt, cutoffMs))
+      payload.chatDeletes.filter((deletion) => isWithinRetention(deletion.deletedAt, cutoffMs))
     ),
-    ...(payload.readState ? { readState: payload.readState } : {}),
+    readState: payload.readState,
     terminalRequests: retainNewest(
       payload.terminalRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs))
     ),
@@ -33,7 +33,7 @@ export function pruneLocalRoomHistory(
       payload.inviteRequests.filter((request) => isWithinRetention(request.requestedAt, cutoffMs))
     ),
     codexEvents: retainNewest(payload.codexEvents.filter((event) => isWithinRetention(event.createdAt, cutoffMs))),
-    codexActivities: (payload.codexActivities ?? [])
+    codexActivities: payload.codexActivities
       .filter((activity) => isWithinRetention(activity.updatedAt, cutoffMs))
       .slice(-maxCodexActivitiesPerRoom),
     gitWorkflowEvents: retainNewest(
@@ -54,7 +54,7 @@ export function pruneLocalRoomHistory(
       payload.hostHandoffs.filter((handoff) => isWithinRetention(handoff.createdAt, cutoffMs))
     ),
     queuedCodexTurns: retainNewest(
-      (payload.queuedCodexTurns ?? []).filter((turn) => isWithinRetention(turn.queuedAt, cutoffMs))
+      payload.queuedCodexTurns.filter((turn) => isWithinRetention(turn.queuedAt, cutoffMs))
     ),
     ...(payload.roomGoal && isWithinRetention(payload.roomGoal.updatedAt, cutoffMs)
       ? { roomGoal: payload.roomGoal }

@@ -16,8 +16,6 @@ const room: RoomRecord = {
   hostUserId: "github:maddiedreese",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
-  browserAllowedOrigins: ["https://github.com"],
   browserProfilePersistent: false
 };
 
@@ -113,11 +111,6 @@ test("room settings reject host-local fields and invalid public settings with pr
       [{ name: "" }, "Room name is required and must be up to 160 characters"],
       [{ name: "x".repeat(161) }, "Room name is required and must be up to 160 characters"],
       [{ approvalPolicy: "sometimes" }, "approvalPolicy is invalid"],
-      [{ mode: { chat: true } }, "mode must include boolean chat, code, workspace, and browser fields"],
-      [
-        { browserAllowedOrigins: ["ftp://example.com"] },
-        "browserAllowedOrigins must be up to 20 http(s) origins such as https://github.com"
-      ],
       [{ browserProfilePersistent: "yes" }, "browserProfilePersistent must be a boolean"]
     ];
     for (const [input, error] of invalidInputs) {
@@ -136,12 +129,9 @@ test("room settings reject host-local fields and invalid public settings with pr
 test("room settings normalize and persist every public setting while preserving omitted values", async () => {
   const harness = await startSettingsRouteHarness();
   try {
-    const mode = { chat: false, code: true, workspace: false, browser: true };
     const response = await harness.patch({
       name: "  Renamed room  ",
       approvalPolicy: "never",
-      mode,
-      browserAllowedOrigins: ["https://example.com/path", "https://github.com"],
       browserProfilePersistent: true
     });
     assert.equal(response.status, 200);
@@ -150,8 +140,6 @@ test("room settings normalize and persist every public setting while preserving 
       ...room,
       name: "Renamed room",
       approvalPolicy: "never",
-      mode,
-      browserAllowedOrigins: ["https://example.com", "https://github.com"],
       browserProfilePersistent: true
     });
     assert.deepEqual(harness.store.getRoom(room.id), updated);
@@ -161,7 +149,6 @@ test("room settings normalize and persist every public setting while preserving 
     harness.reset(updated);
     const omitted = ((await (await harness.patch({})).json()) as { room: RoomRecord }).room;
     assert.deepEqual(omitted, updated);
-    assert.equal(harness.browserNormalizationCalls(), 0);
     assert.equal(harness.saves(), 1);
     assert.equal(harness.broadcasts(), 1);
   } finally {
@@ -185,7 +172,6 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
   let canAccess = true;
   let isHost = true;
   let sessionEnabled = true;
-  let browserNormalizationCalls = 0;
   const session = {
     sessionIdHash: "c".repeat(64),
     user: { id: room.hostUserId, login: "maddie" },
@@ -198,7 +184,6 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
     store.setRoom({ ...value });
     saves = 0;
     broadcasts = 0;
-    browserNormalizationCalls = 0;
     canAccess = true;
     isHost = true;
   };
@@ -220,27 +205,7 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
       const normalized = value.trim();
       return normalized && normalized.length <= maxChars ? normalized : null;
     },
-    normalizeBrowserAllowedOrigins: (value) => {
-      browserNormalizationCalls++;
-      if (!Array.isArray(value) || value.length > 20) return null;
-      const origins: string[] = [];
-      for (const item of value) {
-        try {
-          const url = new URL(typeof item === "string" ? item : "");
-          if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-          origins.push(url.origin);
-        } catch {
-          return null;
-        }
-      }
-      return origins;
-    },
     isApprovalPolicy: (value) => ["ask_every_turn", "never"].includes(value),
-    isRoomMode: (value): value is RoomRecord["mode"] => {
-      if (!value || typeof value !== "object") return false;
-      const candidate = value as Record<string, unknown>;
-      return ["chat", "code", "workspace", "browser"].every((key) => typeof candidate[key] === "boolean");
-    },
     scheduleStoreSave: () => saves++,
     broadcastRoomUpdated: () => broadcasts++,
     maxRoomNameChars: 160,
@@ -257,7 +222,6 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
     reset,
     saves: () => saves,
     broadcasts: () => broadcasts,
-    browserNormalizationCalls: () => browserNormalizationCalls,
     setMutationAllowed: (value: boolean) => (mutationAllowed = value),
     setCanAccess: (value: boolean) => (canAccess = value),
     setIsHost: (value: boolean) => (isHost = value),

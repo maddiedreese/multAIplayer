@@ -18,7 +18,7 @@ People chat normally in the room. When someone clicks Codex or types `@Codex`, t
 
 The supported Codex app-server compatibility range is 0.133.0–0.144.0, with generated-schema contract fixtures for 0.133.0, 0.143.0, and 0.144.0. Versions older than 0.133.0 cannot host turns. A version newer than 0.144.0 is labelled unverified: ordinary compatible behavior can continue, but security-sensitive features stay behind manifest/capability checks and fail closed when their contract is unknown.
 
-Model settings express room intent and are resolved against the active host's local `model/list` catalog. `auto` selects the catalog's default model, reasoning effort, and service tier. `pinned` requests the saved choice; if the host catalog does not support a pinned reasoning effort or service tier, the desktop uses a catalog-supported fallback and shows the fallback. Legacy rooms remain pinned for compatibility.
+Model settings express room intent and are resolved against the active host's local `model/list` catalog. `auto` selects the catalog's default model, reasoning effort, and service tier. `pinned` requests the saved choice; if the host catalog does not support a pinned reasoning effort or service tier, the desktop uses a catalog-supported fallback and shows the fallback.
 
 ## Bidirectional Requests And Host Approval
 

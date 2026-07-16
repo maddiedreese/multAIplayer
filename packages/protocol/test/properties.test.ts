@@ -26,10 +26,7 @@ const room = {
   activeHostDeviceId: "device-1",
   hostStatus: "active" as const,
   approvalPolicy: "ask_every_turn" as const,
-  mode: { chat: true, code: true, workspace: true, browser: false },
-  browserAllowedOrigins: [],
-  browserProfilePersistent: false,
-  unread: 0
+  browserProfilePersistent: false
 };
 
 const clientCases = [

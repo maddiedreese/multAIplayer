@@ -18,9 +18,7 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: false },
   codexModel: "gpt-5.4",
-  browserAllowedOrigins: ["https://github.com"],
   browserProfilePersistent: true,
   unread: 0
 };
@@ -28,19 +26,11 @@ const room: ClientRoomRecord = {
 test("local workspace access requires an unlocked room", () => {
   assert.equal(canUseLocalWorkspace(room, { id: "github:maddie", name: "Maddie" }), true);
   assert.equal(canUseLocalWorkspace(room, { id: "github:alex", name: "Alex" }), true);
-  assert.equal(
-    canUseLocalWorkspace(
-      { ...room, mode: { ...room.mode, workspace: false } },
-      { id: "github:maddie", name: "Maddie" }
-    ),
-    true
-  );
   assert.equal(canUseLocalWorkspace(room, { id: "github:maddie", name: "Maddie" }, true), false);
 });
 
 test("workspace action requests require an unlocked room", () => {
   assert.equal(canRequestWorkspaceAction(room), true);
-  assert.equal(canRequestWorkspaceAction({ ...room, mode: { ...room.mode, workspace: false } }), true);
   assert.equal(canRequestWorkspaceAction(room, true), false);
 });
 

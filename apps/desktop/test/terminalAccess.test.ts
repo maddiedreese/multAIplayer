@@ -12,9 +12,7 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
-  browserAllowedOrigins: ["https://docs.example.com"],
   browserProfilePersistent: true,
   unread: 0
 };
@@ -25,7 +23,6 @@ const terminal = { roomId: room.id };
 test("terminal control requires active host access and matching room terminal", () => {
   assert.equal(canControlRoomTerminal(room, host, terminal), true);
   assert.equal(canControlRoomTerminal(room, { id: "github:peer", name: "Peer" }, terminal), false);
-  assert.equal(canControlRoomTerminal({ ...room, mode: { ...room.mode, workspace: false } }, host, terminal), true);
   assert.equal(canControlRoomTerminal(room, host, { roomId: "other-room" }), false);
   assert.equal(canControlRoomTerminal(room, host, null), false);
   assert.equal(canControlRoomTerminal(room, host, terminal, true), false);
@@ -33,10 +30,7 @@ test("terminal control requires active host access and matching room terminal", 
 
 test("terminal control messages explain unavailable controls", () => {
   assert.equal(roomTerminalControlMessage(room, terminal, true), "Unlock this room before controlling terminals.");
-  assert.equal(
-    roomTerminalControlMessage({ ...room, mode: { ...room.mode, workspace: false } }, terminal),
-    "Terminal control is available."
-  );
+  assert.equal(roomTerminalControlMessage(room, terminal), "Terminal control is available.");
   assert.equal(roomTerminalControlMessage(room, null), "Select a terminal in this room before controlling it.");
   assert.equal(
     roomTerminalControlMessage(room, { roomId: "other-room" }),

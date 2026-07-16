@@ -111,10 +111,7 @@ test("relay rejects expired invite metadata loaded from store", async () => {
           host: "No host",
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
-          mode: { chat: true, code: true, workspace: true, browser: false },
-          browserAllowedOrigins: ["https://github.com"],
-          browserProfilePersistent: true,
-          unread: 0
+          browserProfilePersistent: true
         }
       ],
       teamMembers: ownerMembership(),
@@ -156,10 +153,7 @@ test("relay drops invalid persisted invite metadata", async () => {
           host: "No host",
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
-          mode: { chat: true, code: true, workspace: true, browser: false },
-          browserAllowedOrigins: ["https://github.com"],
-          browserProfilePersistent: true,
-          unread: 0
+          browserProfilePersistent: true
         },
         {
           id: "room-deleted",
@@ -168,10 +162,7 @@ test("relay drops invalid persisted invite metadata", async () => {
           host: "No host",
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
-          mode: { chat: true, code: true, workspace: true, browser: false },
-          browserAllowedOrigins: [],
           browserProfilePersistent: true,
-          unread: 0,
           deletedAt: new Date().toISOString()
         },
         {
@@ -181,10 +172,7 @@ test("relay drops invalid persisted invite metadata", async () => {
           host: "No host",
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
-          mode: { chat: true, code: true, workspace: true, browser: false },
-          browserAllowedOrigins: [],
-          browserProfilePersistent: true,
-          unread: 0
+          browserProfilePersistent: true
         }
       ],
       teamMembers: ownerMembership(),
@@ -271,10 +259,7 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
           host: "No host",
           hostStatus: "offline",
           approvalPolicy: "ask_every_turn",
-          mode: { chat: true, code: true, workspace: true, browser: false },
-          browserAllowedOrigins: ["https://github.com"],
-          browserProfilePersistent: true,
-          unread: 0
+          browserProfilePersistent: true
         }
       ],
       teamMembers: ownerMembership(),

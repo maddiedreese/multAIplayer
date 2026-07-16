@@ -1,44 +1,5 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "../access/roomHost";
-import { reportExpectedFailure } from "../core/nonFatalReporting";
-
-export function normalizeBrowserAllowedOrigins(value: string[] | string): string[] | null {
-  const rawOrigins = Array.isArray(value) ? value : value.split(/\r?\n|,/);
-  if (rawOrigins.length > 20) return null;
-
-  const origins = new Set<string>();
-  for (const rawOrigin of rawOrigins) {
-    const raw = rawOrigin.trim();
-    if (!raw) continue;
-    try {
-      const parsed = new URL(raw);
-      if (!["http:", "https:"].includes(parsed.protocol)) return null;
-      if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
-      origins.add(parsed.origin);
-    } catch {
-      reportExpectedFailure("browser origin validation rejected malformed input");
-      return null;
-    }
-  }
-  return Array.from(origins);
-}
-
-export function isBrowserUrlAllowed(url: string, allowedOrigins: string[]): boolean {
-  try {
-    const origin = new URL(url).origin;
-    return allowedOrigins.includes(origin);
-  } catch {
-    reportExpectedFailure("browser allowlist check rejected malformed input");
-    return false;
-  }
-}
-
-export function shouldAutoApproveBrowserRequest(url: string, room: ClientRoomRecord, activeHost: boolean): boolean {
-  void url;
-  void room;
-  void activeHost;
-  return false;
-}
 
 export function canRequestBrowserAccess(room: ClientRoomRecord, locked = false): boolean {
   void room;

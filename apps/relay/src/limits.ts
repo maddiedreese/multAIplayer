@@ -93,12 +93,6 @@ export function isApprovalPolicy(value: string): value is RoomRecord["approvalPo
   return ["ask_every_turn", "never_host"].includes(value);
 }
 
-export function isRoomMode(value: unknown): value is RoomRecord["mode"] {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return ["chat", "code", "workspace", "browser"].every((key) => typeof candidate[key] === "boolean");
-}
-
 export function normalizeRoomProjectPath(value: unknown, maxRoomProjectPathChars: number): string | null {
   const projectPath = String(value ?? "").trim();
   if (!projectPath || projectPath.length > maxRoomProjectPathChars) return null;
@@ -138,25 +132,6 @@ export function normalizeCodexSpeedOrDefault(value: unknown): CodexSpeed {
 
 export function normalizeTeamRole(value: unknown): TeamRole {
   return value === "owner" || value === "admin" || value === "member" ? value : "member";
-}
-
-export function normalizeBrowserAllowedOrigins(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 20) return null;
-  const origins = new Set<string>();
-  for (const item of value) {
-    if (typeof item !== "string") return null;
-    const raw = item.trim();
-    if (!raw) continue;
-    try {
-      const parsed = new URL(raw);
-      if (!["http:", "https:"].includes(parsed.protocol)) return null;
-      if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
-      origins.add(parsed.origin);
-    } catch {
-      return null;
-    }
-  }
-  return Array.from(origins);
 }
 
 export function isMlsMessageWithinLimits(envelope: MlsRelayMessage, options: MlsMessageLimitOptions): boolean {

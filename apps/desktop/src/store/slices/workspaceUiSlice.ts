@@ -4,9 +4,7 @@ import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import {
   applyLocalRoomReadState,
   markRoomRead as markRoomReadRecord,
-  markRoomUnreadForIncomingChat,
-  replaceRoomPreservingUnread,
-  upsertRoomPreservingUnread
+  markRoomUnreadForIncomingChat
 } from "../../lib/history/roomUnread";
 import type { LocalRoomReadState, SidebarPanel } from "../../types";
 import type { AppStoreState } from "../appStore";
@@ -169,15 +167,12 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
   },
   upsertRoomRecord: (room) => {
     set((state) => {
+      const existing = state.rooms.find((item) => item.id === room.id);
       const rooms = room.deletedAt
         ? state.rooms.filter((item) => item.id !== room.id)
-        : upsertRoomPreservingUnread(
-            state.rooms,
-            ensureRoomDefaults(
-              room,
-              state.rooms.find((item) => item.id === room.id)
-            )
-          );
+        : existing
+          ? state.rooms.map((item) => (item.id === room.id ? ensureRoomDefaults(room, existing) : item))
+          : [...state.rooms, ensureRoomDefaults(room)];
       return {
         rooms,
         ...repairRoomSelection(rooms, state.selectedRoomId, state.selectedTeam)
@@ -186,15 +181,12 @@ export const createWorkspaceUiSlice: StateCreator<AppStoreState, [], [], Workspa
   },
   replaceRoomRecord: (room) => {
     set((state) => {
+      const existing = state.rooms.find((item) => item.id === room.id);
       const rooms = room.deletedAt
         ? state.rooms.filter((item) => item.id !== room.id)
-        : replaceRoomPreservingUnread(
-            state.rooms,
-            ensureRoomDefaults(
-              room,
-              state.rooms.find((item) => item.id === room.id)
-            )
-          );
+        : existing
+          ? state.rooms.map((item) => (item.id === room.id ? ensureRoomDefaults(room, existing) : item))
+          : state.rooms;
       return {
         rooms,
         ...repairRoomSelection(rooms, state.selectedRoomId, state.selectedTeam)

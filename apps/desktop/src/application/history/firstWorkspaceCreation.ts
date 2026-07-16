@@ -1,5 +1,4 @@
 import {
-  defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexModelPolicy,
@@ -13,7 +12,6 @@ import {
   type TeamRecord
 } from "@multaiplayer/protocol";
 import type { LocalHistorySettings } from "../../lib/history/localHistory";
-import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import {
   planRoomCreation,
   planTeamCreation,
@@ -49,9 +47,7 @@ export interface LocalRoomCreationDefaults {
   historySettings: LocalHistorySettings;
 }
 
-export type RequestedRoomCreationSettings = Omit<Readonly<RoomCreationSettings>, "browserAllowedOrigins"> & {
-  readonly browserAllowedOrigins?: readonly string[];
-};
+export type RequestedRoomCreationSettings = Readonly<RoomCreationSettings>;
 
 export interface FirstWorkspaceCreationInput {
   workspaceName: string;
@@ -74,7 +70,6 @@ export const firstWorkspaceSafeRoomSettings: RequestedRoomCreationSettings = Obj
   codexSpeed: defaultCodexSpeed,
   codexServiceTierPolicy: defaultCodexServiceTierPolicy,
   codexSandboxLevel: defaultCodexSandboxLevel,
-  browserAllowedOrigins: Object.freeze([...defaultBrowserAllowedOrigins]),
   browserProfilePersistent: defaultBrowserProfilePersistent
 });
 
@@ -97,8 +92,7 @@ export async function createWorkspaceRoom(
     "createTeam" | "findTeam" | "upsertTeam" | "selectTeam" | "loadTeamHistorySettings"
   >
 ): Promise<ClientRoomRecord> {
-  const created = await runtime.createRoom(plan.teamId, plan.name, plan.projectPath, copyRoomSettings(settings));
-  const room = ensureRoomDefaults(created);
+  const room = await runtime.createRoom(plan.teamId, plan.name, plan.projectPath, copyRoomSettings(settings));
   runtime.upsertRoom(room);
   runtime.restoreRoomAccess(room.id);
   runtime.restoreTeamAccess(room.teamId);
@@ -153,9 +147,5 @@ function requireExistingTeam(teamId: string, runtime: Pick<WorkspaceCreationRunt
 }
 
 function copyRoomSettings(settings: RequestedRoomCreationSettings): RoomCreationSettings {
-  const { browserAllowedOrigins, ...scalarSettings } = settings;
-  return {
-    ...scalarSettings,
-    ...(browserAllowedOrigins ? { browserAllowedOrigins: [...browserAllowedOrigins] } : {})
-  };
+  return { ...settings };
 }

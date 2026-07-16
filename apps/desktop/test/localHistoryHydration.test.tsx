@@ -35,16 +35,21 @@ function currentHistory(messages: unknown[]) {
   return {
     version: 3,
     messages,
+    chatEdits: [],
+    chatDeletes: [],
+    readState: { unread: 0 },
     terminalRequests: [],
     fileSaveRequests: [],
     browserRequests: [],
     inviteRequests: [],
     codexEvents: [],
+    codexActivities: [],
     gitWorkflowEvents: [],
     githubActionsEvents: [],
     localPreviews: [],
     terminalSnapshots: [],
-    hostHandoffs: []
+    hostHandoffs: [],
+    queuedCodexTurns: []
   };
 }
 

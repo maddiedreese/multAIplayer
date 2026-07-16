@@ -14,7 +14,7 @@ test("direct host release and reclaim cannot bypass signed MLS handoff", async (
         hostUserId: "github:maddiedreese",
         hostStatus: "offline"
       }),
-      409
+      400
     );
     assert.equal(
       await patchHostStatus(relay.baseUrl, { host: "Peer", hostUserId: "github:peer", hostStatus: "active" }),
@@ -44,7 +44,6 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     host: "Host",
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: false },
     codexModel: "gpt-5.4",
     codexModelPolicy: "pinned",
     codexReasoningEffort: "medium",
@@ -52,9 +51,7 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     codexSpeed: "standard",
     codexServiceTierPolicy: "pinned",
     codexSandboxLevel: "workspace-write",
-    browserAllowedOrigins: [],
     browserProfilePersistent: false,
-    unread: 0,
     acceptedMlsEpoch: 0
   });
   const invite = {

@@ -3,7 +3,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { InspectorTab } from "../lib/core/uiTypes";
 import { closeRoomBrowserSurface } from "../lib/browser/browserSurfaceEvents";
 
-type HostStatus = "active" | "handoff" | "offline";
+type HostStatus = "active" | "offline";
+type HostAction = "active" | "handoff";
 const roomToolTabs: Array<{ id: InspectorTab; label: string; icon: ReactNode }> = [
   { id: "files", label: "Files", icon: <FileText size={16} /> },
   { id: "terminal", label: "Terminal", icon: <Terminal size={16} /> },
@@ -72,7 +73,7 @@ export function RoomHeader({
   selectedCount: number;
   markdownSelectionMode: boolean;
   activeInspectorTab: InspectorTab;
-  onSetHost: (status: HostStatus) => void;
+  onSetHost: (action: HostAction) => void;
   onSelectTeam: (teamId: string) => void;
   onRenameRoom: (name: string) => void;
   onSelectModel: (model: string) => void;

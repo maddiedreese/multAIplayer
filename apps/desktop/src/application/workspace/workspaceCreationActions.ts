@@ -8,7 +8,6 @@ import {
   type FirstWorkspaceCreationInput,
   type WorkspaceCreationRuntime
 } from "../history/firstWorkspaceCreation";
-import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { loadTeamRoomDefaults } from "../../lib/team/teamRoomDefaults";
 import { planRoomCreation, planTeamCreation } from "../../lib/workspace/workspaceCreation";
 import { createRoom, createTeam, updateRoomLifecycle, updateTeamLifecycle } from "./workspaceClient";
@@ -89,7 +88,6 @@ export function createWorkspaceCreationActions({
         {
           approvalPolicy: teamDefaults.approvalPolicy,
           codexModel: teamDefaults.codexModel,
-          browserAllowedOrigins: teamDefaults.browserAllowedOrigins,
           browserProfilePersistent: teamDefaults.browserProfilePersistent
         },
         {
@@ -133,7 +131,7 @@ export function createWorkspaceCreationActions({
     try {
       const result = await updateTeamLifecycle(teamId, action);
       upsertTeam(result.team);
-      for (const room of result.rooms) upsertRoom(ensureRoomDefaults(room));
+      for (const room of result.rooms) upsertRoom(room);
       setWorkspaceStatusError(null);
     } catch (error) {
       setWorkspaceStatusError(String(error));
@@ -143,7 +141,7 @@ export function createWorkspaceCreationActions({
   async function setRoomLifecycle(roomId: string, action: "archive" | "restore" | "delete") {
     try {
       const room = await updateRoomLifecycle(roomId, action, roomSettingsActor());
-      upsertRoom(ensureRoomDefaults(room));
+      upsertRoom(room);
       setWorkspaceStatusError(null);
     } catch (error) {
       setWorkspaceStatusError(String(error));

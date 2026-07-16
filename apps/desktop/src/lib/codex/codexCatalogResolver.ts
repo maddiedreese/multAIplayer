@@ -5,7 +5,6 @@ import {
   defaultCodexModel,
   defaultCodexReasoningEffort,
   defaultCodexSpeed,
-  legacyCodexCatalogSelectionPolicy,
   type CodexCatalogSelectionPolicy,
   type CodexReasoningEffort,
   type CodexSpeed,
@@ -46,9 +45,9 @@ export function resolveCodexRunSettings(
   room: RoomCodexIntent,
   probe: Pick<CodexProbe, "available" | "models"> | null
 ): ResolvedCodexRunSettings {
-  const modelPolicy = room.codexModelPolicy ?? legacyCodexCatalogSelectionPolicy;
-  const reasoningEffortPolicy = room.codexReasoningEffortPolicy ?? legacyCodexCatalogSelectionPolicy;
-  const serviceTierPolicy = room.codexServiceTierPolicy ?? legacyCodexCatalogSelectionPolicy;
+  const modelPolicy = room.codexModelPolicy;
+  const reasoningEffortPolicy = room.codexReasoningEffortPolicy;
+  const serviceTierPolicy = room.codexServiceTierPolicy;
   const catalog = probe?.available ? probe.models : [];
   const visibleModels = catalog.filter((candidate) => !candidate.hidden);
   const catalogDefault = visibleModels.find((candidate) => candidate.isDefault) ?? visibleModels[0];

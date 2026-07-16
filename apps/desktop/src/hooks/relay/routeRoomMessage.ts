@@ -8,11 +8,10 @@ import {
 import {
   findEnvelopeRoom,
   isEnvelopeFromActiveRoomHost,
-  isEnvelopeFromHandoffInitiator,
   roomHostEnvelopeRejectionMessage
 } from "../../lib/access/roomHost";
 import { buildRoomSettingsSystemMessage } from "../../presentation/rooms/roomSettingsMessages";
-import { approvalPolicyLabels, roomModeLabels } from "../../appDefaults";
+import { approvalPolicyLabels } from "../../appDefaults";
 import type { AppStoreState } from "../../store/appStore";
 import type { MlsMessageRouteContext, MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
 import { applyRoomConfig } from "../../application/mls/roomConfigSnapshot";
@@ -102,7 +101,7 @@ async function routeHostHandoffOffer(
   const parsed = HostHandoffPlaintextPayload.safeParse(await decrypt());
   if (!parsed.success) return;
   const room = findEnvelopeRoom(context.roomsRef.current, envelope.roomId);
-  if (!isEnvelopeFromHandoffInitiator(room, envelope) || parsed.data.fromUserId !== envelope.senderUserId) {
+  if (!isEnvelopeFromActiveRoomHost(room, envelope) || parsed.data.fromUserId !== envelope.senderUserId) {
     store.setHostMessageForRoom(envelope.roomId, roomHostEnvelopeRejectionMessage(room, "host handoff"));
   } else store.appendHostHandoff(envelope.roomId, hostHandoffRecord(parsed.data));
 }
@@ -133,14 +132,14 @@ function hostHandoffRecord(payload: DecodedHostHandoff): RoutedHostHandoff {
     id: payload.id,
     fromHost: payload.fromHost,
     fromUserId: payload.fromUserId,
-    ...(payload.reason ? { reason: payload.reason } : {}),
+    reason: payload.reason,
     projectPath: payload.projectPath,
     ...hostHandoffGitFields(payload),
     codexModel: payload.codexModel,
     ...hostHandoffCodexFields(payload),
     approvalPolicy: payload.approvalPolicy,
     messagesSinceLastCodex: payload.messagesSinceLastCodex,
-    ...(payload.queuedCodexTurns ? { queuedCodexTurns: payload.queuedCodexTurns } : {}),
+    queuedCodexTurns: payload.queuedCodexTurns,
     attachmentNames: payload.attachmentNames,
     terminals: payload.terminals,
     ...(payload.continuationSummary ? { continuationSummary: payload.continuationSummary } : {}),
@@ -164,15 +163,13 @@ function hostHandoffGitFields(payload: DecodedHostHandoff): HostHandoffGitFields
 
 function hostHandoffCodexFields(payload: DecodedHostHandoff): HostHandoffCodexFields {
   return {
-    ...(payload.codexModelPolicy ? { codexModelPolicy: payload.codexModelPolicy } : {}),
-    ...(payload.codexReasoningEffort ? { codexReasoningEffort: payload.codexReasoningEffort } : {}),
-    ...(payload.codexReasoningEffortPolicy ? { codexReasoningEffortPolicy: payload.codexReasoningEffortPolicy } : {}),
-    ...(payload.codexRawReasoningEnabled === undefined
-      ? {}
-      : { codexRawReasoningEnabled: payload.codexRawReasoningEnabled }),
-    ...(payload.codexSpeed ? { codexSpeed: payload.codexSpeed } : {}),
-    ...(payload.codexServiceTierPolicy ? { codexServiceTierPolicy: payload.codexServiceTierPolicy } : {}),
-    ...(payload.codexSandboxLevel ? { codexSandboxLevel: payload.codexSandboxLevel } : {})
+    codexModelPolicy: payload.codexModelPolicy,
+    codexReasoningEffort: payload.codexReasoningEffort,
+    codexReasoningEffortPolicy: payload.codexReasoningEffortPolicy,
+    codexRawReasoningEnabled: payload.codexRawReasoningEnabled,
+    codexSpeed: payload.codexSpeed,
+    codexServiceTierPolicy: payload.codexServiceTierPolicy,
+    codexSandboxLevel: payload.codexSandboxLevel
   };
 }
 
@@ -197,13 +194,7 @@ async function routeRoomSettings(
   if (!parsed.success) return;
   const room = findEnvelopeRoom(context.roomsRef.current, envelope.roomId);
   if (!isEnvelopeFromActiveRoomHost(room, envelope) || parsed.data.changedByUserId !== envelope.senderUserId) return;
-  store.appendRoomMessage(
-    envelope.roomId,
-    buildRoomSettingsSystemMessage(parsed.data, {
-      approvalPolicyLabels,
-      roomModeLabels
-    })
-  );
+  store.appendRoomMessage(envelope.roomId, buildRoomSettingsSystemMessage(parsed.data, { approvalPolicyLabels }));
 }
 
 async function routeAcceptedHostHandoff(

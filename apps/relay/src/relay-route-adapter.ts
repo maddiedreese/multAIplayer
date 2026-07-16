@@ -24,9 +24,7 @@ import type { loadRelayConfig } from "./config.js";
 import { registerRelayRoutes } from "./http/register-routes.js";
 import {
   isApprovalPolicy,
-  isRoomMode,
   maxCiphertextCharactersForBlob,
-  normalizeBrowserAllowedOrigins,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   parseIntegerValue
@@ -163,8 +161,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     requesterFromRequest: options.requesterFromRequest,
     isRoomHost,
     isApprovalPolicy,
-    isRoomMode,
-    normalizeBrowserAllowedOrigins,
     maxHostNameChars,
     maxRoomNameChars
   });

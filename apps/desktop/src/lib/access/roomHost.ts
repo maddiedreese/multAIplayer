@@ -6,7 +6,7 @@ export interface LocalHostUser {
 }
 
 export function isLocalUserActiveHostForRoom(room: ClientRoomRecord, user: LocalHostUser): boolean {
-  return room.hostStatus === "active" && (room.hostUserId ? room.hostUserId === user.id : room.host === user.name);
+  return room.hostStatus === "active" && Boolean(room.hostUserId) && room.hostUserId === user.id;
 }
 
 export function findEnvelopeRoom(rooms: ClientRoomRecord[], roomId: string): ClientRoomRecord | null {
@@ -18,22 +18,6 @@ export function isEnvelopeFromActiveRoomHost(
   envelope: Pick<MlsRelayMessage, "senderUserId">
 ): boolean {
   return Boolean(room?.hostStatus === "active" && room.hostUserId && room.hostUserId === envelope.senderUserId);
-}
-
-/**
- * A handoff package can race with the relay's room-state update. The initiating
- * host remains bound in hostUserId while the room is in the handoff state.
- */
-export function isEnvelopeFromHandoffInitiator(
-  room: ClientRoomRecord | null,
-  envelope: Pick<MlsRelayMessage, "senderUserId">
-): boolean {
-  return Boolean(
-    room &&
-    (room.hostStatus === "active" || room.hostStatus === "handoff") &&
-    room.hostUserId &&
-    room.hostUserId === envelope.senderUserId
-  );
 }
 
 export function roomHostEnvelopeRejectionMessage(room: ClientRoomRecord | null, eventLabel: string): string {

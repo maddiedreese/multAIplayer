@@ -1,4 +1,4 @@
-import { approvalPolicyLabels, defaultBrowserUrl, roomModeLabels } from "../appDefaults";
+import { approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { createAppRoomActions } from "./appRoomActions";
@@ -108,7 +108,6 @@ export function useAppRelaySync({
         deviceId: localIdentity.deviceId,
         localUser: localIdentity.localUser,
         approvalPolicyLabels,
-        roomModeLabels,
         appendLocalPreviewEvent,
         appendGitWorkflowEvent,
         appendCodexEvent,

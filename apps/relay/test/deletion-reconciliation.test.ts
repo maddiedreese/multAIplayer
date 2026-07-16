@@ -119,10 +119,7 @@ test("offline resolution deletes only resources owned by the exact reported subj
     hostStatus: "active",
     acceptedMlsEpoch: 0,
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: true },
-    browserAllowedOrigins: [],
-    browserProfilePersistent: true,
-    unread: 0
+    browserProfilePersistent: true
   });
   store.rooms.set("collaborator-room", {
     ...store.rooms.get("room")!,
@@ -174,10 +171,7 @@ test("offline resolution revokes invite artifacts for a restored hosted room", a
     hostUserId: userId,
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    mode: { chat: true, code: true, workspace: true, browser: false },
-    browserAllowedOrigins: [],
-    browserProfilePersistent: false,
-    unread: 0
+    browserProfilePersistent: false
   });
   store.invites.set("invite", {
     id: "invite",

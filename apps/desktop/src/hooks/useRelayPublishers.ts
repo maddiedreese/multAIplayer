@@ -38,7 +38,6 @@ interface UseRelayPublishersOptions {
   deviceId: string;
   localUser: LocalUser;
   approvalPolicyLabels: Record<string, string>;
-  roomModeLabels: Record<string, string>;
   appendLocalPreviewEvent: (roomId: string, event: LocalPreviewRecord) => void;
   appendGitWorkflowEvent: (roomId: string, event: GitWorkflowEventPlaintextPayload) => void;
   appendCodexEvent: (roomId: string, event: CodexRoomEvent) => void;
@@ -56,7 +55,6 @@ export function useRelayPublishers({
   deviceId,
   localUser,
   approvalPolicyLabels,
-  roomModeLabels,
   appendLocalPreviewEvent,
   appendGitWorkflowEvent,
   appendCodexEvent,
@@ -242,13 +240,7 @@ export function useRelayPublishers({
       changedByUserId: localUser.id,
       ...event
     };
-    appendRoomMessage(
-      room.id,
-      buildRoomSettingsSystemMessage(payload, {
-        approvalPolicyLabels,
-        roomModeLabels
-      })
-    );
+    appendRoomMessage(room.id, buildRoomSettingsSystemMessage(payload, { approvalPolicyLabels }));
 
     const client = relayRef.current;
     if (!client || relayStatus === "closed" || relayStatus === "error") return;

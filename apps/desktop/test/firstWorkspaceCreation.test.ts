@@ -18,9 +18,7 @@ const room: ClientRoomRecord = {
   hostUserId: "github:maddie",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
-  mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.6-sol",
-  browserAllowedOrigins: ["https://github.com"],
   browserProfilePersistent: true,
   unread: 0
 };
@@ -116,7 +114,6 @@ test("first workspace sends the exact reviewed safe room settings and initialize
     codexSpeed: "standard",
     codexServiceTierPolicy: "auto",
     codexSandboxLevel: "workspace_write",
-    browserAllowedOrigins: ["https://github.com"],
     browserProfilePersistent: true
   });
 });
