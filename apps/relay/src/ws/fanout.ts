@@ -24,6 +24,7 @@ interface Options {
   roomKey: (teamId: string, roomId: string) => RoomKey;
   pruneMlsBacklog: (messages: MlsRelayMessage[]) => MlsRelayMessage[];
   addTeamMember: (teamId: string, userId: string) => void;
+  reclaimDurableCapacity?: () => Promise<void>;
   saveMlsMessage: (roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) => Promise<void>;
   saveMlsCommit: (roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]) => Promise<void>;
   teamRecordForUser: (
@@ -80,11 +81,13 @@ export function createRelayFanout(options: Options) {
     }
   }
   async function publishForRoom(key: RoomKey, message: MlsRelayMessage) {
+    await options.reclaimDurableCapacity?.();
     const digest = retryDigest(message);
     const receiptKey = `${key}\0${message.id}`;
     const acceptedReceipt = options.store.acceptedMessageReceipts.get(receiptKey);
     if (acceptedReceipt && isAcceptedReceiptRetry(acceptedReceipt.digest, digest)) return false;
-    const previous = options.store.getMlsBacklog(key) ?? [];
+    const storedPrevious = options.store.getMlsBacklog(key);
+    const previous = storedPrevious ?? [];
     const replay = previous.find((item) => item.id === message.id);
     if (replay && isBacklogRetry(replay, message)) return false;
     const room = options.store.getRoom(message.roomId);
@@ -93,27 +96,28 @@ export function createRelayFanout(options: Options) {
     validatePublishAuthority(options.store, room, message, acceptedEpoch);
     const oldRoom = room;
     const previousReceipts = new Map(options.store.acceptedMessageReceipts);
-    if (message.messageType === "commit") options.store.setRoom(roomAfterCommit(room, message, acceptedEpoch));
     const backlog = options.pruneMlsBacklog([...previous, message]);
     const retained = new Set(backlog.map((item) => item.id));
     const prunedIds = previous.filter((item) => !retained.has(item.id)).map((item) => item.id);
-    options.store.setMlsBacklog(key, backlog);
-    options.store.acceptedMessageReceipts.set(receiptKey, {
-      roomKey: key,
-      messageId: message.id,
-      messageType: message.messageType,
-      senderUserId: message.senderUserId,
-      senderDeviceId: message.senderDeviceId,
-      parentEpoch: message.epochHint,
-      digest,
-      acceptedAt: new Date().toISOString()
-    });
-    pruneAcceptedReceipts(options.store, key);
     try {
+      if (message.messageType === "commit") options.store.setRoom(roomAfterCommit(room, message, acceptedEpoch));
+      options.store.setMlsBacklog(key, backlog);
+      options.store.acceptedMessageReceipts.set(receiptKey, {
+        roomKey: key,
+        messageId: message.id,
+        messageType: message.messageType,
+        senderUserId: message.senderUserId,
+        senderDeviceId: message.senderDeviceId,
+        parentEpoch: message.epochHint,
+        digest,
+        acceptedAt: new Date().toISOString()
+      });
+      pruneAcceptedReceipts(options.store, key);
       if (message.messageType === "commit") await options.saveMlsCommit(key, message, prunedIds);
       else await options.saveMlsMessage(key, message, prunedIds);
     } catch (error) {
-      options.store.setMlsBacklog(key, previous);
+      if (storedPrevious) options.store.setMlsBacklog(key, previous);
+      else options.store.mlsBacklog.delete(key);
       options.store.setRoom(oldRoom);
       options.store.acceptedMessageReceipts.clear();
       for (const [id, receipt] of previousReceipts) options.store.acceptedMessageReceipts.set(id, receipt);

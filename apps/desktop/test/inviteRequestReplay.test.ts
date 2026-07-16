@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { retryInviteRequestReplay } from "../src/application/invite/inviteRelayActions.js";
+import { RelayHttpError } from "../src/lib/core/httpResponse.js";
 
 test("retries a transient invite replay until native validation is ready", async () => {
   let attempts = 0;
@@ -54,4 +55,40 @@ test("reports the final transient failure after bounded replay retries", async (
     /transient failure 2/
   );
   assert.equal(attempts, 2);
+});
+
+test("honors a bounded relay Retry-After before replaying a durable invite request", async () => {
+  let attempts = 0;
+  const waits: number[] = [];
+  const handled = await retryInviteRequestReplay(
+    async () => {
+      attempts += 1;
+      if (attempts === 1) throw new RelayHttpError("slow down", 429, "rate_limited", 2_000);
+      return true;
+    },
+    [0, 100],
+    async (delayMs) => {
+      waits.push(delayMs);
+    }
+  );
+
+  assert.equal(handled, true);
+  assert.deepEqual(waits, [2_000]);
+});
+
+test("does not delay a terminal relay rejection", async () => {
+  const waits: number[] = [];
+  await assert.rejects(
+    retryInviteRequestReplay(
+      async () => {
+        throw new RelayHttpError("gone", 404, "invite_not_found");
+      },
+      [0, 100, 400],
+      async (delayMs) => {
+        waits.push(delayMs);
+      }
+    ),
+    /gone/
+  );
+  assert.deepEqual(waits, []);
 });

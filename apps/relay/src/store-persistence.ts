@@ -1,7 +1,7 @@
 import { isRecord, type MlsRelayMessage } from "@multaiplayer/protocol";
 import { logRelayEvent } from "./observability.js";
 import { RelayPersistenceMigrationError, RelayStaleEpochError, type RelayPersistence } from "./persistence.js";
-import { RelayStoreCapacityError, type RoomKey } from "./state.js";
+import { RelayStoreByteCapacityError, RelayStoreCapacityError, type RoomKey } from "./state.js";
 import type { RelayStoreCodec } from "./store-codec.js";
 
 export interface RelayStorePersistenceCoordinator {
@@ -13,6 +13,7 @@ export interface RelayStorePersistenceCoordinator {
   saveMlsMessage(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]): Promise<void>;
   saveMlsCommit(roomKey: RoomKey, message: MlsRelayMessage, prunedIds: string[]): Promise<void>;
   saveRelayStore(): Promise<void>;
+  reclaimDurableCapacity(): Promise<void>;
   flushRelayStore(): Promise<void>;
   closeRelayStore(): Promise<void>;
 }
@@ -77,7 +78,9 @@ export function createRelayStorePersistenceCoordinator(options: {
       if (!isRecord(stored) || stored.version !== 1) {
         logRelayEvent("warn", "unsupported_store_version_quarantined");
         await options.persistence.quarantine("unsupported-version");
-        return;
+        throw new RelayPersistenceLoadError(
+          "Relay store version is unsupported; quarantined evidence requires operator recovery."
+        );
       }
       options.storeCodec.applyStoredRelayState(stored);
       await options.persistence.finalizeLoad?.(() => options.storeCodec.toStoredRelayState());
@@ -89,9 +92,19 @@ export function createRelayStorePersistenceCoordinator(options: {
       pendingChanges = [];
       logRelayEvent("info", "relay_store_loaded");
     } catch (error) {
-      if (error instanceof RelayPersistenceMigrationError || error instanceof RelayStoreCapacityError) throw error;
+      if (
+        error instanceof RelayPersistenceMigrationError ||
+        error instanceof RelayStoreCapacityError ||
+        error instanceof RelayStoreByteCapacityError ||
+        error instanceof RelayPersistenceLoadError
+      )
+        throw error;
       logRelayEvent("warn", "relay_store_load_failed");
       await options.persistence.quarantine("unreadable");
+      throw new RelayPersistenceLoadError(
+        "Relay store could not be read and was quarantined; refusing to start with replacement state.",
+        error
+      );
     }
   }
 
@@ -149,6 +162,11 @@ export function createRelayStorePersistenceCoordinator(options: {
     return Promise.resolve();
   }
 
+  async function reclaimDurableCapacity() {
+    options.storeCodec.pruneExpiredRelayState();
+    await saveRelayStore();
+  }
+
   async function flushRelayStore() {
     options.storeCodec.pruneExpiredRelayState();
     await saveRelayStore();
@@ -171,6 +189,7 @@ export function createRelayStorePersistenceCoordinator(options: {
     saveMlsMessage,
     saveMlsCommit,
     saveRelayStore,
+    reclaimDurableCapacity,
     flushRelayStore,
     closeRelayStore
   };
@@ -181,6 +200,13 @@ export class RelayPersistenceUnavailableError extends Error {
 
   constructor(cause?: unknown) {
     super("Relay persistence is unavailable; restart the relay before serving more traffic.", { cause });
+  }
+}
+
+export class RelayPersistenceLoadError extends Error {
+  override readonly name = "RelayPersistenceLoadError";
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
   }
 }
 

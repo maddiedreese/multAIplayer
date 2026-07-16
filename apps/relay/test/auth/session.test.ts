@@ -350,7 +350,7 @@ test(
       assert.equal(((await refused.json()) as { code: string }).code, "persistence_unavailable");
       const readiness = await fetch(`${relay.baseUrl}/readyz`);
       assert.equal(readiness.status, 503);
-      assert.equal(((await readiness.json()) as { code: string }).code, "persistence_unavailable");
+      assert.deepEqual(await readiness.json(), { ok: false, code: "persistence_unavailable" });
       const close = await socketClosed;
       assert.equal(close.code, 1012);
       assert.equal(close.reason, "Relay persistence unavailable");

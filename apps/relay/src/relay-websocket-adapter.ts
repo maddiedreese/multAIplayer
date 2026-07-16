@@ -32,7 +32,8 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
     limits: options.limits,
     authentication: {
       getAuthSessionFromRequest: options.auth.getAuthSessionFromRequest,
-      clientIdentityFromIncomingMessage: options.guards.clientIdentityFromIncomingMessage
+      clientIdentityFromIncomingMessage: options.guards.clientIdentityFromIncomingMessage,
+      clientRateLimitIdentitiesFromIncomingMessage: options.guards.clientRateLimitIdentitiesFromIncomingMessage
     },
     rateLimiting: {
       consume: options.guards.consumeRateLimit,
@@ -40,6 +41,7 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
     },
     metrics: {
       recordQuotaRejection: options.metrics.recordQuotaRejection,
+      recordCapacityRejection: options.metrics.recordCapacityRejection,
       recordRateLimitRejection: options.metrics.recordRateLimitRejection,
       recordRateLimitAllowed: options.metrics.recordRateLimitAllowed,
       recordConnectionAttempt: options.metrics.recordWebSocketConnectionAttempt,
@@ -49,6 +51,7 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
     rooms: {
       roomKey,
       isKnownRoom: roomManager.isKnownRoom,
+      canAuthenticateJoinIdentity: roomManager.canAuthenticateJoinIdentity,
       canJoinRoom: roomManager.canJoinRoom,
       hasDeviceSession: (token, userId, deviceId) =>
         !config.mutationsRequireAuth ||

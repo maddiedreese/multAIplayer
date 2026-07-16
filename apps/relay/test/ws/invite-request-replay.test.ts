@@ -13,11 +13,27 @@ test("joining replays pending invite requests only to the exact active host devi
     const otherUser = await joinAndCollect("github:member", "member-device-1");
     assert.deepEqual(inviteNotifications(otherDevice.messages), []);
     assert.deepEqual(inviteNotifications(otherUser.messages), []);
+    otherUser.socket.send(
+      JSON.stringify({
+        type: "presence",
+        teamId: "team-core",
+        roomId: "room-one",
+        userId: "github:member",
+        deviceId: "member-device-1",
+        displayName: "Member"
+      })
+    );
+    await delay(25);
 
     const firstHostConnection = await joinAndCollect("github:host", "host-device-1");
     assert.deepEqual(inviteNotifications(firstHostConnection.messages), [
       { type: "invite.requested", inviteId: "invite-pending", requestId: "request-pending" }
     ]);
+    assert.deepEqual(
+      firstHostConnection.messages.map((message) => message.type),
+      ["mls.message", "invite.requested", "presence", "joined"],
+      "retained MLS state and pending invites must precede the joined recovery barrier"
+    );
     firstHostConnection.socket.close();
 
     const rejoinedHost = await joinAndCollect("github:host", "host-device-1");
@@ -122,7 +138,25 @@ function inviteReplayFixture() {
         ]
       }
     ],
-    encryptedBacklog: []
+    encryptedBacklog: [],
+    mlsBacklog: [
+      {
+        key: "team-core:room-one",
+        messages: [
+          {
+            id: "message-retained",
+            teamId: "team-core",
+            roomId: "room-one",
+            senderUserId: "github:member",
+            senderDeviceId: "member-device-1",
+            createdAt,
+            messageType: "application",
+            epochHint: 0,
+            mlsMessage: "AA=="
+          }
+        ]
+      }
+    ]
   };
 }
 

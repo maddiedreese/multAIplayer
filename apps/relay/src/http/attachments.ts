@@ -1,10 +1,16 @@
-import { sendRelayError } from "./errors.js";
+import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import {
   maxAttachmentBlobIdChars,
   type AttachmentBlobRecord as AttachmentBlobRecordType
 } from "@multaiplayer/protocol";
-import type { AccountQuotaRecord, AuthSession, RelayStore } from "../state.js";
+import {
+  RelayStoreByteCapacityError,
+  RelayStoreCapacityError,
+  type AccountQuotaRecord,
+  type AuthSession,
+  type RelayStore
+} from "../state.js";
 import { isStrictExporterCiphertextJson } from "../opaque.js";
 import { acquireDurableQuotaTransaction, reserveDurableQuota, rollbackDurableQuota } from "../auth/account-quotas.js";
 
@@ -25,7 +31,9 @@ interface RegisterAttachmentRoutesOptions {
   canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
   scheduleStoreSave: () => void;
   saveRelayStore: () => Promise<void>;
+  reclaimDurableCapacity?: () => Promise<void>;
   recordQuotaRejection?: (type: string) => void;
+  recordCapacityRejection?: (resource: string, scope: string) => void;
   recordUpload?: (bytes: number) => void;
   recordUploadRejection?: (reason: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
@@ -37,93 +45,33 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
   const {
     app,
     store,
-    attachmentBlobLiveQuotaBytes,
-    attachmentBlobTeamLiveQuotaBytes,
-    attachmentBlobUploadBytesPerWindow,
-    attachmentBlobUploadWindowMs,
-    attachmentBlobTtlDays,
     getAuthSession,
     allowRead,
     allowMutation,
     canAccessRoom,
     scheduleStoreSave,
-    saveRelayStore,
-    recordQuotaRejection,
-    recordUpload,
-    recordUploadRejection,
     isExpiredAttachmentBlob
   } = options;
   app.post("/attachment-blobs", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
 
+    try {
+      await options.reclaimDurableCapacity?.();
+    } catch {
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not reclaim expired durable relay state.");
+    }
+
     const target = validateAttachmentTarget(options, req.body, session, res);
     if (!target) return;
     const payload = validateAttachmentPayload(options, req.body, res);
     if (!payload) return;
-    const { teamId, roomId, blobId } = target;
-    const { name, type, size, epoch, sealedBlob, storageBytes } = payload;
-    const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
-    let reservation: ReturnType<typeof reserveAttachmentQuota> | null = null;
-    let blob: AttachmentBlobRecordType | null = null;
-    let durableCommitCompleted = false;
-    try {
-      reservation = session
-        ? reserveAttachmentQuota({
-            store,
-            session,
-            teamId,
-            storageBytes,
-            liveLimit: attachmentBlobLiveQuotaBytes,
-            teamLiveLimit: attachmentBlobTeamLiveQuotaBytes,
-            uploadLimit: attachmentBlobUploadBytesPerWindow,
-            uploadWindowMs: attachmentBlobUploadWindowMs,
-            isExpiredAttachmentBlob,
-            ...(recordQuotaRejection ? { recordQuotaRejection } : {}),
-            ...(recordUploadRejection ? { recordUploadRejection } : {}),
-            res
-          })
-        : null;
-      if (session && !reservation) return;
-
-      blob = {
-        id: blobId,
-        teamId,
-        roomId,
-        name,
-        type,
-        size,
-        ...attachmentUploader(session),
-        epoch,
-        sealedBlob,
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + attachmentBlobTtlDays * 24 * 60 * 60 * 1000).toISOString()
-      };
-      store.setAttachmentBlob(blob);
-      if (session) {
-        await saveRelayStore();
-      } else {
-        scheduleStoreSave();
-      }
-      durableCommitCompleted = true;
-      recordUpload?.(storageBytes);
-      res.status(201).json({ blob });
-    } catch (error) {
-      if (durableCommitCompleted) throw error;
-      if (blob) store.deleteAttachmentBlob(blob.id);
-      if (reservation) rollbackDurableQuota(store, reservation);
-      return void sendRelayError(
-        res,
-        503,
-        "persistence_unavailable",
-        "Could not persist attachment blob and upload quota."
-      );
-    } finally {
-      releaseQuotaTransaction();
-    }
+    await persistAttachmentUpload(options, session, target, payload, res);
   });
 
   app.get("/attachment-blobs/:blobId", (req, res) => {
+    const session = getAuthSession(req.cookies?.multaiplayer_session);
+    if (!allowRead(session, res)) return;
     const blob = store.getAttachmentBlob(req.params.blobId);
     if (!blob) {
       sendRelayError(res, 404, "not_found", "Attachment blob not found");
@@ -139,8 +87,6 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
       sendRelayError(res, 404, "not_found", "Attachment blob not found");
       return;
     }
-    const session = getAuthSession(req.cookies?.multaiplayer_session);
-    if (!allowRead(session, res)) return;
     if (session && !canAccessRoom(teamId, roomId, session.user.id)) {
       sendRelayError(res, 403, "forbidden", "Join this room before reading attachment blobs.");
       return;
@@ -153,6 +99,95 @@ export function registerAttachmentRoutes(options: RegisterAttachmentRoutesOption
     }
     res.json({ blob });
   });
+}
+
+async function persistAttachmentUpload(
+  options: RegisterAttachmentRoutesOptions,
+  session: AuthSession | null,
+  target: { teamId: string; roomId: string; blobId: string },
+  payload: NonNullable<ReturnType<typeof validateAttachmentPayload>>,
+  res: Response
+) {
+  const {
+    store,
+    attachmentBlobLiveQuotaBytes,
+    attachmentBlobTeamLiveQuotaBytes,
+    attachmentBlobUploadBytesPerWindow,
+    attachmentBlobUploadWindowMs,
+    attachmentBlobTtlDays,
+    scheduleStoreSave,
+    saveRelayStore,
+    recordQuotaRejection,
+    recordUploadRejection,
+    isExpiredAttachmentBlob
+  } = options;
+  const { teamId, roomId, blobId } = target;
+  const { name, type, size, epoch, sealedBlob, storageBytes } = payload;
+  const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+  let reservation: ReturnType<typeof reserveAttachmentQuota> | null = null;
+  let blob: AttachmentBlobRecordType | null = null;
+  let durableCommitCompleted = false;
+  try {
+    reservation = session
+      ? reserveAttachmentQuota({
+          store,
+          session,
+          teamId,
+          storageBytes,
+          liveLimit: attachmentBlobLiveQuotaBytes,
+          teamLiveLimit: attachmentBlobTeamLiveQuotaBytes,
+          uploadLimit: attachmentBlobUploadBytesPerWindow,
+          uploadWindowMs: attachmentBlobUploadWindowMs,
+          isExpiredAttachmentBlob,
+          ...(recordQuotaRejection ? { recordQuotaRejection } : {}),
+          ...(recordUploadRejection ? { recordUploadRejection } : {}),
+          res
+        })
+      : null;
+    if (session && !reservation) return;
+
+    blob = {
+      id: blobId,
+      teamId,
+      roomId,
+      name,
+      type,
+      size,
+      ...attachmentUploader(session),
+      epoch,
+      sealedBlob,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + attachmentBlobTtlDays * 24 * 60 * 60 * 1000).toISOString()
+    };
+    store.setAttachmentBlob(blob);
+    if (session) {
+      await saveRelayStore();
+    } else {
+      scheduleStoreSave();
+    }
+    durableCommitCompleted = true;
+    options.recordUpload?.(storageBytes);
+    res.status(201).json({ blob });
+  } catch (error) {
+    if (durableCommitCompleted) throw error;
+    if (blob) store.deleteAttachmentBlob(blob.id);
+    if (reservation) rollbackDurableQuota(store, reservation);
+    if (error instanceof RelayStoreCapacityError || error instanceof RelayStoreByteCapacityError) {
+      options.recordCapacityRejection?.(
+        error instanceof RelayStoreByteCapacityError ? error.resource : "durable_entries",
+        error instanceof RelayStoreByteCapacityError ? error.scope : error.teamId ? "team" : "relay"
+      );
+      return void sendRelayCapacityError(res, error);
+    }
+    return void sendRelayError(
+      res,
+      503,
+      "persistence_unavailable",
+      "Could not persist attachment blob and upload quota."
+    );
+  } finally {
+    releaseQuotaTransaction();
+  }
 }
 
 function attachmentUploader(session: AuthSession | null): { uploadedByUserId?: string } {

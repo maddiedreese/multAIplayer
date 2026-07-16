@@ -21,6 +21,7 @@ export interface RelayWebSocketConnectionOptions {
   authentication: {
     getAuthSessionFromRequest: (request: IncomingMessage) => AuthSession | undefined;
     clientIdentityFromIncomingMessage: (request: IncomingMessage) => string;
+    clientRateLimitIdentitiesFromIncomingMessage?: (request: IncomingMessage) => string[];
   };
   rateLimiting: {
     consume: (bucket: WebSocketRateLimitBucket, clientId: string) => { allowed: boolean };
@@ -28,6 +29,7 @@ export interface RelayWebSocketConnectionOptions {
   };
   metrics: {
     recordQuotaRejection?: (type: string) => void;
+    recordCapacityRejection?: (resource: string, scope: string) => void;
     recordRateLimitRejection?: (bucket: string) => void;
     recordRateLimitAllowed?: (bucket: string) => void;
     recordConnectionAttempt?: () => void;
@@ -37,6 +39,7 @@ export interface RelayWebSocketConnectionOptions {
   rooms: {
     roomKey: (teamId: string, roomId: string) => RoomKey;
     isKnownRoom: (teamId: string, roomId: string) => boolean;
+    canAuthenticateJoinIdentity: (session: ClientSession, userId: string) => boolean;
     canJoinRoom: (
       session: ClientSession,
       teamId: string,

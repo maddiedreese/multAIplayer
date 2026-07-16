@@ -184,3 +184,176 @@ test("joinAndWaitForAck resolves only after exact relay room admission", async (
   await joined;
   client.close();
 });
+
+test("applies relay server messages in wire order across asynchronous handlers", async () => {
+  const applied: string[] = [];
+  let releaseFirst!: () => void;
+  const firstBlocked = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const client = connectRelay(
+    "ws://relay",
+    async (message) => {
+      applied.push(`start:${message.type}`);
+      if (message.type === "joined") await firstBlocked;
+      applied.push(`finish:${message.type}`);
+    },
+    () => undefined
+  );
+  FakeWebSocket.latest.open();
+  FakeWebSocket.latest.receive({ type: "joined", teamId: "team-test", roomId: "room-test" });
+  FakeWebSocket.latest.receive({ type: "invite.requested", inviteId: "invite-test", requestId: "request-test" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(applied, ["start:joined"]);
+  releaseFirst();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(applied, ["start:joined", "finish:joined", "start:invite.requested", "finish:invite.requested"]);
+  client.close();
+});
+
+test("continues ordered relay processing after an asynchronous handler rejects", async () => {
+  const applied: string[] = [];
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => warnings.push(args);
+  try {
+    const client = connectRelay(
+      "ws://relay",
+      async (message) => {
+        applied.push(message.type);
+        if (message.type === "joined") throw new Error("ordered handler failed");
+      },
+      () => undefined
+    );
+    FakeWebSocket.latest.open();
+    FakeWebSocket.latest.receive({ type: "joined", teamId: "team-test", roomId: "room-test" });
+    FakeWebSocket.latest.receive({ type: "invite.requested", inviteId: "invite-test", requestId: "request-test" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(applied, ["joined", "invite.requested"]);
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0]?.[0], "Non-fatal failure: apply an ordered relay server message");
+    assert.match(String(warnings[0]?.[1]), /ordered handler failed/);
+    client.close();
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("resolves a normal join after prior replay but before a blocked joined handler", async () => {
+  let releaseReplay!: () => void;
+  let releaseJoined!: () => void;
+  const replayBlocked = new Promise<void>((resolve) => (releaseReplay = resolve));
+  const joinedBlocked = new Promise<void>((resolve) => (releaseJoined = resolve));
+  const applied: string[] = [];
+  const client = connectRelay(
+    "ws://relay",
+    async (message) => {
+      applied.push(`start:${message.type}`);
+      if (message.type === "mls.message") await replayBlocked;
+      if (message.type === "joined") await joinedBlocked;
+      applied.push(`finish:${message.type}`);
+    },
+    () => undefined
+  );
+  FakeWebSocket.latest.open();
+  const joined = client.joinAndWaitForAck(
+    {
+      type: "join",
+      teamId: "team-test",
+      roomId: "room-test",
+      userId: "user-test",
+      deviceId: "device-test",
+      deviceSessionToken: "session-test"
+    },
+    100
+  );
+  FakeWebSocket.latest.receive({ type: "mls.message", message: publishMessage.message });
+  FakeWebSocket.latest.receive({ type: "joined", teamId: "team-test", roomId: "room-test" });
+  let settled = false;
+  void joined.then(() => (settled = true));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(settled, false);
+  assert.deepEqual(applied, ["start:mls.message"]);
+
+  releaseReplay();
+  await joined;
+  assert.deepEqual(applied, ["start:mls.message", "finish:mls.message", "start:joined"]);
+  releaseJoined();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  client.close();
+});
+
+test("an explicit backlog rejoin can resolve from inside an ordered handler without deadlock", async () => {
+  const applied: string[] = [];
+  let appliedEpoch = 0;
+  let epochWhenRejoinResolved = -1;
+  let rejoined: Promise<void> | null = null;
+  const client = connectRelay(
+    "ws://relay",
+    async (message) => {
+      applied.push(message.type);
+      if (message.type === "mls.message") appliedEpoch = message.message.epochHint;
+      if (message.type !== "invite.requested") return;
+      rejoined = client.rejoinForBacklog(
+        {
+          type: "join",
+          teamId: "team-test",
+          roomId: "room-test",
+          userId: "user-test",
+          deviceId: "device-test",
+          deviceSessionToken: "session-test"
+        },
+        100
+      );
+      await rejoined;
+      epochWhenRejoinResolved = appliedEpoch;
+    },
+    () => undefined
+  );
+  FakeWebSocket.latest.open();
+  FakeWebSocket.latest.receive({ type: "invite.requested", inviteId: "invite-test", requestId: "request-test" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(rejoined);
+  FakeWebSocket.latest.receive({ type: "mls.message", message: publishMessage.message });
+  FakeWebSocket.latest.receive({ type: "joined", teamId: "team-test", roomId: "room-test" });
+  await rejoined;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(applied, ["invite.requested", "mls.message", "joined"]);
+  assert.equal(epochWhenRejoinResolved, 0, "reentrant acknowledgement must let the active handler release first");
+  assert.equal(appliedEpoch, publishMessage.message.epochHint, "queued backlog applies after the handler releases");
+  client.close();
+});
+
+test("an unrelated normal join started during another handler still waits for replay", async () => {
+  let releaseHandler!: () => void;
+  const handlerBlocked = new Promise<void>((resolve) => (releaseHandler = resolve));
+  const client = connectRelay(
+    "ws://relay",
+    async (message) => {
+      if (message.type === "invite.requested") await handlerBlocked;
+    },
+    () => undefined
+  );
+  FakeWebSocket.latest.open();
+  FakeWebSocket.latest.receive({ type: "invite.requested", inviteId: "invite-test", requestId: "request-test" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const joined = client.joinAndWaitForAck(
+    {
+      type: "join",
+      teamId: "team-other",
+      roomId: "room-other",
+      userId: "user-test",
+      deviceId: "device-test",
+      deviceSessionToken: "session-test"
+    },
+    100
+  );
+  FakeWebSocket.latest.receive({ type: "joined", teamId: "team-other", roomId: "room-other" });
+  let settled = false;
+  void joined.then(() => (settled = true));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(settled, false);
+  releaseHandler();
+  await joined;
+  client.close();
+});

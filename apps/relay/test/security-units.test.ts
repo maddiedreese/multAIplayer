@@ -25,6 +25,7 @@ import {
 } from "../src/limits.js";
 import { createRelayAuthz } from "../src/authz.js";
 import { createRelayStore } from "../src/state.js";
+import { canPublishMlsMessage } from "../src/relay-domain.js";
 const message = {
   id: "m",
   teamId: "team",
@@ -36,6 +37,17 @@ const message = {
   epochHint: 0,
   mlsMessage: "AA=="
 };
+test("MLS publishers cannot spoof the sender identity used for exact-local replay classification", () => {
+  const session = {
+    teamId: "team",
+    roomId: "room",
+    userId: "user",
+    deviceId: "device-1"
+  } as Parameters<typeof canPublishMlsMessage>[0];
+  assert.equal(canPublishMlsMessage(session, message), true);
+  assert.equal(canPublishMlsMessage(session, { ...message, senderUserId: "other-user" }), false);
+  assert.equal(canPublishMlsMessage(session, { ...message, senderDeviceId: "device-2" }), false);
+});
 test("MLS routing boundaries reject control text and oversize blobs", () => {
   assert.equal(normalizeMetadataText("bad\0id", 32), null);
   assert.equal(

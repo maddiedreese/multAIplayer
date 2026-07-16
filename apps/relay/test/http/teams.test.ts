@@ -56,6 +56,25 @@ test("relay scopes authenticated workspace access to team members and admits inv
 
     const inviteBody = { invite: { id: "invite-approved" } };
 
+    const invalidDeviceSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
+    await onceOpen(invalidDeviceSocket);
+    const invalidDeviceError = waitForError(invalidDeviceSocket);
+    invalidDeviceSocket.send(
+      JSON.stringify({
+        type: "join",
+        teamId: "team-core",
+        roomId: "room-desktop",
+        userId: "github:peer",
+        deviceId: "device-peer-123",
+        inviteId: inviteBody.invite.id,
+        deviceSessionToken: "invalid-device-session-token-000000000000"
+      })
+    );
+    assert.match(await invalidDeviceError, /device-authenticated session/);
+    invalidDeviceSocket.close();
+    const workspaceAfterInvalidDevice = await fetch(`${relay.baseUrl}/teams`, { headers: { cookie: peerCookie } });
+    assert.deepEqual(await workspaceAfterInvalidDevice.json(), { teams: [], rooms: [] });
+
     peerSocket = new WebSocket(relay.wsUrl, { headers: { cookie: peerCookie } });
     await onceOpen(peerSocket);
     peerSocket.send(
@@ -171,6 +190,8 @@ test("relay revokes live room access and stale invites when a team member is rem
 
 function approvedInviteFixture(deviceId: string) {
   const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const keyPackageHash = `sha256:${"a".repeat(64)}`;
   return {
     version: 1 as const,
     savedAt: createdAt,
@@ -183,6 +204,7 @@ function approvedInviteFixture(deviceId: string) {
         host: "Maddie",
         hostUserId: "github:maddiedreese",
         hostStatus: "active",
+        activeHostDeviceId: "host-device",
         unread: 0
       }
     ],
@@ -193,6 +215,38 @@ function approvedInviteFixture(deviceId: string) {
         roomId: "room-desktop",
         approvedUserId: "github:peer",
         approvedDeviceId: deviceId,
+        keyPackageHash,
+        createdAt
+      }
+    ],
+    inviteResponses: [
+      {
+        requestId: "request-approved",
+        inviteId: "invite-approved",
+        requesterUserId: "github:peer",
+        requesterDeviceId: deviceId,
+        keyPackageHash,
+        status: "approved" as const,
+        responseBinding: {
+          version: 3 as const,
+          phase: "response" as const,
+          inviteId: "invite-approved",
+          teamId: "team-core",
+          roomId: "room-desktop",
+          keyEpoch: 0,
+          keyPackageHash,
+          requestId: "request-approved",
+          requestNonce: "request-nonce",
+          requesterUserId: "github:peer",
+          requesterDeviceId: deviceId,
+          hostUserId: "github:maddiedreese",
+          hostDeviceId: "host-device",
+          expiresAt,
+          status: "approved" as const,
+          decidedAt: createdAt
+        },
+        responseMac: "AA==",
+        welcome: "AA==",
         createdAt
       }
     ],

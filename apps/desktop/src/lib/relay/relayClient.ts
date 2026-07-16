@@ -23,12 +23,14 @@ export interface RelayClient {
   publish(message: RelayClientMessage): void;
   publishAndWaitForAck(message: Extract<RelayClientMessage, { type: "publish" }>, timeoutMs?: number): Promise<void>;
   joinAndWaitForAck(message: Extract<RelayClientMessage, { type: "join" }>, timeoutMs?: number): Promise<void>;
+  /** In-handler stale-Commit escape hatch; normal callers must use joinAndWaitForAck. */
+  rejoinForBacklog(message: Extract<RelayClientMessage, { type: "join" }>, timeoutMs?: number): Promise<void>;
   close(): void;
 }
 
 export function connectRelay(
   url: string,
-  onMessage: (message: RelayServerMessage) => void,
+  onMessage: (message: RelayServerMessage) => void | Promise<void>,
   onStatus: (status: "connecting" | "open" | "closed" | "error") => void,
   onOpen?: (client: RelayClient) => void
 ): RelayClient {
@@ -37,8 +39,12 @@ export function connectRelay(
   let closedByClient = false;
   let reconnectTimer: number | null = null;
   let reconnectAttempt = 0;
+  let incomingMessageChain = Promise.resolve();
   const pendingAcks = new Map<string, { resolve: () => void; reject: (error: Error) => void; timeout: number }>();
-  const pendingJoins = new Map<string, { resolve: () => void; reject: (error: Error) => void; timeout: number }>();
+  const pendingJoins = new Map<
+    string,
+    { resolve: () => void; reject: (error: Error) => void; timeout: number; resolveBeforeWatermark: boolean }
+  >();
 
   const joinKey = (teamId: string, roomId: string) => `${teamId}\u0000${roomId}`;
 
@@ -83,21 +89,10 @@ export function connectRelay(
       });
     },
     joinAndWaitForAck(message, timeoutMs = 10_000) {
-      const key = joinKey(message.teamId, message.roomId);
-      if (pendingJoins.has(key)) return Promise.reject(new Error("This relay room join is already pending."));
-      if (socket?.readyState !== WebSocket.OPEN)
-        return Promise.reject(new Error("Relay is not open for acknowledged joining."));
-      return new Promise<void>((resolve, reject) => {
-        const timeout = window.setTimeout(
-          () => {
-            pendingJoins.delete(key);
-            reject(new Error("Timed out waiting for relay room admission."));
-          },
-          Math.max(1, timeoutMs)
-        );
-        pendingJoins.set(key, { resolve, reject, timeout });
-        socket!.send(JSON.stringify(message));
-      });
+      return waitForJoin(message, timeoutMs, false);
+    },
+    rejoinForBacklog(message, timeoutMs = 10_000) {
+      return waitForJoin(message, timeoutMs, true);
     },
     close() {
       closedByClient = true;
@@ -109,6 +104,28 @@ export function connectRelay(
       socket?.close();
     }
   };
+
+  function waitForJoin(
+    message: Extract<RelayClientMessage, { type: "join" }>,
+    timeoutMs: number,
+    resolveBeforeWatermark: boolean
+  ) {
+    const key = joinKey(message.teamId, message.roomId);
+    if (pendingJoins.has(key)) return Promise.reject(new Error("This relay room join is already pending."));
+    if (socket?.readyState !== WebSocket.OPEN)
+      return Promise.reject(new Error("Relay is not open for acknowledged joining."));
+    return new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(
+        () => {
+          pendingJoins.delete(key);
+          reject(new Error("Timed out waiting for relay room admission."));
+        },
+        Math.max(1, timeoutMs)
+      );
+      pendingJoins.set(key, { resolve, reject, timeout, resolveBeforeWatermark });
+      socket!.send(JSON.stringify(message));
+    });
+  }
 
   function connect() {
     onStatus("connecting");
@@ -148,13 +165,6 @@ export function connectRelay(
           window.clearTimeout(pending.timeout);
           pending.resolve();
         }
-      } else if (message.type === "joined") {
-        const pending = pendingJoins.get(joinKey(message.teamId, message.roomId));
-        if (pending) {
-          pendingJoins.delete(joinKey(message.teamId, message.roomId));
-          window.clearTimeout(pending.timeout);
-          pending.resolve();
-        }
       } else if (message.type === "error" && message.messageId) {
         const pending = pendingAcks.get(message.messageId);
         if (pending) {
@@ -168,8 +178,24 @@ export function connectRelay(
         // publish or join to report a misleading timeout later.
         rejectPendingAcks(new Error(message.message));
       }
-      onMessage(message);
+      const joinedKey = message.type === "joined" ? joinKey(message.teamId, message.roomId) : null;
+      const joinedPending = joinedKey ? pendingJoins.get(joinedKey) : undefined;
+      if (joinedKey && joinedPending?.resolveBeforeWatermark) resolvePendingJoin(joinedKey, joinedPending);
+      incomingMessageChain = incomingMessageChain
+        .then(async () => {
+          if (joinedKey && joinedPending && !joinedPending.resolveBeforeWatermark)
+            resolvePendingJoin(joinedKey, joinedPending);
+          await onMessage(message);
+        })
+        .catch((error) => console.warn("Non-fatal failure: apply an ordered relay server message", error));
     });
+  }
+
+  function resolvePendingJoin(key: string, pending: { resolve: () => void; timeout: number }) {
+    if (pendingJoins.get(key) !== pending) return;
+    pendingJoins.delete(key);
+    window.clearTimeout(pending.timeout);
+    pending.resolve();
   }
 
   connect();

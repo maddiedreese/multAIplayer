@@ -125,25 +125,32 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
   function applyStoredRows<T>(
     value: unknown,
     normalize: (candidate: unknown) => T | null,
-    apply: (normalized: T) => void
+    apply: (normalized: T) => void,
+    criticalEntity?: string
   ): void {
     for (const candidate of storedArray(value)) {
       const normalized = normalize(candidate);
       if (normalized) apply(normalized);
+      else if (criticalEntity) throw new Error(`Stored relay ${criticalEntity} row failed validation.`);
     }
   }
 
   function applyStoredState(stored: Record<string, unknown>): void {
     const migrated = migrateStoredRelayDocument(stored);
     if (!migrated) return;
-    applyStoredRows(migrated.teams, normalizeTeam, (team) => store.teams.set(team.id, team));
-    applyStoredRows(migrated.rooms, normalizeRoom, (room) => store.rooms.set(room.id, room));
+    applyStoredRows(migrated.teams, normalizeTeam, (team) => store.teams.set(team.id, team), "team");
+    applyStoredRows(migrated.rooms, normalizeRoom, (room) => store.rooms.set(room.id, room), "room");
     applyStoredRows(migrated.invites, normalizeInvite, (invite) => {
       if (!isExpiredInvite(invite)) store.invites.set(invite.id, invite);
     });
-    applyStoredRows(migrated.devices, normalizeDevice, (device) => {
-      store.devices.set(deviceKey(device.userId, device.deviceId), device);
-    });
+    applyStoredRows(
+      migrated.devices,
+      normalizeDevice,
+      (device) => {
+        store.devices.set(deviceKey(device.userId, device.deviceId), device);
+      },
+      "device"
+    );
     applyStoredRows(migrated.keyPackages, normalizeKeyPackage, (keyPackage) => {
       if (!store.keyPackages.has(keyPackage.id)) store.setKeyPackage(keyPackage);
     });
@@ -153,7 +160,15 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     applyStoredRows(migrated.inviteResponses, normalizeWelcome, (response) => {
       if (!store.inviteResponses.has(response.requestId)) store.inviteResponses.set(response.requestId, response);
     });
-    for (const item of storedArray(migrated.teamMembers)) applyStoredTeamMembers(item);
+    const restoredMembershipTeams = new Set<string>();
+    for (const item of storedArray(migrated.teamMembers)) {
+      const teamId = storedTeamMembershipKey(item);
+      if (!teamId || restoredMembershipTeams.has(teamId)) {
+        throw new Error("Stored relay team-member row failed validation.");
+      }
+      if (!applyStoredTeamMembers(item)) throw new Error("Stored relay team-member row failed validation.");
+      restoredMembershipTeams.add(teamId);
+    }
     applyStoredRows(migrated.inviteAckReceipts, normalizeInviteAckReceipt, (receipt) => {
       store.inviteAckReceipts.set(receipt.requestId, receipt);
     });
@@ -175,9 +190,32 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     applyStoredRows(migrated.appliedDeletionLedgerEntries, normalizeDeletionLedgerEntry, (entry) => {
       store.appliedDeletionLedgerEntries.set(entry.entryId, entry);
     });
-    applyStoredRows(migrated.mlsBacklog, normalizeStoredBacklog, (backlog) => {
-      store.mlsBacklog.set(backlog.key, backlog.messages);
-    });
+    applyStoredRows(
+      migrated.mlsBacklog,
+      normalizeStoredBacklog,
+      (backlog) => {
+        if (backlog.messages.length > 0) store.mlsBacklog.set(backlog.key, backlog.messages);
+      },
+      "MLS backlog"
+    );
+    validateCriticalRelationships(restoredMembershipTeams);
+  }
+
+  function validateCriticalRelationships(restoredMembershipTeams: Set<string>): void {
+    for (const [teamId, team] of store.teams) {
+      const members = store.teamMembers.get(teamId);
+      if (team.members === 0 && !members?.size) continue;
+      if (!restoredMembershipTeams.has(teamId) || !members || members.size !== team.members) {
+        throw new Error("Stored relay team membership count failed validation.");
+      }
+      const owners = Array.from(members.values()).filter((member) => member.role === "owner");
+      if (owners.length !== 1) throw new Error("Stored relay team ownership failed validation.");
+    }
+    for (const room of store.rooms.values()) {
+      if (room.hostUserId && !store.teamMembers.get(room.teamId)?.has(room.hostUserId)) {
+        throw new Error("Stored relay room host membership failed validation.");
+      }
+    }
   }
 
   function pruneMap<T>(records: Map<string, T>, expired: (record: T) => boolean): void {
@@ -225,6 +263,12 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
 
   function pruneMlsBacklogs(): void {
     for (const [key, messages] of store.mlsBacklog) {
+      const separator = key.indexOf(":");
+      const room = separator >= 0 ? store.getRoom(key.slice(separator + 1)) : undefined;
+      if (!room || room.archivedAt || room.deletedAt) {
+        store.mlsBacklog.delete(key);
+        continue;
+      }
       const pruned = options.pruneMlsBacklog(messages);
       if (pruned.length) store.mlsBacklog.set(key, pruned);
       else store.mlsBacklog.delete(key);
@@ -271,8 +315,7 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
         acceptedMessageReceipts: Array.from(store.acceptedMessageReceipts.values()),
         teamMembers: Array.from(store.teamMembers.entries()).map(([teamId, members]) => ({
           teamId,
-          members: Array.from(members.values()),
-          userIds: Array.from(members.keys())
+          members: Array.from(members.values())
         })),
         authSessions: options.storedAuthSessions(store.authSessions),
         accountRestrictions: Array.from(store.accountRestrictions.values()).filter(
@@ -290,6 +333,12 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
       };
     }
   };
+}
+
+function storedTeamMembershipKey(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const teamId = Reflect.get(value, "teamId");
+  return typeof teamId === "string" ? teamId : null;
 }
 
 function storedArray(value: unknown): unknown[] {

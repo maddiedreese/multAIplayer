@@ -2,6 +2,7 @@ import { test } from "node:test";
 import { assert, startRelay } from "../support/relay.js";
 import { createRelayRequestGuards } from "../../src/http/middleware.js";
 import { createRelayMetrics } from "../../src/observability.js";
+import { hashAuthSessionId } from "../../src/auth/session.js";
 import type { TokenBucketRecord } from "../../src/state.js";
 
 test("relay rate limits repeated HTTP reads and mutations", async () => {
@@ -44,6 +45,25 @@ test("relay rate limits repeated HTTP reads and mutations", async () => {
     assert.equal(second.status, 429);
   } finally {
     await mutationLimitedRelay.close();
+  }
+});
+
+test("rotating caller-supplied session cookies cannot bypass the mandatory IP bucket", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_RATE_LIMIT_READ: "1",
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000"
+  });
+  try {
+    const first = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: "multaiplayer_session=attacker-selected-cookie-one" }
+    });
+    assert.equal(first.status, 200);
+    const rotated = await fetch(`${relay.baseUrl}/teams`, {
+      headers: { cookie: "multaiplayer_session=attacker-selected-cookie-two" }
+    });
+    assert.equal(rotated.status, 429);
+  } finally {
+    await relay.close();
   }
 });
 
@@ -176,4 +196,77 @@ test("rate-limit identifiers prune after two idle refill windows without scannin
   } finally {
     Date.now = originalNow;
   }
+});
+
+test("signed-in rate-limit keys contain only a digest of the bearer session", () => {
+  const records = new Map<string, TokenBucketRecord>();
+  const rawSession = "raw-session-cookie-that-must-not-be-retained";
+  const guards = createRelayRequestGuards({
+    rateLimitsEnabled: true,
+    rateLimitWindowMs: 100,
+    rateLimitCaps: { auth: 2, read: 2, mutation: 2, attachment: 2, websocket: 2, websocketConnect: 2 },
+    rateLimitStore: records,
+    trustProxyHeaders: false,
+    metrics: createRelayMetrics(),
+    normalizeSessionId: (value) => (typeof value === "string" ? value : ""),
+    trustedSessionIdentity: (value) => (value === rawSession ? `session:${hashAuthSessionId(rawSession)}` : null)
+  });
+  const request = {
+    headers: { cookie: `multaiplayer_session=${rawSession}` },
+    socket: { remoteAddress: "127.0.0.1" }
+  } as never;
+  const identities = guards.clientRateLimitIdentitiesFromIncomingMessage(request);
+  assert.deepEqual(identities, ["trusted-network:127.0.0.1", `session:${hashAuthSessionId(rawSession)}`]);
+  for (const identity of identities) guards.consumeRateLimit("read", identity);
+  assert.equal(
+    [...records.keys()].some((key) => /^read:session:[a-f0-9]{64}$/.test(key)),
+    true
+  );
+  assert.equal(
+    [...records.keys()].some((key) => key.includes(rawSession)),
+    false
+  );
+
+  const rotatedIdentities = guards.clientRateLimitIdentitiesFromIncomingMessage({
+    headers: { cookie: "multaiplayer_session=untrusted-rotated-cookie" },
+    socket: { remoteAddress: "127.0.0.1" }
+  } as never);
+  assert.deepEqual(rotatedIdentities, ["ip:127.0.0.1"]);
+});
+
+test("trusted sessions keep individual caps while sharing a higher bounded network cap", () => {
+  const records = new Map<string, TokenBucketRecord>();
+  const guards = createRelayRequestGuards({
+    rateLimitsEnabled: true,
+    rateLimitWindowMs: 60_000,
+    trustedNetworkRateLimitMultiplier: 3,
+    rateLimitCaps: { auth: 2, read: 2, mutation: 2, attachment: 2, websocket: 2, websocketConnect: 2 },
+    rateLimitStore: records,
+    trustProxyHeaders: false,
+    metrics: createRelayMetrics(),
+    normalizeSessionId: (value) => (typeof value === "string" ? value : ""),
+    trustedSessionIdentity: (value) =>
+      typeof value === "string" && value.startsWith("valid-") ? `session:${value}` : null
+  });
+  const consumeRequest = (sessionId: string, remoteAddress = "203.0.113.60") => {
+    const identities = guards.clientRateLimitIdentitiesFromIncomingMessage({
+      headers: { cookie: `multaiplayer_session=${sessionId}` },
+      socket: { remoteAddress }
+    } as never);
+    return identities.every((identity) => guards.consumeRateLimit("read", identity).allowed);
+  };
+
+  assert.equal(consumeRequest("valid-single", "203.0.113.61"), true);
+  assert.equal(consumeRequest("valid-single", "203.0.113.61"), true);
+  assert.equal(consumeRequest("valid-single", "203.0.113.61"), false, "the strict session cap still wins");
+  for (const sessionId of ["valid-a", "valid-a", "valid-b", "valid-b", "valid-c", "valid-c"]) {
+    assert.equal(consumeRequest(sessionId), true);
+  }
+  assert.equal(
+    consumeRequest("valid-d"),
+    false,
+    "a valid-session rotation must not bypass the bounded shared-network bucket"
+  );
+  assert.equal(records.get("read:session:valid-a")?.tokens, 0, "each trusted session keeps the strict base cap");
+  assert.equal(records.get("read:trusted-network:203.0.113.60")?.tokens, 0);
 });

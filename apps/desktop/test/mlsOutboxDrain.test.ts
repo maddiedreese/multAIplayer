@@ -76,6 +76,7 @@ test("startup drain retires an exact application that exceeded the retained epoc
         throw new RelayPublishRejectedError("application_epoch_expired", message.id, "expired");
       },
       joinAndWaitForAck: async () => undefined,
+      rejoinForBacklog: async () => undefined,
       close: () => undefined
     },
     room,

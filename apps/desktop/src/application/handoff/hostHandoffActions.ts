@@ -458,8 +458,7 @@ export function createHostHandoffActions(
           relay,
           selectedRoom,
           { userId: localUser.id, deviceId, deviceSessionToken: token },
-          commit.outboxId,
-          commit.parentEpoch
+          commit.outboxId
         );
       }
       throw error;

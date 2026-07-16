@@ -1,4 +1,4 @@
-import { sendRelayError } from "./errors.js";
+import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import { nanoid } from "nanoid";
 import {
   defaultApprovalDelegationPolicy,
@@ -7,7 +7,6 @@ import {
   defaultRoomMode,
   type RoomRecord
 } from "@multaiplayer/protocol";
-import { loadRelayConfig } from "../config.js";
 import { allowTotalRoomQuota, normalizeTrustedApproverUserIds } from "./room-validation.js";
 import {
   acquireDurableQuotaTransaction,
@@ -17,6 +16,7 @@ import {
 } from "../auth/account-quotas.js";
 import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
 import type { Response } from "express";
+import { RelayStoreCapacityError } from "../state.js";
 
 const encryptedConfigFields = [
   "projectPath",
@@ -31,21 +31,8 @@ const encryptedConfigFields = [
 ] as const;
 
 export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
-  const {
-    app,
-    store,
-    getAuthSession,
-    allowMutation,
-    teamIdsForUser,
-    scheduleStoreSave,
-    saveRelayStore,
-    broadcastRoomUpdated,
-    recordQuotaRejection,
-    normalizeMetadataText,
-    displayNameForUser,
-    maxHostNameChars
-  } = options;
-  const { dailyCreationCaps, totalRoomCapPerUser } = loadRelayConfig();
+  const { app, store, getAuthSession, allowMutation, teamIdsForUser, recordQuotaRejection } = options;
+  const totalRoomCapPerUser = options.totalRoomCapPerUser ?? 500;
 
   app.post("/rooms", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
@@ -65,65 +52,91 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
       })
     )
       return;
-    const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
-    let reservation: ReturnType<typeof reserveDurableQuota> | null = null;
-    let room: RoomRecord | null = null;
-    let durableCommitCompleted = false;
-    try {
-      reservation = session
-        ? reserveDurableQuota({
-            store,
-            quota: "daily_room_creations",
-            userId: session.user.id,
-            limit: dailyCreationCaps.roomsPerUser,
-            resetAt: nextUtcMidnight()
-          })
-        : null;
-      if (reservation && !reservation.allowed) {
-        recordQuotaRejection?.("daily_user_room_creations");
-        res.setHeader("Retry-After", Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)));
-        return void sendRelayError(res, 429, "quota_exceeded", "Daily room creation quota exceeded.", {
-          retryAfterSeconds: Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)),
-          quota: {
-            type: "daily_user_room_creations",
-            limit: dailyCreationCaps.roomsPerUser,
-            used: reservation.used,
-            remaining: 0,
-            resetsAt: new Date(reservation.resetAt).toISOString()
-          }
-        });
-      }
-      room = {
-        id: `room_${nanoid(10)}`,
-        teamId,
-        name: input.name,
-        host: session
-          ? (normalizeMetadataText(displayNameForUser(session.user), maxHostNameChars) ?? "Reserved host")
-          : "No host",
-        hostUserId: session?.user.id,
-        hostStatus: "offline",
-        approvalPolicy: input.approvalPolicy,
-        approvalDelegationPolicy: input.approvalDelegationPolicy,
-        trustedApproverUserIds: input.trustedApproverUserIds,
-        mode: defaultRoomMode,
-        browserAllowedOrigins: input.browserAllowedOrigins,
-        browserProfilePersistent: input.browserProfilePersistent,
-        unread: 0
-      };
-      store.setRoom(room);
-      if (session) await saveRelayStore();
-      else scheduleStoreSave();
-      durableCommitCompleted = true;
-      broadcastRoomUpdated(room);
-      res.status(201).json({ room });
-    } catch (error) {
-      if (durableCommitCompleted) throw error;
-      rollbackRoomCreation(store, room, reservation);
-      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist room quota and room.");
-    } finally {
-      releaseQuotaTransaction();
-    }
+    await persistRoomCreation(options, session, teamId, input, res);
   });
+}
+
+async function persistRoomCreation(
+  options: RegisterRoomRoutesOptions,
+  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>,
+  teamId: string,
+  input: NonNullable<ReturnType<typeof parseRoomCreationInput>>,
+  res: Response
+) {
+  const {
+    store,
+    scheduleStoreSave,
+    saveRelayStore,
+    broadcastRoomUpdated,
+    recordQuotaRejection,
+    recordCapacityRejection,
+    normalizeMetadataText,
+    displayNameForUser,
+    maxHostNameChars
+  } = options;
+  const dailyCreationCaps = options.dailyCreationCaps ?? { roomsPerUser: 100 };
+  const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
+  let reservation: ReturnType<typeof reserveDurableQuota> | null = null;
+  let room: RoomRecord | null = null;
+  let durableCommitCompleted = false;
+  try {
+    reservation = session
+      ? reserveDurableQuota({
+          store,
+          quota: "daily_room_creations",
+          userId: session.user.id,
+          limit: dailyCreationCaps.roomsPerUser,
+          resetAt: nextUtcMidnight()
+        })
+      : null;
+    if (reservation && !reservation.allowed) {
+      recordQuotaRejection?.("daily_user_room_creations");
+      res.setHeader("Retry-After", Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)));
+      return void sendRelayError(res, 429, "quota_exceeded", "Daily room creation quota exceeded.", {
+        retryAfterSeconds: Math.max(1, Math.ceil((reservation.resetAt - Date.now()) / 1000)),
+        quota: {
+          type: "daily_user_room_creations",
+          limit: dailyCreationCaps.roomsPerUser,
+          used: reservation.used,
+          remaining: 0,
+          resetsAt: new Date(reservation.resetAt).toISOString()
+        }
+      });
+    }
+    room = {
+      id: `room_${nanoid(10)}`,
+      teamId,
+      name: input.name,
+      host: session
+        ? (normalizeMetadataText(displayNameForUser(session.user), maxHostNameChars) ?? "Reserved host")
+        : "No host",
+      hostUserId: session?.user.id,
+      hostStatus: "offline",
+      approvalPolicy: input.approvalPolicy,
+      approvalDelegationPolicy: input.approvalDelegationPolicy,
+      trustedApproverUserIds: input.trustedApproverUserIds,
+      mode: defaultRoomMode,
+      browserAllowedOrigins: input.browserAllowedOrigins,
+      browserProfilePersistent: input.browserProfilePersistent,
+      unread: 0
+    };
+    store.setRoom(room);
+    if (session) await saveRelayStore();
+    else scheduleStoreSave();
+    durableCommitCompleted = true;
+    broadcastRoomUpdated(room);
+    res.status(201).json({ room });
+  } catch (error) {
+    if (durableCommitCompleted) throw error;
+    rollbackRoomCreation(store, room, reservation);
+    if (error instanceof RelayStoreCapacityError) {
+      recordCapacityRejection?.("durable_entries", error.teamId ? "team" : "relay");
+      return void sendRelayCapacityError(res, error);
+    }
+    return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist room quota and room.");
+  } finally {
+    releaseQuotaTransaction();
+  }
 }
 
 function rollbackRoomCreation(

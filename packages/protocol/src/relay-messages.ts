@@ -118,7 +118,8 @@ export const RelayErrorCode = z.enum([
   "application_epoch_expired",
   "membership_removed",
   "key_package_invalid",
-  "key_package_unavailable"
+  "key_package_unavailable",
+  "capacity_exceeded"
 ]);
 
 export const RelayServerMessage = z.discriminatedUnion("type", [

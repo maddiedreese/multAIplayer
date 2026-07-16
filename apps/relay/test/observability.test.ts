@@ -26,12 +26,15 @@ test("Prometheus metrics are stable, typed, and escape labels", () => {
     activeSockets: 2,
     liveAttachmentBlobCount: 1,
     liveAttachmentBlobBytes: 12,
+    retainedMlsBacklogBytes: 123,
+    retainedAttachmentBlobBytes: 456,
     envelopesPublishedTotal: 3,
     attachmentBlobUploadsTotal: 1,
     attachmentBlobUploadBytesTotal: 12,
     attachmentBlobUploadRejectionsByReason: { 'bad"reason\\line\n': 4 },
     quotaRejectionsTotal: 5,
     quotaRejectionsByType: { rooms: 5 },
+    capacityRejectionsByReason: { team_attachment_blobs: 2 },
     rateLimitRejectionsTotal: 6,
     rateLimitRejectionsByBucket: { mutation: 6 },
     webSocketConnectionAttemptsTotal: 7,
@@ -46,11 +49,14 @@ test("Prometheus metrics are stable, typed, and escape labels", () => {
 
   assert.match(output, /# TYPE multaiplayer_relay_envelopes_published_total counter/);
   assert.match(output, /multaiplayer_relay_active_sockets 2/);
+  assert.match(output, /multaiplayer_relay_retained_mls_backlog_bytes 123/);
+  assert.match(output, /multaiplayer_relay_retained_attachment_blob_bytes 456/);
   assert.match(output, /reason="bad\\"reason\\\\line\\n"} 4/);
   assert.match(output, /multaiplayer_relay_publish_to_fanout_duration_seconds_bucket\{le="0\.005"} 2/);
   assert.match(output, /multaiplayer_relay_publish_to_fanout_duration_seconds_bucket\{le="\+Inf"} 3/);
   assert.match(output, /multaiplayer_relay_publish_to_fanout_duration_seconds_sum 0\.02/);
   assert.match(output, /multaiplayer_relay_sqlite_write_duration_seconds_count 2/);
+  assert.match(output, /multaiplayer_relay_capacity_rejections_total\{reason="team_attachment_blobs"\} 2/);
   assert.match(output, /multaiplayer_relay_start_time_seconds 1767225600/);
   assert.ok(output.endsWith("\n"));
 });

@@ -18,6 +18,7 @@ export const RelayHttpErrorCode = z.enum([
   "rate_limited",
   "quota_exceeded",
   "payload_too_large",
+  "capacity_exceeded",
   "persistence_unavailable",
   "upstream_unavailable",
   "relay_shutting_down",

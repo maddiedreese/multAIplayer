@@ -108,19 +108,10 @@ export function registerGitHubAuthRoutes({
       return;
     }
     if (deletionLedger) {
-      let deletedSubjects;
-      try {
-        deletedSubjects = new Set((await deletionLedger.list()).map((entry) => entry.subject));
-      } catch {
-        sendRelayError(
-          res,
-          503,
-          "persistence_unavailable",
-          "GitHub sign-in is temporarily unavailable because deletion safety could not be verified."
-        );
-        return;
-      }
-      if (deletedSubjects.has(deletionLedger.subjectFor(normalizedUserId))) {
+      // Startup reconciliation authenticates the complete external ledger before
+      // the listener opens. record()/purgeExpired() keep this single-writer cache
+      // coherent, avoiding an O(all tombstones) S3 scan on every sign-in.
+      if (deletionLedger.isProtected(normalizedUserId)) {
         sendRelayError(
           res,
           403,

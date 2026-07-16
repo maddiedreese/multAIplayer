@@ -7,6 +7,7 @@ import { useAppStore } from "../../store/appStore";
 import type { ChatMessage, RoomPresence } from "../../types";
 import { useLatestRef } from "../useLatestRef";
 import { recoverAuthenticatedHostTransfer, routeMlsMessage } from "./routeMlsMessage";
+import { handleExactLocalMlsReplay } from "./mlsReplay";
 import {
   currentMlsEpoch,
   listMlsJoinAdmissions,
@@ -270,21 +271,23 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           if (message.type === "joined") {
             const room = current.roomsRef.current.find((candidate) => candidate.id === message.roomId);
             if (room) {
-              void recoverRoomAfterJoin(
-                client,
-                room,
-                {
-                  userId: current.localUser.id,
-                  deviceId: current.deviceId,
-                  deviceSessionToken: current.deviceSessionToken
-                },
-                seenEnvelopeIds.current
-              ).catch(() => {
+              try {
+                await recoverRoomAfterJoin(
+                  client,
+                  room,
+                  {
+                    userId: current.localUser.id,
+                    deviceId: current.deviceId,
+                    deviceSessionToken: current.deviceSessionToken
+                  },
+                  seenEnvelopeIds.current
+                );
+              } catch {
                 store.setHostMessageForRoom(
                   room.id,
                   "A durable MLS message is still pending relay delivery and will retry after reconnecting."
                 );
-              });
+              }
             }
           }
           return;
@@ -336,6 +339,16 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           .then(async () => {
             if (cancelled || seenEnvelopeIds.current.has(message.message.id)) return;
             try {
+              if (
+                await handleExactLocalMlsReplay(
+                  message.message,
+                  { userId: current.localUser.id, deviceId: current.deviceId },
+                  recoverAuthenticatedHostTransfer
+                )
+              ) {
+                seenEnvelopeIds.current.add(message.message.id);
+                return;
+              }
               const epoch = await currentMlsEpoch(roomId);
               if (message.message.messageType === "commit" && message.message.epochHint < epoch) {
                 if (message.message.commitEffect === "host_handoff") {
@@ -365,7 +378,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
             }
           });
         roomReceiveQueues.set(roomId, queued);
-        void queued.finally(() => {
+        await queued.finally(() => {
           if (roomReceiveQueues.get(roomId) === queued) roomReceiveQueues.delete(roomId);
         });
       },

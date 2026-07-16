@@ -14,6 +14,7 @@ export interface RegisterRoomRoutesOptions {
   saveRelayStore: () => Promise<void>;
   broadcastRoomUpdated: (room: RoomRecord) => void;
   recordQuotaRejection?: (type: string) => void;
+  recordCapacityRejection?: (resource: string, scope: string) => void;
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
   isRoomHost: (room: RoomRecord, requester: { id: string; name: string }) => boolean;
   isApprovalPolicy: (value: string) => value is RoomRecord["approvalPolicy"];
@@ -28,4 +29,6 @@ export interface RegisterRoomRoutesOptions {
   maxRoomNameChars: number;
   maxUserIdChars: number;
   deviceAuthRequired: boolean;
+  dailyCreationCaps?: { roomsPerUser: number };
+  totalRoomCapPerUser?: number;
 }

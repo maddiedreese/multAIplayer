@@ -18,6 +18,15 @@ if (!config.exitOnPersistencePoison)
 if (config.maxDurableEntriesPerTeam >= config.maxDurableEntries) {
   violations.push("per-team durable-entry ceiling must be lower than the global ceiling");
 }
+if (
+  config.maxMlsBacklogBytesPerRoom > config.maxMlsBacklogBytesPerTeam ||
+  config.maxMlsBacklogBytesPerTeam > config.maxMlsBacklogBytes
+) {
+  violations.push("MLS backlog byte ceilings must be ordered room <= team <= relay");
+}
+if (config.maxAttachmentBlobBytesPerTeam > config.maxAttachmentBlobBytes) {
+  violations.push("attachment byte ceilings must be ordered team <= relay");
+}
 try {
   const filesystem = statfsSync(dirname(config.dataPath));
   const availableBytes = Number(filesystem.bavail) * Number(filesystem.bsize);

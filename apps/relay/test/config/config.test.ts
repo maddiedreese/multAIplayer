@@ -57,24 +57,64 @@ test("relay falls back safely for invalid shutdown drain values", () => {
   }
 });
 
+test("relay bounds the trusted-network rate-limit multiplier", () => {
+  const previous = process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER;
+  try {
+    delete process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER;
+    assert.equal(loadRelayConfig().trustedNetworkRateLimitMultiplier, 8);
+    process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER = "0";
+    assert.equal(loadRelayConfig().trustedNetworkRateLimitMultiplier, 1);
+    process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER = "500";
+    assert.equal(loadRelayConfig().trustedNetworkRateLimitMultiplier, 100);
+  } finally {
+    restoreEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER", previous);
+  }
+});
+
 test("production fail-stop exits for supervisor restart unless explicitly overridden", () => {
-  const previous = {
-    nodeEnv: process.env.NODE_ENV,
-    exit: process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON,
-    ledgerPath: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH,
-    ledgerKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY
-  };
+  const keys = [
+    "NODE_ENV",
+    "MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
+    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"
+  ] as const;
+  const previous = new Map(keys.map((key) => [key, process.env[key]]));
   try {
     process.env.NODE_ENV = "production";
     delete process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON;
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH = ".multaiplayer/test-deletion-ledger";
+    delete process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH;
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = "https://ledger.example.test";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET = "relay";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION = "us-test-1";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID = "test-access-key";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY = "test-secret-key-at-least-32-characters";
     process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
     assert.equal(loadRelayConfig().exitOnPersistencePoison, true);
     process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON = "false";
     assert.equal(loadRelayConfig().exitOnPersistencePoison, false);
   } finally {
+    for (const key of keys) restoreEnv(key, previous.get(key));
+  }
+});
+
+test("production rejects the development filesystem deletion ledger", () => {
+  const previous = {
+    nodeEnv: process.env.NODE_ENV,
+    ledgerPath: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH,
+    ledgerKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY
+  };
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH = ".multaiplayer/test-deletion-ledger";
+    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
+    assert.throws(() => loadRelayConfig(), /external S3-compatible deletion ledger/);
+  } finally {
     restoreEnv("NODE_ENV", previous.nodeEnv);
-    restoreEnv("MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON", previous.exit);
     restoreEnv("MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH", previous.ledgerPath);
     restoreEnv("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY", previous.ledgerKey);
   }
@@ -99,6 +139,22 @@ test("relay supports only SQLite persistence", () => {
     else process.env.MULTAIPLAYER_RELAY_STORAGE = previousStorage;
     if (previousDataPath === undefined) delete process.env.MULTAIPLAYER_RELAY_DATA_PATH;
     else process.env.MULTAIPLAYER_RELAY_DATA_PATH = previousDataPath;
+  }
+});
+
+test("relay rejects one-sided trusted-proxy configuration", () => {
+  const previousTrust = process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS;
+  const previousConfigured = process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED;
+  try {
+    process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS = "true";
+    process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED = "false";
+    assert.throws(() => loadRelayConfig(), /must be enabled or disabled together/);
+    process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS = "false";
+    process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED = "true";
+    assert.throws(() => loadRelayConfig(), /must be enabled or disabled together/);
+  } finally {
+    restoreEnv("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", previousTrust);
+    restoreEnv("MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED", previousConfigured);
   }
 });
 

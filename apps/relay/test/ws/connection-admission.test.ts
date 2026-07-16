@@ -74,3 +74,22 @@ test("WebSocket admission records accepted sessions and enforces user/device quo
   assert.match(socketConnectionQuotaError(deviceQuota.options, deviceCandidate) ?? "", /device \(1 max\)/);
   assert.deepEqual(deviceQuota.metrics, ["quota:websocket_connections_per_device"]);
 });
+
+test("WebSocket admission consumes the bounded trusted-network bucket and strict session bucket", () => {
+  const candidate = fixture();
+  const consumed: string[] = [];
+  candidate.options.authentication.clientRateLimitIdentitiesFromIncomingMessage = () => [
+    "trusted-network:127.0.0.1",
+    "session:trusted-digest"
+  ];
+  candidate.options.rateLimiting.consume = (_bucket, clientId) => {
+    consumed.push(clientId);
+    return { allowed: true };
+  };
+  assert.ok(admitRelayWebSocketConnection(candidate.options, candidate.socket as never, {} as never));
+  assert.deepEqual(consumed, ["trusted-network:127.0.0.1", "session:trusted-digest"]);
+  assert.deepEqual(candidate.sessions.get(candidate.socket)?.rateClientIds, [
+    "trusted-network:127.0.0.1",
+    "session:trusted-digest"
+  ]);
+});

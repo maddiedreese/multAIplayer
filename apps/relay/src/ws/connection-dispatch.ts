@@ -64,6 +64,14 @@ function dispatchJoin(
     send(socket, { type: "error", message: "Room not found" });
     return;
   }
+  if (!options.rooms.canAuthenticateJoinIdentity(session, message.userId)) {
+    send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
+    return;
+  }
+  if (!options.rooms.hasDeviceSession(message.deviceSessionToken ?? "", message.userId, message.deviceId)) {
+    send(socket, { type: "error", message: "A device-authenticated session is required.", code: "not_joined" });
+    return;
+  }
   if (
     !options.rooms.canJoinRoom(
       session,
@@ -75,10 +83,6 @@ function dispatchJoin(
     )
   ) {
     send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
-    return;
-  }
-  if (!options.rooms.hasDeviceSession(message.deviceSessionToken ?? "", message.userId, message.deviceId)) {
-    send(socket, { type: "error", message: "A device-authenticated session is required.", code: "not_joined" });
     return;
   }
 
@@ -93,15 +97,17 @@ function dispatchJoin(
     return;
   }
   options.rooms.joinRoom(session, message.teamId, message.roomId, message.userId, message.deviceId);
-  send(socket, { type: "joined", teamId: message.teamId, roomId: message.roomId });
-  replayPendingInviteRequests(options, session);
   const key = options.rooms.roomKey(message.teamId, message.roomId);
   for (const backlogMessage of options.state.store.getMlsBacklog(key) ?? []) {
     send(socket, { type: "mls.message", message: backlogMessage });
   }
+  replayPendingInviteRequests(options, session);
   for (const presence of options.state.roomPresence.get(key)?.values() ?? []) {
     send(socket, { type: "presence", ...presence, status: "online" });
   }
+  // `joined` is the recovery barrier: everything retained for this room is
+  // already on the wire before the client resumes outbox/config publication.
+  send(socket, { type: "joined", teamId: message.teamId, roomId: message.roomId });
 }
 
 function replayPendingInviteRequests(options: RelayWebSocketConnectionOptions, session: ClientSession) {

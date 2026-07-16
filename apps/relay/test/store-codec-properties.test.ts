@@ -34,7 +34,10 @@ const authSessionPersistence = createRelayAuthSessionPersistence({
   maxUserIdChars: 128
 });
 
-function codec(store = new InMemoryRelayStore()) {
+function codec(
+  store = new InMemoryRelayStore(),
+  pruneMlsBacklog: (messages: MlsRelayMessage[]) => MlsRelayMessage[] = (messages) => messages
+) {
   return {
     store,
     codec: createRelayStoreCodec({
@@ -54,7 +57,7 @@ function codec(store = new InMemoryRelayStore()) {
       maxTeamNameChars: 128,
       maxUserIdChars: 128,
       normalizeStoredAuthSession: authSessionPersistence.normalizeStoredAuthSession,
-      pruneMlsBacklog: (messages) => messages,
+      pruneMlsBacklog,
       storedAuthSessions: authSessionPersistence.storedAuthSessions,
       now: () => fixedNow
     })
@@ -77,7 +80,7 @@ const storedState: fc.Arbitrary<GeneratedState> = fc.record({
   roomPart: safePart,
   teamName: fc.stringMatching(/^[A-Za-z][A-Za-z0-9 _-]{0,30}$/),
   roomName: fc.stringMatching(/^[A-Za-z][A-Za-z0-9 _-]{0,30}$/),
-  members: fc.nat({ max: 10_000 }),
+  members: fc.integer({ min: 1, max: 8 }),
   unread: fc.nat({ max: 10_000 }),
   keyEpoch: fc.integer({ min: 1, max: Number.MAX_SAFE_INTEGER }),
   epochEnvelopeCount: fc.nat({ max: Number.MAX_SAFE_INTEGER })
@@ -104,6 +107,17 @@ function input(value: GeneratedState): Record<string, unknown> {
       }
     ],
     invites: [],
+    teamMembers: [
+      {
+        teamId,
+        members: Array.from({ length: value.members }, (_, index) => ({
+          teamId,
+          userId: `github:member-${index}`,
+          role: index === 0 ? "owner" : "member",
+          joinedAt: "2020-01-01T00:00:00.000Z"
+        }))
+      }
+    ],
     encryptedBacklog: []
   };
 }
@@ -190,6 +204,12 @@ function pendingInviteState({
         ...approvalFields
       }
     ],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [{ teamId: "team-core", userId: "github:host", role: "owner", joinedAt: createdAt }]
+      }
+    ],
     inviteRequests: [
       {
         requestId: "request-one",
@@ -222,20 +242,21 @@ test("relay store codec round-trips normalized generated states idempotently", (
   );
 });
 
-test("malformed generated records are isolated from valid store records", () => {
-  fc.assert(
-    fc.property(storedState, fc.jsonValue(), (value, malformed) => {
-      const { store, codec: storeCodec } = codec();
-      const valid = input(value);
-      storeCodec.applyStoredRelayState({
-        ...valid,
-        teams: [malformed, ...(valid.teams as unknown[])],
-        rooms: [...(valid.rooms as unknown[]), malformed]
-      });
-      assert.equal(store.teams.size, 1);
-      assert.equal(store.rooms.size, 1);
-    }),
-    { numRuns: 500 }
+test("malformed critical store records fail startup normalization", () => {
+  const { codec: storeCodec } = codec();
+  const valid = input({
+    teamPart: "core",
+    roomPart: "desktop",
+    teamName: "Core",
+    roomName: "Desktop",
+    members: 0,
+    unread: 0,
+    keyEpoch: 0,
+    epochEnvelopeCount: 0
+  });
+  assert.throws(
+    () => storeCodec.applyStoredRelayState({ ...valid, teams: [null, ...(valid.teams as unknown[])] }),
+    /team row failed validation/
   );
 });
 
@@ -243,7 +264,12 @@ test("arbitrary decoded store documents never escape codec normalization", () =>
   fc.assert(
     fc.property(fc.dictionary(fc.string(), fc.jsonValue({ maxDepth: 10 })), (document) => {
       const first = codec();
-      assert.doesNotThrow(() => first.codec.applyStoredRelayState({ ...document, version: 1 }));
+      try {
+        first.codec.applyStoredRelayState({ ...document, version: 1 });
+      } catch (error) {
+        assert.match(String(error), /Stored relay .* failed validation/);
+        return;
+      }
       const normalized = first.codec.toStoredRelayState();
       const second = codec();
       assert.doesNotThrow(() => second.codec.applyStoredRelayState(normalized));
@@ -257,7 +283,12 @@ test("every emitted row satisfies its authoritative protocol or persistence sche
   fc.assert(
     fc.property(fc.dictionary(fc.string(), fc.jsonValue({ maxDepth: 10 })), (document) => {
       const instance = codec();
-      instance.codec.applyStoredRelayState({ ...document, version: 1 });
+      try {
+        instance.codec.applyStoredRelayState({ ...document, version: 1 });
+      } catch (error) {
+        assert.match(String(error), /Stored relay .* failed validation/);
+        return;
+      }
       const stored = instance.codec.toStoredRelayState();
       assertStoredStateAllowlist(stored);
       assertStoredSchemas(stored);
@@ -479,7 +510,7 @@ test("a complete valid relay store strips unknown fields and exercises every per
   const state = {
     ...pending,
     unknownRoot: "must not persist",
-    teams: [{ ...(pending.teams[0] as object), unknownTeam: "must not persist" }],
+    teams: [{ ...(pending.teams[0] as object), members: 2, unknownTeam: "must not persist" }],
     rooms: [
       {
         ...(pending.rooms[0] as object),
@@ -781,9 +812,61 @@ test("expiry and pruning use the injected clock", () => {
     user: { id: "user", login: "user" },
     expiresAt: fixedNow + 1
   });
+  store.setRoom({
+    id: "room-archived",
+    teamId: "team-core",
+    name: "Archived",
+    host: "No host",
+    hostStatus: "offline",
+    unread: 0,
+    archivedAt: new Date(fixedNow - 1).toISOString()
+  });
+  store.setMlsBacklog("team-core:room-archived", [
+    {
+      id: "message-one",
+      teamId: "team-core",
+      roomId: "room-archived",
+      senderUserId: "github:owner",
+      senderDeviceId: "device-owner",
+      createdAt: new Date(fixedNow - 1).toISOString(),
+      messageType: "application",
+      epochHint: 0,
+      mlsMessage: "AA=="
+    }
+  ]);
+  store.setAttachmentBlob({
+    id: "blob-expired",
+    teamId: "team-core",
+    roomId: "room-archived",
+    name: "expired",
+    type: "file",
+    size: 1,
+    epoch: 0,
+    sealedBlob: "{}",
+    createdAt: new Date(fixedNow - 2).toISOString(),
+    expiresAt: new Date(fixedNow - 1).toISOString()
+  });
+  storeCodec.discardStoredRelayMutations();
   storeCodec.pruneExpiredRelayState();
   assert.equal(store.authSessions.has("expired"), false);
   assert.equal(store.authSessions.has("active"), true);
+  assert.equal(store.attachmentBlobs.size, 0);
+  assert.equal(store.mlsBacklog.size, 0);
+  const mutations = storeCodec.drainStoredRelayMutations();
+  assert.ok(
+    mutations.some(
+      (mutation) =>
+        mutation.entity === "attachmentBlobs" && mutation.key === "blob-expired" && mutation.operation === "delete"
+    )
+  );
+  assert.ok(
+    mutations.some(
+      (mutation) =>
+        mutation.entity === "mlsBacklog" &&
+        mutation.key === "team-core:room-archived" &&
+        mutation.operation === "delete"
+    )
+  );
 });
 
 test("startup normalization discards non-canonical opaque encodings", () => {
@@ -805,20 +888,13 @@ test("startup normalization discards non-canonical opaque encodings", () => {
       }
     ],
     invites: [],
-    teamMembers: [],
-    devices: [
+    teamMembers: [
       {
-        userId: "github:test",
-        deviceId: "device-test",
-        displayName: "Test",
-        signaturePublicKey: "AQ==",
-        signatureKeyFingerprint: "AA",
-        hpkePublicKey: "AQ==",
-        hpkeKeyFingerprint: "BB",
-        registeredAt: createdAt,
-        lastSeenAt: createdAt
+        teamId: "team-core",
+        members: [{ teamId: "team-core", userId: "github:owner", role: "owner", joinedAt: createdAt }]
       }
     ],
+    devices: [],
     keyPackages: [
       {
         id: "kp-bad",
@@ -866,30 +942,193 @@ test("startup normalization discards non-canonical opaque encodings", () => {
         createdAt
       }
     ],
-    mlsBacklog: [
-      {
-        key: "team-core:room-desktop",
-        messages: [
-          {
-            id: "message-bad",
-            teamId: "team-core",
-            roomId: "room-desktop",
-            senderUserId: "github:test",
-            senderDeviceId: "device-test",
-            createdAt,
-            messageType: "application",
-            epochHint: 0,
-            mlsMessage: "AB=="
-          }
-        ]
-      }
-    ]
+    mlsBacklog: []
   });
   assert.equal(store.keyPackages.size, 0);
   assert.equal(store.inviteRequests.size, 0);
   assert.equal(store.inviteResponses.size, 0);
   assert.equal(store.attachmentBlobs.size, 0);
   assert.equal(store.mlsBacklog.size, 0);
+});
+
+test("startup fails closed on malformed team members while preserving role-bearing v1 forms", () => {
+  const createdAt = "2026-07-11T11:00:00.000Z";
+  const base = {
+    version: 1,
+    teams: [{ id: "team-core", name: "Core", members: 1 }],
+    rooms: [],
+    invites: [],
+    mlsBacklog: []
+  };
+  for (const member of [
+    { teamId: "team-core", userId: "github:owner", role: "invalid", joinedAt: createdAt },
+    { teamId: "team-other", userId: "github:owner", role: "owner", joinedAt: createdAt },
+    { teamId: "team-core", userId: "github:owner", role: "owner", joinedAt: "not-a-date" }
+  ]) {
+    assert.throws(
+      () =>
+        codec().codec.applyStoredRelayState({
+          ...base,
+          teamMembers: [{ teamId: "team-core", members: [member] }]
+        }),
+      /team-member row failed validation/
+    );
+  }
+  assert.throws(
+    () =>
+      codec().codec.applyStoredRelayState({
+        ...base,
+        teamMembers: [{ teamId: "team-core", userIds: ["github:owner", null, " "] }]
+      }),
+    /team-member row failed validation/
+  );
+  const legacyUserIds = codec();
+  legacyUserIds.codec.applyStoredRelayState({
+    ...base,
+    teams: [{ id: "team-core", name: "Core", members: 3 }],
+    teamMembers: [{ teamId: "team-core", userIds: ["github:creator", "github:second", "github:third"] }]
+  });
+  assert.deepEqual(
+    Array.from(legacyUserIds.store.getTeamMembers("team-core")?.values() ?? []).map(({ userId, role }) => ({
+      userId,
+      role
+    })),
+    [
+      { userId: "github:creator", role: "owner" },
+      { userId: "github:second", role: "member" },
+      { userId: "github:third", role: "member" }
+    ]
+  );
+  for (const userIds of [[], ["github:owner", "github:owner"], ["github:owner", null]]) {
+    assert.throws(
+      () =>
+        codec().codec.applyStoredRelayState({
+          ...base,
+          teamMembers: [{ teamId: "team-core", userIds }]
+        }),
+      /team-member row failed validation/
+    );
+  }
+
+  const scopedV1 = codec();
+  scopedV1.codec.applyStoredRelayState({
+    ...base,
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [{ userId: "github:owner", role: "owner", joinedAt: createdAt }]
+      }
+    ]
+  });
+  assert.equal(scopedV1.store.getTeamMember("team-core", "github:owner")?.role, "owner");
+});
+
+test("startup rejects membership count, ownership, duplicate rows, and host cross-record corruption", () => {
+  const createdAt = "2026-07-11T11:00:00.000Z";
+  const member = (userId: string, role: "owner" | "admin" | "member") => ({
+    teamId: "team-core",
+    userId,
+    role,
+    joinedAt: createdAt
+  });
+  const base = {
+    version: 1,
+    teams: [{ id: "team-core", name: "Core", members: 2 }],
+    rooms: [],
+    invites: [],
+    mlsBacklog: []
+  };
+  for (const teamMembers of [
+    [],
+    [{ teamId: "team-core", members: [member("github:owner", "owner")] }],
+    [{ teamId: "team-core", members: [member("github:a", "owner"), member("github:b", "owner")] }],
+    [{ teamId: "team-core", members: [member("github:a", "member"), member("github:b", "member")] }],
+    [
+      { teamId: "team-core", members: [member("github:a", "owner"), member("github:b", "member")] },
+      { teamId: "team-core", members: [member("github:a", "owner"), member("github:b", "member")] }
+    ]
+  ]) {
+    assert.throws(() => codec().codec.applyStoredRelayState({ ...base, teamMembers }), /Stored relay team/);
+  }
+
+  assert.throws(
+    () =>
+      codec().codec.applyStoredRelayState({
+        ...base,
+        rooms: [
+          {
+            id: "room-desktop",
+            teamId: "team-core",
+            name: "Desktop",
+            host: "Removed host",
+            hostUserId: "github:removed",
+            hostStatus: "offline",
+            unread: 0
+          }
+        ],
+        teamMembers: [
+          { teamId: "team-core", members: [member("github:owner", "owner"), member("github:member", "member")] }
+        ]
+      }),
+    /room host membership failed validation/
+  );
+});
+
+test("startup fails closed on malformed current MLS backlog while allowing intentional pruning", () => {
+  const createdAt = "2026-07-11T11:00:00.000Z";
+  const message: MlsRelayMessage = {
+    id: "message-one",
+    teamId: "team-core",
+    roomId: "room-desktop",
+    senderUserId: "github:owner",
+    senderDeviceId: "device-owner",
+    createdAt,
+    messageType: "application",
+    epochHint: 0,
+    mlsMessage: "AA=="
+  };
+  const base = {
+    version: 1,
+    teams: [{ id: "team-core", name: "Core", members: 1 }],
+    rooms: [
+      {
+        id: "room-desktop",
+        teamId: "team-core",
+        name: "Desktop",
+        projectPath: "/repo",
+        host: "No host",
+        hostStatus: "offline",
+        unread: 0
+      }
+    ],
+    invites: [],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [{ teamId: "team-core", userId: "github:owner", role: "owner", joinedAt: createdAt }]
+      }
+    ]
+  };
+  for (const candidate of [
+    { ...message, mlsMessage: "AB==" },
+    { ...message, roomId: "room-other" },
+    { ...message, messageType: "unknown" }
+  ]) {
+    assert.throws(
+      () =>
+        codec().codec.applyStoredRelayState({
+          ...base,
+          mlsBacklog: [{ key: "team-core:room-desktop", messages: [candidate] }]
+        }),
+      /MLS backlog row failed validation/
+    );
+  }
+  const pruned = codec(new InMemoryRelayStore(), () => []);
+  pruned.codec.applyStoredRelayState({
+    ...base,
+    mlsBacklog: [{ key: "team-core:room-desktop", messages: [message] }]
+  });
+  assert.equal(pruned.store.mlsBacklog.size, 0);
 });
 
 test("startup normalization rejects corrupt invite anchors and retains bounded receipts", () => {
@@ -1044,6 +1283,19 @@ test("startup normalization preserves an offline room's reserved bootstrap host"
         hostUserId: "github:creator",
         hostStatus: "offline",
         unread: 0
+      }
+    ],
+    teamMembers: [
+      {
+        teamId: "team-core",
+        members: [
+          {
+            teamId: "team-core",
+            userId: "github:creator",
+            role: "owner",
+            joinedAt: "2026-07-12T12:00:00.000Z"
+          }
+        ]
       }
     ]
   });
