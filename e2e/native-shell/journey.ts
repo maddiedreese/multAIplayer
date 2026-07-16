@@ -125,8 +125,8 @@ function workspace(): StoredRelayStateFixture {
       {
         teamId: "team-native-e2e",
         members: [
-          { userId: hostIdentity.id, role: "owner", joinedAt },
-          { userId: guestIdentity.id, role: "member", joinedAt }
+          { teamId: "team-native-e2e", userId: hostIdentity.id, role: "owner", joinedAt },
+          { teamId: "team-native-e2e", userId: guestIdentity.id, role: "member", joinedAt }
         ]
       }
     ],
