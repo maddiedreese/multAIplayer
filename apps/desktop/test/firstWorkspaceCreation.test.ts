@@ -94,13 +94,13 @@ test("first workspace sends the exact reviewed safe room settings and initialize
   assert.deepEqual(fixture.localEffects, [
     "upsert-team:team-first",
     "select-team:team-first",
-    "upsert-room:room-first",
     "restore-room:room-first",
     "restore-team:team-first",
     "restore-forgotten:room-first",
     "invite-gate:room-first:true",
     "history:room-first:true:30",
     "messages:room-first",
+    "upsert-room:room-first",
     "select-room:room-first"
   ]);
   assert.deepEqual(fixture.roomSettings[0], {

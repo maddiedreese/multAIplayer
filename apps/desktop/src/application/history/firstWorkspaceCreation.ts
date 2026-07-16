@@ -91,13 +91,15 @@ export async function createWorkspaceRoom(
   >
 ): Promise<ClientRoomRecord> {
   const room = await runtime.createRoom(plan.teamId, plan.name, plan.projectPath, copyRoomSettings(settings));
-  runtime.upsertRoom(room);
+  // upsertRoom selects the first room. Prepare every room-scoped store before
+  // making the record render-visible so hooks never observe a half-created room.
   runtime.restoreRoomAccess(room.id);
   runtime.restoreTeamAccess(room.teamId);
   runtime.restoreForgottenRoom(room.id);
   runtime.setInviteApprovalGate(room.id, localDefaults.inviteApprovalGate);
   runtime.seedNewRoomHistorySettings(room.id, localDefaults.historySettings);
   runtime.initializeMessages(room.id);
+  runtime.upsertRoom(room);
   runtime.selectRoom(room.id);
   return room;
 }
