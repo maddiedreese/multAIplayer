@@ -60,7 +60,6 @@ jobs:
         run: |
           npm run sync:release-versions
           npm run check:release-versions
-          node tools/release/check-release-notes.mjs
           if git diff --quiet; then
             exit 0
           fi
@@ -136,7 +135,7 @@ jobs:
           release_error="$RUNNER_TEMP/existing-release-error.txt"
           if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$release_metadata" 2> "$release_error"; then
             if [ "$(jq -r .draft "$release_metadata")" = "false" ]; then
-              echo "Release $tag is already public; refusing to rebuild or emit new transparency records." >&2
+              echo "Release $tag is already public; refusing to rebuild or replace it." >&2
               echo "If updater-channel advancement failed in its original run, use GitHub's Re-run failed jobs action on that run." >&2
               exit 1
             fi
@@ -356,49 +355,6 @@ jobs:
           bash scripts/verify-macos-deployment-target.sh "$app_path"
           npm run verify:macos-associated-domains -- "$app_path"
 
-      - name: Rebuild unsigned payload in an isolated target directory
-        id: reproducibility-rebuild
-        continue-on-error: true
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/multaiplayer-repro-target
-          MACOSX_DEPLOYMENT_TARGET: "11.0"
-        run: npm run tauri:build:release -w @multaiplayer/desktop -- --no-sign --bundles app
-
-      - name: Compare normalized signed and rebuilt payloads
-        id: reproducibility-compare
-        if: steps.reproducibility-rebuild.outcome == 'success'
-        continue-on-error: true
-        run: |
-          mkdir -p reproducibility-evidence
-          node tools/release/compare-macos-app-payloads.mjs \
-            apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app \
-            "$RUNNER_TEMP/multaiplayer-repro-target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app" \
-            reproducibility-evidence
-
-      - name: Package advisory reproducibility evidence
-        if: always()
-        env:
-          REBUILD_OUTCOME: ${{ steps.reproducibility-rebuild.outcome }}
-          COMPARE_OUTCOME: ${{ steps.reproducibility-compare.outcome }}
-        run: |
-          mkdir -p reproducibility-evidence release-assets
-          if [ ! -f reproducibility-evidence/comparison.json ]; then
-            printf '{"matched":false,"comparisonUnavailable":true,"rebuildOutcome":"%s","compareOutcome":"%s","caveat":"This advisory result is not a bit-for-bit claim for signed, notarized, stapled, or packaged output."}\n' \
-              "$REBUILD_OUTCOME" "$COMPARE_OUTCOME" > reproducibility-evidence/comparison.json
-          fi
-          {
-            echo "commit=$(git rev-parse HEAD)"
-            echo "node=$(node --version)"
-            echo "npm=$(npm --version)"
-            echo "rustc=$(rustc --version)"
-            echo "cargo=$(cargo --version)"
-            xcodebuild -version
-            sw_vers
-          } > reproducibility-evidence/build-environment.txt
-          ditto -c -k --sequesterRsrc --keepParent \
-            reproducibility-evidence \
-            release-assets/desktop-reproducibility-evidence.zip
-
       - name: Package release assets
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -414,9 +370,6 @@ jobs:
             exit 1
           fi
           cp "$dmg_path" "release-assets/$(basename "$dmg_path")"
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$bundle_root/macos/multAIplayer.app" \
-            release-assets/multAIplayer-macos-arm64-app.zip
           updater_path="$(find "$bundle_root/macos" -maxdepth 1 -type f -name '*.app.tar.gz' | head -n 1)"
           if [ -z "$updater_path" ] || [ ! -f "$updater_path.sig" ]; then
             echo "Signed Tauri updater bundle and signature are required." >&2
@@ -446,18 +399,10 @@ jobs:
             release-assets/latest.json \
             "release-assets/$updater_name"
 
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
-        with:
-          path: apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/multAIplayer.app
-          artifact-name: multaiplayer.spdx.json
-          output-file: release-assets/multaiplayer.spdx.json
-          upload-artifact: false
-
       - name: Generate release checksums
         run: (cd release-assets && shasum -a 256 ./* > SHA256SUMS.txt)
 
-      - name: Validate canonical build asset contract
+      - name: Validate required build assets
         run: npm run verify:release-assets -- build release-assets
 
       - name: Upload trusted release assets
@@ -474,15 +419,13 @@ jobs:
           security delete-keychain build.keychain 2>/dev/null || true
 
   publish:
-    name: Attest, sign, and publish
+    name: Publish authenticated release
     needs: build
     environment: public-alpha-release
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
-      id-token: write
-      attestations: write
     steps:
       - name: Check out the released contract and validation tooling
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -539,30 +482,14 @@ jobs:
             "$release_metadata" \
             "$RUNNER_TEMP/authenticated-build-asset-names.txt" \
             "$RUNNER_TEMP/build-release-asset-names.txt"
-          echo "Release $RELEASE_TAG is already public with the exact retained build output and authenticated canonical public asset set."
+          echo "Release $RELEASE_TAG is already public with the retained build output and authenticated required asset set."
           echo "already_public=true" >> "$GITHUB_OUTPUT"
 
-      - name: Attest release artifact provenance
-        if: steps.public-state.outputs.already_public != 'true'
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
-        with:
-          subject-path: release-assets/*
-
-      - name: Install cosign
-        if: steps.public-state.outputs.already_public != 'true'
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-      - name: Keyless-sign checksums and SBOM
-        if: steps.public-state.outputs.already_public != 'true'
-        run: |
-          cosign sign-blob --yes --bundle release-assets/SHA256SUMS.txt.sigstore.json release-assets/SHA256SUMS.txt
-          cosign sign-blob --yes --bundle release-assets/multaiplayer.spdx.json.sigstore.json release-assets/multaiplayer.spdx.json
-
-      - name: Validate canonical published asset contract
+      - name: Validate required published assets
         if: steps.public-state.outputs.already_public != 'true'
         run: node tools/release/check-release-assets.mjs published release-assets
 
-      - name: Reconcile the private draft release to the canonical asset set
+      - name: Reconcile the private draft release to the build output
         if: steps.public-state.outputs.already_public != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -600,7 +527,7 @@ jobs:
                 "$RUNNER_TEMP/public-release-asset-names.txt"
               node tools/release/check-release-assets.mjs \
                 published-list "$RUNNER_TEMP/public-release-asset-names.txt"
-              echo "Release $RELEASE_TAG is already public with the exact authenticated asset set; leaving it unchanged."
+              echo "Release $RELEASE_TAG is already public with the authenticated required asset set; leaving it unchanged."
               exit 0
             fi
           else

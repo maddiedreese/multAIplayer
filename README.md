@@ -48,7 +48,7 @@ multAIplayer is an independent open-source project. It is **not** an official Op
 
 ## Security posture
 
-Rooms use RFC 9420 MLS through the Rust `mls-rs` implementation, and relevant payloads use exporter-derived encryption in the native boundary. The relay routes encrypted records but necessarily observes bounded identity, routing, size, timing, and lifecycle metadata. The active host remains responsible for local approvals, and admitted members receive meaningful shared context. Complete invite links are capabilities and must remain private. The integration is **unaudited**; automated tests, fuzzing, property checks, scheduled mutation testing, and release verification reduce regression risk but do not replace independent review. The [threat model](docs/threat-model.md) is the only normative source for intended properties, assumptions, evidence, and residual risks.
+Rooms use RFC 9420 MLS through the Rust `mls-rs` implementation, and relevant payloads use exporter-derived encryption in the native boundary. The relay routes encrypted records but necessarily observes bounded identity, routing, size, timing, and lifecycle metadata. The active host remains responsible for local approvals, and admitted members receive meaningful shared context. Complete invite links are capabilities and must remain private. The integration is **unaudited**; behavior tests, property checks, fuzzing, native journeys, and release verification reduce regression risk but do not replace independent review. The [threat model](docs/threat-model.md) is the only normative source for intended properties, assumptions, evidence, and residual risks.
 
 Before private use, read the [alpha limitations](docs/alpha-limitations.md), [cryptography mechanism guide](docs/cryptography.md), and authoritative [threat model](docs/threat-model.md). Report vulnerabilities through [SECURITY.md](SECURITY.md).
 
@@ -74,7 +74,7 @@ npm test
 npm run verify
 ```
 
-Pull requests run fast checks and path-selected journeys. Scheduled workflows provide expensive mutation, fuzz, supply-chain, and compatibility evidence. Releases additionally verify signing, notarization, updater metadata, SBOM publication, and reproducibility. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
+Pull requests run workspace checks and product journeys when executable code changes. Scheduled workflows provide focused fuzz, supply-chain, container, and Codex-compatibility checks. Releases verify signing, notarization, authenticated updater metadata, the exact release asset set, and checksums. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
 
 ## Repository map
 
@@ -92,7 +92,7 @@ The [architecture guide](docs/product-architecture.md) maps flows to code. SQLit
 
 ## Releases and operations
 
-Supported macOS releases are Developer ID-signed, notarized, published with checksums, Sigstore evidence, an SPDX SBOM, authenticated updater metadata bound to the exact signed bundle, and desktop reproducibility evidence. Verification instructions live in [Reproducible builds](docs/reproducible-builds.md).
+Supported macOS releases are Developer ID-signed, notarized, published with checksums, and use authenticated updater metadata bound to the exact signed bundle. Verification instructions live in [Verifying releases](docs/reproducible-builds.md).
 
 The pre-committed updater public key has minisign key id `5F97AE260BE16B2F`. The SHA-256 fingerprint of the exact committed `apps/desktop/src-tauri/updater-public.key` file is `626f3a15f71fc8c5794c9ce00392a12f782cd05ec47a88ce27858b43ce774673`. Compare that hash with the independently published fingerprint on [multaiplayer.com](https://multaiplayer.com/security/updater-key) before trusting a first install or a compromise-recovery key.
 

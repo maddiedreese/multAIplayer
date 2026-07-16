@@ -26,8 +26,7 @@ Do not add Redis, distributed fanout, shared sessions, or multiple writers specu
 - The small in-process fanout and limiter remain preferable to dependencies that do not solve a current scale problem.
 - Operators must size and monitor both entry and retained-byte ceilings; increasing them trades a larger memory dataset for headroom rather than changing the architecture.
 - A poisoned production relay emits the stable `relay_store_persistence_poisoned` alert event and exits nonzero for supervisor restart. Repeated poison/restart cycles require investigation of disk space, permissions, filesystem health, and SQLite errors; there is no degraded in-memory write mode.
-- The separate multi-instance rate-limiting decision defines minimum requirements if this topology is revisited.
 
 ## Revisit when
 
-Revisit only after measured single-node limits or availability requirements cannot be met by vertical scaling or team-level sharding. Any proposal must coordinate persistence, sessions, presence, fanout, attachments, semantic quotas, and edge identity together and satisfy the adversarial suite in [Multi-instance rate limiting](multi-instance-rate-limiting.md).
+Revisit only after measured single-node limits or availability requirements cannot be met by vertical scaling or team-level sharding. Any proposal must coordinate persistence, sessions, presence, fanout, attachments, semantic quotas, and edge identity together and add tests for those shared boundaries.

@@ -76,7 +76,7 @@ npm test
 npm run verify
 ```
 
-Pull requests run fast blocking checks and path-selected journeys. Scheduled workflows run expensive mutation, fuzz, supply-chain, compatibility, and native evidence. Releases additionally verify signing, notarization, updater metadata, SBOM publication, and artifact reproducibility. [CONTRIBUTING.md](../CONTRIBUTING.md) owns the current workflow and check policy.
+Pull requests run blocking workspace checks and an always-present product-journey aggregate; executable changes run UI, native two-client, and packaged macOS journeys. Scheduled workflows run focused fuzz, relay churn/restore, supply-chain, container, compatibility, and native checks. Releases verify signing, notarization, authenticated updater metadata, checksums, and the required asset set. [CONTRIBUTING.md](../CONTRIBUTING.md) owns the current workflow and check policy.
 
 Generated evidence should be preferred over prose sentinels. A test that supports a threat-model claim emits a machine-readable claim record; CI then regenerates or verifies the evidence table. A green check must correspond to verification that actually executed.
 

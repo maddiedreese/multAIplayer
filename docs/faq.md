@@ -40,7 +40,7 @@ The public alpha targets Apple-silicon macOS 11 or later. Windows, Linux desktop
 
 ## How are updates delivered?
 
-Supported releases use a pinned, signed Tauri updater channel and also publish notarized manual-download artifacts. Verify release checksums, signatures, SBOMs, and reproducibility evidence using [Reproducible builds](reproducible-builds.md). Development builds are not supported releases.
+Supported releases use a pinned, signed Tauri updater channel and also publish notarized manual-download artifacts. Verify release checksums and Apple signatures using [Verifying releases](reproducible-builds.md). Development builds are not supported releases.
 
 ## Is the alpha appropriate for private work?
 

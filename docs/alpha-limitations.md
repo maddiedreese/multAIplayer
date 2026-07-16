@@ -8,7 +8,7 @@ claims, audit status, metadata exposure, and residual risks.
 ## Releases and platforms
 
 - No supported public build has shipped yet. A supported build must pass the
-  signed, notarized release process in [Reproducing release builds](reproducible-builds.md).
+  signed, notarized release process in [Verifying releases](reproducible-builds.md).
 - Public packages target Apple-silicon Macs on macOS 11 or later. Intel Macs,
   Windows, and Linux are not supported release targets.
 - Official invitations use macOS universal links. Each release still needs a
@@ -78,6 +78,6 @@ claims, audit status, metadata exposure, and residual risks.
   associated-domain configuration, signing, and native allowlists.
 - A room intentionally binds one primary repository. Multi-repository rooms wait
   for a stable multi-root execution and sandbox contract; use separate rooms in
-  the meantime. See the [accepted decision](decisions/multi-repository-rooms.md).
+  the meantime.
 - Native layout, resizable columns, and embedded-browser behavior still require
   review on real macOS screens.

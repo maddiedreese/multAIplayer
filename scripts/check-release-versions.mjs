@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { discoverWorkspacePackagePaths } from "../tools/release/sync-release-metadata.mjs";
+import { parseSemver } from "../tools/release/check-updater-channel-order.mjs";
 
 const dependencySections = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 
@@ -42,7 +43,7 @@ export function assertReleaseVersions(repositoryVersion, workspaceEntries, lockf
   );
 }
 
-export function assertReleasePleaseBootstrap(config, manifest, resolveTagCommit) {
+export function assertReleasePleaseBootstrap(config, manifest, inspectBootstrapCommit) {
   const rootPackage = config.packages?.["."];
   assert.ok(rootPackage, "release-please must configure the repository root package");
   assert.equal(
@@ -63,10 +64,13 @@ export function assertReleasePleaseBootstrap(config, manifest, resolveTagCommit)
     "release-please extra-files must contain only irreducible desktop/native version entry points"
   );
   const version = manifest["."];
-  assert.match(version ?? "", /^\d+\.\d+\.\d+/, "release-please manifest must define the root version");
+  assert.equal(typeof version, "string", "release-please manifest must define the root version");
+  parseSemver(version);
   const bootstrapSha = config["bootstrap-sha"];
   assert.match(bootstrapSha ?? "", /^[0-9a-f]{40}$/, "release-please must pin a bootstrap commit");
-  assert.equal(bootstrapSha, resolveTagCommit(`v${version}`), "bootstrap commit must be the manifest-version tag");
+  const bootstrap = inspectBootstrapCommit(bootstrapSha);
+  assert.equal(bootstrap.commit, bootstrapSha, "release-please bootstrap SHA must resolve exactly as a commit");
+  assert.equal(bootstrap.isAncestor, true, "release-please bootstrap commit must be an ancestor of HEAD");
 }
 
 function main() {
@@ -102,9 +106,16 @@ function main() {
   );
   const releasePleaseConfig = JSON.parse(readFileSync("release-please-config.json", "utf8"));
   const releasePleaseManifest = JSON.parse(readFileSync(".release-please-manifest.json", "utf8"));
-  assertReleasePleaseBootstrap(releasePleaseConfig, releasePleaseManifest, (tag) =>
-    execFileSync("git", ["rev-list", "-n", "1", tag], { encoding: "utf8" }).trim()
-  );
+  assertReleasePleaseBootstrap(releasePleaseConfig, releasePleaseManifest, (bootstrapSha) => {
+    const commit = execFileSync("git", ["rev-parse", `${bootstrapSha}^{commit}`], { encoding: "utf8" }).trim();
+    let isAncestor = true;
+    try {
+      execFileSync("git", ["merge-base", "--is-ancestor", bootstrapSha, "HEAD"], { stdio: "ignore" });
+    } catch {
+      isAncestor = false;
+    }
+    return { commit, isAncestor };
+  });
   console.log(
     `Root, ${workspaceEntries.length} workspaces, lockfiles, Cargo, and Tauri agree at ${rootPackage.version}.`
   );

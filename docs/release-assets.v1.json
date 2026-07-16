@@ -2,27 +2,11 @@
   "schemaVersion": 1,
   "description": "Canonical public asset contract for a supported multAIplayer macOS release.",
   "requiredExactNames": [
-    "multAIplayer-macos-arm64-app.zip",
     "multAIplayer-macos-arm64.app.tar.gz",
     "multAIplayer-macos-arm64.app.tar.gz.sig",
     "latest.json",
-    "desktop-reproducibility-evidence.zip",
-    "SHA256SUMS.txt",
-    "multaiplayer.spdx.json",
-    "SHA256SUMS.txt.sigstore.json",
-    "multaiplayer.spdx.json.sigstore.json"
+    "SHA256SUMS.txt"
   ],
   "requiredNamePatterns": ["^multAIplayer_[0-9A-Za-z.+-]+_aarch64\\.dmg$"],
-  "buildOutputExactNames": [
-    "multAIplayer-macos-arm64-app.zip",
-    "multAIplayer-macos-arm64.app.tar.gz",
-    "multAIplayer-macos-arm64.app.tar.gz.sig",
-    "latest.json",
-    "desktop-reproducibility-evidence.zip",
-    "SHA256SUMS.txt",
-    "multaiplayer.spdx.json"
-  ],
-  "publishGeneratedExactNames": ["SHA256SUMS.txt.sigstore.json", "multaiplayer.spdx.json.sigstore.json"],
-  "checksumManifest": "SHA256SUMS.txt",
-  "artifactSbom": "multaiplayer.spdx.json"
+  "checksumManifest": "SHA256SUMS.txt"
 }

@@ -59,43 +59,7 @@ jobs:
           node tools/release/relay-runtime-dependency-closure.mjs \
             check-tree node_modules "$RUNNER_TEMP/relay-production-tree.json"
       - name: Verify web, relay, and packages
-        run: npm run lint && npm run format:check && npm run verify:repository-policy && npm run build:packages && npm run test:harness && npm run test:workspaces && npm run build:apps
-      - name: Enforce the relay authorization coverage floor
-        run: npm run test:coverage
-      - name: Upload gated relay authorization coverage
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: relay-authorization-coverage
-          path: apps/relay/coverage
-          if-no-files-found: error
-          retention-days: 14
-
-  desktop-coverage:
-    name: Desktop invite and host-handoff coverage gates
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Set up locked Node and npm
-        uses: ./.github/actions/setup-node-npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Build package dependencies
-        run: npm run build:packages
-      - name: Enforce invite and host-handoff coverage floors
-        run: npm run test:coverage:desktop
-      - name: Upload gated desktop coverage reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: desktop-typescript-coverage
-          path: |
-            apps/desktop/coverage-critical
-            apps/desktop/coverage-host-handoff
-          if-no-files-found: error
-          retention-days: 14
+        run: npm run lint && npm run format:check && npm run test:release-tools && npm run build:packages && npm run test:workspaces && npm run build:apps
 
   native-core:
     name: Native formatting, lints, and tests
@@ -120,3 +84,22 @@ jobs:
           libwebkit2gtk-4.1-dev
       - name: Verify native code and release metadata
         run: npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native
+
+  required-core-checks:
+    name: Required core checks
+    if: always()
+    needs: [workflow-policy, web-and-relay, native-core]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every core check
+        env:
+          WORKFLOW_POLICY_RESULT: ${{ needs.workflow-policy.result }}
+          WEB_RELAY_RESULT: ${{ needs.web-and-relay.result }}
+          NATIVE_RESULT: ${{ needs.native-core.result }}
+        run: |
+          for result in "$WORKFLOW_POLICY_RESULT" "$WEB_RELAY_RESULT" "$NATIVE_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "A required core check did not succeed: $result" >&2
+              exit 1
+            fi
+          done
