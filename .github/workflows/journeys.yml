@@ -38,6 +38,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
+          set -o pipefail
           if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
             echo "product=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -305,14 +306,23 @@ jobs:
     steps:
       - name: Require successful journeys when product code changed
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           PRODUCT_CHANGED: ${{ needs.changes.outputs.product }}
           UI_RESULT: ${{ needs.web-shell-e2e.result }}
           NATIVE_RESULT: ${{ needs.native-shell-e2e.result }}
           MACOS_RESULT: ${{ needs.macos-desktop.result }}
         run: |
-          if [ "$PRODUCT_CHANGED" != "true" ]; then
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Product-change detection did not succeed: $CHANGES_RESULT" >&2
+            exit 1
+          fi
+          if [ "$PRODUCT_CHANGED" = "false" ]; then
             echo "No executable product or journey files changed."
             exit 0
+          fi
+          if [ "$PRODUCT_CHANGED" != "true" ]; then
+            echo "Product-change detection returned an invalid result: $PRODUCT_CHANGED" >&2
+            exit 1
           fi
           for result in "$UI_RESULT" "$NATIVE_RESULT" "$MACOS_RESULT"; do
             if [ "$result" != "success" ]; then
