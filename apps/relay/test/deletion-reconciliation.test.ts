@@ -120,7 +120,6 @@ test("offline resolution deletes only resources owned by the exact reported subj
     acceptedMlsEpoch: 0,
     approvalPolicy: "ask_every_turn",
     mode: { chat: true, code: true, workspace: true, browser: true },
-    browserAllowedOrigins: [],
     browserProfilePersistent: true,
     unread: 0
   });

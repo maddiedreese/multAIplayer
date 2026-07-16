@@ -32,7 +32,6 @@ export interface RoomCreationSettings {
   codexSpeed?: ClientRoomRecord["codexSpeed"];
   codexServiceTierPolicy?: ClientRoomRecord["codexServiceTierPolicy"];
   codexSandboxLevel?: ClientRoomRecord["codexSandboxLevel"];
-  browserAllowedOrigins?: string[];
   browserProfilePersistent?: boolean;
 }
 
@@ -294,7 +293,6 @@ export async function updateRoomSettings(
     codexServiceTierPolicy?: ClientRoomRecord["codexServiceTierPolicy"];
     codexSandboxLevel?: ClientRoomRecord["codexSandboxLevel"];
     projectPath?: string;
-    browserAllowedOrigins?: string[];
     browserProfilePersistent?: boolean;
     requesterName?: string;
     requesterUserId?: string;

@@ -111,7 +111,6 @@ test("alpha smoke flow covers rooms, chat, Codex approval, files, terminal, brow
     configRevision: 1,
     configEpoch: 0,
     configPending: false,
-    browserAllowedOrigins: [],
     browserProfilePersistent: true,
     unread: 0
   };

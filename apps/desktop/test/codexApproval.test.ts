@@ -14,7 +14,6 @@ const room: ClientRoomRecord = {
   approvalPolicy: "ask_every_turn",
   mode: { chat: true, code: true, workspace: false, browser: false },
   codexModel: "gpt-5.4",
-  browserAllowedOrigins: ["https://github.com"],
   browserProfilePersistent: true,
   unread: 0
 };
@@ -38,13 +37,6 @@ test("Codex approvals reset when room execution context changes", () => {
   assert.equal(
     shouldResetCodexApprovalForRoomUpdate(room, { ...room, mode: { ...room.mode, workspace: true } }),
     false
-  );
-  assert.equal(
-    shouldResetCodexApprovalForRoomUpdate(room, {
-      ...room,
-      browserAllowedOrigins: ["https://github.com", "https://docs.github.com"]
-    }),
-    true
   );
   assert.equal(shouldResetCodexApprovalForRoomUpdate(room, { ...room, browserProfilePersistent: false }), true);
   assert.equal(

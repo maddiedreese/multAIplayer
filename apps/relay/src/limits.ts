@@ -140,25 +140,6 @@ export function normalizeTeamRole(value: unknown): TeamRole {
   return value === "owner" || value === "admin" || value === "member" ? value : "member";
 }
 
-export function normalizeBrowserAllowedOrigins(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 20) return null;
-  const origins = new Set<string>();
-  for (const item of value) {
-    if (typeof item !== "string") return null;
-    const raw = item.trim();
-    if (!raw) continue;
-    try {
-      const parsed = new URL(raw);
-      if (!["http:", "https:"].includes(parsed.protocol)) return null;
-      if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
-      origins.add(parsed.origin);
-    } catch {
-      return null;
-    }
-  }
-  return Array.from(origins);
-}
-
 export function isMlsMessageWithinLimits(envelope: MlsRelayMessage, options: MlsMessageLimitOptions): boolean {
   if (!normalizeMetadataText(envelope.id, options.maxEnvelopeIdChars)) return false;
   if (!normalizeMetadataText(envelope.senderUserId, options.maxUserIdChars)) return false;

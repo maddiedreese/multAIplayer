@@ -12,12 +12,6 @@ export function shouldResetCodexApprovalForRoomUpdate(previous: ClientRoomRecord
     previous.codexReasoningEffort !== next.codexReasoningEffort ||
     previous.codexSpeed !== next.codexSpeed ||
     previous.approvalPolicy !== next.approvalPolicy ||
-    previous.browserProfilePersistent !== next.browserProfilePersistent ||
-    !sameStrings(previous.browserAllowedOrigins ?? [], next.browserAllowedOrigins ?? [])
+    previous.browserProfilePersistent !== next.browserProfilePersistent
   );
-}
-
-function sameStrings(left: string[], right: string[]): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((value, index) => value === right[index]);
 }

@@ -141,8 +141,7 @@ export function useRoomMainColumnComposition({
     forgotten,
     revoked,
     codexProbe,
-    currentUser,
-    browserRequests
+    currentUser
   } = useAppStore(useShallow(selectRoomMainColumnView));
   const roomId = selectedRoom.id;
   const onboarding = useAppStore((state) => state.onboarding);
@@ -308,7 +307,7 @@ export function useRoomMainColumnComposition({
       attachments: formatApprovalAttachments(approvalMessages),
       sandbox: formatCodexSandboxLevel(selectedRoom.codexSandboxLevel ?? defaultCodexSandboxLevel),
       highPrivilegeLabels: buildHighPrivilegeLabels(activeApproval?.summary, selectedRoom.codexSandboxLevel),
-      riskFlags: activeApproval ? detectCodexTurnRiskFlags(approvalMessages, selectedRoom, browserRequests, null) : []
+      riskFlags: activeApproval ? detectCodexTurnRiskFlags(approvalMessages, null) : []
     };
   }
 

@@ -1,5 +1,4 @@
 import {
-  defaultBrowserAllowedOrigins,
   defaultBrowserProfilePersistent,
   defaultCodexModel,
   defaultCodexModelPolicy,
@@ -49,9 +48,7 @@ export interface LocalRoomCreationDefaults {
   historySettings: LocalHistorySettings;
 }
 
-export type RequestedRoomCreationSettings = Omit<Readonly<RoomCreationSettings>, "browserAllowedOrigins"> & {
-  readonly browserAllowedOrigins?: readonly string[];
-};
+export type RequestedRoomCreationSettings = Readonly<RoomCreationSettings>;
 
 export interface FirstWorkspaceCreationInput {
   workspaceName: string;
@@ -74,7 +71,6 @@ export const firstWorkspaceSafeRoomSettings: RequestedRoomCreationSettings = Obj
   codexSpeed: defaultCodexSpeed,
   codexServiceTierPolicy: defaultCodexServiceTierPolicy,
   codexSandboxLevel: defaultCodexSandboxLevel,
-  browserAllowedOrigins: Object.freeze([...defaultBrowserAllowedOrigins]),
   browserProfilePersistent: defaultBrowserProfilePersistent
 });
 
@@ -153,9 +149,5 @@ function requireExistingTeam(teamId: string, runtime: Pick<WorkspaceCreationRunt
 }
 
 function copyRoomSettings(settings: RequestedRoomCreationSettings): RoomCreationSettings {
-  const { browserAllowedOrigins, ...scalarSettings } = settings;
-  return {
-    ...scalarSettings,
-    ...(browserAllowedOrigins ? { browserAllowedOrigins: [...browserAllowedOrigins] } : {})
-  };
+  return { ...settings };
 }

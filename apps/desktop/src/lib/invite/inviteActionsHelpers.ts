@@ -1,10 +1,5 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
-import {
-  defaultBrowserAllowedOrigins,
-  defaultBrowserProfilePersistent,
-  defaultCodexModel,
-  defaultRoomMode
-} from "@multaiplayer/protocol";
+import { defaultBrowserProfilePersistent, defaultCodexModel, defaultRoomMode } from "@multaiplayer/protocol";
 import { defaultProjectPath } from "../platform/localBackend";
 import { ensureRoomDefaults } from "../room/roomDefaults";
 import { maxInviteLinkChars } from "./inviteUrl";
@@ -29,7 +24,6 @@ export function buildFallbackInvitedRoom({
     approvalPolicy: "ask_every_turn",
     mode: defaultRoomMode,
     codexModel: defaultCodexModel,
-    browserAllowedOrigins: defaultBrowserAllowedOrigins,
     browserProfilePersistent: defaultBrowserProfilePersistent,
     unread: 0
   });

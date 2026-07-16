@@ -259,7 +259,6 @@ function room(id: string, hostUserId: string) {
     approvalPolicy: "ask_every_turn" as const,
     mode: { chat: true, code: true, workspace: true, browser: false },
     codexModel: "gpt-5.4",
-    browserAllowedOrigins: [],
     browserProfilePersistent: false,
     unread: 0
   };

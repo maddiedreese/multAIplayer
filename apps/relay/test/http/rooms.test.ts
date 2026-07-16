@@ -26,7 +26,6 @@ test("relay accepts public room metadata and rejects host-local configuration", 
         teamId: "team-core",
         name: "Approval room",
         approvalPolicy: "ask_every_turn",
-        browserAllowedOrigins: ["https://github.com", "https://example.com"],
         browserProfilePersistent: false
       })
     });
@@ -34,14 +33,12 @@ test("relay accepts public room metadata and rejects host-local configuration", 
     const body = (await response.json()) as {
       room: {
         approvalPolicy: string;
-        browserAllowedOrigins: string[];
         browserProfilePersistent: boolean;
       };
     };
     assert.equal(body.room.approvalPolicy, "ask_every_turn");
     assert.equal("projectPath" in body.room, false);
     assert.equal("codexModel" in body.room, false);
-    assert.deepEqual(body.room.browserAllowedOrigins, ["https://github.com", "https://example.com"]);
     assert.equal(body.room.browserProfilePersistent, false);
 
     assert.equal(
@@ -57,14 +54,6 @@ test("relay accepts public room metadata and rejects host-local configuration", 
         teamId: "team-core",
         name: "Leaking raw reasoning setting",
         codexRawReasoningEnabled: "yes"
-      }),
-      400
-    );
-    assert.equal(
-      await postJsonStatus(relay.baseUrl, "/rooms", {
-        teamId: "team-core",
-        name: "Bad browser room",
-        browserAllowedOrigins: ["ftp://example.com"]
       }),
       400
     );
@@ -653,7 +642,6 @@ function hostBootstrapRoom(): RoomRecord {
     hostStatus: "offline",
     approvalPolicy: "ask_every_turn",
     mode: { chat: true, code: true, workspace: true, browser: true },
-    browserAllowedOrigins: [],
     browserProfilePersistent: false,
     unread: 0
   };

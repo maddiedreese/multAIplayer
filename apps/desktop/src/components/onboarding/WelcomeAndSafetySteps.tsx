@@ -84,7 +84,7 @@ export function SafetyStep({
       <details className="onboarding-advanced">
         <summary>Advanced settings</summary>
         <p>
-          Model, reasoning effort, browser allowlist, history retention, and approval policy remain available in room
+          Model, reasoning effort, browser profile, history retention, and approval policy remain available in room
           settings.
         </p>
       </details>

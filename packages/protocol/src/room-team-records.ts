@@ -14,8 +14,7 @@ import {
   maxEnvelopeIdChars,
   maxRoomNameChars,
   maxRoomProjectPathChars,
-  maxTeamNameChars,
-  maxUrlChars
+  maxTeamNameChars
 } from "./limits-ids.js";
 
 export const TeamRole = z.enum(["owner", "admin", "member"]);
@@ -67,7 +66,6 @@ export const RoomRecord = z
     hostStatus: z.enum(["active", "offline", "handoff"]),
     approvalPolicy: z.enum(["ask_every_turn", "never_host"]),
     mode: RoomModeSchema,
-    browserAllowedOrigins: z.array(z.string().min(1).max(maxUrlChars)).max(20),
     browserProfilePersistent: z.boolean(),
     unread: z.number().int().nonnegative(),
     archivedAt: z.string().datetime().optional(),

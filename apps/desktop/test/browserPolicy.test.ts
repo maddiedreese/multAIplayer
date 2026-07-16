@@ -7,10 +7,7 @@ import {
   canHostBrowserAction,
   canRequestBrowserAccess,
   findRoomBrowserRequest,
-  isBrowserUrlAllowed,
-  normalizeBrowserAllowedOrigins,
-  roomBrowserRequestMessage,
-  shouldAutoApproveBrowserRequest
+  roomBrowserRequestMessage
 } from "../src/lib/browser/browserPolicy";
 
 const room: ClientRoomRecord = {
@@ -24,31 +21,9 @@ const room: ClientRoomRecord = {
   approvalPolicy: "ask_every_turn",
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
-  browserAllowedOrigins: ["https://docs.example.com", "https://github.com"],
   browserProfilePersistent: true,
   unread: 0
 };
-
-test("normalizeBrowserAllowedOrigins accepts only bare http(s) origins", () => {
-  assert.deepEqual(normalizeBrowserAllowedOrigins(" https://docs.example.com/path , https://github.com "), null);
-  assert.deepEqual(normalizeBrowserAllowedOrigins("https://docs.example.com, https://github.com/"), [
-    "https://docs.example.com",
-    "https://github.com"
-  ]);
-  assert.deepEqual(normalizeBrowserAllowedOrigins("file:///tmp"), null);
-});
-
-test("isBrowserUrlAllowed matches approved origins", () => {
-  assert.equal(isBrowserUrlAllowed("https://docs.example.com/guide?query=1", ["https://docs.example.com"]), true);
-  assert.equal(isBrowserUrlAllowed("https://evil.example.com/guide", ["https://docs.example.com"]), false);
-  assert.equal(isBrowserUrlAllowed("not a url", ["https://docs.example.com"]), false);
-});
-
-test("shouldAutoApproveBrowserRequest no longer auto-approves browser pages", () => {
-  assert.equal(shouldAutoApproveBrowserRequest("https://docs.example.com/guide", room, true), false);
-  assert.equal(shouldAutoApproveBrowserRequest("https://github.com/maddiedreese/multAIplayer", room, true), false);
-  assert.equal(shouldAutoApproveBrowserRequest("https://docs.example.com/account/security", room, true), false);
-});
 
 test("browser access requests require an unlocked room", () => {
   assert.equal(canRequestBrowserAccess(room), true);

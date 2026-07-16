@@ -99,7 +99,6 @@ const workspaceRoom: ClientRoomRecord = {
   approvalPolicy: "ask_every_turn",
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
-  browserAllowedOrigins: [],
   browserProfilePersistent: true,
   configRevision: 4,
   configEpoch: 2,
@@ -130,15 +129,13 @@ test("room creation keeps local workspace and Codex execution settings off the r
   try {
     const created = await createRoom(workspaceRoom.teamId, "Injected\nroom name", workspaceRoom.projectPath, {
       codexModel: "gpt-5.4",
-      codexSandboxLevel: "workspace-write",
-      browserAllowedOrigins: ["https://example.test"]
+      codexSandboxLevel: "workspace-write"
     });
 
     assert.match(requestUrl, /\/rooms$/);
     assert.deepEqual(requestBody, {
       teamId: workspaceRoom.teamId,
-      name: "Injected\nroom name",
-      browserAllowedOrigins: ["https://example.test"]
+      name: "Injected\nroom name"
     });
     assert.equal(JSON.stringify(requestBody).includes(workspaceRoom.projectPath), false);
     assert.equal(created.projectPath, workspaceRoom.projectPath);

@@ -26,7 +26,6 @@ import {
   isApprovalPolicy,
   isRoomMode,
   maxCiphertextCharactersForBlob,
-  normalizeBrowserAllowedOrigins,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   parseIntegerValue
@@ -164,7 +163,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     isRoomHost,
     isApprovalPolicy,
     isRoomMode,
-    normalizeBrowserAllowedOrigins,
     maxHostNameChars,
     maxRoomNameChars
   });

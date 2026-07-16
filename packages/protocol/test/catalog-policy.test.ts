@@ -24,7 +24,6 @@ test("active rooms require a stable host identity", () => {
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
     mode: { chat: true, code: true, workspace: true, browser: true },
-    browserAllowedOrigins: [],
     browserProfilePersistent: true,
     unread: 0
   };
@@ -51,7 +50,6 @@ test("room protocol derives its reasoning enum from the shared options", () => {
     codexSpeed: "standard",
     codexServiceTierPolicy: "auto",
     codexSandboxLevel: "workspace_write",
-    browserAllowedOrigins: [],
     browserProfilePersistent: true,
     unread: 0,
     configRevision: 1,

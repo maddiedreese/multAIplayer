@@ -66,7 +66,6 @@ const room: ClientRoomRecord = {
   approvalPolicy: "ask_every_turn",
   mode: { chat: true, code: true, workspace: true, browser: true },
   codexModel: "gpt-5.4",
-  browserAllowedOrigins: [],
   browserProfilePersistent: true,
   unread: 0
 };

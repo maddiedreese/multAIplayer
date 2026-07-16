@@ -172,7 +172,6 @@ function room(id: string) {
     acceptedMlsEpoch: 0,
     approvalPolicy: "ask_every_turn",
     mode: { chat: true, code: true, workspace: true, browser: false },
-    browserAllowedOrigins: [],
     browserProfilePersistent: false,
     unread: 0
   };
