@@ -41,6 +41,9 @@ fn three_client_lifecycle_enforces_authority_and_epoch_exclusion() {
     let mut carol = engine("3", "carol-mac");
 
     alice.create_group("room-1").unwrap();
+    let initial_host = alice.host_context("room-1").unwrap();
+    assert_eq!(initial_host.version, 2);
+    assert!(initial_host.transfer_id.is_none());
     let pre_join_history = alice
         .encrypt_history("room-1", b"epoch-zero-history")
         .unwrap();
@@ -769,6 +772,21 @@ fn welcome_with_malformed_host_context_is_rejected() {
     let extensions: ExtensionList = core::iter::once(Extension::new(
         ExtensionType::new(0xff01),
         b"not-json".to_vec(),
+    ))
+    .collect();
+    let welcome = welcome_with_extensions(&joiner.generate_key_package().unwrap(), extensions);
+    assert!(matches!(
+        joiner.join_welcome("bad-room", &welcome),
+        Err(EngineError::InvalidInput)
+    ));
+}
+
+#[test]
+fn welcome_with_pre_public_host_context_version_is_rejected() {
+    let mut joiner = engine("2", "joiner-v1");
+    let extensions: ExtensionList = core::iter::once(Extension::new(
+        ExtensionType::new(0xff01),
+        br#"{"version":1,"host_leaf":0,"host_device_id":"raw-host-device"}"#.to_vec(),
     ))
     .collect();
     let welcome = welcome_with_extensions(&joiner.generate_key_package().unwrap(), extensions);
