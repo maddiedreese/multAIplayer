@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { createRelayAuthSessionManager, createRelayAuthSessionPersistence } from "./auth/session.js";
 import { createAccountRestrictionManager, isAccountRestricted } from "./auth/account-restrictions.js";
-import { FileDeletionLedger, S3DeletionLedger } from "./auth/deletion-ledger.js";
+import { FileDeletionLedger, S3DeletionLedger, type DeletionLedger } from "./auth/deletion-ledger.js";
 import { reconcileDeletionLedger } from "./auth/deletion-reconciliation.js";
 import {
   maxAttachmentBlobIdChars,
@@ -29,7 +29,13 @@ import { createRelayAuthz } from "./authz.js";
 import { loadRelayConfig } from "./config.js";
 import { createRelayRequestGuards } from "./http/middleware.js";
 import { persistenceAvailabilityMiddleware } from "./http/persistence-availability.js";
-import { relayJsonBodyErrorMiddleware, typedRelayErrorMiddleware } from "./http/errors.js";
+import {
+  createContentLengthGuard,
+  relayInternalErrorMiddleware,
+  relayJsonBodyErrorMiddleware,
+  relayNotFoundMiddleware,
+  typedRelayErrorMiddleware
+} from "./http/errors.js";
 import { createRelayOriginPolicy } from "./http/origin-policy.js";
 import { teamRecordForUser } from "./http/teams.js";
 import { createRelayLifecycle } from "./lifecycle.js";
@@ -56,7 +62,9 @@ import type { KeyPackageValidator } from "./mls/key-package-validator.js";
 
 export { configuredKeyPackageValidator } from "./mls/configured-validator.js";
 
-export async function createRelayApp(options: { keyPackageValidator?: KeyPackageValidator } = {}) {
+export async function createRelayApp(
+  options: { keyPackageValidator?: KeyPackageValidator; deletionLedgerForTests?: DeletionLedger } = {}
+) {
   const relayConfig = loadRelayConfig();
   const keyPackageValidator = options.keyPackageValidator ?? configuredKeyPackageValidator(relayConfig.nodeEnv);
   const {
@@ -77,19 +85,25 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     maxDurableEntriesPerTeam,
     structuredLogsEnabled,
     rateLimitWindowMs,
+    trustedNetworkRateLimitMultiplier,
     rateLimitCaps,
     shutdown: shutdownConfig
   } = relayConfig;
   const relayMetrics = createRelayMetrics();
-  const deletionLedger = relayConfig.deletionLedger
-    ? relayConfig.deletionLedger.backend === "s3"
-      ? new S3DeletionLedger(relayConfig.deletionLedger)
-      : new FileDeletionLedger(
-          relayConfig.deletionLedger.path,
-          relayConfig.deletionLedger.hmacKey,
-          relayConfig.deletionLedger.protectionSeconds
-        )
-    : null;
+  // Tests may inject an in-process ledger explicitly. The production entry
+  // point never supplies this option, so no environment variable can weaken
+  // the production requirement for an external S3-compatible ledger.
+  const deletionLedger =
+    options.deletionLedgerForTests ??
+    (relayConfig.deletionLedger
+      ? relayConfig.deletionLedger.backend === "s3"
+        ? new S3DeletionLedger(relayConfig.deletionLedger)
+        : new FileDeletionLedger(
+            relayConfig.deletionLedger.path,
+            relayConfig.deletionLedger.hmacKey,
+            relayConfig.deletionLedger.protectionSeconds
+          )
+      : null);
   const relayPersistence = createRelayPersistence({
     dataPath,
     legacyJsonImportPath,
@@ -98,11 +112,11 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
   });
   const originPolicy = createRelayOriginPolicy({ nodeEnv, allowedCorsOrigins });
   const app = express();
+  app.disable("x-powered-by");
   app.use(originPolicy.enforceAllowedOrigin);
   app.use(cors(originPolicy.corsOptions));
   app.use(cookieParser());
   app.use(requestLoggingMiddleware(structuredLogsEnabled));
-  app.use(express.json({ limit: `${jsonBodyLimitBytes}b` }));
   app.use(typedRelayErrorMiddleware);
 
   const server = createServer(app);
@@ -119,7 +133,17 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     }
   });
 
-  const relayStore = createRelayStore(maxDurableEntries, maxDurableEntriesPerTeam);
+  const relayStore = createRelayStore(maxDurableEntries, maxDurableEntriesPerTeam, {
+    mlsBacklog: {
+      global: relayConfig.maxMlsBacklogBytes,
+      perTeam: relayConfig.maxMlsBacklogBytesPerTeam,
+      perRoom: relayConfig.maxMlsBacklogBytesPerRoom
+    },
+    attachmentBlobs: {
+      global: relayConfig.maxAttachmentBlobBytes,
+      perTeam: relayConfig.maxAttachmentBlobBytesPerTeam
+    }
+  });
   const { sessions, roomSockets, teamSockets, workspaceSockets, roomPresence, authSessions, rateLimitStore } =
     relayStore;
   const relayAuthz = createRelayAuthz(relayStore);
@@ -215,12 +239,23 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
   const relayRequestGuards = createRelayRequestGuards({
     rateLimitsEnabled,
     rateLimitWindowMs,
+    trustedNetworkRateLimitMultiplier,
     rateLimitCaps,
     rateLimitStore,
     trustProxyHeaders,
     metrics: relayMetrics,
-    normalizeSessionId: normalizeAuthSessionId
+    normalizeSessionId: normalizeAuthSessionId,
+    trustedSessionIdentity: (sessionId) => {
+      const session = getAuthSession(sessionId);
+      return session ? `session:${session.sessionIdHash}` : null;
+    }
   });
+  app.use(relayRequestGuards.rateLimitMiddleware);
+  const ordinaryJsonBodyLimitBytes = Math.min(jsonBodyLimitBytes, 2_000_000);
+  app.use("/attachment-blobs", createContentLengthGuard(jsonBodyLimitBytes));
+  app.use("/attachment-blobs", express.json({ limit: `${jsonBodyLimitBytes}b` }));
+  app.use(createContentLengthGuard(ordinaryJsonBodyLimitBytes));
+  app.use(express.json({ limit: `${ordinaryJsonBodyLimitBytes}b` }));
   let addTeamMemberImpl: ReturnType<typeof createTeamMutationHelpers>["addTeamMember"] = () => {};
   const addTeamMember: typeof addTeamMemberImpl = (...args) => addTeamMemberImpl(...args);
   const relayFanout = createRelayFanout({
@@ -234,6 +269,7 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     roomKey,
     pruneMlsBacklog,
     addTeamMember,
+    reclaimDurableCapacity: relayStorePersistence.reclaimDurableCapacity,
     saveMlsMessage: (roomKey, message, prunedIds) => relayStorePersistence.saveMlsMessage(roomKey, message, prunedIds),
     saveMlsCommit: (roomKey, message, prunedIds) => relayStorePersistence.saveMlsCommit(roomKey, message, prunedIds),
     teamRecordForUser
@@ -266,7 +302,6 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     persist: () => relayStorePersistence.saveRelayStore()
   });
 
-  app.use(relayRequestGuards.rateLimitMiddleware);
   const requesterFromRequest = createRequesterFromRequest(getAuthSession);
   registerRelayRouteAdapter({
     app,
@@ -283,12 +318,15 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
     scheduleStoreSave,
     revokeTeamInvites: teamMutations.revokeTeamInvites,
     requesterFromRequest,
+    reclaimDurableCapacity: relayStorePersistence.reclaimDurableCapacity,
     deletionLedger,
     isAccountRestricted: (userId) => isAccountRestricted(relayStore, userId),
     isReady: relayIsReady,
     readinessFailureCode: () => (relayStorePersistence.isHealthy() ? "relay_shutting_down" : "persistence_unavailable")
   });
   app.use(relayJsonBodyErrorMiddleware);
+  app.use(relayNotFoundMiddleware);
+  app.use(relayInternalErrorMiddleware);
   registerRelayWebSocketAdapter({
     config: relayConfig,
     store: relayStore,
@@ -304,7 +342,9 @@ export async function createRelayApp(options: { keyPackageValidator?: KeyPackage
 
   await relayStorePersistence.loadRelayStore();
   const restrictionStartup = accountRestrictionManager.evictRestrictedAccounts();
-  if (restrictionStartup.removedAuthSessions > 0) await relayStorePersistence.saveRelayStore();
+  if (restrictionStartup.removedAuthSessions > 0 || restrictionStartup.removedRestrictions > 0) {
+    await relayStorePersistence.saveRelayStore();
+  }
   const deletionReconciliation = deletionLedger
     ? await reconcileDeletionLedger({
         ledger: deletionLedger,

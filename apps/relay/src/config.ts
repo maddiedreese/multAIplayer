@@ -49,6 +49,7 @@ export interface RelayConfig {
   structuredLogsEnabled: boolean;
   exitOnPersistencePoison: boolean;
   rateLimitWindowMs: number;
+  trustedNetworkRateLimitMultiplier: number;
   rateLimitCaps: {
     auth: number;
     read: number;
@@ -74,6 +75,11 @@ export interface RelayConfig {
   liveInviteCapPerUser: number;
   maxDurableEntries: number;
   maxDurableEntriesPerTeam: number;
+  maxMlsBacklogBytes: number;
+  maxMlsBacklogBytesPerTeam: number;
+  maxMlsBacklogBytesPerRoom: number;
+  maxAttachmentBlobBytes: number;
+  maxAttachmentBlobBytesPerTeam: number;
 }
 
 export function loadRelayConfig(): RelayConfig {
@@ -101,6 +107,18 @@ export function loadRelayConfig(): RelayConfig {
   const deletionLedger = parseDeletionLedgerConfig();
   if (nodeEnv === "production" && !deletionLedger) {
     throw new Error("Production relay requires a complete external deletion ledger configuration.");
+  }
+  if (nodeEnv === "production" && deletionLedger?.backend === "file") {
+    throw new Error(
+      "Production relay requires an external S3-compatible deletion ledger; the file backend is development-only."
+    );
+  }
+  const trustProxyHeadersRequested = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false);
+  const trustedProxyConfigured = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED, false);
+  if (trustProxyHeadersRequested !== trustedProxyConfigured) {
+    throw new Error(
+      "MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS and MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED must be enabled or disabled together."
+    );
   }
   if (nodeEnv === "production" && deletionLedger && deletionLedger.protectionSeconds < 7_776_000) {
     throw new Error("Production deletion ledger protection must be at least 7776000 seconds (90 days).");
@@ -169,15 +187,19 @@ export function loadRelayConfig(): RelayConfig {
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
     mutationsRequireAuth: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_REQUIRE_AUTH, nodeEnv === "production"),
     rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
-    trustProxyHeaders:
-      parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false) &&
-      parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED, false),
+    trustProxyHeaders: trustProxyHeadersRequested && trustedProxyConfigured,
     structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
     exitOnPersistencePoison: parseBooleanEnv(
       process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON,
       nodeEnv === "production"
     ),
     rateLimitWindowMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000),
+    trustedNetworkRateLimitMultiplier: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER,
+      8,
+      1,
+      100
+    ),
     rateLimitCaps: {
       auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),
       read: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_READ, 300, 1, 100_000),
@@ -212,6 +234,38 @@ export function loadRelayConfig(): RelayConfig {
       25_000,
       100,
       maxDurableEntries
+    ),
+    // Byte ceilings complement record-count ceilings because ciphertext-bearing
+    // records can differ by orders of magnitude in retained memory.
+    maxMlsBacklogBytes: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES,
+      100_000_000,
+      1_000_000,
+      10_000_000_000
+    ),
+    maxMlsBacklogBytesPerTeam: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM,
+      50_000_000,
+      500_000,
+      10_000_000_000
+    ),
+    maxMlsBacklogBytesPerRoom: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM,
+      10_000_000,
+      100_000,
+      1_000_000_000
+    ),
+    maxAttachmentBlobBytes: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES,
+      500_000_000,
+      attachmentBlobMaxBytes,
+      10_000_000_000
+    ),
+    maxAttachmentBlobBytesPerTeam: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM,
+      250_000_000,
+      attachmentBlobMaxBytes,
+      10_000_000_000
     )
   };
 }

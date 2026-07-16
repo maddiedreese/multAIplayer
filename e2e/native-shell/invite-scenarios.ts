@@ -83,9 +83,12 @@ export async function submitInviteThroughOnboarding(guest: Browser, invite: stri
 export async function waitForGuestInviteRequest(guest: Browser) {
   await guest.waitUntil(
     () =>
-      guest.execute(() =>
-        (document.querySelector(".invite-panel .workflow-message")?.textContent ?? "").includes("Requested access")
-      ),
+      guest.execute(() => {
+        const requested = (document.querySelector(".invite-panel .workflow-message")?.textContent ?? "").includes(
+          "Requested access"
+        );
+        return requested && Boolean(document.querySelector(".invite-panel .terminal-request.pending"));
+      }),
     { timeout: 60_000, timeoutMsg: "guest did not persist the protected invite request" }
   );
 }

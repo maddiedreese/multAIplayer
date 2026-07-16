@@ -30,6 +30,7 @@ import { parseDirectedMlsInviteCiphertext } from "../../lib/invite/mlsInviteProt
 import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
 import { getRelayHttpUrl } from "../../lib/core/appConfig";
 import { retryAfterDeviceSessionExpiry } from "../../lib/identity/deviceSession";
+import { RelayHttpError } from "../../lib/core/httpResponse";
 import {
   assertInviteApprovalEpoch,
   recoverInviteApproval,
@@ -47,7 +48,7 @@ const validatedRequests = new Map<
   }
 >();
 const approvedInviteOutboxes = new Map<string, PendingInviteApproval>();
-const inviteRequestReplayDelaysMs = [0, 100, 400, 1_000] as const;
+const inviteRequestReplayDelaysMs = [0, 100, 400, 1_000, 2_000, 4_000, 8_000, 16_000] as const;
 
 export async function retryInviteRequestReplay(
   attempt: () => Promise<boolean>,
@@ -56,7 +57,10 @@ export async function retryInviteRequestReplay(
 ): Promise<boolean> {
   let lastError: unknown;
   for (const delayMs of delaysMs) {
-    if (delayMs > 0) await wait(delayMs);
+    const retryAfterMs =
+      lastError instanceof RelayHttpError && lastError.status === 429 ? (lastError.retryAfterMs ?? 0) : 0;
+    const effectiveDelayMs = Math.max(delayMs, retryAfterMs);
+    if (effectiveDelayMs > 0) await wait(effectiveDelayMs);
     const outcome = await attempt().then(
       (handled) => ({ handled, error: undefined }),
       (error: unknown) => ({ handled: false, error })
@@ -65,6 +69,9 @@ export async function retryInviteRequestReplay(
     if (outcome.error === undefined) {
       lastError = undefined;
     } else {
+      if (outcome.error instanceof RelayHttpError && outcome.error.status < 500 && outcome.error.status !== 429) {
+        throw outcome.error;
+      }
       lastError = outcome.error;
     }
   }
@@ -118,7 +125,12 @@ export function createInviteRelayActions(
     const { localUser, deviceId } = currentLocalIdentity();
     const metadata = await lookupInvite(inviteId);
     if (metadata.room.hostUserId !== localUser.id || metadata.room.activeHostDeviceId !== deviceId) return true;
-    const records = await loadDirectedInviteRequests(inviteId, deviceId);
+    const records = await retryAfterDeviceSessionExpiry(
+      getRelayHttpUrl(),
+      deviceId,
+      () => loadDirectedInviteRequests(inviteId, deviceId),
+      (session) => useAppStore.getState().replaceDeviceSessionToken(session.token)
+    );
     let handled = false;
     for (const record of records) {
       if (validatedRequests.has(record.requestId)) {

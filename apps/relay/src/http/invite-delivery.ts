@@ -189,6 +189,14 @@ export function registerInviteDeliveryRoutes({
     const record = validInviteResponseRecord(candidate, invite, request, session.user.id, room);
     if (!record)
       return void sendRelayError(res, 400, "invalid_request", "Invite response binding does not match its request.");
+    if (!membershipCommitAcceptedForWelcome(record, room)) {
+      return void sendRelayError(
+        res,
+        409,
+        "conflict",
+        "The membership Commit must be durably accepted before publishing its Welcome."
+      );
+    }
     if (!(await saveInviteResponseAtomically(store, request, record, saveRelayStore))) {
       return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist invite response.");
     }
@@ -348,6 +356,10 @@ async function saveInviteRequestAtomically(
   return persisted;
 }
 
+function membershipCommitAcceptedForWelcome(record: InviteResponseRecordType, room: RoomRecord): boolean {
+  return record.status !== "approved" || room.acceptedMlsEpoch === record.responseBinding.keyEpoch + 1;
+}
+
 function isSameInviteResponse(
   existing: InviteResponseRecordType,
   inviteId: string | undefined,
@@ -381,7 +393,12 @@ function inviteResponseBindingMatches(
   room: RoomRecord
 ): boolean {
   const binding = record.responseBinding;
+  const directed = parseStrictDirectedInviteRequestJson(request.sealedRequest, maxOpaqueChars);
+  if (!directed) return false;
   return (
+    binding.keyEpoch === directed.binding.keyEpoch &&
+    binding.requestNonce === directed.binding.requestNonce &&
+    binding.expiresAt === directed.binding.expiresAt &&
     binding.inviteId === invite.id &&
     binding.teamId === invite.teamId &&
     binding.roomId === invite.roomId &&

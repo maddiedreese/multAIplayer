@@ -64,6 +64,14 @@ function dispatchJoin(
     send(socket, { type: "error", message: "Room not found" });
     return;
   }
+  if (!options.rooms.canAuthenticateJoinIdentity(session, message.userId)) {
+    send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
+    return;
+  }
+  if (!options.rooms.hasDeviceSession(message.deviceSessionToken ?? "", message.userId, message.deviceId)) {
+    send(socket, { type: "error", message: "A device-authenticated session is required.", code: "not_joined" });
+    return;
+  }
   if (
     !options.rooms.canJoinRoom(
       session,
@@ -75,10 +83,6 @@ function dispatchJoin(
     )
   ) {
     send(socket, { type: "error", message: "Sign in and use a valid invite before joining this room." });
-    return;
-  }
-  if (!options.rooms.hasDeviceSession(message.deviceSessionToken ?? "", message.userId, message.deviceId)) {
-    send(socket, { type: "error", message: "A device-authenticated session is required.", code: "not_joined" });
     return;
   }
 

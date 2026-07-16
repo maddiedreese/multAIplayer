@@ -79,7 +79,7 @@ export async function startRelay(
     const port = await getFreePort();
     // Launch the relay as the direct child so shutdown cannot orphan the
     // secondary Node process created by the `tsx` CLI wrapper.
-    const child = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
+    const child = spawn(process.execPath, ["--import", "tsx", "test/fixtures/relay-process.ts"], {
       cwd: relayPackageRoot,
       env: {
         ...process.env,
@@ -454,7 +454,7 @@ export async function waitForDebugBacklog(baseUrl: string, envelopes: number) {
 }
 
 export async function waitForReady(baseUrl: string, child: ChildProcessWithoutNullStreams, getOutput: () => string) {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 150; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`Relay exited before ready: ${getOutput()}`);
     }
@@ -469,13 +469,13 @@ export async function waitForReady(baseUrl: string, child: ChildProcessWithoutNu
   throw new Error(`Relay did not become ready: ${getOutput()}`);
 }
 
-export async function waitForNotReady(baseUrl: string): Promise<{ code: string }> {
+export async function waitForNotReady(baseUrl: string): Promise<{ ok: false; code: string }> {
   let lastStatus = 0;
   for (let attempt = 0; attempt < 30; attempt += 1) {
     try {
       const response = await fetch(`${baseUrl}/readyz`);
       lastStatus = response.status;
-      if (response.status === 503) return (await response.json()) as { code: string };
+      if (response.status === 503) return (await response.json()) as { ok: false; code: string };
     } catch {
       // Keep polling while the child is transitioning.
     }
@@ -665,14 +665,14 @@ export function waitForEnvelope(
   });
 }
 
-export function waitForPublished(socket: WebSocket, envelopeId: string): Promise<string> {
+export function waitForPublished(socket: WebSocket, messageId: string): Promise<string> {
   return new Promise((resolvePublished, rejectPublished) => {
     const timer = setTimeout(() => rejectPublished(new Error("Timed out waiting for publish acknowledgement")), 5_000);
     socket.on("message", (raw) => {
-      const message = JSON.parse(raw.toString()) as { type: string; envelopeId?: string };
-      if (message.type === "published" && message.envelopeId === envelopeId) {
+      const message = JSON.parse(raw.toString()) as { type: string; messageId?: string };
+      if (message.type === "published" && message.messageId === messageId) {
         clearTimeout(timer);
-        resolvePublished(message.envelopeId);
+        resolvePublished(message.messageId);
       }
     });
     socket.once("error", rejectPublished);

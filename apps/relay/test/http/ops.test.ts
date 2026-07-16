@@ -13,6 +13,17 @@ import {
   writeFile
 } from "../support/relay.js";
 
+test("readiness exposes only the stable health contract", async () => {
+  const relay = await startRelay();
+  try {
+    const response = await fetch(`${relay.baseUrl}/readyz`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay exposes content-free operational metrics", async () => {
   const metricsToken = "test-metrics-token-that-is-at-least-32-characters";
   const relay = await startRelay({ MULTAIPLAYER_RELAY_METRICS_TOKEN: metricsToken });
@@ -77,7 +88,7 @@ test("relay drains readiness, sockets, and pending store writes on graceful shut
     const closePromise = waitForClose(socket);
     const shutdownPromise = relay.beginShutdown();
     const readyBody = await waitForNotReady(relay.baseUrl);
-    assert.equal(readyBody.code, "relay_shutting_down");
+    assert.deepEqual(readyBody, { ok: false, code: "relay_shutting_down" });
 
     const rejectedResponse = await fetch(`${relay.baseUrl}/teams`, {
       method: "POST",

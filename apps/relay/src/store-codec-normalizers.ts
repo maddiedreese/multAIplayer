@@ -33,8 +33,7 @@ import {
   normalizeBrowserAllowedOrigins,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
-  normalizeRelayId,
-  normalizeTeamRole
+  normalizeRelayId
 } from "./limits.js";
 import {
   isCanonicalPaddedBase64,
@@ -138,8 +137,9 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
   // Persistence is a separate trust boundary from live protocol parsing. Reuse
   // protocol schemas where a stored record has the same shape, then apply
   // store-specific limits, referential checks, expiry, and legacy defaults.
-  // These normalizers deliberately return null so one bad row can be dropped
-  // without turning a recoverable store into a relay startup failure.
+  // Non-authoritative rows may return null for documented recovery. Team,
+  // device, membership, and MLS backlog restoration are fail-closed because
+  // silently repairing or dropping them can change authorization or history.
   const { store } = options;
   const now = options.now ?? Date.now;
 
@@ -216,18 +216,48 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
     return parsed.success ? parsed.data : null;
   }
 
-  function applyStoredTeamMembers(item: unknown): void {
+  function applyStoredTeamMembers(item: unknown): boolean {
     const parsed = parseStoredRecord(StoredTeamMembers, item);
-    if (!parsed) return;
+    if (!parsed) return false;
     const teamId = normalizeRelayId(parsed.teamId, options.maxTeamIdChars);
-    if (!teamId || !store.teams.has(teamId)) return;
+    if (!teamId || !store.teams.has(teamId)) return false;
     const members = new Map<string, TeamMemberRecord>();
-    for (const member of parsed.members ?? []) addStoredMember(members, teamId, member, options.maxUserIdChars, now());
-    for (const userId of parsed.userIds ?? []) addLegacyMember(members, teamId, userId, options.maxUserIdChars, now());
-    if (members.size === 0) return;
+    if (parsed.members === undefined && parsed.userIds !== undefined) {
+      return applyUserIdsOnlyMembership(members, teamId, parsed.userIds);
+    }
+    for (const member of parsed.members ?? []) {
+      if (!addStoredMember(members, teamId, member, options.maxUserIdChars)) return false;
+    }
+    for (const userId of parsed.userIds ?? []) {
+      if (!validateLegacyMemberProjection(members, userId, options.maxUserIdChars)) return false;
+    }
+    if (members.size === 0) return true;
     store.teamMembers.set(teamId, members);
-    const team = store.teams.get(teamId);
-    if (team && team.members < members.size) store.teams.set(teamId, { ...team, members: members.size });
+    return true;
+  }
+
+  function applyUserIdsOnlyMembership(
+    members: Map<string, TeamMemberRecord>,
+    teamId: string,
+    userIds: unknown[]
+  ): boolean {
+    if (userIds.length === 0) return false;
+    // Before role-bearing rows existed, team creation inserted the creator into
+    // a Set first and invite admissions only appended. The v1 writer preserved
+    // that Set insertion order in userIds, so the first exact identity is the
+    // historical owner; assigning any other owner would invent authority.
+    for (const [index, value] of userIds.entries()) {
+      const userId = normalizeMetadataText(value, options.maxUserIdChars);
+      if (!userId || members.has(userId)) return false;
+      members.set(userId, {
+        teamId,
+        userId,
+        role: index === 0 ? "owner" : "member",
+        joinedAt: new Date(now()).toISOString()
+      });
+    }
+    store.teamMembers.set(teamId, members);
+    return true;
   }
 
   function deviceKey(userId: string, deviceId: string): string {
@@ -421,20 +451,20 @@ export function createRelayStoreNormalizers(options: RelayStoreCodecOptions) {
     const messages: MlsRelayMessage[] = [];
     for (const candidate of parsedBacklog.messages) {
       const parsed = MlsRelayMessage.safeParse(candidate);
-      if (!parsed.success) continue;
-      if (parsed.data.teamId !== teamId || parsed.data.roomId !== roomId) continue;
-      if (!isCanonicalPaddedBase64(parsed.data.mlsMessage, options.maxMlsMessageChars)) continue;
+      if (!parsed.success) return null;
+      if (parsed.data.teamId !== teamId || parsed.data.roomId !== roomId) return null;
+      if (!isCanonicalPaddedBase64(parsed.data.mlsMessage, options.maxMlsMessageChars)) return null;
       if (
         parsed.data.hostTransferAuthorization &&
         (!isCanonicalPaddedBase64(parsed.data.hostTransferAuthorization.signatureDer, 1_400_000) ||
           !isCanonicalPaddedBase64(parsed.data.hostTransferAuthorization.publicKeySpkiDer, 1_400_000))
       )
-        continue;
+        return null;
       messages.push(parsed.data);
     }
 
     const pruned = options.pruneMlsBacklog(messages);
-    return pruned.length ? { key: roomKey(teamId, roomId), messages: pruned } : null;
+    return { key: roomKey(teamId, roomId), messages: pruned };
   }
 
   return {
@@ -462,31 +492,35 @@ function addStoredMember(
   members: Map<string, TeamMemberRecord>,
   teamId: string,
   value: unknown,
-  maxUserIdChars: number,
-  now: number
-): void {
-  if (!isRecord(value)) return;
-  const userId = normalizeMetadataText(value.userId, maxUserIdChars);
-  if (!userId) return;
-  const parsed = TeamMemberRecordSchema.safeParse({
-    teamId,
-    userId,
-    role: normalizeTeamRole(value.role),
-    joinedAt: validDate(value.joinedAt) ?? new Date(now).toISOString()
-  });
-  if (parsed.success) members.set(userId, parsed.data);
+  maxUserIdChars: number
+): boolean {
+  // Early v1 rows scoped nested members by the outer teamId and omitted the
+  // repeated field. Preserve only that structural legacy default.
+  const candidate = isRecord(value) && value.teamId === undefined ? { ...value, teamId } : value;
+  const parsed = TeamMemberRecordSchema.safeParse(candidate);
+  if (
+    !parsed.success ||
+    parsed.data.teamId !== teamId ||
+    parsed.data.userId.length > maxUserIdChars ||
+    members.has(parsed.data.userId)
+  )
+    return false;
+  members.set(parsed.data.userId, parsed.data);
+  return true;
 }
 
-function addLegacyMember(
+function validateLegacyMemberProjection(
   members: Map<string, TeamMemberRecord>,
-  teamId: string,
   value: unknown,
-  maxUserIdChars: number,
-  now: number
-): void {
+  maxUserIdChars: number
+): boolean {
   const userId = normalizeMetadataText(value, maxUserIdChars);
-  if (!userId || members.has(userId)) return;
-  members.set(userId, { teamId, userId, role: "member", joinedAt: new Date(now).toISOString() });
+  if (!userId) return false;
+  // Transitional v1 writers emitted both explicit members and a userIds
+  // compatibility projection. Accept it only when an explicit role-bearing
+  // row already establishes the same identity; userIds alone cannot recover
+  // ownership safely.
+  return members.has(userId);
 }
 
 function normalizeTrustedApprovers(value: unknown, maxUserIdChars: number): string[] {

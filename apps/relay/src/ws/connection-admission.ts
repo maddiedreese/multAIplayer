@@ -51,8 +51,10 @@ export function admitRelayWebSocketConnection(
     return null;
   }
 
-  const rateClientId = options.authentication.clientIdentityFromIncomingMessage(request);
-  if (!options.rateLimiting.consume("websocketConnect", rateClientId).allowed) {
+  const rateClientIds = options.authentication.clientRateLimitIdentitiesFromIncomingMessage?.(request) ?? [
+    options.authentication.clientIdentityFromIncomingMessage(request)
+  ];
+  if (rateClientIds.some((clientId) => !options.rateLimiting.consume("websocketConnect", clientId).allowed)) {
     options.metrics.recordRateLimitRejection?.("websocketConnect");
     options.metrics.recordConnectionRejection?.("rate_limit");
     send(socket, {
@@ -68,7 +70,8 @@ export function admitRelayWebSocketConnection(
   const session: ClientSession = {
     socket,
     ...(authSession ? { authSession } : {}),
-    rateClientId,
+    rateClientId: rateClientIds[0]!,
+    rateClientIds,
     subscribedTeamIds: new Set<string>(),
     workspaceSubscribed: false
   };

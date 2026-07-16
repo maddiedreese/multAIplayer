@@ -118,6 +118,7 @@ test("relay rejects expired invite metadata loaded from store", async () => {
           unread: 0
         }
       ],
+      teamMembers: ownerMembership(),
       invites: [
         {
           id: "invite_expired",
@@ -160,6 +161,7 @@ test("relay drops invalid persisted invite metadata", async () => {
           unread: 0
         }
       ],
+      teamMembers: ownerMembership(),
       invites: [
         {
           id: "invite_live",
@@ -232,6 +234,7 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
           unread: 0
         }
       ],
+      teamMembers: ownerMembership(),
       invites: [
         {
           id: "invite_live",
@@ -269,6 +272,22 @@ test("relay prunes expired in-memory invites and attachment blobs", async () => 
     await relay.close();
   }
 });
+
+function ownerMembership() {
+  return [
+    {
+      teamId: "team-core",
+      members: [
+        {
+          teamId: "team-core",
+          userId: "github:maddiedreese",
+          role: "owner" as const,
+          joinedAt: new Date().toISOString()
+        }
+      ]
+    }
+  ];
+}
 
 function fingerprint(encoded: string) {
   const hex = createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex");

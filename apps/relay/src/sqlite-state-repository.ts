@@ -46,7 +46,12 @@ export function purgeLegacyRoomConfigFields(db: Database.Database, normalizedRoo
 export function loadNormalizedRelayState(db: Database.Database): unknown | null {
   const version = db.prepare("select value from relay_meta where key = ?").get("version") as
     { value?: unknown } | undefined;
-  if (version?.value !== "1") return null;
+  if (version?.value !== "1") {
+    if (version?.value !== undefined || relayDatabaseContainsDurableState(db)) {
+      throw new Error("Existing relay database has missing or unsupported version metadata.");
+    }
+    return null;
+  }
   const savedAt = db.prepare("select value from relay_meta where key = ?").get("savedAt") as
     { value?: unknown } | undefined;
   return {
@@ -241,19 +246,30 @@ function clearNormalizedRelayTables(db: Database.Database) {
 
 function loadMlsBacklogRows(db: Database.Database): unknown[] {
   const rows = db
-    .prepare("select room_key, data_json from relay_mls_messages order by room_key, sort_order, message_id")
-    .all() as Array<{ room_key?: unknown; data_json?: unknown }>;
+    .prepare("select room_key, message_id, data_json from relay_mls_messages order by room_key, sort_order, message_id")
+    .all() as Array<{ room_key?: unknown; message_id?: unknown; data_json?: unknown }>;
 
   const backlog = new Map<string, unknown[]>();
   for (const row of rows) {
-    if (typeof row.room_key !== "string" || typeof row.data_json !== "string") continue;
+    if (typeof row.room_key !== "string" || typeof row.message_id !== "string" || typeof row.data_json !== "string") {
+      throw new Error("Relay MLS backlog contains a malformed row.");
+    }
     try {
+      const parsed = JSON.parse(row.data_json) as unknown;
+      if (
+        !isRecord(parsed) ||
+        parsed.id !== row.message_id ||
+        typeof parsed.teamId !== "string" ||
+        typeof parsed.roomId !== "string" ||
+        `${parsed.teamId}:${parsed.roomId}` !== row.room_key
+      ) {
+        throw new Error("Relay MLS backlog row identity does not match its storage key.");
+      }
       const messages = backlog.get(row.room_key) ?? [];
-      messages.push(JSON.parse(row.data_json) as unknown);
+      messages.push(parsed);
       backlog.set(row.room_key, messages);
     } catch {
-      // The store codec validates each envelope; skip a malformed row so one
-      // damaged envelope cannot hide the rest of the room backlog.
+      throw new Error("Relay MLS backlog contains malformed JSON or a mismatched row identity.");
     }
   }
   return Array.from(backlog.entries()).map(([key, messages]) => ({ key, messages }));
@@ -348,20 +364,86 @@ export function appendMlsBacklogRow(
 }
 
 function loadJsonRows(db: Database.Database, table: string, keyColumn: string): unknown[] {
-  const rows = db.prepare(`select data_json from ${table} order by ${keyColumn}`).all() as Array<{
+  const rows = db
+    .prepare(`select ${keyColumn} as storage_key, data_json from ${table} order by ${keyColumn}`)
+    .all() as Array<{
+    storage_key?: unknown;
     data_json?: unknown;
   }>;
   const values: unknown[] = [];
   for (const row of rows) {
-    if (typeof row.data_json !== "string") continue;
+    if (typeof row.storage_key !== "string" || typeof row.data_json !== "string") {
+      throw new Error(`Relay ${table} contains a malformed row.`);
+    }
     try {
-      values.push(JSON.parse(row.data_json) as unknown);
+      const parsed = JSON.parse(row.data_json) as unknown;
+      if (!isRecord(parsed) || storageKeyForRow(table, parsed) !== row.storage_key) {
+        throw new Error(`Relay ${table} row identity does not match its storage key.`);
+      }
+      values.push(parsed);
     } catch {
-      // The store codec will quarantine unreadable files; skip one malformed row so a
-      // One bad record cannot hide every other opaque MLS room record.
+      throw new Error(`Relay ${table} contains malformed JSON or a mismatched row identity.`);
     }
   }
   return values;
+}
+
+function storageKeyForRow(table: string, value: Record<string, unknown>): string | null {
+  const stringField = (field: string) => (typeof value[field] === "string" && value[field] ? value[field] : null);
+  if (table === "relay_devices") {
+    const userId = stringField("userId");
+    const deviceId = stringField("deviceId");
+    return userId && deviceId ? `${userId}:${deviceId}` : null;
+  }
+  if (table === "relay_accepted_message_receipts") {
+    const roomKey = stringField("roomKey");
+    const messageId = stringField("messageId");
+    return roomKey && messageId ? JSON.stringify([roomKey, messageId]) : null;
+  }
+  const fieldByTable: Record<string, string> = {
+    relay_teams: "id",
+    relay_rooms: "id",
+    relay_invites: "id",
+    relay_key_packages: "id",
+    relay_invite_requests: "requestId",
+    relay_invite_responses: "requestId",
+    relay_invite_ack_receipts: "requestId",
+    relay_team_members: "teamId",
+    relay_account_restrictions: "userId",
+    relay_account_quota_records: "key",
+    relay_attachment_blobs: "id",
+    relay_applied_deletion_ledger_entries: "entryId"
+  };
+  if (table === "relay_auth_sessions") return stringField("sessionIdHash") ?? stringField("sessionId");
+  const field = fieldByTable[table];
+  return field ? stringField(field) : null;
+}
+
+function relayDatabaseContainsDurableState(db: Database.Database): boolean {
+  const tables = [
+    "relay_teams",
+    "relay_rooms",
+    "relay_invites",
+    "relay_devices",
+    "relay_key_packages",
+    "relay_invite_requests",
+    "relay_invite_responses",
+    "relay_invite_ack_receipts",
+    "relay_accepted_message_receipts",
+    "relay_team_members",
+    "relay_auth_sessions",
+    "relay_account_restrictions",
+    "relay_account_quota_records",
+    "relay_attachment_blobs",
+    "relay_applied_deletion_ledger_entries",
+    "relay_mls_messages",
+    "relay_room_epochs",
+    "relay_meta"
+  ];
+  return tables.some((table) => {
+    const row = db.prepare(`select 1 as present from ${table} limit 1`).get() as { present?: unknown } | undefined;
+    return row?.present === 1;
+  });
 }
 
 function saveJsonRows(

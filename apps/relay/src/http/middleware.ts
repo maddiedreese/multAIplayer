@@ -8,6 +8,7 @@ import type { TokenBucketRecord } from "../state.js";
 interface RelayRequestGuardsOptions {
   rateLimitsEnabled: boolean;
   rateLimitWindowMs: number;
+  trustedNetworkRateLimitMultiplier?: number;
   rateLimitCaps: {
     auth: number;
     read: number;
@@ -20,6 +21,7 @@ interface RelayRequestGuardsOptions {
   trustProxyHeaders: boolean;
   metrics: ReturnType<typeof createRelayMetrics>;
   normalizeSessionId: (value: unknown) => string;
+  trustedSessionIdentity?: (sessionId: unknown) => string | null;
 }
 
 type RateLimitBucket = RelayRequestGuardsOptions["rateLimitCaps"] extends Record<infer Key, number> ? Key : never;
@@ -27,11 +29,13 @@ type RateLimitBucket = RelayRequestGuardsOptions["rateLimitCaps"] extends Record
 export function createRelayRequestGuards({
   rateLimitsEnabled,
   rateLimitWindowMs,
+  trustedNetworkRateLimitMultiplier = 8,
   rateLimitCaps,
   rateLimitStore,
   trustProxyHeaders,
   metrics,
-  normalizeSessionId
+  normalizeSessionId,
+  trustedSessionIdentity = () => null
 }: RelayRequestGuardsOptions) {
   let nextRateLimitPruneAt = 0;
   function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
@@ -40,7 +44,7 @@ export function createRelayRequestGuards({
       next();
       return;
     }
-    const result = consumeRateLimit(bucket, clientIdentityFromRequest(req));
+    const result = consumeRateLimits(bucket, clientIdentitiesFromRequest(req));
     if (result.allowed) {
       metrics.recordRateLimitAllowed(bucket);
       next();
@@ -52,6 +56,15 @@ export function createRelayRequestGuards({
       bucket,
       retryAfterSeconds: Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)
     });
+  }
+
+  function consumeRateLimits(bucket: RateLimitBucket, clientIds: readonly string[]) {
+    let result: ReturnType<typeof consumeRateLimit> = { allowed: true, resetAt: Date.now() + rateLimitWindowMs };
+    for (const clientId of clientIds) {
+      result = consumeRateLimit(bucket, clientId);
+      if (!result.allowed) return result;
+    }
+    return result;
   }
 
   function rateLimitBucketForRequest(req: Request): RateLimitBucket | null {
@@ -72,7 +85,8 @@ export function createRelayRequestGuards({
     const now = Date.now();
     pruneRateLimitStore(now);
     const key = `${bucket}:${clientId}`;
-    const capacity = rateLimitCaps[bucket];
+    const capacity =
+      rateLimitCaps[bucket] * (clientId.startsWith("trusted-network:") ? trustedNetworkRateLimitMultiplier : 1);
     const refillPerMs = capacity / rateLimitWindowMs;
     const current = rateLimitStore.get(key);
     const tokens = current
@@ -100,16 +114,28 @@ export function createRelayRequestGuards({
     nextRateLimitPruneAt = Number.isFinite(earliestLiveExpiry) ? earliestLiveExpiry : now + rateLimitWindowMs;
   }
 
-  function clientIdentityFromRequest(req: Request): string {
-    const sessionId = normalizeSessionId(req.cookies?.multaiplayer_session);
-    if (sessionId) return `session:${sessionId}`;
-    return clientIdentityFromIncomingMessage(req);
+  function clientIdentitiesFromRequest(req: Request): string[] {
+    return clientRateLimitIdentities(req, req.cookies?.multaiplayer_session);
   }
 
   function clientIdentityFromIncomingMessage(request: IncomingMessage): string {
+    return clientIpIdentity(request);
+  }
+
+  function clientRateLimitIdentitiesFromIncomingMessage(request: IncomingMessage): string[] {
     const cookies = parseCookieHeader(request.headers.cookie);
-    const sessionId = normalizeSessionId(cookies.get("multaiplayer_session"));
-    if (sessionId) return `session:${sessionId}`;
+    return clientRateLimitIdentities(request, cookies.get("multaiplayer_session"));
+  }
+
+  function clientRateLimitIdentities(request: IncomingMessage, rawSessionId: unknown): string[] {
+    const normalizedSessionId = normalizeSessionId(rawSessionId);
+    const trustedIdentity = normalizedSessionId ? trustedSessionIdentity(normalizedSessionId) : null;
+    const ipIdentity = clientIpIdentity(request);
+    if (!trustedIdentity) return [ipIdentity];
+    return [`trusted-network:${ipIdentity.slice("ip:".length)}`, trustedIdentity];
+  }
+
+  function clientIpIdentity(request: IncomingMessage): string {
     const forwardedIp = trustProxyHeaders
       ? firstHeaderValue(request.headers["x-real-ip"]) || firstForwardedForIp(request.headers["x-forwarded-for"])
       : null;
@@ -120,6 +146,7 @@ export function createRelayRequestGuards({
   return {
     rateLimitMiddleware,
     clientIdentityFromIncomingMessage,
+    clientRateLimitIdentitiesFromIncomingMessage,
     consumeRateLimit
   };
 }

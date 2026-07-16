@@ -7,7 +7,8 @@ export class RelayHttpError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly code: RelayHttpErrorCodeType | null
+    readonly code: RelayHttpErrorCodeType | null,
+    readonly retryAfterMs: number | null = null
   ) {
     super(message);
   }
@@ -26,10 +27,24 @@ export async function readJsonResponse<T>(response: Response, fallbackMessage: s
     throw new RelayHttpError(
       relayMessage ?? `${fallbackMessage}: HTTP ${response.status}`,
       response.status,
-      parsedCode.success ? parsedCode.data : null
+      parsedCode.success ? parsedCode.data : null,
+      parseRetryAfterMs(response, body)
     );
   }
   return body as T;
+}
+
+function parseRetryAfterMs(response: Response, body: Record<string, unknown> | null): number | null {
+  const bodySeconds = body?.retryAfterSeconds;
+  const header = response.headers.get("retry-after");
+  const headerSeconds = header === null ? null : Number(header);
+  const seconds =
+    typeof bodySeconds === "number" && Number.isFinite(bodySeconds) && bodySeconds >= 0
+      ? bodySeconds
+      : headerSeconds !== null && Number.isFinite(headerSeconds) && headerSeconds >= 0
+        ? headerSeconds
+        : null;
+  return seconds === null ? null : Math.min(30_000, Math.ceil(seconds * 1_000));
 }
 
 async function readOptionalJson(response: Response): Promise<Record<string, unknown> | null> {

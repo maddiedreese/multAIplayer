@@ -33,6 +33,120 @@ test("SQLite initializes normalized MLS and KeyPackage tables", async () => {
   }
 });
 
+test("SQLite refuses existing state with missing or unsupported version metadata", async () => {
+  for (const version of [null, "2"] as const) {
+    const dir = await mkdtemp(join(tmpdir(), "relay-version-metadata-"));
+    const path = join(dir, "relay.sqlite");
+    const persistence = new SqliteRelayPersistence(path);
+    await persistence.save({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team", name: "Team", members: 0 }],
+      rooms: [],
+      invites: [],
+      mlsBacklog: []
+    });
+    persistence.close();
+    const db = new Database(path);
+    if (version === null) db.prepare("delete from relay_meta where key = 'version'").run();
+    else db.prepare("update relay_meta set value = ? where key = 'version'").run(version);
+    db.close();
+    const reopened = new SqliteRelayPersistence(path);
+    try {
+      await assert.rejects(reopened.load(), /missing or unsupported version metadata/);
+    } finally {
+      reopened.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("SQLite refuses malformed JSON rows and storage-key identity mismatches", async () => {
+  for (const data of ["{not-json", JSON.stringify({ id: "different-team", name: "Team", members: 0 })]) {
+    const dir = await mkdtemp(join(tmpdir(), "relay-invalid-row-"));
+    const path = join(dir, "relay.sqlite");
+    const persistence = new SqliteRelayPersistence(path);
+    await persistence.save({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [{ id: "team", name: "Team", members: 0 }],
+      rooms: [],
+      invites: [],
+      mlsBacklog: []
+    });
+    persistence.close();
+    const db = new Database(path);
+    db.prepare("update relay_teams set data_json = ? where id = 'team'").run(data);
+    db.close();
+    const reopened = new SqliteRelayPersistence(path);
+    try {
+      await assert.rejects(reopened.load(), /malformed JSON or a mismatched row identity/);
+    } finally {
+      reopened.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("SQLite refuses malformed or identity-mismatched MLS backlog rows", async () => {
+  for (const data of [
+    "{not-json",
+    JSON.stringify({
+      id: "different-message",
+      teamId: "team",
+      roomId: "room",
+      senderUserId: "user",
+      senderDeviceId: "device",
+      createdAt: new Date().toISOString(),
+      messageType: "application",
+      epochHint: 0,
+      mlsMessage: "AA=="
+    })
+  ]) {
+    const dir = await mkdtemp(join(tmpdir(), "relay-invalid-mls-row-"));
+    const path = join(dir, "relay.sqlite");
+    const persistence = new SqliteRelayPersistence(path);
+    await persistence.save({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      teams: [],
+      rooms: [],
+      invites: [],
+      mlsBacklog: [
+        {
+          key: "team:room",
+          messages: [
+            {
+              id: "message",
+              teamId: "team",
+              roomId: "room",
+              senderUserId: "user",
+              senderDeviceId: "device",
+              createdAt: new Date().toISOString(),
+              messageType: "application",
+              epochHint: 0,
+              mlsMessage: "AA=="
+            }
+          ]
+        }
+      ]
+    });
+    persistence.close();
+    const db = new Database(path);
+    db.prepare(
+      "insert into relay_mls_messages (room_key, message_id, sort_order, created_at, data_json) values (?, ?, ?, ?, ?)"
+    ).run("team:room", "message", 0, new Date().toISOString(), data);
+    db.close();
+    const reopened = new SqliteRelayPersistence(path);
+    try {
+      await assert.rejects(reopened.load(), /MLS backlog contains malformed JSON or a mismatched row identity/);
+    } finally {
+      reopened.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("SQLite startup purges legacy host-local room config from rows, pages, and WAL", async () => {
   const dir = await mkdtemp(join(tmpdir(), "relay-room-config-purge-"));
   const path = join(dir, "relay.sqlite");

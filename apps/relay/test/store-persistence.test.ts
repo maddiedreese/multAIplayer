@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { RelayStaleEpochError } from "../src/persistence.js";
-import { createRelayStorePersistenceCoordinator } from "../src/store-persistence.js";
+import { createRelayStorePersistenceCoordinator, RelayPersistenceLoadError } from "../src/store-persistence.js";
 
 test("relay persistence flushes durable mutations and closes", async () => {
   let saves = 0,
@@ -191,3 +191,95 @@ test("an expected competing MLS commit does not poison persistence", async () =>
   );
   assert.equal(coordinator.isHealthy(), true);
 });
+
+test("unsupported stored versions are quarantined and never replaced with an empty relay", async () => {
+  const quarantines: string[] = [];
+  const coordinator = createRelayStorePersistenceCoordinator({
+    dataPath: "unused",
+    persistence: {
+      load: async () => ({ version: 2 }),
+      save: async () => {},
+      saveChanges: () => true,
+      saveKeyPackages: () => {},
+      saveMlsBacklog: () => true,
+      saveMlsMessage: () => true,
+      saveMlsCommit: () => {},
+      quarantine: async (reason) => void quarantines.push(reason),
+      close: () => {}
+    },
+    storeCodec: inertCodec()
+  });
+  await assert.rejects(coordinator.loadRelayStore(), RelayPersistenceLoadError);
+  assert.deepEqual(quarantines, ["unsupported-version"]);
+});
+
+test("unreadable stored state is quarantined and fails startup", async () => {
+  const quarantines: string[] = [];
+  const coordinator = createRelayStorePersistenceCoordinator({
+    dataPath: "unused",
+    persistence: {
+      load: async () => {
+        throw new Error("corrupt database");
+      },
+      save: async () => {},
+      saveChanges: () => true,
+      saveKeyPackages: () => {},
+      saveMlsBacklog: () => true,
+      saveMlsMessage: () => true,
+      saveMlsCommit: () => {},
+      quarantine: async (reason) => void quarantines.push(reason),
+      close: () => {}
+    },
+    storeCodec: inertCodec()
+  });
+  await assert.rejects(coordinator.loadRelayStore(), RelayPersistenceLoadError);
+  assert.deepEqual(quarantines, ["unreadable"]);
+});
+
+test("capacity reclamation persists prune mutations before admitting new payloads", async () => {
+  let pruned = 0;
+  const saved: unknown[] = [];
+  const coordinator = createRelayStorePersistenceCoordinator({
+    dataPath: "unused",
+    persistence: {
+      load: async () => null,
+      save: async () => {},
+      saveChanges: (changes) => {
+        saved.push(...changes);
+        return true;
+      },
+      saveKeyPackages: () => {},
+      saveMlsBacklog: () => true,
+      saveMlsMessage: () => true,
+      saveMlsCommit: () => {},
+      quarantine: async () => {},
+      close: () => {}
+    },
+    storeCodec: {
+      ...inertCodec(),
+      pruneExpiredRelayState: () => void (pruned += 1),
+      drainStoredRelayMutations: () => [
+        { entity: "attachmentBlobs", key: "expired", operation: "delete" as const },
+        { entity: "mlsBacklog", key: "team:archived", operation: "delete" as const }
+      ]
+    }
+  });
+  await coordinator.reclaimDurableCapacity();
+  assert.equal(pruned, 1);
+  assert.deepEqual(saved, [
+    { entity: "attachmentBlobs", key: "expired", operation: "delete" },
+    { entity: "mlsBacklog", key: "team:archived", operation: "delete" }
+  ]);
+});
+
+function inertCodec() {
+  return {
+    isExpiredInvite: () => false,
+    isExpiredAttachmentBlob: () => false,
+    applyStoredRelayState: () => {},
+    pruneExpiredRelayState: () => {},
+    drainStoredRelayMutations: () => [],
+    discardStoredRelayMutations: () => {},
+    toStoredRelayState: () => ({ version: 1 }) as never
+  };
+}

@@ -44,15 +44,17 @@ export function createAccountRestrictionManager(options: {
 
   function evictRestrictedAccounts() {
     let removedAuthSessions = 0;
+    let removedRestrictions = 0;
     const now = Date.now();
     for (const [userId, restriction] of options.store.accountRestrictions) {
       if (restriction.expiresAt && Date.parse(restriction.expiresAt) <= now) {
         options.store.accountRestrictions.delete(userId);
+        removedRestrictions += 1;
         continue;
       }
       removedAuthSessions += evictAccount(userId);
     }
-    return { removedAuthSessions };
+    return { removedAuthSessions, removedRestrictions };
   }
 
   function evictAccount(userId: string) {

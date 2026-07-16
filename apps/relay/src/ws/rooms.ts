@@ -74,9 +74,24 @@ export function createRelayRoomSocketManager({
     if (!mutationsRequireAuth) return true;
     if (!session.authSession || session.authSession.user.id !== userId) return false;
     if (canAccessRoom(teamId, roomId, userId)) return true;
-    if (!inviteId || !consumeApprovedInvite(inviteId, teamId, roomId, userId, deviceId)) return false;
+    const invite = inviteId ? approvedInviteForAdmission(inviteId, teamId, roomId, userId, deviceId) : null;
+    if (!invite) return false;
+    // Persist membership before consuming the one-shot invite. If the second
+    // write fails, restart reloads an admitted member plus a still-usable
+    // capability instead of a deleted capability with no membership.
     addTeamMember(teamId, userId);
+    store.deleteInvite(invite.id);
+    try {
+      scheduleStoreSave();
+    } catch (error) {
+      store.setInvite(invite);
+      throw error;
+    }
     return true;
+  }
+
+  function canAuthenticateJoinIdentity(session: ClientSession, userId: string): boolean {
+    return !mutationsRequireAuth || session.authSession?.user.id === userId;
   }
 
   function canSubscribeTeam(session: ClientSession, teamId: string, userId: string): boolean {
@@ -165,24 +180,31 @@ export function createRelayRoomSocketManager({
     revokeUserPresence(userId);
   }
 
-  function consumeApprovedInvite(
+  function approvedInviteForAdmission(
     inviteId: string,
     teamId: string,
     roomId: string,
     userId: string,
     deviceId: string
-  ): boolean {
+  ): ReturnType<RelayStore["getInvite"]> | null {
     const invite = store.getInvite(inviteId);
-    if (!invite || invite.teamId !== teamId || invite.roomId !== roomId) return false;
+    if (!invite || invite.teamId !== teamId || invite.roomId !== roomId) return null;
     if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
       store.deleteInvite(invite.id);
       scheduleStoreSave();
-      return false;
+      return null;
     }
-    if (invite.approvedUserId !== userId || invite.approvedDeviceId !== deviceId) return false;
-    store.deleteInvite(invite.id);
-    scheduleStoreSave();
-    return true;
+    if (invite.approvedUserId !== userId || invite.approvedDeviceId !== deviceId) return null;
+    const durableWelcome = Array.from(store.inviteResponses.values()).find(
+      (response) =>
+        response.inviteId === invite.id &&
+        response.requesterUserId === userId &&
+        response.requesterDeviceId === deviceId &&
+        response.keyPackageHash === invite.keyPackageHash &&
+        response.status === "approved" &&
+        Boolean(response.welcome)
+    );
+    return durableWelcome ? invite : null;
   }
 
   return {
@@ -190,6 +212,7 @@ export function createRelayRoomSocketManager({
     subscribeTeam,
     subscribeWorkspace,
     isKnownRoom,
+    canAuthenticateJoinIdentity,
     canJoinRoom,
     canSubscribeTeam,
     canSubscribeWorkspace,

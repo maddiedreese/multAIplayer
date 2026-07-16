@@ -28,7 +28,7 @@ export interface RelayClient {
 
 export function connectRelay(
   url: string,
-  onMessage: (message: RelayServerMessage) => void,
+  onMessage: (message: RelayServerMessage) => void | Promise<void>,
   onStatus: (status: "connecting" | "open" | "closed" | "error") => void,
   onOpen?: (client: RelayClient) => void
 ): RelayClient {
@@ -37,6 +37,7 @@ export function connectRelay(
   let closedByClient = false;
   let reconnectTimer: number | null = null;
   let reconnectAttempt = 0;
+  let incomingMessageChain = Promise.resolve();
   const pendingAcks = new Map<string, { resolve: () => void; reject: (error: Error) => void; timeout: number }>();
   const pendingJoins = new Map<string, { resolve: () => void; reject: (error: Error) => void; timeout: number }>();
 
@@ -168,7 +169,9 @@ export function connectRelay(
         // publish or join to report a misleading timeout later.
         rejectPendingAcks(new Error(message.message));
       }
-      onMessage(message);
+      incomingMessageChain = incomingMessageChain
+        .then(() => onMessage(message))
+        .catch((error) => console.warn("Non-fatal failure: apply an ordered relay server message", error));
     });
   }
 

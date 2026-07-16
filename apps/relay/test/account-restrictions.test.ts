@@ -231,6 +231,29 @@ test("expired restrictions no longer deny an identity", () => {
   );
 });
 
+test("startup eviction reports expired restrictions so the caller persists their deletion", () => {
+  const store = createRelayStore();
+  store.accountRestrictions.set("github:expired", {
+    userId: "github:expired",
+    reasonCode: "temporary",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2026-01-02T00:00:00.000Z"
+  });
+  const manager = createAccountRestrictionManager({
+    store,
+    liveControl: { revokeUserSessions: () => assert.fail("expired restriction must not evict live sessions") },
+    persist: async () => {}
+  });
+  const previousNow = Date.now;
+  try {
+    Date.now = () => Date.parse("2026-01-03T00:00:00Z");
+    assert.deepEqual(manager.evictRestrictedAccounts(), { removedAuthSessions: 0, removedRestrictions: 1 });
+    assert.equal(store.accountRestrictions.size, 0);
+  } finally {
+    Date.now = previousNow;
+  }
+});
+
 async function runRestrictionCli(action: string, userId: string, reasonCode: string, dataPath: string) {
   return execFileAsync(
     process.execPath,

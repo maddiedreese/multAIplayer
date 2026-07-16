@@ -3,6 +3,7 @@ import { admitRelayWebSocketConnection } from "./connection-admission.js";
 import { dispatchRelayClientMessage } from "./connection-dispatch.js";
 import type { RelayWebSocketConnectionOptions } from "./connection-types.js";
 import { parseRelayClientMessage } from "./connection-validation.js";
+import { RelayStoreByteCapacityError, RelayStoreCapacityError } from "../state.js";
 
 export function registerRelayWebSocketConnection(options: RelayWebSocketConnectionOptions) {
   const { wss, send } = options.transport;
@@ -20,7 +21,8 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
             socket.close(1012, "Relay not ready");
             return;
           }
-          if (!options.rateLimiting.consume("websocket", session.rateClientId).allowed) {
+          const rateClientIds = session.rateClientIds ?? [session.rateClientId];
+          if (rateClientIds.some((clientId) => !options.rateLimiting.consume("websocket", clientId).allowed)) {
             options.metrics.recordRateLimitRejection?.("websocket");
             send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
             return;
@@ -35,12 +37,13 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
           publishMessageId = parsed.message.type === "publish" ? parsed.message.message.id : undefined;
           await dispatchRelayClientMessage(options, session, parsed.message);
         } catch (error) {
-          send(socket, {
-            type: "error",
-            message: error instanceof Error ? error.message : "Invalid relay message",
-            code: error instanceof RelayPublishError ? error.code : undefined,
-            messageId: publishMessageId
-          });
+          if (error instanceof RelayStoreCapacityError || error instanceof RelayStoreByteCapacityError) {
+            options.metrics.recordCapacityRejection?.(
+              error instanceof RelayStoreByteCapacityError ? error.resource : "durable_entries",
+              error instanceof RelayStoreByteCapacityError ? error.scope : error.teamId ? "team" : "relay"
+            );
+          }
+          send(socket, relayWebSocketError(error, publishMessageId));
         }
       });
     });
@@ -52,4 +55,23 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
       options.state.sessions.delete(socket);
     });
   });
+}
+
+export function relayWebSocketError(error: unknown, messageId?: string) {
+  return {
+    type: "error" as const,
+    message:
+      error instanceof RelayStoreCapacityError || error instanceof RelayStoreByteCapacityError
+        ? "Relay durable capacity is exhausted."
+        : error instanceof Error
+          ? error.message
+          : "Invalid relay message",
+    code:
+      error instanceof RelayStoreCapacityError || error instanceof RelayStoreByteCapacityError
+        ? ("capacity_exceeded" as const)
+        : error instanceof RelayPublishError
+          ? error.code
+          : undefined,
+    ...(messageId ? { messageId } : {})
+  };
 }

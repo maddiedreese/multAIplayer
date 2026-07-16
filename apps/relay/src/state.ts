@@ -1,4 +1,12 @@
 import type { WebSocket } from "ws";
+import {
+  DurableByteCapacity,
+  retainedJsonBytes,
+  type RelayStoreByteLimits,
+  type RetainedByteWeight
+} from "./store-byte-capacity.js";
+
+export { RelayStoreByteCapacityError, type RelayStoreByteLimits } from "./store-byte-capacity.js";
 import type {
   AttachmentBlobRecord,
   DeviceRecord,
@@ -56,6 +64,7 @@ export interface ClientSession {
   socket: WebSocket;
   authSession?: AuthSession;
   rateClientId: string;
+  rateClientIds?: string[];
   teamId?: string;
   roomId?: string;
   userId?: string;
@@ -198,6 +207,10 @@ export interface RelayStore {
   allMlsBacklogEntries(): Array<[RoomKey, MlsRelayMessage[]]>;
   drainDurableMutations(): RelayStoreMutation[];
   discardDurableMutations(): void;
+  retainedByteUsage(): {
+    mlsBacklogBytes: number;
+    attachmentBlobBytes: number;
+  };
 }
 
 export class RelayStoreCapacityError extends Error {
@@ -215,17 +228,21 @@ export class RelayStoreCapacityError extends Error {
   }
 }
 
+const defaultByteLimits: RelayStoreByteLimits = {
+  mlsBacklog: { global: 100_000_000, perTeam: 50_000_000, perRoom: 10_000_000 },
+  attachmentBlobs: { global: 500_000_000, perTeam: 250_000_000 }
+};
+
 export class InMemoryRelayStore implements RelayStore {
   private durableMutations: RelayStoreMutation[] = [];
   private readonly capacity = new DurableEntryCapacity();
+  private readonly byteCapacity: DurableByteCapacity;
   readonly sessions = new Map<WebSocket, ClientSession>();
   readonly roomSockets = new Map<RoomKey, Set<WebSocket>>();
   readonly teamSockets = new Map<string, Set<WebSocket>>();
   readonly workspaceSockets = new Set<WebSocket>();
   readonly roomPresence = new Map<RoomKey, Map<string, PresenceRecord>>();
-  readonly mlsBacklog = this.trackedMap<RoomKey, MlsRelayMessage[]>("mlsBacklog", (_value, key) =>
-    teamFromRoomKey(key)
-  );
+  readonly mlsBacklog: Map<RoomKey, MlsRelayMessage[]>;
   readonly authSessions = this.trackedMap<string, AuthSession>("authSessions");
   readonly accountRestrictions = this.trackedMap<string, AccountRestriction>("accountRestrictions");
   readonly accountQuotaRecords = this.trackedMap<string, AccountQuotaRecord>("accountQuotaRecords");
@@ -244,7 +261,7 @@ export class InMemoryRelayStore implements RelayStore {
   );
   readonly devices = this.trackedMap<string, DeviceRecord>("devices");
   readonly keyPackages = this.trackedMap<string, KeyPackageRecord>("keyPackages");
-  readonly attachmentBlobs = this.trackedMap<string, AttachmentBlobRecord>("attachmentBlobs", (value) => value.teamId);
+  readonly attachmentBlobs: Map<string, AttachmentBlobRecord>;
   readonly teamMembers: TeamMemberCollectionMap;
   readonly rateLimitStore = new Map<string, TokenBucketRecord>();
   readonly dailyTeamCreationCounts = new Map<string, RateLimitRecord>();
@@ -256,8 +273,32 @@ export class InMemoryRelayStore implements RelayStore {
     "appliedDeletionLedgerEntries"
   );
 
-  constructor(maxDurableEntries = 250_000, maxDurableEntriesPerTeam = maxDurableEntries) {
+  constructor(
+    maxDurableEntries = 250_000,
+    maxDurableEntriesPerTeam = maxDurableEntries,
+    byteLimits: RelayStoreByteLimits = defaultByteLimits
+  ) {
     this.capacity.configure(maxDurableEntries, maxDurableEntriesPerTeam);
+    this.byteCapacity = new DurableByteCapacity(byteLimits);
+    this.mlsBacklog = this.trackedMap<RoomKey, MlsRelayMessage[]>(
+      "mlsBacklog",
+      (_value, key) => teamFromRoomKey(key),
+      (value, key) => ({
+        resource: "mls_backlog",
+        bytes: retainedJsonBytes(value),
+        teamId: teamFromRoomKey(key),
+        roomId: key
+      })
+    );
+    this.attachmentBlobs = this.trackedMap<string, AttachmentBlobRecord>(
+      "attachmentBlobs",
+      (value) => value.teamId,
+      (value) => ({
+        resource: "attachment_blobs",
+        bytes: Buffer.byteLength(value.sealedBlob, "utf8"),
+        teamId: value.teamId
+      })
+    );
     this.teamMembers = new TeamMemberCollectionMap(
       (key) => this.durableMutations.push({ entity: "teamMembers", key }),
       this.capacity
@@ -382,23 +423,31 @@ export class InMemoryRelayStore implements RelayStore {
     this.durableMutations = [];
   }
 
+  retainedByteUsage() {
+    return this.byteCapacity.snapshot();
+  }
+
   private trackedMap<Key extends string, Value>(
     entity: RelayStoreMutationEntity,
-    teamIdForEntry: (value: Value, key: Key) => string | null = () => null
+    teamIdForEntry: (value: Value, key: Key) => string | null = () => null,
+    byteWeight?: (value: Value, key: Key) => RetainedByteWeight
   ): Map<Key, Value> {
     return new DurableMutationMap<Key, Value>(
       (key) => this.durableMutations.push({ entity, key }),
       this.capacity,
-      teamIdForEntry
+      teamIdForEntry,
+      this.byteCapacity,
+      byteWeight
     );
   }
 }
 
 export function createRelayStore(
   maxDurableEntries = 250_000,
-  maxDurableEntriesPerTeam = maxDurableEntries
+  maxDurableEntriesPerTeam = maxDurableEntries,
+  byteLimits: RelayStoreByteLimits = defaultByteLimits
 ): RelayStore {
-  return new InMemoryRelayStore(maxDurableEntries, maxDurableEntriesPerTeam);
+  return new InMemoryRelayStore(maxDurableEntries, maxDurableEntriesPerTeam, byteLimits);
 }
 
 function deviceKey(userId: string, deviceId: string): string {
@@ -409,24 +458,39 @@ class DurableMutationMap<Key extends string, Value> extends Map<Key, Value> {
   constructor(
     private readonly onMutation: (key: string) => void,
     private readonly capacity: DurableEntryCapacity,
-    private readonly teamIdForEntry: (value: Value, key: Key) => string | null = () => null
+    private readonly teamIdForEntry: (value: Value, key: Key) => string | null = () => null,
+    private readonly byteCapacity?: DurableByteCapacity,
+    private readonly byteWeight?: (value: Value, key: Key) => RetainedByteWeight
   ) {
     super();
   }
 
   override set(key: Key, value: Value): this {
     const previous = this.get(key);
-    if (previous === undefined) this.capacity.claim(this.teamIdForEntry(value, key));
-    else this.capacity.move(this.teamIdForEntry(previous, key), this.teamIdForEntry(value, key));
-    super.set(key, value);
-    this.onMutation(key);
-    return this;
+    this.byteCapacity?.replace(
+      previous && this.byteWeight ? this.byteWeight(previous, key) : null,
+      this.byteWeight?.(value, key) ?? null
+    );
+    try {
+      if (previous === undefined) this.capacity.claim(this.teamIdForEntry(value, key));
+      else this.capacity.move(this.teamIdForEntry(previous, key), this.teamIdForEntry(value, key));
+      super.set(key, value);
+      this.onMutation(key);
+      return this;
+    } catch (error) {
+      this.byteCapacity?.replace(
+        this.byteWeight?.(value, key) ?? null,
+        previous && this.byteWeight ? this.byteWeight(previous, key) : null
+      );
+      throw error;
+    }
   }
 
   override delete(key: Key): boolean {
     const previous = this.get(key);
     const deleted = super.delete(key);
     if (deleted && previous !== undefined) {
+      if (this.byteCapacity && this.byteWeight) this.byteCapacity.replace(this.byteWeight(previous, key), null);
       this.capacity.release(this.teamIdForEntry(previous, key));
       this.onMutation(key);
     }
@@ -437,6 +501,7 @@ class DurableMutationMap<Key extends string, Value> extends Map<Key, Value> {
     const entries = Array.from(this.entries());
     super.clear();
     for (const [key, value] of entries) {
+      if (this.byteCapacity && this.byteWeight) this.byteCapacity.replace(this.byteWeight(value, key), null);
       this.capacity.release(this.teamIdForEntry(value, key));
       this.onMutation(key);
     }

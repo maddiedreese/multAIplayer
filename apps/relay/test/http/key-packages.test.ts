@@ -7,7 +7,8 @@ import {
   createDebugSession,
   onceOpen,
   startRelayWithWorkspace,
-  waitForJoined
+  waitForJoined,
+  waitForPublished
 } from "../support/relay.js";
 import { commitValidatedKeyPackages } from "../../src/http/key-package-upload-transaction.js";
 import { createRelayStore } from "../../src/state.js";
@@ -308,7 +309,6 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
       409,
       "one invite cannot bind a second pending request or KeyPackage"
     );
-    hostSocket.close();
     const mismatchedConsume = await fetch(
       `${relay.baseUrl}/rooms/room-desktop/key-packages/github%3Atester/peer-device-1/consume`,
       {
@@ -368,28 +368,68 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
       keyEpoch: 0,
       keyPackageHash,
       requestId: "request-one",
-      requestNonce: "request-nonce",
+      requestNonce: "request-nonce-0001",
       requesterUserId: "github:tester",
       requesterDeviceId: "peer-device-1",
       hostUserId: "github:maddiedreese",
       hostDeviceId: "host-device-1",
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      expiresAt: invite.expiresAt,
       status: "approved",
       decidedAt
     };
+    const welcomeBody = {
+      hostDeviceId: "host-device-1",
+      requestId: "request-one",
+      status: "approved",
+      responseBinding,
+      responseMac: "AA==",
+      welcome: "AA=="
+    };
+    const prematureWelcome = await fetch(`${relay.baseUrl}/invites/${invite.id}/response`, {
+      method: "POST",
+      headers: hostHeaders,
+      body: JSON.stringify(welcomeBody)
+    });
+    assert.equal(prematureWelcome.status, 409);
+    assert.deepEqual(await prematureWelcome.json(), {
+      error: "The membership Commit must be durably accepted before publishing its Welcome.",
+      code: "conflict"
+    });
+    const commitId = "membership-commit-before-welcome";
+    const publishedCommit = waitForPublished(hostSocket, commitId);
+    hostSocket.send(
+      JSON.stringify({
+        type: "publish",
+        message: {
+          id: commitId,
+          teamId: "team-core",
+          roomId: "room-desktop",
+          senderUserId: "github:maddiedreese",
+          senderDeviceId: "host-device-1",
+          createdAt: new Date().toISOString(),
+          messageType: "commit",
+          epochHint: 0,
+          mlsMessage: "AA=="
+        }
+      })
+    );
+    await publishedCommit;
+    hostSocket.close();
+    const mismatchedRequestBinding = await fetch(`${relay.baseUrl}/invites/${invite.id}/response`, {
+      method: "POST",
+      headers: hostHeaders,
+      body: JSON.stringify({
+        ...welcomeBody,
+        responseBinding: { ...responseBinding, requestNonce: "different-request-nonce" }
+      })
+    });
+    assert.equal(mismatchedRequestBinding.status, 400);
     assert.equal(
       (
         await fetch(`${relay.baseUrl}/invites/${invite.id}/response`, {
           method: "POST",
           headers: hostHeaders,
-          body: JSON.stringify({
-            hostDeviceId: "host-device-1",
-            requestId: "request-one",
-            status: "approved",
-            responseBinding,
-            responseMac: "AA==",
-            welcome: "AA=="
-          })
+          body: JSON.stringify(welcomeBody)
         })
       ).status,
       201
@@ -495,7 +535,8 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
       inviteId: deniedInvite.id,
       keyPackageHash: deniedKeyPackageHash,
       requestId: "request-denied",
-      expiresAt: deniedInvite.expiresAt
+      expiresAt: deniedInvite.expiresAt,
+      keyEpoch: 1
     });
     assert.equal(
       (
@@ -528,6 +569,8 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
               inviteId: deniedInvite.id,
               keyPackageHash: deniedKeyPackageHash,
               requestId: "request-denied",
+              keyEpoch: 1,
+              expiresAt: deniedInvite.expiresAt,
               status: "denied",
               decidedAt: deniedAt
             },
@@ -841,6 +884,7 @@ function directedSealedRequest(input: {
   keyPackageHash: string;
   requestId: string;
   expiresAt: string;
+  keyEpoch?: number;
 }) {
   return JSON.stringify({
     version: 3,
@@ -850,7 +894,7 @@ function directedSealedRequest(input: {
       inviteId: input.inviteId,
       teamId: "team-core",
       roomId: "room-desktop",
-      keyEpoch: 0,
+      keyEpoch: input.keyEpoch ?? 0,
       keyPackageHash: input.keyPackageHash,
       requestId: input.requestId,
       requestNonce: "request-nonce-0001",

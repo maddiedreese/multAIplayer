@@ -30,7 +30,8 @@ test("direct host release and reclaim cannot bypass signed MLS handoff", async (
   }
 });
 
-test("invite admission requires the exact approved user and device and consumes once", () => {
+test("invite admission requires the exact durable Welcome, approved user, and device and consumes once", () => {
+  const keyPackageHash = `sha256:${"a".repeat(64)}`;
   const store = new InMemoryRelayStore();
   store.setTeam({ id: "team", name: "Team", members: 1 });
   store.setRoom({
@@ -62,6 +63,7 @@ test("invite admission requires the exact approved user and device and consumes 
     roomId: "room",
     approvedUserId: "github:joiner",
     approvedDeviceId: "device-approved",
+    keyPackageHash,
     createdAt: new Date().toISOString()
   };
   store.setInvite(invite);
@@ -98,6 +100,18 @@ test("invite admission requires the exact approved user and device and consumes 
   });
   assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-wrong", "invite"), false);
   assert.equal(store.getInvite("invite")?.id, "invite");
+  assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-approved", "invite"), false);
+  assert.equal(store.getInvite("invite")?.id, "invite");
+  store.inviteResponses.set("request", {
+    requestId: "request",
+    inviteId: "invite",
+    requesterUserId: "github:joiner",
+    requesterDeviceId: "device-approved",
+    keyPackageHash,
+    status: "approved",
+    welcome: "AA==",
+    responseBinding: { teamId: "team" }
+  } as never);
   assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-approved", "invite"), true);
   assert.equal(store.getInvite("invite"), undefined);
   assert.equal(manager.canJoinRoom(session, "team", "room", "github:joiner", "device-approved"), true);

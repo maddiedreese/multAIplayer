@@ -17,6 +17,8 @@ interface RegisterOpsRoutesOptions {
   isExpiredAttachmentBlob?: (blob: AttachmentBlobRecord) => boolean;
   isReady?: () => boolean;
   readinessFailureCode?: () => "relay_shutting_down" | "persistence_unavailable";
+  retainedByteUsage?: () => { mlsBacklogBytes: number; attachmentBlobBytes: number };
+  retainedByteLimits?: { mlsBacklogBytes: number; attachmentBlobBytes: number };
 }
 
 export function registerOpsRoutes({
@@ -28,7 +30,9 @@ export function registerOpsRoutes({
   attachmentBlobs = [],
   isExpiredAttachmentBlob = () => false,
   isReady = () => true,
-  readinessFailureCode = () => "relay_shutting_down"
+  readinessFailureCode = () => "relay_shutting_down",
+  retainedByteUsage = () => ({ mlsBacklogBytes: 0, attachmentBlobBytes: 0 }),
+  retainedByteLimits = { mlsBacklogBytes: 0, attachmentBlobBytes: 0 }
 }: RegisterOpsRoutesOptions) {
   app.get("/healthz", (_req, res) => {
     res.json({ ok: true, service: "multaiplayer-relay" });
@@ -36,10 +40,10 @@ export function registerOpsRoutes({
 
   app.get("/readyz", (_req, res) => {
     if (!isReady()) {
-      res.status(503).json({ ok: false, dataPath, code: readinessFailureCode() });
+      res.status(503).json({ ok: false, code: readinessFailureCode() });
       return;
     }
-    res.json({ ok: true, dataPath });
+    res.json({ ok: true });
   });
 
   app.get("/metrics", (req, res) => {
@@ -48,8 +52,13 @@ export function registerOpsRoutes({
       res.status(401).type("text/plain").send("Unauthorized\n");
       return;
     }
+    const retained = retainedByteUsage();
     const snapshot = metrics.snapshot(sessions.size, {
       ...liveAttachmentBlobGauges(attachmentBlobs, isExpiredAttachmentBlob),
+      retainedMlsBacklogBytes: retained.mlsBacklogBytes,
+      retainedAttachmentBlobBytes: retained.attachmentBlobBytes,
+      retainedMlsBacklogLimitBytes: retainedByteLimits.mlsBacklogBytes,
+      retainedAttachmentBlobLimitBytes: retainedByteLimits.attachmentBlobBytes,
       ...sqliteOperationalGauges(dataPath)
     });
     res.type("text/plain; version=0.0.4; charset=utf-8").send(relayMetricsToPrometheus(snapshot));

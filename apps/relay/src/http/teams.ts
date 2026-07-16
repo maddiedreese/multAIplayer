@@ -1,9 +1,8 @@
-import { sendRelayError } from "./errors.js";
+import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
 import type { RoomRecord, TeamMemberRecord, TeamRecord, TeamRole } from "@multaiplayer/protocol";
-import { loadRelayConfig } from "../config.js";
-import type { AuthSession, RelayStore } from "../state.js";
+import { RelayStoreCapacityError, type AuthSession, type RelayStore } from "../state.js";
 import { acquireDurableQuotaTransaction, reserveDurableQuota, rollbackDurableQuota } from "../auth/account-quotas.js";
 
 interface RegisterTeamRoutesOptions {
@@ -28,8 +27,10 @@ interface RegisterTeamRoutesOptions {
   scheduleStoreSave: () => void;
   saveRelayStore: () => Promise<void>;
   recordQuotaRejection?: (type: string) => void;
+  recordCapacityRejection?: (resource: string, scope: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxTeamNameChars: number;
+  dailyCreationCaps?: { teamsPerUser: number };
 }
 
 export function registerTeamRoutes({
@@ -51,11 +52,11 @@ export function registerTeamRoutes({
   scheduleStoreSave,
   saveRelayStore,
   recordQuotaRejection,
+  recordCapacityRejection,
   normalizeMetadataText,
-  maxTeamNameChars
+  maxTeamNameChars,
+  dailyCreationCaps = { teamsPerUser: 25 }
 }: RegisterTeamRoutesOptions) {
-  const { dailyCreationCaps } = loadRelayConfig();
-
   app.get("/teams", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
@@ -144,10 +145,16 @@ export function registerTeamRoutes({
       return;
     }
 
+    const previousMembers = new Map(members);
     const updatedMembers = transferTeamOwnership(members, userId);
     const team = store.getTeam(teamId);
+    try {
+      scheduleStoreSave();
+    } catch {
+      store.setTeamMembers(teamId, previousMembers);
+      return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team ownership transfer.");
+    }
     if (team) broadcastWorkspaceUpdated(team);
-    scheduleStoreSave();
     res.json({ member: updatedMembers.get(userId), members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
@@ -180,9 +187,9 @@ export function registerTeamRoutes({
       store.setTeam(updatedTeam);
       revokeTeamInvites(teamId);
       revokeTeamMemberSessions(teamId, userId);
-      broadcastWorkspaceUpdated(updatedTeam);
     }
     scheduleStoreSave();
+    if (team) broadcastWorkspaceUpdated(store.getTeam(teamId)!);
     res.json({ members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
@@ -221,9 +228,9 @@ export function registerTeamRoutes({
     }
 
     if (action === "delete") revokeTeamInvites(teamId);
+    scheduleStoreSave();
     broadcastWorkspaceUpdated(updatedTeam);
     for (const room of updatedRooms) broadcastRoomUpdated(room);
-    scheduleStoreSave();
     res.json({ team: teamRecordForUser(updatedTeam, store, session?.user.id), rooms: updatedRooms });
   });
 
@@ -269,7 +276,7 @@ export function registerTeamRoutes({
       const team: TeamRecord = {
         id: `team_${nanoid(10)}`,
         name,
-        members: 1
+        members: session ? 1 : 0
       };
       try {
         store.setTeam(team);
@@ -285,10 +292,14 @@ export function registerTeamRoutes({
         } else {
           scheduleStoreSave();
         }
-      } catch {
+      } catch (error) {
         store.teams.delete(team.id);
         store.teamMembers.delete(team.id);
         if (reservation?.allowed) rollbackDurableQuota(store, reservation);
+        if (error instanceof RelayStoreCapacityError) {
+          recordCapacityRejection?.("durable_entries", error.teamId ? "team" : "relay");
+          return void sendRelayCapacityError(res, error);
+        }
         return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team quota and team.");
       }
       broadcastWorkspaceUpdated(team);

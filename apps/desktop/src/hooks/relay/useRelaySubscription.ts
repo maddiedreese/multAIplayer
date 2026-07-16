@@ -271,21 +271,23 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
           if (message.type === "joined") {
             const room = current.roomsRef.current.find((candidate) => candidate.id === message.roomId);
             if (room) {
-              void recoverRoomAfterJoin(
-                client,
-                room,
-                {
-                  userId: current.localUser.id,
-                  deviceId: current.deviceId,
-                  deviceSessionToken: current.deviceSessionToken
-                },
-                seenEnvelopeIds.current
-              ).catch(() => {
+              try {
+                await recoverRoomAfterJoin(
+                  client,
+                  room,
+                  {
+                    userId: current.localUser.id,
+                    deviceId: current.deviceId,
+                    deviceSessionToken: current.deviceSessionToken
+                  },
+                  seenEnvelopeIds.current
+                );
+              } catch {
                 store.setHostMessageForRoom(
                   room.id,
                   "A durable MLS message is still pending relay delivery and will retry after reconnecting."
                 );
-              });
+              }
             }
           }
           return;
@@ -367,7 +369,7 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
             }
           });
         roomReceiveQueues.set(roomId, queued);
-        void queued.finally(() => {
+        await queued.finally(() => {
           if (roomReceiveQueues.get(roomId) === queued) roomReceiveQueues.delete(roomId);
         });
       },

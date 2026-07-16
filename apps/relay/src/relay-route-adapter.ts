@@ -56,6 +56,7 @@ interface RegisterRelayRouteAdapterOptions {
   scheduleStoreSave: () => void;
   revokeTeamInvites: (teamId: string) => void;
   requesterFromRequest: (body: unknown, sessionId: unknown) => { id: string; name: string };
+  reclaimDurableCapacity: () => Promise<void>;
   deletionLedger: DeletionLedger | null;
   isAccountRestricted: (userId: string) => boolean;
   isReady: () => boolean;
@@ -79,6 +80,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     getAuthSession: auth.getAuthSession,
     scheduleStoreSave: options.scheduleStoreSave,
     saveRelayStore: () => options.persistence.saveRelayStore(),
+    reclaimDurableCapacity: options.reclaimDurableCapacity,
     notifyInviteRequested: (inviteId: string, requestId: string) => {
       const invite = store.getInvite(inviteId);
       const room = invite ? store.getRoom(invite.roomId) : undefined;
@@ -117,6 +119,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     allowRead: auth.allowRead,
     allowMutation: auth.allowMutation,
     recordQuotaRejection: metrics.recordQuotaRejection,
+    recordCapacityRejection: metrics.recordCapacityRejection,
     recordUpload: metrics.recordAttachmentBlobUpload,
     recordUploadRejection: metrics.recordAttachmentBlobUploadRejection,
     maxCiphertextCharactersForBlob,
@@ -137,6 +140,8 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     broadcastWorkspaceUpdated: fanout.broadcastWorkspaceUpdated,
     broadcastRoomUpdated: fanout.broadcastRoomUpdated,
     maxTeamNameChars,
+    dailyCreationCaps: config.dailyCreationCaps,
+    totalRoomCapPerUser: config.totalRoomCapPerUser,
     normalizeOptionalMetadataText,
     displayNameForUser,
     maxDeviceIdChars,
@@ -149,6 +154,11 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
     validator: options.keyPackageValidator,
     sessions: store.sessions,
     opsAttachmentBlobs: store.attachmentBlobs.values(),
+    retainedByteUsage: () => store.retainedByteUsage(),
+    retainedByteLimits: {
+      mlsBacklogBytes: config.maxMlsBacklogBytes,
+      attachmentBlobBytes: config.maxAttachmentBlobBytes
+    },
     isReady: options.isReady,
     readinessFailureCode: options.readinessFailureCode,
     requesterFromRequest: options.requesterFromRequest,

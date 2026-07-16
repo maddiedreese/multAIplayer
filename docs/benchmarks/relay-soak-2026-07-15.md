@@ -2,6 +2,8 @@
 
 This record quantifies the event-loop cost of synchronous `better-sqlite3` writes under a representative alpha workload. It combines a short local checkpoint comparison with a longer Railway-volume follow-up. The results are regression and capacity evidence, not a hosted-service SLO.
 
+This workload did not fill the configurable MLS-backlog or attachment-ciphertext byte ceilings and therefore does not validate their defaults or establish a safe maximum resident dataset. Those limits are conservative guardrails that must be tuned against measured memory on the actual host; the results below support the synchronous-write and WAL-checkpoint decision only.
+
 ## Workload and environment
 
 - Source baseline: `c33ed8a477287b4633a71e210fc952f92fb76280` plus the operational-readiness changes under review.
@@ -38,7 +40,7 @@ The default checkpoint produced a 325 ms worst event-loop stall and a roughly 4 
 
 The hosted follow-up ran on 2026-07-15 PDT for 905.3 seconds against the 5 GB persistent volume mounted by the production Railway relay. It exercised deployed commit `ca52f4f7` with the default 1000-page WAL checkpoint, 50 rooms, 100 members, 16 concurrent reconnecting clients, two relay start/reload phases, continuous publication and `GET /teams`, and a live backup with an independent SQLite integrity check.
 
-To avoid corrupting or measuring against user data, the runner launched a second loopback-only relay on port 4322 and gave it a UUID-named SQLite database under `/data`. It did not address the public listener or open `/data/relay-store.sqlite`. A `finally` cleanup removed the isolated directory; an independent directory scan found no `relay-hosted-soak-*` paths afterward, and the public `/readyz` response still named `/data/relay-store.sqlite` and returned healthy.
+To avoid corrupting or measuring against user data, the runner launched a second loopback-only relay on port 4322 and gave it a UUID-named SQLite database under `/data`. It did not address the public listener or open `/data/relay-store.sqlite`. A `finally` cleanup removed the isolated directory; an independent directory scan found no `relay-hosted-soak-*` paths afterward, and the public `/readyz` response returned healthy. Readiness responses no longer expose the configured filesystem path.
 
 | Hosted measurement                                  |                      Result |
 | --------------------------------------------------- | --------------------------: |

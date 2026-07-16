@@ -42,6 +42,7 @@ test("readJsonResponse surfaces relay auth errors", async () => {
   assert.ok(error instanceof RelayHttpError);
   assert.equal(error.status, 401);
   assert.equal(error.code, "authentication_required");
+  assert.equal(error.retryAfterMs, null);
   assert.match(error.message, /Sign in with GitHub/);
 });
 
@@ -52,6 +53,16 @@ test("readJsonResponse includes HTTP status for non-json failures", async () => 
     () => readJsonResponse(response, "Failed to load workspace"),
     /Failed to load workspace: HTTP 502/
   );
+});
+
+test("readJsonResponse preserves a bounded rate-limit retry delay", async () => {
+  const response = new Response(JSON.stringify({ code: "rate_limited", retryAfterSeconds: 45 }), {
+    status: 429,
+    headers: { "content-type": "application/json", "retry-after": "45" }
+  });
+  const error = await readJsonResponse(response, "Failed").catch((caught: unknown) => caught);
+  assert.ok(error instanceof RelayHttpError);
+  assert.equal(error.retryAfterMs, 30_000);
 });
 
 test("readJsonResponse returns typed JSON bodies", async () => {

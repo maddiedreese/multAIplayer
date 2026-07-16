@@ -179,7 +179,12 @@ function readProductionRelayConfig() {
     websocketConnectRateLimit: envInteger("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT", 120),
     totalRoomCap: envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500),
     maxDurableEntries: envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES", 250_000),
-    maxDurableEntriesPerTeam: envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM", 25_000)
+    maxDurableEntriesPerTeam: envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM", 25_000),
+    maxMlsBacklogBytes: envInteger("MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES", 100_000_000),
+    maxMlsBacklogBytesPerTeam: envInteger("MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM", 50_000_000),
+    maxMlsBacklogBytesPerRoom: envInteger("MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM", 10_000_000),
+    maxAttachmentBlobBytes: envInteger("MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES", 500_000_000),
+    maxAttachmentBlobBytesPerTeam: envInteger("MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM", 250_000_000)
   };
 }
 
@@ -310,13 +315,14 @@ function checkRelayPathsAndProxy(config) {
         : "configured executable"
   });
   checks.push({
-    ok: !trustProxyHeaders || trustedProxyConfigured,
-    label: "production MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS",
-    detail: trustProxyHeaders
-      ? trustedProxyConfigured
-        ? "forwarded headers enabled with an explicitly configured trusted proxy boundary"
-        : "requires MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED=true after the edge strips and rewrites forwarding headers"
-      : "proxy headers not trusted by default"
+    ok: trustProxyHeaders === trustedProxyConfigured,
+    label: "production trusted-proxy configuration",
+    detail:
+      trustProxyHeaders === trustedProxyConfigured
+        ? trustProxyHeaders
+          ? "forwarded headers enabled with an explicitly configured trusted proxy boundary"
+          : "proxy headers not trusted by default"
+        : "MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS and MULTAIPLAYER_RELAY_TRUSTED_PROXY_CONFIGURED must match"
   });
 }
 
@@ -330,7 +336,12 @@ function checkRelayAbuseLimits(config) {
     websocketConnectRateLimit,
     totalRoomCap,
     maxDurableEntries,
-    maxDurableEntriesPerTeam
+    maxDurableEntriesPerTeam,
+    maxMlsBacklogBytes,
+    maxMlsBacklogBytesPerTeam,
+    maxMlsBacklogBytesPerRoom,
+    maxAttachmentBlobBytes,
+    maxAttachmentBlobBytesPerTeam
   } = config;
   checks.push({
     ok: attachmentBlobMaxBytes > 0 && attachmentBlobMaxBytes <= 50_000_000,
@@ -394,6 +405,22 @@ function checkRelayAbuseLimits(config) {
       maxDurableEntriesPerTeam < maxDurableEntries
         ? `per-team ceiling ${maxDurableEntriesPerTeam}; global ceiling ${maxDurableEntries}`
         : "per-team ceiling must be lower than the global durable-entry ceiling"
+  });
+  checks.push({
+    ok: maxMlsBacklogBytesPerRoom <= maxMlsBacklogBytesPerTeam && maxMlsBacklogBytesPerTeam <= maxMlsBacklogBytes,
+    label: "production MLS retained-byte ceiling hierarchy",
+    detail:
+      maxMlsBacklogBytesPerRoom <= maxMlsBacklogBytesPerTeam && maxMlsBacklogBytesPerTeam <= maxMlsBacklogBytes
+        ? `room ${maxMlsBacklogBytesPerRoom}; team ${maxMlsBacklogBytesPerTeam}; relay ${maxMlsBacklogBytes}`
+        : "room ceiling must not exceed team, and team must not exceed relay"
+  });
+  checks.push({
+    ok: maxAttachmentBlobBytesPerTeam <= maxAttachmentBlobBytes,
+    label: "production attachment retained-byte ceiling hierarchy",
+    detail:
+      maxAttachmentBlobBytesPerTeam <= maxAttachmentBlobBytes
+        ? `team ${maxAttachmentBlobBytesPerTeam}; relay ${maxAttachmentBlobBytes}`
+        : "team ceiling must not exceed relay"
   });
 }
 
