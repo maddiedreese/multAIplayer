@@ -14,7 +14,7 @@ impl MlsEngine {
     pub fn create_group(&mut self, room_id: &str) -> Result<u64, EngineError> {
         valid_room(room_id)?;
         let host = HostContext {
-            version: 1,
+            version: 2,
             host_leaf: 0,
             host_device_id: self.self_device_id.clone(),
             transfer_id: None,

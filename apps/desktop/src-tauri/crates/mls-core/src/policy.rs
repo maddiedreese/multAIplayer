@@ -56,10 +56,12 @@ pub fn validate_credential(bytes: &[u8]) -> Result<BasicAppCredential, PolicyErr
 }
 
 pub fn validate_host_commit(sender_leaf: u32, context: &HostContext) -> Result<(), PolicyError> {
-    if !matches!(context.version, 1 | 2)
+    if context.version != 2
         || !valid_id(&context.host_device_id)
-        || (context.version == 1 && context.transfer_id.is_some())
-        || (context.version == 2 && !context.transfer_id.as_deref().is_some_and(valid_id))
+        || context
+            .transfer_id
+            .as_deref()
+            .is_some_and(|transfer_id| !valid_id(transfer_id))
     {
         return Err(PolicyError::InvalidHostContext);
     }
@@ -105,7 +107,7 @@ mod tests {
     #[test]
     fn only_current_host_leaf_can_commit() {
         let context = HostContext {
-            version: 1,
+            version: 2,
             host_leaf: 7,
             host_device_id: "mac-1".into(),
             transfer_id: None,
@@ -118,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn transferred_host_context_requires_a_bounded_correlation_id() {
+    fn transferred_host_context_requires_a_bounded_correlation_id_when_present() {
         let transferred = HostContext {
             version: 2,
             host_leaf: 9,
@@ -134,7 +136,7 @@ mod tests {
                     ..transferred.clone()
                 }
             ),
-            Err(PolicyError::InvalidHostContext)
+            Ok(())
         );
         assert_eq!(
             validate_host_commit(
@@ -144,6 +146,20 @@ mod tests {
                     ..transferred
                 }
             ),
+            Err(PolicyError::InvalidHostContext)
+        );
+    }
+
+    #[test]
+    fn pre_public_host_context_version_is_rejected() {
+        let context = HostContext {
+            version: 1,
+            host_leaf: 7,
+            host_device_id: "mac-1".into(),
+            transfer_id: None,
+        };
+        assert_eq!(
+            validate_host_commit(7, &context),
             Err(PolicyError::InvalidHostContext)
         );
     }

@@ -77,6 +77,9 @@ impl CommandError {
     }
 }
 
+// Active native helpers in the Codex, terminal, Git, browser, archive, and MLS
+// command paths still return human-readable String errors. Keep their Tauri IPC
+// boundary structured until those helpers are converted within their owning domains.
 impl From<String> for CommandError {
     fn from(message: String) -> Self {
         Self::new(CommandErrorCode::InternalError, message)
@@ -119,10 +122,10 @@ mod tests {
     }
 
     #[test]
-    fn legacy_string_conversion_has_a_stable_fallback_code() {
-        let error = CommandError::from("legacy failure".to_string());
+    fn string_based_native_helpers_receive_a_stable_ipc_code() {
+        let error = CommandError::from("native helper failure".to_string());
         assert_eq!(error.code, CommandErrorCode::InternalError);
-        assert_eq!(error.message, "legacy failure");
+        assert_eq!(error.message, "native helper failure");
     }
 
     #[test]

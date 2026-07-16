@@ -71,11 +71,9 @@ pub struct JoinAdmissionMetadata {
 )]
 pub enum OutboxMetadata {
     Application {
-        #[serde(alias = "authenticated_data")]
         authenticated_data: Vec<u8>,
     },
     Commit {
-        #[serde(alias = "parent_epoch")]
         parent_epoch: u64,
     },
     Welcome(WelcomeRetryMetadata),

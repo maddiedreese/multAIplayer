@@ -61,19 +61,16 @@ fn exporter_ciphertext_uses_canonical_padded_base64() {
 }
 
 #[test]
-fn outbox_metadata_uses_camel_case_at_the_native_boundary_and_reads_legacy_rows() {
+fn outbox_metadata_uses_camel_case_at_the_native_boundary() {
     let commit = OutboxMetadata::Commit { parent_epoch: 7 };
     assert_eq!(
         serde_json::to_value(&commit).unwrap(),
         serde_json::json!({ "type": "commit", "parentEpoch": 7 })
     );
-    assert_eq!(
-        serde_json::from_value::<OutboxMetadata>(
-            serde_json::json!({ "type": "commit", "parent_epoch": 7 })
-        )
-        .unwrap(),
-        commit
-    );
+    assert!(serde_json::from_value::<OutboxMetadata>(
+        serde_json::json!({ "type": "commit", "parent_epoch": 7 })
+    )
+    .is_err());
 
     let application = OutboxMetadata::Application {
         authenticated_data: vec![1, 2, 3],
@@ -82,13 +79,10 @@ fn outbox_metadata_uses_camel_case_at_the_native_boundary_and_reads_legacy_rows(
         serde_json::to_value(&application).unwrap(),
         serde_json::json!({ "type": "application", "authenticatedData": [1, 2, 3] })
     );
-    assert_eq!(
-        serde_json::from_value::<OutboxMetadata>(
-            serde_json::json!({ "type": "application", "authenticated_data": [1, 2, 3] })
-        )
-        .unwrap(),
-        application
-    );
+    assert!(serde_json::from_value::<OutboxMetadata>(
+        serde_json::json!({ "type": "application", "authenticated_data": [1, 2, 3] })
+    )
+    .is_err());
 }
 
 #[test]

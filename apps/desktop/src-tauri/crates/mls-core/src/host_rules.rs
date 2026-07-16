@@ -83,7 +83,12 @@ impl MlsRules for HostRules {
             _ => return Err(HostRuleError),
         }
         if let Some(change) = proposals.group_context_ext_proposals().first() {
-            validate_host(current_roster, &change.proposal)?;
+            let next_host = validate_host(current_roster, &change.proposal)?;
+            // Genesis has no transfer to correlate. Any later context change is
+            // a handoff and must retain the authenticated offer identifier.
+            if next_host.transfer_id.is_none() {
+                return Err(HostRuleError);
+            }
         }
         Ok(proposals)
     }
