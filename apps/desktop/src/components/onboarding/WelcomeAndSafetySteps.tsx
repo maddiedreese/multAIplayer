@@ -39,7 +39,7 @@ export function WelcomeStep({
           </span>
           <span>
             <strong>Join with an invite</strong>
-            <small>Accept a secure invitation from someone you trust.</small>
+            <small>Use a single-use bearer invitation shared privately by someone you trust.</small>
           </span>
           <ArrowRight size={17} aria-hidden="true" />
         </button>

@@ -117,7 +117,8 @@ export function CreateStep({
         </div>
       </Field>
       <p className="onboarding-form-note">
-        After the room is ready, the setup checklist will help you create a secure invite link for a teammate.
+        After the room is ready, the setup checklist will help you create a single-use bearer invite link to share
+        privately with a teammate.
       </p>
       <StepActions onBack={onBack}>
         <button type="submit" className="onboarding-primary" disabled={busy}>
@@ -167,8 +168,8 @@ export function JoinStep({
         <div className="onboarding-recovery" role="status">
           <ShieldCheck size={17} aria-hidden="true" />
           <span>
-            <strong>Invitation received securely.</strong> Continue to verify this device and request access from the
-            active host.
+            <strong>Invitation link captured on this device.</strong> Continue to verify this device and request access
+            from the active host.
           </span>
         </div>
       ) : (

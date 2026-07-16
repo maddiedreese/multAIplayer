@@ -162,7 +162,7 @@ test("create form keeps folder selection local and retries only the room after p
   assert.equal((view.getByLabelText("Project folder") as HTMLInputElement).value, "/safe/project");
   fireEvent.click(view.getByRole("button", { name: /Retry room setup/ }));
   assert.deepEqual(retry, { teamId: "team_alpha", roomName: "general", projectPath: "/safe/project" });
-  assert.match(view.getByText(/secure invite link/).textContent ?? "", /secure invite link/);
+  assert.match(view.getByText(/single-use bearer invite link/).textContent ?? "", /single-use bearer invite link/);
 });
 
 test("join verification is announced and cannot be submitted again while pending", () => {
@@ -207,7 +207,7 @@ test("join submission clears the protected invite from the visible input immedia
   assert.doesNotMatch(view.container.textContent ?? "", /#protected/);
 });
 
-test("native invitation receipt exposes only a secure action and never renders the protected payload", () => {
+test("native invitation receipt exposes only a bounded action and never renders the protected payload", () => {
   let submissions = 0;
   const state = reduceOnboardingState(createInitialOnboardingState(), { type: "choose_intent", intent: "join" });
   const view = render(
@@ -222,7 +222,7 @@ test("native invitation receipt exposes only a secure action and never renders t
     />
   );
   assert.equal(view.queryByLabelText("Invite link or code"), null);
-  assert.match(view.getByRole("status").textContent ?? "", /Invitation received securely/);
+  assert.match(view.getByRole("status").textContent ?? "", /Invitation link captured on this device/);
   assert.doesNotMatch(view.container.textContent ?? "", /capability|multaiplayerJoin|invite_123/);
   fireEvent.click(view.getByRole("button", { name: /Accept invite/ }));
   assert.equal(submissions, 1);
