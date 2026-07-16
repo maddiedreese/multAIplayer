@@ -14,6 +14,6 @@ The website is therefore a separate deployment and review boundary, not code bun
 
 ## Hosted relay
 
-The official relay deploys the public `apps/relay` container to Railway with operator-held GitHub OAuth, persistence, deletion-ledger, and monitoring configuration. Secrets and production data are not repository content. [Self-hosting](self-hosting.md) documents the public deployment contract and operational requirements; it does not imply access to the hosted operator account.
+The official relay deploys the public `apps/relay` container to Railway with operator-managed persistence, deletion-ledger, origin/rate-limit, and monitoring configuration. The official native desktop is compiled separately with the public GitHub Device Flow client id and exact relay origin. Secrets and production data are not repository content. [Self-hosting](self-hosting.md) documents the public deployment contract and operational requirements; it does not imply access to the hosted operator account.
 
 Separating deployments is not an independent security guarantee. A maintainer or hosting-account compromise may affect the surface controlled by that account. The [threat model](threat-model.md) remains authoritative for those residual risks.

@@ -16,7 +16,7 @@ Encrypted room archives are a data-exit path, not a room backup or membership mi
 
 ## Self-host forever
 
-Fork or archive a known-good repository revision, including its lockfile and release artifacts. Follow [Self-hosting](self-hosting.md) to build the relay and desktop, configure durable storage, HTTPS/WSS, exact origins, auth, a stable session secret, quotas, and backups. A custom relay origin requires a self-built desktop whose Tauri CSP permits that HTTPS/WSS origin.
+Fork or archive a known-good repository revision, including its lockfile and release artifacts. Follow [Self-hosting](self-hosting.md) to build the relay and desktop, configure durable storage, HTTPS/WSS, exact origins, auth, quotas, and backups. A custom relay origin requires a self-built desktop whose Tauri CSP permits that HTTPS/WSS origin.
 
 Use the [hosted-to-self-hosted migration procedure](../CONTRIBUTING.md#hosted-to-self-hosted-migration) while the old relay is reachable. Migration recreates teams, rooms, membership, sessions, and invites; it does not transfer live-room history, MLS private state, group secrets, or exporter-derived history secrets. Encrypted room archives can carry inert display history separately, but cannot restore membership or cryptographic continuity. Keep the original devices intact until the replacement rooms and archives have been verified.
 
