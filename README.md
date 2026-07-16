@@ -27,13 +27,17 @@
 Start a private project room, invite people you trust, and work with Codex as a team. Everyone can follow the conversation, propose the next turn, inspect structured progress, review changes, and use room-scoped files, diffs, terminals, browser previews, Git, and GitHub workflows. One active host supplies the project, local tools, credentials, and Codex account; an explicit handoff can move that responsibility to another verified member.
 
 <p align="center">
+  <img src="docs/assets/screens/room-app.png" width="100%" alt="The multAIplayer desktop workspace with an active team room, shared Codex chat, and live work context">
+</p>
+
+<p align="center">
   <img src="docs/assets/screens/room-chat.png" width="64%" alt="Team chat with a Codex result and structured activity inside a shared room">
 </p>
 <p align="center">
-  <img src="docs/assets/screens/room-browser.png" width="64%" alt="An approved local project preview open in the room browser">
+  <img src="docs/assets/screens/room-browser.png" width="64%" alt="The room browser ready for a host-approved local page">
 </p>
 <p align="center">
-  <img src="docs/assets/screens/room-terminal.png" width="64%" alt="A live host-controlled development terminal shared with the room">
+  <img src="docs/assets/screens/room-terminal.png" width="64%" alt="The host-controlled room terminal ready for a shared shell session">
 </p>
 
 multAIplayer does not provide or replace Codex's system or developer instructions. It connects to the standard open-source Codex app-server running on the active host. An approved room turn becomes ordinary user-turn input: the app formats the selected conversation and attachments, and explicitly labels teammate, file, terminal, browser, and tool material as untrusted context.

@@ -29,6 +29,9 @@ where
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
+        // The requested mode contains no group or other bits, and umask can
+        // only remove bits. Do not chmod after creation: under a restrictive
+        // umask that would widen permissions rather than restrict them.
         options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
     }
     let mut file = options
@@ -71,7 +74,6 @@ fn replace_private_file(temporary: &Path, target: &Path) -> Result<(), String> {
         return Err("Temporary path must be a regular file, not a symlink".to_string());
     }
     reject_non_regular_target(target)?;
-    restrict_to_owner(temporary)?;
     platform_replace(temporary, target)
 }
 
@@ -84,19 +86,6 @@ fn reject_non_regular_target(target: &Path) -> Result<(), String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(format!("Failed to inspect target file: {error}")),
     }
-}
-
-#[cfg(unix)]
-fn restrict_to_owner(path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-
-    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-        .map_err(|error| format!("Failed to restrict temporary file permissions: {error}"))
-}
-
-#[cfg(not(unix))]
-fn restrict_to_owner(_path: &Path) -> Result<(), String> {
-    Ok(())
 }
 
 #[cfg(not(windows))]
@@ -233,20 +222,19 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn restricts_the_installed_file_to_its_owner() {
+    fn creates_the_installed_file_for_its_owner_only() {
         use std::os::unix::fs::PermissionsExt;
 
         let directory = tempfile::tempdir().unwrap();
         let target = directory.path().join("target");
-        let temporary = directory.path().join("temporary");
-        fs::write(&temporary, b"new").unwrap();
-        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o666)).unwrap();
 
-        replace_private_file(&temporary, &target).unwrap();
+        atomic_write_private_file(&target, |file| {
+            file.write_all(b"new").map_err(|error| error.to_string())
+        })
+        .unwrap();
 
-        assert_eq!(
-            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
+        let mode = fs::metadata(&target).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode & 0o077, 0, "group/other permissions must be absent");
+        assert_eq!(mode & !0o600, 0, "umask may remove but never add mode bits");
     }
 }

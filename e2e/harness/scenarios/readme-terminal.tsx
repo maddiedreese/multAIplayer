@@ -8,25 +8,20 @@ export const mockedBoundaries = ["native PTY process", "room terminal event deli
 const terminal: TerminalSnapshot = {
   id: "readme-terminal",
   roomId: "northstar",
-  name: "dev server",
+  name: "Shell",
   cwd: "~/Projects/northstar",
-  command: "npm run dev",
+  command: "zsh",
   running: true,
   exitStatus: null,
   startedAt: "2026-07-15T18:00:00.000Z",
-  lines: [
-    {
-      stream: "stdout",
-      text: "> northstar@0.4.0 dev\r\n> vite --host 127.0.0.1\r\n\r\n  VITE ready in 312 ms\r\n  Local: http://127.0.0.1:4173/\r\n"
-    }
-  ]
+  lines: []
 };
 
 const noop = () => undefined;
 
 export default function ReadmeTerminalScenario() {
   return (
-    <section className="readme-terminal-surface" aria-label="Room terminal feature">
+    <section className="readme-terminal-surface" data-readme-capture aria-label="Room terminal feature">
       <TerminalPanel
         terminalBusy={false}
         terminalError={null}

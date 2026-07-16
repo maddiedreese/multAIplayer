@@ -1,0 +1,120 @@
+{
+  "formatVersion": 1,
+  "description": "Isolated relay soak against the production Railway persistent volume; no live relay records were read or mutated.",
+  "deployment": {
+    "sourceCommit": "ca52f4f71e658700b662b8e7849db2a5a7b2ea60",
+    "deploymentId": "9e088aaa-ae58-43ef-95ce-9e060ed034d9",
+    "environment": "production",
+    "service": "relay",
+    "region": "sfo",
+    "cpuLimitVcpu": 1,
+    "memoryLimitBytes": 1000000000,
+    "volumeRoot": "/data",
+    "volumeLimitMb": 5000
+  },
+  "isolation": {
+    "liveDataPath": "/data/relay-store.sqlite",
+    "benchmarkDataPath": "/data/relay-hosted-soak-ff72acdc-57de-4171-8a9d-1e9bee95e5f9/relay-store.sqlite",
+    "loopbackPort": 4322,
+    "publicPortUsed": false,
+    "syntheticDataOnly": true,
+    "benchmarkDirectoryRemoved": true,
+    "remainingBenchmarkDirectories": [],
+    "liveReadinessAfterCleanup": {
+      "ok": true,
+      "dataPath": "/data/relay-store.sqlite"
+    }
+  },
+  "workload": {
+    "startedAt": "2026-07-16T00:57:51.863Z",
+    "endedAt": "2026-07-16T01:12:57.211Z",
+    "configuredDurationMs": 900000,
+    "measuredDurationMs": 905348,
+    "phaseCount": 2,
+    "concurrentClients": 16,
+    "roomCount": 50,
+    "memberCount": 100,
+    "sqliteWalAutoCheckpointPages": 1000,
+    "rateLimitsEnabled": false,
+    "backlogLimit": 1000,
+    "seed": 0
+  },
+  "results": {
+    "publishedMessages": 47309,
+    "retainedMessages": 1000,
+    "reconnects": 94456,
+    "acknowledgementLatencyMs": {
+      "samples": 47309,
+      "p95": 27.634224000008544,
+      "p99": 54.13480299999355,
+      "max": 245.44398199999705
+    },
+    "requestLatencyMs": {
+      "samples": 23233,
+      "p95": 34.181057999958284,
+      "p99": 67.23042300000088,
+      "max": 350.96040899999207
+    },
+    "reconnectLatencyMs": {
+      "samples": 94458,
+      "p95": 187.28207700001076,
+      "p99": 221.55686400004197,
+      "max": 367.7611770000003
+    },
+    "eventLoopDelayMs": {
+      "p99": 104.857599,
+      "max": 245.235711
+    },
+    "sqliteWriteHistogram": {
+      "scope": "second phase after relay reload; metric counters reset when the isolated relay restarted",
+      "count": 23773,
+      "sumSeconds": 19.7234636839959,
+      "meanMs": 0.8296581703611617,
+      "buckets": [
+        { "leSeconds": "0.001", "count": 23026 },
+        { "leSeconds": "0.005", "count": 23443 },
+        { "leSeconds": "0.01", "count": 23479 },
+        { "leSeconds": "0.025", "count": 23748 },
+        { "leSeconds": "0.05", "count": 23772 },
+        { "leSeconds": "0.1", "count": 23773 },
+        { "leSeconds": "0.25", "count": 23773 },
+        { "leSeconds": "0.5", "count": 23773 },
+        { "leSeconds": "1", "count": 23773 },
+        { "leSeconds": "2.5", "count": 23773 },
+        { "leSeconds": "5", "count": 23773 },
+        { "leSeconds": "+Inf", "count": 23773 }
+      ]
+    },
+    "maxWalBytes": 4194192,
+    "maxDatabaseBytes": 2969600,
+    "minFilesystemAvailableBytes": 4809957376,
+    "maxActiveSockets": 9,
+    "backupIntegrity": "ok",
+    "sourceIntegrity": "ok",
+    "leakedSockets": 0,
+    "errors": []
+  },
+  "railwayResourceMetrics": {
+    "window": {
+      "since": "2026-07-16T00:57:51.863+00:00",
+      "until": "2026-07-16T01:12:57.211+00:00"
+    },
+    "cpuVcpu": {
+      "average": 0.9319687935483871,
+      "max": 1.1226761333333333,
+      "limit": 1
+    },
+    "memoryMb": {
+      "average": 255.55921332025804,
+      "max": 281.068699648,
+      "limit": 1023.99737856
+    },
+    "volumeMb": {
+      "average": 112.75317432980643,
+      "max": 129.578827776,
+      "limit": 5000
+    },
+    "cpuThrottledTimeAvailable": false,
+    "note": "Railway exposed CPU usage and the configured limit for this window, but not a CPU-throttled-time counter. The average was 93.2% of one vCPU and samples reached the configured limit."
+  }
+}

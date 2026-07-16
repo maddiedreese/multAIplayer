@@ -13,6 +13,12 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const output = fileURLToPath(new URL("../docs/assets/screens/", import.meta.url));
 const port = 1423;
 const baseUrl = `http://127.0.0.1:${port}/e2e/harness/index.html`;
+const expectedCaptureGeometry = new Map([
+  ["room-chat.png", { width: 760, minHeight: 390, maxHeight: 400 }],
+  ["room-browser.png", { width: 760, minHeight: 360, maxHeight: 360 }],
+  ["room-terminal.png", { width: 760, minHeight: 400, maxHeight: 460 }],
+  ["room-app.png", { width: 1200, minHeight: 700, maxHeight: 700 }]
+]);
 
 await mkdir(output, { recursive: true });
 const npmExecPath = process.env.npm_execpath;
@@ -43,6 +49,7 @@ try {
   await capture(page, "readme-chat", "room-chat.png");
   await capture(page, "readme-browser", "room-browser.png");
   await capture(page, "readme-terminal", "room-terminal.png");
+  await capture(page, "readme-app", "room-app.png");
 } finally {
   await browser?.close();
   await stopServer(server);
@@ -54,18 +61,29 @@ async function capture(page, scenario, filename) {
 }
 
 async function captureFeature(page, filename) {
-  const feature = page.locator(".readme-feature");
+  const feature = page.locator("[data-readme-capture]");
   await feature.waitFor({ state: "visible" });
   if (filename === "room-browser.png") {
-    await page
-      .frameLocator('iframe[title="Room browser"]')
-      .getByRole("heading", { name: /Ship the work/ })
-      .waitFor();
+    const address = feature.getByRole("textbox", { name: "Browser URL" });
+    if ((await address.inputValue()) !== "") throw new Error("README browser capture must use an empty address bar.");
+    if ((await feature.getByRole("tab").count()) !== 0)
+      throw new Error("README browser capture must not include named tabs.");
+    if ((await feature.locator("iframe").count()) !== 0)
+      throw new Error("README browser capture must not include preview content.");
   }
   if (filename === "room-terminal.png") {
-    await page.waitForFunction(() =>
-      globalThis.document.querySelector(".xterm-rows")?.textContent?.includes("VITE ready")
-    );
+    await feature.locator(".xterm").waitFor({ state: "visible" });
+    const terminalOutput = (await feature.locator(".xterm-rows").textContent())?.trim() ?? "";
+    if (terminalOutput !== "") throw new Error("README terminal capture must not include session output.");
+  }
+  if (filename === "room-app.png") {
+    await feature.getByLabel("Codex activity timeline").waitFor({ state: "visible" });
+    if ((await feature.getByLabel("Room title").inputValue()) !== "Launch") {
+      throw new Error("README full-app capture must show the active production room.");
+    }
+    if ((await feature.getByText("Welcome to multAIplayer").count()) !== 0) {
+      throw new Error("README full-app capture must not include onboarding.");
+    }
   }
   await settlePage(page);
   const dimensions = await feature.evaluate((element) => ({
@@ -77,13 +95,43 @@ async function captureFeature(page, filename) {
   if (dimensions.scrollHeight !== dimensions.clientHeight || dimensions.scrollWidth !== dimensions.clientWidth) {
     throw new Error(`README feature ${filename} overflows its capture surface: ${JSON.stringify(dimensions)}`);
   }
+  const expectedGeometry = expectedCaptureGeometry.get(filename);
+  const captureGeometry = await feature.evaluate((element) => ({
+    height: element.getBoundingClientRect().height,
+    width: element.getBoundingClientRect().width
+  }));
+  if (
+    !expectedGeometry ||
+    captureGeometry.width !== expectedGeometry.width ||
+    captureGeometry.height < expectedGeometry.minHeight ||
+    captureGeometry.height > expectedGeometry.maxHeight
+  ) {
+    throw new Error(
+      `README feature ${filename} has unexpected capture geometry: ${JSON.stringify({ captureGeometry, expectedGeometry })}`
+    );
+  }
+  if (filename === "room-app.png") {
+    const fullAppGeometry = await feature.evaluate((element) => {
+      const shell = element.querySelector(".app-shell");
+      return {
+        shellHeight: shell?.clientHeight ?? 0,
+        shellWidth: shell?.clientWidth ?? 0
+      };
+    });
+    if (
+      fullAppGeometry.shellWidth !== dimensions.clientWidth ||
+      fullAppGeometry.shellHeight !== dimensions.clientHeight
+    ) {
+      throw new Error(`README full-app capture has unexpected shell geometry: ${JSON.stringify(fullAppGeometry)}`);
+    }
+  }
   await feature.screenshot({ path: `${output}/${filename}`, omitBackground: true });
 }
 
 async function settlePage(page) {
   await page.addStyleTag({
     content:
-      "*, *::before, *::after { animation: none !important; caret-color: transparent !important; transition: none !important; }"
+      "*, *::before, *::after { animation: none !important; caret-color: transparent !important; transition: none !important; } .xterm-helper-textarea, .xterm-cursor { opacity: 0 !important; }"
   });
   await page.evaluate(() => globalThis.document.fonts.ready);
 }

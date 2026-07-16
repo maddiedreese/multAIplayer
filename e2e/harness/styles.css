@@ -29,7 +29,6 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 .readme-feature {
   box-sizing: border-box;
   width: min(760px, calc(100vw - 120px));
-  height: 560px;
   margin: 0 auto;
   padding: 0;
   overflow: visible;
@@ -38,35 +37,103 @@ html[data-theme="dark"][data-presentation="readme"] #root {
 
 .readme-chat-surface,
 .readme-browser-surface,
-.readme-terminal-surface {
+.readme-terminal-surface,
+.readme-app-surface {
   box-sizing: border-box;
   width: 100%;
-  height: 100%;
   overflow: hidden;
+  background: transparent;
+}
+
+.readme-chat-surface {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
 }
 
-.readme-browser-surface .browser-panel.browser-open {
-  height: 100%;
+.readme-browser-surface {
+  height: 360px;
 }
 
 .readme-terminal-surface {
-  padding: 16px;
+  height: auto;
+}
+
+.readme-browser-surface .browser-panel.browser-open {
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.readme-terminal-surface {
+  display: flex;
 }
 
 .readme-terminal-surface .terminal-panel {
-  height: 100%;
+  width: 100%;
+  height: auto;
   margin: 0;
+  padding: 12px;
+  gap: 8px;
+}
+
+.readme-terminal-surface .terminal-panel .panel-title {
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .readme-terminal-surface .terminal-panel .panel-title-actions {
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1.15fr) 36px;
 }
 
+.readme-terminal-surface .terminal-output.xterm-output {
+  height: 240px;
+}
+
+.readme-terminal-surface .terminal-tab.active {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
 .readme-chat-surface .chat-panel {
+  height: auto;
+}
+
+.readme-chat-surface .chat-scroll {
+  overflow: visible;
+}
+
+.readme-feature[data-scenario="readme-app"] {
+  width: min(1200px, calc(100vw - 80px));
+}
+
+.readme-app-surface {
+  height: 700px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.readme-app-surface .app-shell {
+  --sidebar-width: 210px;
+  --rail-width: 340px;
+  width: 100%;
   height: 100%;
+}
+
+.readme-app-surface .readme-app-inspector {
+  padding-top: 22px;
+}
+
+.readme-app-surface .readme-project-summary {
+  gap: 6px;
+}
+
+.readme-app-surface .readme-project-summary span,
+.readme-app-surface .readme-project-summary small {
+  color: var(--text-muted);
 }
 
 .readme-presentation .e2e-chat-parity {
