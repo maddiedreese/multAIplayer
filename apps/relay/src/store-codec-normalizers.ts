@@ -32,7 +32,6 @@ import type {
   AccountRestriction,
   AppliedDeletionLedgerEntry,
   InviteAckReceipt,
-  RelayStore,
   RoomKey
 } from "./state.js";
 import type { RelayStoreCodecOptions } from "./store-codec.js";
@@ -447,17 +446,16 @@ export function normalizeAccountQuotaRecord(value: unknown, now: number): Accoun
   return parsed && parsed.resetAt > now ? parsed : null;
 }
 
+export function isExpiredStoredAccountQuotaRecord(value: unknown, now: number): boolean {
+  const parsed = StoredAccountQuotaRecord.safeParse(value);
+  return parsed.success && parsed.data.resetAt <= now;
+}
+
+export function isExpiredStoredAcceptedMessageReceipt(value: unknown, now: number): boolean {
+  const parsed = StoredAcceptedMessageReceipt.safeParse(value);
+  return parsed.success && Date.parse(parsed.data.acceptedAt) < now - 180 * 24 * 60 * 60 * 1000;
+}
+
 export function normalizeDeletionLedgerEntry(value: unknown): AppliedDeletionLedgerEntry | null {
   return parseStoredRecord(StoredDeletionLedgerEntry, value);
-}
-
-export function applyStoredAccountQuotaRecords(store: RelayStore, value: unknown, now: number): void {
-  for (const item of storedArray(value)) {
-    const quota = normalizeAccountQuotaRecord(item, now);
-    if (quota) store.accountQuotaRecords.set(quota.key, quota);
-  }
-}
-
-function storedArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
 }

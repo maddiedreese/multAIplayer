@@ -183,7 +183,84 @@ test("malformed current account restrictions fail startup while expired restrict
   assert.equal(expired.store.accountRestrictions.size, 0);
 });
 
-test("invalid non-authoritative persistence rows are dropped independently of valid siblings", () => {
+test("malformed current account quotas fail startup while expired quotas are discarded", () => {
+  const malformed = codec();
+  assert.throws(
+    () =>
+      malformed.codec.applyStoredRelayState({
+        version: 1,
+        accountQuotaRecords: [
+          {
+            key: "daily_room_creations:github:other",
+            userId: "github:user",
+            quota: "daily_room_creations",
+            used: 1,
+            resetAt: fixedNow + 60_000
+          }
+        ]
+      }),
+    /account-quota row failed validation/
+  );
+
+  const expired = codec();
+  assert.doesNotThrow(() =>
+    expired.codec.applyStoredRelayState({
+      version: 1,
+      accountQuotaRecords: [
+        {
+          key: "daily_room_creations:github:user",
+          userId: "github:user",
+          quota: "daily_room_creations",
+          used: 1,
+          resetAt: fixedNow
+        }
+      ]
+    })
+  );
+  assert.equal(expired.store.accountQuotaRecords.size, 0);
+});
+
+test("malformed current accepted-message receipts fail startup while expired receipts are discarded", () => {
+  const base = input({
+    teamPart: "core",
+    roomPart: "desktop",
+    teamName: "Core",
+    roomName: "Desktop",
+    members: 1,
+    unread: 0
+  });
+  const receipt = {
+    roomKey: "team-core:room-desktop",
+    messageId: "message-one",
+    messageType: "commit",
+    senderUserId: "github:host",
+    senderDeviceId: "device-host",
+    parentEpoch: 1,
+    digest: "c".repeat(64),
+    acceptedAt: "2026-07-11T11:00:00.000Z"
+  };
+
+  const malformed = codec();
+  assert.throws(
+    () =>
+      malformed.codec.applyStoredRelayState({
+        ...base,
+        acceptedMessageReceipts: [{ ...receipt, roomKey: "team-core:room-missing" }]
+      }),
+    /accepted-message-receipt row failed validation/
+  );
+
+  const expired = codec();
+  assert.doesNotThrow(() =>
+    expired.codec.applyStoredRelayState({
+      ...base,
+      acceptedMessageReceipts: [{ ...receipt, acceptedAt: "2026-01-01T00:00:00.000Z" }]
+    })
+  );
+  assert.equal(expired.store.acceptedMessageReceipts.size, 0);
+});
+
+test("invalid non-critical persistence rows are dropped independently of valid siblings", () => {
   const { store, codec: relayCodec } = codec();
   relayCodec.applyStoredRelayState({
     version: 1,
@@ -194,13 +271,6 @@ test("invalid non-authoritative persistence rows are dropped independently of va
         userId: "github:valid",
         quota: "daily_team_creations",
         used: 2,
-        resetAt: fixedNow + 60_000
-      },
-      {
-        key: "daily_room_creations:github:other",
-        userId: "github:valid",
-        quota: "daily_room_creations",
-        used: 1,
         resetAt: fixedNow + 60_000
       }
     ],

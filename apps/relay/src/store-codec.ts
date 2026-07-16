@@ -25,9 +25,11 @@ import type { StoredRelayMutation } from "./persistence-types.js";
 import { createStoredRelayMutationStream } from "./store-mutations.js";
 import { createRelayStoreNormalizers } from "./store-codec-normalizers.js";
 import {
-  applyStoredAccountQuotaRecords,
+  isExpiredStoredAcceptedMessageReceipt,
+  isExpiredStoredAccountQuotaRecord,
   normalizeAccountRestriction,
   isExpiredStoredAccountRestriction,
+  normalizeAccountQuotaRecord,
   normalizeDeletionLedgerEntry
 } from "./store-codec-normalizers.js";
 
@@ -173,9 +175,15 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     applyStoredRows(stored.inviteAckReceipts, normalizeInviteAckReceipt, (receipt) => {
       store.inviteAckReceipts.set(receipt.requestId, receipt);
     });
-    applyStoredRows(stored.acceptedMessageReceipts, normalizeAcceptedMessageReceipt, (receipt) => {
-      store.acceptedMessageReceipts.set(`${receipt.roomKey}\0${receipt.messageId}`, receipt);
-    });
+    applyStoredRows(
+      stored.acceptedMessageReceipts,
+      normalizeAcceptedMessageReceipt,
+      (receipt) => {
+        store.acceptedMessageReceipts.set(`${receipt.roomKey}\0${receipt.messageId}`, receipt);
+      },
+      "accepted-message-receipt",
+      (candidate) => isExpiredStoredAcceptedMessageReceipt(candidate, now())
+    );
     applyStoredRows(stored.attachmentBlobs, normalizeAttachmentBlob, (blob) => {
       if (!isExpiredAttachmentBlob(blob)) store.attachmentBlobs.set(blob.id, blob);
     });
@@ -189,7 +197,13 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
       "account-restriction",
       (candidate) => isExpiredStoredAccountRestriction(candidate, now())
     );
-    applyStoredAccountQuotaRecords(store, stored.accountQuotaRecords, now());
+    applyStoredRows(
+      stored.accountQuotaRecords,
+      (item) => normalizeAccountQuotaRecord(item, now()),
+      (quota) => store.accountQuotaRecords.set(quota.key, quota),
+      "account-quota",
+      (candidate) => isExpiredStoredAccountQuotaRecord(candidate, now())
+    );
     applyStoredRows(stored.appliedDeletionLedgerEntries, normalizeDeletionLedgerEntry, (entry) => {
       store.appliedDeletionLedgerEntries.set(entry.entryId, entry);
     });
