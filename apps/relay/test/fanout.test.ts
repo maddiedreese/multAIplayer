@@ -46,6 +46,7 @@ test("queued publishes fail after room lifecycle changes without restoring durab
     async () => {
       writes += 1;
     },
+    true,
     createRelayMetrics(),
     async () => {
       store.setRoom({ ...store.getRoom("room-desktop")!, archivedAt: new Date().toISOString() });
@@ -94,6 +95,12 @@ test("workspace updates are sent only to current team members", () => {
 
   assert.equal(member.sent.length, 1);
   assert.equal(unrelated.sent.length, 0);
+
+  store.workspaceSockets.clear();
+  const authDisabled = recordingSocket();
+  store.workspaceSockets.add(authDisabled.socket);
+  fanoutFor(store, "team-core:room-desktop", async () => undefined, undefined, false).broadcastWorkspaceUpdated(team);
+  assert.equal(authDisabled.sent.length, 1);
 });
 
 test("identical retries acknowledge without rebroadcast while conflicting ids fail", async () => {
@@ -180,6 +187,7 @@ test("successful publishes record queue-to-fanout and WebSocket send latency", a
     key,
     async () => undefined,
     async () => undefined,
+    true,
     metrics
   );
 
@@ -327,6 +335,7 @@ function fanoutFor(
   key: RoomKey,
   saveMlsCommit: () => Promise<void>,
   saveMlsMessage: () => Promise<void> = async () => undefined,
+  mutationsRequireAuth = true,
   metrics = createRelayMetrics(),
   reclaimDurableCapacity?: () => Promise<void>
 ) {
@@ -337,6 +346,7 @@ function fanoutFor(
     workspaceSockets: store.workspaceSockets,
     sessions: store.sessions,
     roomPresence: store.roomPresence,
+    mutationsRequireAuth,
     metrics,
     roomKey: () => key,
     pruneMlsBacklog: (items) => items,

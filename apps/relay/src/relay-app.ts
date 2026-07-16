@@ -264,6 +264,7 @@ export async function createRelayApp(
     workspaceSockets,
     sessions,
     roomPresence,
+    mutationsRequireAuth,
     metrics: relayMetrics,
     roomKey,
     pruneMlsBacklog,

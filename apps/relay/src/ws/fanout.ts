@@ -21,6 +21,7 @@ interface Options {
   workspaceSockets: Set<WebSocket>;
   sessions: Map<WebSocket, ClientSession>;
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
+  mutationsRequireAuth: boolean;
   metrics: RelayMetrics;
   roomKey: (teamId: string, roomId: string) => RoomKey;
   pruneMlsBacklog: (messages: MlsRelayMessage[]) => MlsRelayMessage[];
@@ -56,7 +57,7 @@ export function createRelayFanout(options: Options) {
     for (const socket of options.workspaceSockets) {
       const session = options.sessions.get(socket);
       const userId = session?.authSession?.user.id ?? session?.userId;
-      if (!userId || !options.store.hasTeamMember(team.id, userId)) continue;
+      if (options.mutationsRequireAuth && (!userId || !options.store.hasTeamMember(team.id, userId))) continue;
       send(socket, {
         type: "team.updated",
         team: options.teamRecordForUser(team, options.store, userId)
