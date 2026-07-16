@@ -74,6 +74,10 @@ jobs:
         uses: ./.github/actions/setup-node-npm
       - name: Install dependencies
         run: npm ci
+      - name: Install native lint components for the repository toolchain
+        run: |
+          rustup show active-toolchain
+          rustup component add rustfmt clippy
       - name: Install native Linux build dependencies
         run: >-
           sudo apt-get update &&

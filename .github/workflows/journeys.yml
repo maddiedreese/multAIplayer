@@ -95,10 +95,8 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
-      - name: Install pinned Rust toolchain
-        run: |
-          rustup toolchain install 1.89.0 --profile minimal
-          rustup default 1.89.0
+      - name: Install repository Rust toolchain
+        run: rustup show active-toolchain
       - name: Install Tauri, WebDriver, display, and Secret Service dependencies
         run: >-
           sudo apt-get update &&

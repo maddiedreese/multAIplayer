@@ -186,10 +186,8 @@ jobs:
           ref: ${{ needs.resolve.outputs.commit }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
-      - name: Install pinned Rust toolchain
-        run: |
-          rustup toolchain install 1.89.0 --profile minimal
-          rustup default 1.89.0
+      - name: Install repository Rust toolchain
+        run: rustup show active-toolchain
       - name: Install Tauri, WebDriver, display, and Secret Service dependencies
         run: >-
           sudo apt-get update &&
