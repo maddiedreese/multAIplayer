@@ -189,14 +189,16 @@ function NativeApp() {
     workspaceFlow
   });
   const updateProjectPathWithOnboarding = async () => {
-    const before = useAppStore.getState().rooms.find((room) => room.id === useAppStore.getState().selectedRoomId);
+    const roomId = useAppStore.getState().selectedRoomId;
+    const before = useAppStore.getState().rooms.find((room) => room.id === roomId);
     await roomRuntime.updateProjectPath();
     const state = useAppStore.getState();
-    const after = state.rooms.find((room) => room.id === state.selectedRoomId);
+    const after = state.rooms.find((room) => room.id === roomId);
     if (
       before &&
       after &&
       before.projectPath !== after.projectPath &&
+      state.selectedRoomId === roomId &&
       state.onboarding.markers.membership?.roomId === after.id
     ) {
       state.applyOnboardingEvent({ type: "project_attached", roomId: after.id });

@@ -10,7 +10,6 @@ export interface MlsMessageRouteContext {
   localUser: { id: string; name: string; avatarUrl?: string };
   roomsRef: MutableRefObject<ClientRoomRecord[]>;
   selectedRoomIdRef: MutableRefObject<string>;
-  historyLoadedRoomIds: MutableRefObject<Set<string>>;
   markIncomingChatUnread: (
     roomId: string,
     selectedRoomId: string,

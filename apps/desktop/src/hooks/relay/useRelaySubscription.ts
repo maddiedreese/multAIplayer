@@ -50,7 +50,6 @@ interface UseRelaySubscriptionOptions {
   seenEnvelopeIds: MutableRefObject<Set<string>>;
   roomsRef: MutableRefObject<ClientRoomRecord[]>;
   selectedRoomIdRef: MutableRefObject<string>;
-  historyLoadedRoomIds: MutableRefObject<Set<string>>;
   markIncomingChatUnread: (
     roomId: string,
     selectedRoomId: string,
@@ -353,7 +352,6 @@ export function useRelaySubscription(options: UseRelaySubscriptionOptions) {
                 localUser: current.localUser,
                 roomsRef: current.roomsRef,
                 selectedRoomIdRef: current.selectedRoomIdRef,
-                historyLoadedRoomIds: current.historyLoadedRoomIds,
                 markIncomingChatUnread: current.markIncomingChatUnread,
                 handleCodexBrowserOpenCommand: current.handleCodexBrowserOpenCommand
               });

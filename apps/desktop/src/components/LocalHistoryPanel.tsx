@@ -26,11 +26,13 @@ export function LocalHistoryPanel({
   codexModelOptions,
   teamDefaultBrowserProfilePersistent,
   message,
+  hydrationStatus,
   onHistoryEnabledChange,
   onHistoryRetentionDaysChange,
   onClearRoomHistory,
   onForgetRoomLocalData,
   onApplyTeamDefaultsToRoom,
+  onRetryHistoryHydration,
   onTeamHistoryEnabledChange,
   onTeamHistoryRetentionDaysChange,
   onTeamDefaultApprovalPolicyChange,
@@ -50,11 +52,13 @@ export function LocalHistoryPanel({
   teamDefaultBrowserProfilePersistent: boolean;
   teamDefaultInviteApprovalGate: boolean;
   message: string | null;
+  hydrationStatus: "loading" | "ready" | "failed" | null;
   onHistoryEnabledChange: (enabled: boolean) => void;
   onHistoryRetentionDaysChange: (retentionDays: number) => void;
   onClearRoomHistory: () => void;
   onForgetRoomLocalData: () => void;
   onApplyTeamDefaultsToRoom: () => void;
+  onRetryHistoryHydration: () => void;
   onTeamHistoryEnabledChange: (enabled: boolean) => void;
   onTeamHistoryRetentionDaysChange: (retentionDays: number) => void;
   onTeamDefaultApprovalPolicyChange: (policy: ApprovalPolicy) => void;
@@ -70,6 +74,11 @@ export function LocalHistoryPanel({
           {historySettings.enabled ? `${historySettings.retentionDays} days` : "Off"}
         </small>
       </div>
+      {hydrationStatus === "failed" && (
+        <button className="ghost-wide" onClick={onRetryHistoryHydration} disabled={!hasSelectedRoom}>
+          Retry loading local history
+        </button>
+      )}
       <label className="checkbox-row">
         <input
           type="checkbox"

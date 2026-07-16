@@ -245,3 +245,19 @@ test("Monaco editor synchronizes external values, read-only state, edits, and di
   assert.equal(editorDisposed, 1);
   assert.equal(modelDisposed, 1);
 });
+
+test("Monaco editor exposes a retry when its lazy bundle fails to load", async () => {
+  let attempts = 0;
+  const loadMonaco = async () => {
+    attempts += 1;
+    throw new Error("chunk unavailable");
+  };
+  const view = render(
+    <MonacoFileEditor path="/src/app.ts" value="" disabled={false} onChange={() => undefined} loadMonaco={loadMonaco} />
+  );
+
+  const retry = await view.findByRole("button", { name: "Retry editor" });
+  assert.equal(attempts, 1);
+  fireEvent.click(retry);
+  await waitFor(() => assert.equal(attempts, 2));
+});

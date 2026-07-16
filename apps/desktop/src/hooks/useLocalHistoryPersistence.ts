@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { saveEncryptedHistory, type LocalHistorySettings } from "../lib/history/localHistory";
+import type { LocalHistorySettings } from "../lib/history/localHistory";
+import { queueEncryptedHistorySave } from "../lib/history/localHistoryWriteQueue";
 import { pruneLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
 import { localRoomReadStateForHistory } from "../lib/history/roomUnread";
 import { reportNonFatal } from "../lib/core/nonFatalReporting";
@@ -27,10 +28,7 @@ import type {
   GitHubActionsEventPlaintextPayload,
   GitWorkflowEventPlaintextPayload
 } from "@multaiplayer/protocol";
-
-interface LatestRef<T> {
-  current: T;
-}
+import { useAppStore } from "../store/appStore";
 
 interface UseLocalHistoryPersistenceOptions {
   hasSelectedRoom: boolean;
@@ -40,7 +38,6 @@ interface UseLocalHistoryPersistenceOptions {
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
-  historyLoadedRoomIds: LatestRef<Set<string>>;
   historySettings: LocalHistorySettings;
   messages: ChatMessage[];
   chatEdits: ChatEditPlaintextPayload[];
@@ -69,7 +66,6 @@ export function useLocalHistoryPersistence({
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
-  historyLoadedRoomIds,
   historySettings,
   messages,
   chatEdits,
@@ -89,6 +85,7 @@ export function useLocalHistoryPersistence({
   roomGoal,
   codexThreadGraph
 }: UseLocalHistoryPersistenceOptions) {
+  const hydrationStatus = useAppStore((state) => state.historyPresenceByRoom[selectedRoomId]?.historyHydrationStatus);
   useEffect(() => {
     if (!hasSelectedRoom) return;
     if (
@@ -97,7 +94,7 @@ export function useLocalHistoryPersistence({
       revokedTeamIds.has(selectedRoomTeamId)
     )
       return;
-    if (!historyLoadedRoomIds.current.has(selectedRoomId)) return;
+    if (hydrationStatus !== "ready") return;
     const payload = pruneLocalRoomHistory(
       {
         version: 3,
@@ -122,15 +119,21 @@ export function useLocalHistoryPersistence({
       },
       historySettings.retentionDays
     );
-    saveEncryptedHistory(selectedRoomId, payload satisfies LocalRoomHistoryPayload).catch((error) => {
+    queueEncryptedHistorySave(selectedRoomId, payload satisfies LocalRoomHistoryPayload, (error) => {
       reportNonFatal("save encrypted local history", error);
+      useAppStore
+        .getState()
+        .setHistoryMessageForRoom(
+          selectedRoomId,
+          "Encrypted local history could not be saved. New history will be retried after the next change."
+        );
     });
   }, [
     browserRequests,
     fileSaveRequests,
     historySettings.enabled,
     historySettings.retentionDays,
-    historyLoadedRoomIds,
+    hydrationStatus,
     hostHandoffs,
     queuedCodexTurns,
     roomGoal,

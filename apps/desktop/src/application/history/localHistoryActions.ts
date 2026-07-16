@@ -30,7 +30,6 @@ interface CreateLocalHistoryActionsOptions {
   ) => boolean;
   replaceHistorySettings: (next: LocalHistorySettings) => void;
   replaceRoom: (room: ClientRoomRecord) => void;
-  historyLoadedRoomIds: MutableRefObject<Set<string>>;
 }
 
 export function createLocalHistoryActions({
@@ -38,8 +37,7 @@ export function createLocalHistoryActions({
   settingsBusyRef,
   reportRoomSettingsMutationInFlight,
   replaceHistorySettings,
-  replaceRoom,
-  historyLoadedRoomIds
+  replaceRoom
 }: CreateLocalHistoryActionsOptions) {
   const currentSelectedRoom = () => {
     const state = useAppStore.getState();
@@ -160,7 +158,7 @@ export function createLocalHistoryActions({
     if (!confirmed) return;
     await forgetRoomLocalData(selectedRoom.id);
     clearRoomVisibilityWarningAcknowledgement(selectedRoom.id);
-    historyLoadedRoomIds.current.delete(selectedRoom.id);
+    useAppStore.getState().setHistoryHydrationStatusForRoom(selectedRoom.id, undefined);
     useAppStore.getState().rememberForgottenRoom(selectedRoom.id);
     useAppStore.getState().clearRoomScopedStateForRoom(roomId);
     replaceHistorySettings(loadHistorySettings(selectedRoom.id));

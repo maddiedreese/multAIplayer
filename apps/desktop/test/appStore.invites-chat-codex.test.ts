@@ -576,3 +576,22 @@ test("desktop store keeps history status messages scoped", () => {
   assert.equal(state.teamHistoryByTeam["team-core"]?.message, "Team defaults saved");
   assert.equal(state.teamHistoryByTeam["__no-team"]?.message, undefined);
 });
+
+test("desktop store keeps history hydration retries room scoped", () => {
+  const store = useAppStore.getState();
+  store.setHistoryHydrationStatusForRoom("room-a", "failed");
+  store.setHistoryMessageForRoom("room-a", "Load failed");
+  store.retryHistoryHydrationForRoom("room-a");
+  store.retryHistoryHydrationForRoom("room-a");
+
+  let state = useAppStore.getState();
+  assert.equal(state.historyPresenceByRoom["room-a"]?.historyHydrationStatus, "loading");
+  assert.equal(state.historyPresenceByRoom["room-a"]?.historyHydrationAttempt, 2);
+  assert.equal(state.historyPresenceByRoom["room-a"]?.historyMessage, undefined);
+  assert.equal(state.historyPresenceByRoom["room-b"], undefined);
+
+  store.setHistoryHydrationStatusForRoom("room-a", undefined);
+  state = useAppStore.getState();
+  assert.equal(state.historyPresenceByRoom["room-a"]?.historyHydrationStatus, undefined);
+  assert.equal(state.historyPresenceByRoom["room-a"]?.historyHydrationAttempt, 2);
+});

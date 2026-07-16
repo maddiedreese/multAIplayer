@@ -28,6 +28,6 @@ export default defineConfig({
   envPrefix: ["VITE_", "TAURI_"],
   build: {
     target: "es2022",
-    minify: false
+    minify: "esbuild"
   }
 });

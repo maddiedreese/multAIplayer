@@ -98,7 +98,7 @@ export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
   };
 }
 
-export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistoryPayload): LocalRoomHistoryPayload {
+export function normalizeLocalRoomHistory(value: unknown): LocalRoomHistoryPayload {
   if (Array.isArray(value)) {
     return {
       ...emptyLocalRoomHistoryPayload(),
@@ -106,43 +106,37 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
     };
   }
 
+  if (!isRecord(value)) return emptyLocalRoomHistoryPayload();
+  if (!isSupportedLocalHistoryVersion(value.version)) {
+    return emptyLocalRoomHistoryPayload();
+  }
+
   // One-way v2-alpha migration: old encrypted history may contain the former
   // flat thread-id mirror, but all normalized and newly persisted payloads are
   // graph-only. No runtime state writes the mirror back.
-  const legacyValue = value as LocalRoomHistoryPayload & { codexThreadId?: unknown };
-  const codexThreadId = normalizeCodexThreadId(legacyValue.codexThreadId);
+  const codexThreadId = normalizeCodexThreadId(value.codexThreadId);
   const codexThreadGraph = normalizeCodexThreadGraph(value.codexThreadGraph, codexThreadId);
   const readState = sanitizeLocalRoomReadState(value.readState);
   return {
     version: 3,
-    messages: Array.isArray(value.messages) ? normalizeChatHistoryMessages(value.messages) : [],
-    chatEdits: Array.isArray(value.chatEdits) ? value.chatEdits.filter(isChatEditPlaintextPayload) : [],
-    chatDeletes: Array.isArray(value.chatDeletes) ? value.chatDeletes.filter(isChatDeletePlaintextPayload) : [],
+    messages: normalizeChatHistoryMessages(historyArray(value, "messages")),
+    chatEdits: historyArray(value, "chatEdits").filter(isChatEditPlaintextPayload),
+    chatDeletes: historyArray(value, "chatDeletes").filter(isChatDeletePlaintextPayload),
     ...(readState ? { readState } : {}),
-    terminalRequests: Array.isArray(value.terminalRequests)
-      ? value.terminalRequests.filter(isTerminalCommandRequest)
-      : [],
-    fileSaveRequests: Array.isArray(value.fileSaveRequests)
-      ? value.fileSaveRequests.filter(isWorkspaceFileSaveRequest)
-      : [],
-    browserRequests: Array.isArray(value.browserRequests) ? value.browserRequests.filter(isBrowserAccessRequest) : [],
-    inviteRequests: Array.isArray(value.inviteRequests) ? value.inviteRequests.filter(isInviteJoinRequest) : [],
-    codexEvents: Array.isArray(value.codexEvents) ? value.codexEvents.filter(isCodexEventPlaintextPayloadLenient) : [],
-    codexActivities: Array.isArray(value.codexActivities)
-      ? value.codexActivities.filter(isCodexActivityPlaintextPayload).slice(-maxCodexActivitiesPerRoom)
-      : [],
-    gitWorkflowEvents: Array.isArray(value.gitWorkflowEvents)
-      ? value.gitWorkflowEvents.filter(isGitWorkflowEventPlaintextPayloadLenient)
-      : [],
-    githubActionsEvents: Array.isArray(value.githubActionsEvents)
-      ? value.githubActionsEvents.filter(isGitHubActionsEventPlaintextPayloadLenient)
-      : [],
-    localPreviews: Array.isArray(value.localPreviews) ? value.localPreviews.filter(isLocalPreviewPlaintextPayload) : [],
-    terminalSnapshots: Array.isArray(value.terminalSnapshots)
-      ? terminalsForLocalHistory(value.terminalSnapshots.filter(isTerminalSnapshot))
-      : [],
-    hostHandoffs: Array.isArray(value.hostHandoffs) ? value.hostHandoffs.filter(isHostHandoffRecord) : [],
-    queuedCodexTurns: Array.isArray(value.queuedCodexTurns) ? value.queuedCodexTurns.filter(isQueuedCodexTurn) : [],
+    terminalRequests: historyArray(value, "terminalRequests").filter(isTerminalCommandRequest),
+    fileSaveRequests: historyArray(value, "fileSaveRequests").filter(isWorkspaceFileSaveRequest),
+    browserRequests: historyArray(value, "browserRequests").filter(isBrowserAccessRequest),
+    inviteRequests: historyArray(value, "inviteRequests").filter(isInviteJoinRequest),
+    codexEvents: historyArray(value, "codexEvents").filter(isCodexEventPlaintextPayloadLenient),
+    codexActivities: historyArray(value, "codexActivities")
+      .filter(isCodexActivityPlaintextPayload)
+      .slice(-maxCodexActivitiesPerRoom),
+    gitWorkflowEvents: historyArray(value, "gitWorkflowEvents").filter(isGitWorkflowEventPlaintextPayloadLenient),
+    githubActionsEvents: historyArray(value, "githubActionsEvents").filter(isGitHubActionsEventPlaintextPayloadLenient),
+    localPreviews: historyArray(value, "localPreviews").filter(isLocalPreviewPlaintextPayload),
+    terminalSnapshots: terminalsForLocalHistory(historyArray(value, "terminalSnapshots").filter(isTerminalSnapshot)),
+    hostHandoffs: historyArray(value, "hostHandoffs").filter(isHostHandoffRecord),
+    queuedCodexTurns: historyArray(value, "queuedCodexTurns").filter(isQueuedCodexTurn),
     ...(isRoomGoal(value.roomGoal) ? { roomGoal: value.roomGoal } : {}),
     ...(codexThreadGraph.activeThreadId
       ? {
@@ -150,6 +144,15 @@ export function normalizeLocalRoomHistory(value: ChatMessage[] | LocalRoomHistor
         }
       : {})
   };
+}
+
+function historyArray(value: Record<string, unknown>, key: string): unknown[] {
+  const candidate = value[key];
+  return Array.isArray(candidate) ? candidate : [];
+}
+
+function isSupportedLocalHistoryVersion(value: unknown): boolean {
+  return value === undefined || value === 1 || value === 2 || value === 3;
 }
 
 export function isChatMessage(value: unknown): value is ChatMessage {

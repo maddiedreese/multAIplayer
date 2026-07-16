@@ -1,5 +1,5 @@
 import type { AppStoreState } from "../../store/appStore";
-import type { ChatAttachment, ChatMessage, LocalRoomHistoryPayload } from "../../types";
+import type { ChatAttachment, ChatMessage } from "../../types";
 import type { RoomArchiveBody } from "../../lib/platform/localBackend";
 import { normalizeLocalRoomHistory } from "../../lib/history/localRoomHistoryPayload";
 
@@ -83,7 +83,7 @@ export function projectReadOnlyRoomArchive(archive: RoomArchiveBody): ReadOnlyRo
     hostHandoffs: [],
     queuedCodexTurns: [],
     ...(archive.history.roomGoal ? { roomGoal: archive.history.roomGoal } : {})
-  } as unknown as LocalRoomHistoryPayload);
+  });
   return {
     roomName: archive.source.roomName,
     ...(archive.source.teamName ? { teamName: archive.source.teamName } : {}),

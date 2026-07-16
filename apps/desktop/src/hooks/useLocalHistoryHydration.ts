@@ -9,18 +9,14 @@ import {
 } from "../lib/history/localHistory";
 import { normalizeLocalRoomHistory, pruneLocalRoomHistory } from "../lib/history/localRoomHistoryPayload";
 import { reportNonFatal } from "../lib/core/nonFatalReporting";
+import { useAppStore } from "../store/appStore";
 import type { ChatMessage, LocalRoomHistoryPayload, LocalRoomReadState } from "../types";
-
-interface LatestRef<T> {
-  current: T;
-}
 
 interface UseLocalHistoryHydrationOptions {
   hasSelectedRoom: boolean;
   selectedRoomId: string;
   selectedRoomTeamId: string;
   forgottenRoomIds: Set<string>;
-  historyLoadedRoomIds: LatestRef<Set<string>>;
   replaceHistorySettings: (next: LocalHistorySettings) => void;
   hydrateLocalRoomHistoryForRoom: (roomId: string, payload: LocalRoomHistoryPayload) => void;
   hydrateRoomReadState: (roomId: string, readState?: LocalRoomReadState) => void;
@@ -31,11 +27,13 @@ export function useLocalHistoryHydration({
   selectedRoomId,
   selectedRoomTeamId,
   forgottenRoomIds,
-  historyLoadedRoomIds,
   replaceHistorySettings,
   hydrateLocalRoomHistoryForRoom,
   hydrateRoomReadState
 }: UseLocalHistoryHydrationOptions) {
+  const hydrationAttempt = useAppStore(
+    (state) => state.historyPresenceByRoom[selectedRoomId]?.historyHydrationAttempt ?? 0
+  );
   useEffect(() => {
     if (!hasSelectedRoom) return;
     if (forgottenRoomIds.has(selectedRoomId)) {
@@ -43,6 +41,7 @@ export function useLocalHistoryHydration({
       return;
     }
     let cancelled = false;
+    useAppStore.getState().setHistoryHydrationStatusForRoom(selectedRoomId, "loading");
     const settings = hasHistorySettings(selectedRoomId)
       ? loadHistorySettings(selectedRoomId)
       : loadTeamHistorySettings(selectedRoomTeamId);
@@ -55,16 +54,23 @@ export function useLocalHistoryHydration({
         return loadEncryptedHistory<ChatMessage[] | LocalRoomHistoryPayload>(selectedRoomId);
       })
       .then((storedHistory) => {
-        if (cancelled || !storedHistory) return;
-        const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
-        hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
-        hydrateRoomReadState(selectedRoomId, payload.readState);
+        if (cancelled) return;
+        if (storedHistory) {
+          const payload = pruneLocalRoomHistory(normalizeLocalRoomHistory(storedHistory), settings.retentionDays);
+          hydrateLocalRoomHistoryForRoom(selectedRoomId, payload);
+          hydrateRoomReadState(selectedRoomId, payload.readState);
+        }
+        useAppStore.getState().setHistoryHydrationStatusForRoom(selectedRoomId, "ready");
       })
       .catch((error) => {
-        if (!cancelled) reportNonFatal("load encrypted local history", error);
-      })
-      .finally(() => {
-        if (!cancelled) historyLoadedRoomIds.current.add(selectedRoomId);
+        if (cancelled) return;
+        reportNonFatal("load encrypted local history", error);
+        const state = useAppStore.getState();
+        state.setHistoryHydrationStatusForRoom(selectedRoomId, "failed");
+        state.setHistoryMessageForRoom(
+          selectedRoomId,
+          "Encrypted local history could not be loaded. Saving is paused to protect the existing history. Retry the load before continuing."
+        );
       });
     return () => {
       cancelled = true;
@@ -72,7 +78,7 @@ export function useLocalHistoryHydration({
   }, [
     forgottenRoomIds,
     hasSelectedRoom,
-    historyLoadedRoomIds,
+    hydrationAttempt,
     hydrateLocalRoomHistoryForRoom,
     hydrateRoomReadState,
     selectedRoomTeamId,

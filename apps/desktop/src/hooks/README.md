@@ -83,10 +83,9 @@ Use this index to find the React lifecycle or composition point for a desktop be
 - `useAppBootstrapEffects.ts` composes application startup effects.
 - `useAppRefs.ts` owns stable refs shared by app-level composition.
 - `useDeviceIdentityLifecycle.ts` loads and persists the device identity.
-- `useInitializeAppState.ts` initializes application store state.
 - `useLatestRef.ts` keeps the latest value in a stable ref.
-- `useLocalHistoryHydration.ts` hydrates encrypted local history.
-- `useLocalHistoryPersistence.ts` persists encrypted local history.
+- `useLocalHistoryHydration.ts` hydrates encrypted local history and leaves persistence paused after a failed load until the user retries successfully.
+- `useLocalHistoryPersistence.ts` persists encrypted local history only after hydration succeeds; native writes are serialized per room and burst updates coalesce to the newest snapshot.
 - `useLocalIdentity.ts` derives the current local identity.
 
 ## Boundaries for new hooks

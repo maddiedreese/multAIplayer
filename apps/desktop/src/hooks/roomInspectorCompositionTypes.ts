@@ -53,6 +53,7 @@ export interface RoomInspectorCapabilities {
     | "onClearRoomHistory"
     | "onForgetRoomLocalData"
     | "onApplyTeamDefaultsToRoom"
+    | "onRetryHistoryHydration"
     | "onTeamHistoryEnabledChange"
     | "onTeamHistoryRetentionDaysChange"
     | "onTeamDefaultApprovalPolicyChange"

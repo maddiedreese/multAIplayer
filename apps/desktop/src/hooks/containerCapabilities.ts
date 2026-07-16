@@ -45,6 +45,10 @@ export function buildRoomInspectorCapabilities(sources: RoomInspectorSources): R
       onClearRoomHistory: sources.workspaceFlow.clearRoomHistory,
       onForgetRoomLocalData: sources.workspaceFlow.forgetSelectedRoomLocalData,
       onApplyTeamDefaultsToRoom: sources.workspaceFlow.applyTeamDefaultsToRoom,
+      onRetryHistoryHydration: () => {
+        const { selectedRoomId, retryHistoryHydrationForRoom } = useAppStore.getState();
+        if (selectedRoomId) retryHistoryHydrationForRoom(selectedRoomId);
+      },
       onTeamHistoryEnabledChange: (enabled) =>
         sources.workspaceFlow.updateTeamHistoryDefaults({ ...useAppStore.getState().teamHistorySettings, enabled }),
       onTeamHistoryRetentionDaysChange: (retentionDays) =>

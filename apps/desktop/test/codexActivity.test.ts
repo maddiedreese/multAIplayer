@@ -72,6 +72,13 @@ test("local-history round trips omit absent optional state", () => {
   assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(roundTripped)), "readState"), false);
 });
 
+test("local-history normalization rejects non-objects and unknown schema versions", () => {
+  const empty = emptyLocalRoomHistoryPayload();
+  assert.deepEqual(normalizeLocalRoomHistory(null), empty);
+  assert.deepEqual(normalizeLocalRoomHistory("not history"), empty);
+  assert.deepEqual(normalizeLocalRoomHistory({ version: 99, messages: [{ body: "untrusted" }] }), empty);
+});
+
 test("activity timeline renders safe lifecycle metadata", () => {
   const html = renderToStaticMarkup(
     React.createElement(CodexActivityTimelineView, {
