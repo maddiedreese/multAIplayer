@@ -217,6 +217,11 @@ jobs:
       - name: Remove cached bundle products
         run: rm -rf apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle
 
+      - name: Build production frontend assets
+        run: |
+          npm run build:packages
+          npm run build -w @multaiplayer/desktop
+
       - name: Build signed and notarized Tauri app
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
