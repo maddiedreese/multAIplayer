@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  detectBrowserSecretRisks,
-  detectSecretRisks,
-  detectTerminalCommandRisks
-} from "../src/lib/security/secretRisks";
+import { detectSecretRisks, detectTerminalCommandRisks } from "../src/lib/security/secretRisks";
 
 test("detectSecretRisks flags sensitive filenames", () => {
   assert.deepEqual(detectSecretRisks("DATABASE_URL=postgres://example", "/repo/.env.local"), [
@@ -33,18 +29,6 @@ test("detectSecretRisks flags token and private key patterns", () => {
     "Token or private key pattern"
   ]);
   assert.deepEqual(detectSecretRisks("-----BEGIN OPENSSH PRIVATE KEY-----\nabc"), ["Token or private key pattern"]);
-});
-
-test("detectBrowserSecretRisks flags signed-in and account pages", () => {
-  assert.deepEqual(detectBrowserSecretRisks("https://github.com/maddiedreese/multAIplayer"), [
-    "Signed-in browser page"
-  ]);
-  assert.deepEqual(detectBrowserSecretRisks("https://github.com/settings/tokens"), [
-    "Signed-in browser page",
-    "Account or credential page"
-  ]);
-  assert.deepEqual(detectBrowserSecretRisks("https://example.com/account/security"), ["Account or credential page"]);
-  assert.deepEqual(detectBrowserSecretRisks("not a url"), []);
 });
 
 test("detectTerminalCommandRisks flags environment dumps and sensitive file reads", () => {

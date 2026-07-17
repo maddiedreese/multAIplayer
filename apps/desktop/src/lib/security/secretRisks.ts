@@ -35,28 +35,6 @@ export function detectSecretRisks(text: string, path = ""): string[] {
   return Array.from(risks);
 }
 
-export function detectBrowserSecretRisks(url: string): string[] {
-  const risks = new Set<string>();
-
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname.toLowerCase();
-    const host = parsed.hostname.toLowerCase();
-
-    if (["github.com", "chatgpt.com", "chat.openai.com", "platform.openai.com"].includes(host)) {
-      risks.add("Signed-in browser page");
-    }
-    if (/(settings|account|billing|tokens|keys|secrets|password|credentials|sessions|security)/.test(path)) {
-      risks.add("Account or credential page");
-    }
-  } catch {
-    reportExpectedFailure("browser secret-risk URL validation rejected malformed input");
-    return [];
-  }
-
-  return Array.from(risks);
-}
-
 export function detectTerminalCommandRisks(command: string): string[] {
   const risks = new Set<string>();
   const value = command.trim();

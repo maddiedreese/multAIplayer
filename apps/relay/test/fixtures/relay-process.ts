@@ -1,4 +1,4 @@
-import { createRelayApp } from "../../src/server.js";
+import { createRelayApp } from "../../src/relay-app.js";
 import { logRelayEvent } from "../../src/observability.js";
 import { FileDeletionLedger } from "../../src/auth/deletion-ledger.js";
 import { access, writeFile } from "node:fs/promises";

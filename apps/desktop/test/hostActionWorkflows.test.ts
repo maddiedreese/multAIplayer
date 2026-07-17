@@ -145,6 +145,53 @@ test("Codex invoke rechecks current host authority and room selection at action 
   assert.match(state.roomSettingsByRoom[nextRoom.id]?.hostMessage ?? "", /Only Jordan/);
 });
 
+test("Codex goal mutations use the active thread and retain the native app-server result", async () => {
+  const requests: Array<{ roomId: string; threadId: string; objective: string; status: string }> = [];
+  nativeInvoke = async (command, args) => {
+    assert.equal(command, "set_codex_goal");
+    const request = (args as { request: { roomId: string; threadId: string; objective: string; status: string } })
+      .request;
+    requests.push(request);
+    return {
+      objective: request.objective,
+      status: request.status,
+      threadId: request.threadId,
+      createdAt: 1_752_499_200,
+      updatedAt: 1_752_499_201 + requests.length,
+      timeUsedSeconds: 12,
+      tokensUsed: 34,
+      tokenBudget: null
+    };
+  };
+  const state = useAppStore.getState();
+  state.setCodexThreadIdForRoom(room.id, "thread-goal");
+  state.setRoomGoalForRoom(room.id, {
+    id: "codex-goal-1752499200",
+    text: "Ship the alpha",
+    status: "active",
+    startedAt: "2025-07-14T16:00:00.000Z",
+    updatedAt: "2025-07-14T16:00:00.000Z",
+    elapsedMs: 12_000
+  });
+  const actions = codexActions();
+
+  await actions.pauseGoal();
+  await actions.resumeGoal();
+  await actions.editGoal("  Ship the signed alpha  ");
+
+  assert.deepEqual(
+    requests.map(({ roomId, threadId, objective, status }) => ({ roomId, threadId, objective, status })),
+    [
+      { roomId: room.id, threadId: "thread-goal", objective: "Ship the alpha", status: "paused" },
+      { roomId: room.id, threadId: "thread-goal", objective: "Ship the alpha", status: "active" },
+      { roomId: room.id, threadId: "thread-goal", objective: "Ship the signed alpha", status: "active" }
+    ]
+  );
+  assert.equal(useAppStore.getState().codexRuntimeByRoom[room.id]?.goal?.text, "Ship the signed alpha");
+  assert.equal(useAppStore.getState().codexRuntimeByRoom[room.id]?.goal?.tokensUsed, 34);
+  assert.equal(useAppStore.getState().roomChatByRoom[room.id]?.message, "Codex goal updated.");
+});
+
 function configureGitDraft(pushEnabled = false) {
   const state = useAppStore.getState();
   state.editGitWorkflowDraftForRoom(room.id, {

@@ -41,28 +41,6 @@ import { maxLocalHistoryItemsPerContainer, pruneLocalRoomHistory } from "./local
 
 export { maxLocalHistoryItemsPerContainer, pruneLocalRoomHistory } from "./localHistoryRetention";
 
-export function emptyLocalRoomHistoryPayload(): LocalRoomHistoryPayload {
-  return {
-    version: 3,
-    messages: [],
-    chatEdits: [],
-    chatDeletes: [],
-    readState: { unread: 0 },
-    terminalRequests: [],
-    fileSaveRequests: [],
-    browserRequests: [],
-    inviteRequests: [],
-    codexEvents: [],
-    codexActivities: [],
-    gitWorkflowEvents: [],
-    githubActionsEvents: [],
-    localPreviews: [],
-    terminalSnapshots: [],
-    hostHandoffs: [],
-    queuedCodexTurns: []
-  };
-}
-
 export function normalizeLocalRoomHistory(value: unknown): LocalRoomHistoryPayload {
   if (!isRecord(value)) throw new InvalidLocalRoomHistoryError("Encrypted local history is not an object.");
   if (value.version !== 3) throw new UnsupportedLocalRoomHistoryVersionError();
