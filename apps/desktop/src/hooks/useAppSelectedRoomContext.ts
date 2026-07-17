@@ -1,7 +1,5 @@
 import { useMarkdownSelection } from "./useMarkdownSelection";
-import { useSelectedRoomContext } from "./useSelectedRoomContext";
 import { useSelectedRoomValues } from "./useSelectedRoomValues";
-import { useSelectedTeamData } from "./useSelectedTeamData";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { useAppStore } from "../store/appStore";
@@ -12,6 +10,8 @@ import {
 } from "../store/slices/workspaceDataSlice";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { hasAcknowledgedRoomVisibilityWarning } from "../lib/history/roomVisibilityWarning";
+import { buildTeamMemberRows } from "../presentation/roster/rosterDisplayRows";
 
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
@@ -76,29 +76,34 @@ export function useAppSelectedRoomContext({
   const teamMembersMessageByTeam = useMemo(() => projectTeamMembersMessageByTeam(teamRosterMap), [teamRosterMap]);
   const teamMembersBusyByTeam = useMemo(() => projectTeamMembersBusyByTeam(teamRosterMap), [teamRosterMap]);
 
-  const roomContext = useSelectedRoomContext({
-    rooms,
-    selectedRoomId,
-    inspectorTab: historyPresence?.inspectorTab,
-    secretWarningVisible: codexRuntime?.secretWarningVisible,
-    terminals
-  });
+  const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? null;
+  const hasSelectedRoom = selectedRoom != null;
+  const inspectorTab = selectedRoom ? (historyPresence?.inspectorTab ?? "files") : "files";
+  const secretWarningVisible =
+    selectedRoom != null &&
+    (codexRuntime?.secretWarningVisible ?? !hasAcknowledgedRoomVisibilityWarning(selectedRoom.id));
+  const roomTerminals = useMemo(
+    () => (selectedRoom ? terminals.filter((terminal) => terminal.roomId === selectedRoom.id) : []),
+    [terminals, selectedRoom]
+  );
   const markdownSelection = useMarkdownSelection({
-    activeRoomId: roomContext.selectedRoom?.id ?? null,
-    enabled: roomContext.hasSelectedRoom,
+    activeRoomId: selectedRoom?.id ?? null,
+    enabled: hasSelectedRoom,
     resetKey: selectedRoomId
   });
-  const teamData = useSelectedTeamData({
-    teams,
-    selectedTeam,
-    teamMembersByTeam,
-    teamMembersMessageByTeam,
-    teamMembersBusyByTeam,
+  const selectedTeamRecord = teams.find((team) => team.id === selectedTeam) ?? null;
+  const selectedTeamName = selectedTeamRecord?.name ?? (teams.length ? "No team selected" : "No teams yet");
+  const selectedTeamMembers = teamMembersByTeam[selectedTeam] ?? [];
+  const selectedTeamMembersMessage = teamMembersMessageByTeam[selectedTeam] ?? null;
+  const selectedTeamMembersBusy = teamMembersBusyByTeam[selectedTeam] ?? false;
+  const selectedTeamMemberRows = buildTeamMemberRows({
+    members: selectedTeamMembers,
+    team: selectedTeamRecord,
     currentUser: githubAuth.currentUser,
     localUserId: localIdentity.localUser.id
   });
   const roomValues = useSelectedRoomValues({
-    selectedRoom: roomContext.selectedRoom,
+    selectedRoom,
     selectedMessageIds: markdownSelection.selectedMessageIds,
     markdownSelectionMode: markdownSelection.markdownSelectionMode,
     roomSettings,
@@ -117,9 +122,18 @@ export function useAppSelectedRoomContext({
   });
 
   return {
-    ...roomContext,
+    hasSelectedRoom,
+    selectedRoom,
+    inspectorTab,
+    secretWarningVisible,
+    roomTerminals,
     ...markdownSelection,
-    ...teamData,
+    selectedTeamRecord,
+    selectedTeamName,
+    selectedTeamMembers,
+    selectedTeamMembersMessage,
+    selectedTeamMembersBusy,
+    selectedTeamMemberRows,
     ...roomValues
   };
 }

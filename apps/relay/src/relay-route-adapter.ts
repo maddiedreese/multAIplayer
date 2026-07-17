@@ -18,7 +18,6 @@ import {
   maxUserIdChars
 } from "@multaiplayer/protocol";
 import type { createRelayAuthSessionManager } from "./auth/session.js";
-import type { DeletionLedger } from "./auth/deletion-ledger.js";
 import type { createRelayAuthz } from "./authz.js";
 import type { loadRelayConfig } from "./config.js";
 import { registerRelayRoutes } from "./http/register-routes.js";
@@ -45,7 +44,6 @@ interface RegisterRelayRouteAdapterOptions {
   identity: {
     sessions: ReturnType<typeof createRelayAuthSessionManager>;
     authorization: ReturnType<typeof createRelayAuthz>;
-    deletionLedger: DeletionLedger | null;
     isAccountRestricted: (userId: string) => boolean;
   };
   durability: {
@@ -98,7 +96,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
       setAuthSession: auth.setAuthSession,
       deleteAuthSession: auth.deleteAuthSession,
       store,
-      deletionLedger: options.identity.deletionLedger,
       authSessionMaxAgeMs: auth.authSessionMaxAgeMs,
       retainedAuthSessionCapPerUser: config.retainedAuthSessionCapPerUser,
       authCookieOptions: auth.authCookieOptions,

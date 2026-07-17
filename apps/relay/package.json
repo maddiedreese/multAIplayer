@@ -7,7 +7,6 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/production-entrypoint.js",
-    "deletions:reconcile": "node dist/reconcile-deletions.js",
     "restrictions:manage": "node dist/manage-account-restriction.js",
     "devices:retire": "node dist/retire-device.js",
     "build": "tsc -p tsconfig.json",
@@ -18,9 +17,7 @@
     "test:soak": "tsx --test test/soak/relay-chaos.test.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1089.0",
     "@multaiplayer/protocol": "0.1.0-alpha.0",
-    "@smithy/node-http-handler": "4.9.7",
     "better-sqlite3": "12.11.1",
     "cookie": "2.0.1",
     "cookie-parser": "1.4.7",

@@ -30,7 +30,6 @@ import type {
   AcceptedMessageReceipt,
   AccountQuotaRecord,
   AccountRestriction,
-  AppliedDeletionLedgerEntry,
   InviteAckReceipt,
   RoomKey
 } from "./state.js";
@@ -90,13 +89,6 @@ export const StoredAccountQuotaRecord = z
       context.addIssue({ code: "custom", path: ["key"], message: "Quota key must bind quota and user." });
     }
   });
-
-export const StoredDeletionLedgerEntry = z
-  .object({
-    entryId: z.string().min(1).max(512),
-    appliedAt: isoDateTime
-  })
-  .strip();
 
 const StoredTeamMembers = z
   .object({
@@ -454,8 +446,4 @@ export function isExpiredStoredAccountQuotaRecord(value: unknown, now: number): 
 export function isExpiredStoredAcceptedMessageReceipt(value: unknown, now: number): boolean {
   const parsed = StoredAcceptedMessageReceipt.safeParse(value);
   return parsed.success && Date.parse(parsed.data.acceptedAt) < now - 180 * 24 * 60 * 60 * 1000;
-}
-
-export function normalizeDeletionLedgerEntry(value: unknown): AppliedDeletionLedgerEntry | null {
-  return parseStoredRecord(StoredDeletionLedgerEntry, value);
 }

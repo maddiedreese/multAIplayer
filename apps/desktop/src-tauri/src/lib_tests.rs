@@ -479,29 +479,94 @@ fn browser_view_scope_is_separate_per_project() {
 }
 
 #[test]
-fn room_browser_guard_script_is_packaged_from_the_tested_source() {
-    assert_eq!(ROOM_BROWSER_GUARD_SCRIPT, include_str!("browser_guard.js"));
+fn main_webview_capability_covers_every_registered_command() {
+    let capability: serde_json::Value =
+        serde_json::from_str(include_str!("../capabilities/default.json"))
+            .expect("parse default capability");
+    assert!(capability.get("windows").is_none());
+    assert_eq!(capability["webviews"], serde_json::json!(["main"]));
+    assert!(capability.get("remote").is_none());
+
+    let permissions = capability["permissions"]
+        .as_array()
+        .expect("capability permissions");
+    for command in REGISTERED_COMMAND_NAMES {
+        let permission = format!("allow-{}", command.replace('_', "-"));
+        assert!(
+            permissions.iter().any(|entry| entry == &permission),
+            "missing permission for {command}"
+        );
+    }
 }
 
 #[test]
-fn room_browser_creation_remains_native_only() {
-    let production_capabilities = include_str!("../capabilities/default.json");
-    let native_test_config = include_str!("../tauri.native-e2e.conf.json");
-    let native_browser = include_str!("browser.rs");
-    let browser_panel = include_str!("../../src/components/BrowserAccessPanel.tsx");
+fn app_command_acl_allows_only_the_local_main_webview() {
+    use tauri::ipc::CallbackFn;
+    use tauri::test::{get_ipc_response, mock_builder, INVOKE_KEY};
+    use tauri::webview::InvokeRequest;
 
-    for source in [production_capabilities, native_test_config] {
-        assert!(!source.contains("allow-create-webview"));
-        assert!(!source.contains("allow-webview-close"));
-        assert!(!source.contains("allow-set-webview-position"));
-        assert!(!source.contains("allow-set-webview-size"));
-        assert!(!source.contains("allow-set-webview-focus"));
+    fn request(url: &str) -> InvokeRequest {
+        InvokeRequest {
+            cmd: "app_version".into(),
+            callback: CallbackFn(0),
+            error: CallbackFn(1),
+            url: url.parse().expect("valid request URL"),
+            body: tauri::ipc::InvokeBody::default(),
+            headers: Default::default(),
+            invoke_key: INVOKE_KEY.to_string(),
+        }
     }
-    assert!(!browser_panel.contains("@tauri-apps/api/webview"));
-    assert!(!browser_panel.contains("new Webview"));
-    assert!(browser_panel.contains("openBrowserView"));
-    assert!(native_browser.contains(".incognito(true)"));
-    assert!(!native_browser.contains(".data_directory("));
+
+    let app = mock_builder()
+        .invoke_handler(tauri::generate_handler![app_version])
+        .build(app_context())
+        .expect("build ACL test app");
+    let main = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .expect("build main webview");
+    let local_url = if cfg!(any(windows, target_os = "android")) {
+        "http://tauri.localhost"
+    } else {
+        "tauri://localhost"
+    };
+
+    let allowed = get_ipc_response(&main, request(local_url)).expect("main command allowed");
+    assert_eq!(
+        allowed
+            .deserialize::<String>()
+            .expect("deserialize app version"),
+        env!("CARGO_PKG_VERSION")
+    );
+    assert!(get_ipc_response(&main, request("https://example.com")).is_err());
+
+    let child = main
+        .as_ref()
+        .window()
+        .add_child(
+            tauri::webview::WebviewBuilder::new(
+                "embedded",
+                tauri::WebviewUrl::App("index.html".into()),
+            ),
+            tauri::LogicalPosition::new(0.0, 0.0),
+            tauri::LogicalSize::new(100.0, 100.0),
+        )
+        .expect("build unprivileged child webview");
+    let (response_tx, response_rx) = std::sync::mpsc::sync_channel(1);
+    child.clone().on_message(
+        request(local_url),
+        Box::new(move |_webview, _command, response, _callback, _error| {
+            response_tx.send(response).expect("return IPC response");
+        }),
+    );
+    assert!(matches!(
+        response_rx.recv().expect("receive child IPC response"),
+        tauri::ipc::InvokeResponse::Err(_)
+    ));
+
+    let other = tauri::WebviewWindowBuilder::new(&app, "other", Default::default())
+        .build()
+        .expect("build unprivileged webview");
+    assert!(get_ipc_response(&other, request(local_url)).is_err());
 }
 
 #[test]

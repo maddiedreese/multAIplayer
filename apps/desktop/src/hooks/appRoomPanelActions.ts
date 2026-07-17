@@ -1,7 +1,7 @@
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { useAppRoomRuntime } from "./useAppRoomRuntime";
 import type { useAppRelaySync } from "./useAppRelaySync";
-import type { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
+import type { WorkspaceFlow } from "./useAppWorkspaceFlow";
 import { createRoomChatPanelActions } from "../application/chat/roomChatPanelActions";
 import { createRoomHeaderActions } from "../application/rooms/roomHeaderActions";
 import { createTerminalPanelActions } from "../application/terminal/terminalPanelActions";
@@ -10,7 +10,6 @@ import { createWorkspaceFilesPanelActions } from "../application/files/workspace
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomRuntime = ReturnType<typeof useAppRoomRuntime>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
-type WorkspaceFlow = ReturnType<typeof useWorkspaceFlowContext>;
 
 export function createAppRoomPanelActions({
   roomInteraction,

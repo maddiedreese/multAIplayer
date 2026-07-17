@@ -26,13 +26,12 @@ import {
 } from "../lib/onboarding/onboardingState";
 import { useAppStore } from "../store/appStore";
 import { useCodexAccount } from "./useCodexAccount";
-import type { useAppInviteActions } from "./useAppInviteActions";
+import type { InviteActions } from "./useInviteActions";
 import type { useAppWorkspaceFlow } from "./useAppWorkspaceFlow";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useNativeInviteIntake } from "./useNativeInviteIntake";
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type WorkspaceFlow = ReturnType<typeof useAppWorkspaceFlow>;
-type InviteActions = ReturnType<typeof useAppInviteActions>;
 type NativeInvite = ReturnType<typeof useNativeInviteIntake>;
 
 export function useOnboardingFlow({

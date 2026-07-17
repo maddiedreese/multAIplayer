@@ -142,59 +142,6 @@ test("account deletion preserves consumed KeyPackage hashes across restart and r
   }
 });
 
-test("legacy approved invites and ACK receipts backfill consumed hashes before expiry pruning", () => {
-  const consumedHash = `sha256:${"c".repeat(64)}`;
-  const acknowledgedHash = `sha256:${"d".repeat(64)}`;
-  const target = codec();
-  target.codec.applyStoredRelayState({
-    version: 1,
-    savedAt: new Date(fixedNow).toISOString(),
-    teams: [],
-    rooms: [],
-    invites: [
-      {
-        id: "legacy-approved",
-        teamId: "team-legacy",
-        roomId: "room-legacy",
-        approvedUserId: "github:legacy",
-        approvedDeviceId: "device-legacy",
-        keyPackageHash: consumedHash,
-        createdAt: "2026-06-01T00:00:00.000Z",
-        expiresAt: "2026-06-02T00:00:00.000Z"
-      }
-    ],
-    inviteAckReceipts: [
-      {
-        inviteId: "legacy-acknowledged",
-        requestId: "legacy-request",
-        teamId: "team-legacy",
-        requesterUserId: "github:acknowledged",
-        requesterDeviceId: "device-acknowledged",
-        keyPackageHash: acknowledgedHash,
-        status: "approved",
-        acknowledgedAt: "2026-05-01T00:00:00.000Z",
-        expiresAt: "2026-05-31T00:00:00.000Z"
-      }
-    ],
-    consumedKeyPackages: [],
-    mlsBacklog: []
-  });
-
-  assert.equal(target.store.getInvite("legacy-approved"), undefined);
-  assert.deepEqual(target.store.consumedKeyPackages.get(consumedHash), {
-    keyPackageHash: consumedHash,
-    userId: "github:legacy",
-    deviceId: "device-legacy",
-    consumedAt: "2026-06-01T00:00:00.000Z"
-  });
-  assert.deepEqual(target.store.consumedKeyPackages.get(acknowledgedHash), {
-    keyPackageHash: acknowledgedHash,
-    userId: "github:acknowledged",
-    deviceId: "device-acknowledged",
-    consumedAt: "2026-05-01T00:00:00.000Z"
-  });
-});
-
 test("startup fails closed for malformed or contradictory consumed KeyPackage state", () => {
   const minimal = {
     version: 1,
@@ -549,15 +496,10 @@ test("invalid non-critical persistence rows are dropped independently of valid s
         used: 2,
         resetAt: fixedNow + 60_000
       }
-    ],
-    appliedDeletionLedgerEntries: [
-      { entryId: "ledger-valid", appliedAt: "2026-07-11T11:00:00.000Z" },
-      { entryId: "ledger-invalid", appliedAt: "not-a-date" }
     ]
   });
   assert.deepEqual([...store.accountRestrictions.keys()], ["github:valid"]);
   assert.deepEqual([...store.accountQuotaRecords.keys()], ["daily_team_creations:github:valid"]);
-  assert.deepEqual([...store.appliedDeletionLedgerEntries.keys()], ["ledger-valid"]);
 });
 
 test("unsupported store versions cannot partially populate an existing store", () => {

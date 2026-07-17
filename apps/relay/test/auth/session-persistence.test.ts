@@ -83,7 +83,6 @@ test("matching session digests survive persistence without exposing the bearer t
 test("session manager validates live state, cookies, authorization, and identity denials", () => {
   const sessions = new Map<string, AuthSession>();
   let saves = 0;
-  const deleted = new Set<string>();
   const restricted = new Set<string>();
   const manager = createRelayAuthSessionManager({
     authSessions: sessions,
@@ -91,7 +90,6 @@ test("session manager validates live state, cookies, authorization, and identity
     nodeEnv: "production",
     normalizeSessionId: (value) => (typeof value === "string" && value.length <= 128 ? value : ""),
     scheduleStoreSave: () => saves++,
-    isDeletedIdentity: (id) => deleted.has(id),
     isRestrictedIdentity: (id) => restricted.has(id)
   });
   const token = "live-session-token";
@@ -124,19 +122,11 @@ test("session manager validates live state, cookies, authorization, and identity
   assert.equal(saves, 1);
 
   manager.setAuthSession(token, {
-    user: { id: "github:deleted", login: "deleted" },
-    expiresAt: Date.now() + 60_000
-  });
-  deleted.add("github:deleted");
-  assert.equal(manager.getAuthSession(token), null);
-  assert.equal(saves, 2);
-
-  manager.setAuthSession(token, {
     user: { id: "github:expired", login: "expired" },
     expiresAt: Date.now() - 1
   });
   assert.equal(manager.getAuthSession(token), null);
-  assert.equal(saves, 3);
+  assert.equal(saves, 2);
   assert.equal(manager.deleteAuthSession("missing"), false);
 });
 

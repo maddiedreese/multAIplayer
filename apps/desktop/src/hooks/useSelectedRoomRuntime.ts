@@ -27,6 +27,8 @@ import { canUseRoomChat } from "../lib/chat/chatPolicy";
 import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
 import type { LocalHostUser } from "../lib/access/roomHost";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
+import { useAppStore } from "../store/appStore";
+import { useShallow } from "zustand/react/shallow";
 
 export interface SelectedRoomRuntimeValues {
   activeCodexApproval: PendingCodexApproval | null;
@@ -60,6 +62,46 @@ interface SelectedRoomRuntimeOptions extends SelectedRoomRuntimeValues {
   browserRequests: BrowserAccessRequest[];
   roomTerminals: TerminalSnapshot[];
   selectedTerminalId: string | null;
+}
+
+export type SelectedRoomRuntime = ReturnType<typeof deriveSelectedRoomRuntime>;
+
+type AppStoreState = ReturnType<typeof useAppStore.getState>;
+
+type SelectedRoomRuntimeSelection = Pick<
+  SelectedRoomRuntimeOptions,
+  | "selectedRoom"
+  | "localUser"
+  | "isSelectedRoomLocked"
+  | "messages"
+  | "replyToMessageId"
+  | "pendingAttachments"
+  | "pendingAttachmentBytes"
+  | "browserRequests"
+  | "roomTerminals"
+  | "selectedTerminalId"
+>;
+
+/** Selects the active room's runtime state and derives the values consumed by the UI. */
+export function useSelectedRoomRuntime(selection: SelectedRoomRuntimeSelection): SelectedRoomRuntime {
+  const roomId = selection.selectedRoom?.id ?? null;
+  const { roomSettings, codexRuntime, localPreview, terminalRuntime, invite, gitRuntime } = useAppStore(
+    useShallow((state) => ({
+      roomSettings: roomId ? state.roomSettingsByRoom[roomId] : undefined,
+      codexRuntime: roomId ? state.codexRuntimeByRoom[roomId] : undefined,
+      localPreview: roomId ? state.localPreviewByRoom[roomId] : undefined,
+      terminalRuntime: roomId ? state.terminalRuntimeByRoom[roomId] : undefined,
+      invite: roomId ? state.inviteByRoom[roomId] : undefined,
+      gitRuntime: roomId ? state.gitWorkflowRuntimeByRoom[roomId] : undefined
+    }))
+  );
+
+  return deriveSelectedRoomRuntime({
+    ...selection,
+    ...selectedCodexRuntimeValues(codexRuntime),
+    ...selectedLocalRuntimeValues({ terminalRuntime, localPreview, invite }),
+    ...selectedWorkflowRuntimeValues({ invite, gitRuntime, roomSettings })
+  });
 }
 
 export function deriveSelectedRoomRuntime({
@@ -158,6 +200,71 @@ export function deriveSelectedRoomRuntime({
     membershipCommitBusy,
     hostStatusLabel,
     roomCanUseChat
+  };
+}
+
+function selectedCodexRuntimeValues(
+  runtime: AppStoreState["codexRuntimeByRoom"][string] | undefined
+): Pick<
+  SelectedRoomRuntimeValues,
+  | "activeCodexApproval"
+  | "queuedCodexApprovals"
+  | "approvalVisible"
+  | "hostHandoffs"
+  | "codexEvents"
+  | "codexActivities"
+  | "selectedCodexThreadId"
+  | "codexThreadGraph"
+  | "codexRunning"
+> {
+  return {
+    activeCodexApproval: runtime?.pendingApproval ?? null,
+    queuedCodexApprovals: runtime?.queuedApprovals ?? [],
+    approvalVisible: runtime?.approvalVisible ?? false,
+    hostHandoffs: runtime?.hostHandoffs ?? [],
+    codexEvents: runtime?.events ?? [],
+    codexActivities: runtime?.activities ?? [],
+    selectedCodexThreadId: runtime?.threadGraph?.activeThreadId ?? null,
+    codexThreadGraph: runtime?.threadGraph ?? { activeThreadId: null, nodesById: {} },
+    codexRunning: runtime?.running ?? false
+  };
+}
+
+function selectedLocalRuntimeValues({
+  terminalRuntime,
+  localPreview,
+  invite
+}: {
+  terminalRuntime: AppStoreState["terminalRuntimeByRoom"][string] | undefined;
+  localPreview: AppStoreState["localPreviewByRoom"][string] | undefined;
+  invite: AppStoreState["inviteByRoom"][string] | undefined;
+}): Pick<SelectedRoomRuntimeValues, "terminalRequests" | "localPreviews" | "localPreviewBusy" | "inviteRequests"> {
+  return {
+    terminalRequests: terminalRuntime?.requests ?? [],
+    localPreviews: localPreview?.previews ?? [],
+    localPreviewBusy: localPreview?.busy ?? false,
+    inviteRequests: invite?.requests ?? []
+  };
+}
+
+function selectedWorkflowRuntimeValues({
+  invite,
+  gitRuntime,
+  roomSettings
+}: {
+  invite: AppStoreState["inviteByRoom"][string] | undefined;
+  gitRuntime: AppStoreState["gitWorkflowRuntimeByRoom"][string] | undefined;
+  roomSettings: AppStoreState["roomSettingsByRoom"][string] | undefined;
+}): Pick<
+  SelectedRoomRuntimeValues,
+  "gitWorkflowEvents" | "githubActionsEvents" | "hostBusy" | "settingsBusy" | "membershipCommitBusy"
+> {
+  return {
+    gitWorkflowEvents: gitRuntime?.workflow?.events ?? [],
+    githubActionsEvents: gitRuntime?.actions?.events ?? [],
+    hostBusy: roomSettings?.hostBusy ?? false,
+    settingsBusy: roomSettings?.settingsBusy ?? false,
+    membershipCommitBusy: invite?.membershipCommitBusy ?? false
   };
 }
 

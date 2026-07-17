@@ -18,27 +18,6 @@ export interface RelayConfig {
   attachmentBlobUploadWindowMs: number;
   jsonBodyLimitBytes: number;
   mlsMessageMaxBytes: number;
-  deletionLedger:
-    | {
-        backend: "file";
-        path: string;
-        hmacKey: string;
-        protectionSeconds: number;
-      }
-    | {
-        backend: "s3";
-        endpoint: string;
-        bucket: string;
-        region: string;
-        accessKeyId: string;
-        secretAccessKey: string;
-        prefix: string;
-        urlStyle: "path" | "virtual-host";
-        hmacKey: string;
-        protectionSeconds: number;
-      }
-    | null;
-  deletionProtection: "primary_only" | "restore_safe";
   metricsToken: string | null;
   debugEndpointsEnabled: boolean;
   allowedCorsOrigins: string[];
@@ -137,25 +116,7 @@ export function loadRelayConfig(): RelayConfig {
     maxMlsBacklogBytesPerRoom
   });
 
-  const deletionLedger = parseDeletionLedgerConfig(nodeEnv);
-  const deletionProtection = parseDeletionProtection(deletionLedger);
-  if (deletionProtection === "restore_safe" && !deletionLedger) {
-    throw new Error("Restore-safe account deletion requires a complete external deletion ledger configuration.");
-  }
-  if (nodeEnv === "production" && deletionProtection === "restore_safe" && deletionLedger?.backend === "file") {
-    throw new Error(
-      "Production relay requires an external S3-compatible deletion ledger; the file backend is development-only."
-    );
-  }
   const trustProxyHeadersRequested = parseBooleanEnv("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
-  if (
-    nodeEnv === "production" &&
-    deletionProtection === "restore_safe" &&
-    deletionLedger &&
-    deletionLedger.protectionSeconds < 7_776_000
-  ) {
-    throw new Error("Production deletion ledger protection must be at least 7776000 seconds (90 days).");
-  }
 
   return {
     nodeEnv,
@@ -193,8 +154,6 @@ export function loadRelayConfig(): RelayConfig {
     ),
     jsonBodyLimitBytes,
     mlsMessageMaxBytes: parseIntegerEnv("MULTAIPLAYER_RELAY_MLS_MESSAGE_MAX_BYTES", 1_000_000, 4096, 5_000_000),
-    deletionLedger,
-    deletionProtection,
     metricsToken: normalizeMetricsToken(process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN),
     debugEndpointsEnabled: parseBooleanEnv("MULTAIPLAYER_RELAY_DEBUG", false),
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
@@ -282,100 +241,6 @@ function validateCiphertextByteCeilings(values: {
   if (values.attachmentBlobLiveQuotaBytes > values.maxAttachmentBlobBytes) {
     throw new Error("Per-user live attachment quota must not exceed the relay attachment byte ceiling.");
   }
-}
-
-function parseDeletionProtection(ledger: RelayConfig["deletionLedger"]): RelayConfig["deletionProtection"] {
-  const configured = process.env.MULTAIPLAYER_RELAY_DELETION_PROTECTION?.trim();
-  if (configured === undefined || configured === "") return ledger ? "restore_safe" : "primary_only";
-  if (configured !== "primary_only" && configured !== "restore_safe") {
-    throw new Error("MULTAIPLAYER_RELAY_DELETION_PROTECTION must be primary_only or restore_safe.");
-  }
-  if (configured === "primary_only" && ledger) {
-    throw new Error("Primary-only account deletion must not configure an external deletion ledger.");
-  }
-  return configured;
-}
-
-function parseDeletionLedgerConfig(nodeEnv: string): RelayConfig["deletionLedger"] {
-  const settings = deletionLedgerSettings();
-  const { filePath, endpoint, bucket, region, accessKeyId, secretAccessKey, hmacKey } = settings;
-  const urlStyle = process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE?.trim() || "path";
-  const protectionSeconds = parseDeletionLedgerProtectionSeconds(
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS
-  );
-  const configured = [endpoint, bucket, region, accessKeyId, secretAccessKey, hmacKey].filter(Boolean).length;
-  if (filePath && configured > 1) throw new Error("Configure exactly one deletion ledger backend.");
-  if (filePath) {
-    if (hmacKey.length < 32) throw new Error("Deletion ledger HMAC key must contain at least 32 characters.");
-    return { backend: "file", path: resolve(filePath), hmacKey, protectionSeconds };
-  }
-  if (configured === 0) return null;
-  if (configured !== 6 || secretAccessKey.length < 32 || hmacKey.length < 32) {
-    throw new Error("Deletion ledger configuration is incomplete or uses a key shorter than 32 characters.");
-  }
-  if (secretAccessKey === hmacKey) {
-    throw new Error("Deletion ledger HMAC key must differ from the S3 secret access key.");
-  }
-  if (urlStyle !== "path" && urlStyle !== "virtual-host") {
-    throw new Error("Deletion ledger S3 URL style must be path or virtual-host.");
-  }
-  validateDeletionLedgerEndpoint(endpoint, nodeEnv);
-  return {
-    backend: "s3",
-    endpoint,
-    bucket,
-    region,
-    accessKeyId,
-    secretAccessKey,
-    prefix: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_PREFIX?.trim() || "relay-deletions/v1",
-    urlStyle,
-    hmacKey,
-    protectionSeconds
-  };
-}
-
-function parseDeletionLedgerProtectionSeconds(value: string | undefined): number {
-  if (value === undefined) return 7_776_000;
-  const parsed = Number(value.trim());
-  if (!Number.isSafeInteger(parsed) || parsed < 86_400 || parsed > 31_536_000) {
-    throw new Error(
-      "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS must be an integer between 86400 and 31536000."
-    );
-  }
-  return parsed;
-}
-
-function validateDeletionLedgerEndpoint(endpoint: string, nodeEnv: string): void {
-  let protocol: string;
-  try {
-    protocol = new URL(endpoint).protocol;
-  } catch {
-    throw new Error(
-      nodeEnv === "production"
-        ? "Deletion ledger S3 endpoint must be a valid HTTPS URL."
-        : "Deletion ledger S3 endpoint must be a valid HTTP or HTTPS URL."
-    );
-  }
-  const validProtocol = protocol === "https:" || (nodeEnv !== "production" && protocol === "http:");
-  if (!validProtocol) {
-    throw new Error(
-      nodeEnv === "production"
-        ? "Deletion ledger S3 endpoint must be a valid HTTPS URL."
-        : "Deletion ledger S3 endpoint must be a valid HTTP or HTTPS URL."
-    );
-  }
-}
-
-function deletionLedgerSettings() {
-  return {
-    filePath: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH?.trim() ?? "",
-    endpoint: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT?.trim() ?? "",
-    bucket: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET?.trim() ?? "",
-    region: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION?.trim() ?? "",
-    accessKeyId: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID?.trim() ?? "",
-    secretAccessKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY?.trim() ?? "",
-    hmacKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY?.trim() ?? ""
-  };
 }
 
 function loadRelayEnvFiles() {

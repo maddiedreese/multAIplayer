@@ -22,7 +22,7 @@ import { projectTerminalRuntimeRequestsByRoom } from "../store/slices/terminalSl
 import { deriveOnboardingProgress, onboardingRestartEvent } from "../lib/onboarding/onboardingState";
 import type { useGitHubAuth } from "../hooks/useGitHubAuth";
 import type { useAppRoomRuntime } from "../hooks/useAppRoomRuntime";
-import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
+import type { WorkspaceFlow } from "../hooks/useAppWorkspaceFlow";
 
 function sidebarRoomDisplay(room: ClientRoomRecord | null) {
   if (!room) {
@@ -47,7 +47,7 @@ export interface SidebarSources {
   githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn" | "clearDeletedHostedAccount">;
   roomRuntime: Pick<ReturnType<typeof useAppRoomRuntime>, "signOut" | "chooseProjectPath" | "stopOwnedLocalPreviews">;
   workspaceFlow: Pick<
-    ReturnType<typeof useWorkspaceFlowContext>,
+    WorkspaceFlow,
     | "addTeam"
     | "chooseNewRoomProjectPath"
     | "addRoom"

@@ -91,14 +91,7 @@ export async function startRelay(
           ? { MULTAIPLAYER_MLS_VALIDATOR_PATH: mockValidatorPath }
           : {}),
         PORT: String(port),
-        MULTAIPLAYER_RELAY_DATA_PATH: dataPath,
-        MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH:
-          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH ?? join(tempDir, "external-deletion-ledger"),
-        MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY:
-          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY ??
-          "relay-test-deletion-ledger-hmac-key-at-least-32-characters",
-        MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS:
-          extraEnv.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS ?? "7776000"
+        MULTAIPLAYER_RELAY_DATA_PATH: dataPath
       },
       stdio: ["ignore", "pipe", "pipe"]
     });

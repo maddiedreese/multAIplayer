@@ -47,7 +47,6 @@ test(
       },
       deleteAuthSession: () => false,
       store,
-      deletionLedger: null,
       authSessionMaxAgeMs: 60_000,
       retainedAuthSessionCapPerUser: 1,
       authCookieOptions: () => ({ httpOnly: true }),

@@ -17,7 +17,7 @@ Supported alpha self-hosting requirements:
 - persistent SQLite storage for hosted or internet-facing relays;
 - relay-managed encrypted attachment blob storage in SQLite.
 
-The normal single-node setup uses `MULTAIPLAYER_RELAY_DELETION_PROTECTION=primary_only` and does not need an external deletion service. In this mode, never restore a database backup from before an account deletion. Operators who retain restorable backups must instead use the [restore-safe runbook](relay-operations.md#account-deletion-and-backup-restores).
+Account deletion is committed to the primary SQLite database. Never restore a database backup from before an account deletion; the relay deliberately has no second deletion ledger. See [Relay operations](relay-operations.md#account-deletion-and-backup-restores).
 
 ## Desktop onboarding, authentication, and invite links
 
@@ -64,16 +64,13 @@ Build it from the repository root:
 docker build -f apps/relay/Dockerfile -t multaiplayer-relay:alpha .
 ```
 
-Run it with a persistent `/data` mount. This simple configuration intentionally
-uses primary-only account deletion; do not restore an older database after an
-account has been deleted:
+Run it with a persistent `/data` mount:
 
 ```bash
 docker run --rm -p 4321:4321 \
   -v multaiplayer-relay-data:/data \
   -e MULTAIPLAYER_RELAY_METRICS_TOKEN=replace_with_a_different_32_char_token \
   -e MULTAIPLAYER_RELAY_ALLOWED_ORIGINS=https://your-app.example \
-  -e MULTAIPLAYER_RELAY_DELETION_PROTECTION=primary_only \
   -e MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH=false \
   -e MULTAIPLAYER_RELAY_DEBUG=false \
   multaiplayer-relay:alpha
@@ -209,10 +206,7 @@ GitHub access tokens stay behind the native Rust IPC boundary. Native commands r
 
 ## Account deletion
 
-The desktop exposes account deletion after the user transfers or deletes owned
-resources. The normal self-hosted mode is `primary_only`: do not restore a backup
-from before a deletion. If restorable backups exist, configure the external
-restore-safe ledger and follow [Relay operations](relay-operations.md#account-deletion-and-backup-restores).
+The desktop exposes account deletion after the user transfers or deletes owned resources. Deletion is durable in the current SQLite database; backup policy must prevent an older copy from restoring the account. See [Relay operations](relay-operations.md#account-deletion-and-backup-restores).
 
 For local development, the desktop app expects these values from the root `.env`:
 

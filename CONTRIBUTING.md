@@ -122,7 +122,7 @@ Ordinary contributions do not require release or hosted-relay operations:
 
 - [Self-hosting](docs/self-hosting.md) covers basic relay deployment and migration;
   [Relay operations](docs/relay-operations.md) covers monitoring, incidents,
-  restrictions, and restore-safe deletion.
+  restrictions, deletion, and backup recovery.
 - [Verifying releases](docs/reproducible-builds.md) covers exact-tag artifacts,
   signing, notarization, updater metadata, publication, and failure recovery.
 - [Codex hosting](docs/codex-hosting.md) records the exact supported app-server

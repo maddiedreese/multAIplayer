@@ -7,6 +7,8 @@ import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 import { useAppStore } from "../store/appStore";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+export type InviteActions = ReturnType<typeof useInviteActions>;
+
 export function useInviteActions(options: UseInviteActionsOptions) {
   const relayActions = createInviteRelayActions(options);
   const joinActions = createInviteJoinActions(options);

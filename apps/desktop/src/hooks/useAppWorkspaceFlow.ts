@@ -1,22 +1,31 @@
 import { approvalPolicyLabels } from "../appDefaults";
-import type { useAppInviteActions } from "./useAppInviteActions";
+import type { InviteActions } from "./useInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { createRoomActions } from "../application/rooms/roomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
+import { useAppBootstrapEffects } from "./useAppBootstrapEffects";
+import { createMarkdownCopyActions } from "../application/markdown/markdownCopyActions";
+import { useHistorySearch } from "./useHistorySearch";
+import { useLocalHistoryHydration } from "./useLocalHistoryHydration";
+import { createFileActions } from "../application/files/fileActions";
+import { createLocalHistoryActions } from "../application/history/localHistoryActions";
+import { createMemberActions } from "../application/members/memberActions";
+import { createTeamDefaultActions } from "../application/teams/teamDefaultActions";
+import { createWorkspaceCreationActions } from "../application/workspace/workspaceCreationActions";
 
 type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createRoomActions>;
-type InviteActions = ReturnType<typeof useAppInviteActions>;
 type RoomSettingsActor = () => { requesterName: string; requesterUserId: string };
+
+export type WorkspaceFlow = ReturnType<typeof useAppWorkspaceFlow>;
 
 export function useAppWorkspaceFlow({
   appRefs,
@@ -70,7 +79,7 @@ export function useAppWorkspaceFlow({
   const { setSelectedTeamHistoryMessage, setTeamHistoryMessageForTeam, hydrateLocalRoomHistoryForRoom } = roomActions;
   const actions = useAppStore.getState();
 
-  return useWorkspaceFlowContext({
+  const flow = {
     bootstrap: {
       workspace: {
         relayHttpUrl,
@@ -166,5 +175,22 @@ export function useAppWorkspaceFlow({
         finishHistorySearch: actions.finishHistorySearch
       }
     }
+  };
+  useAppBootstrapEffects(flow.bootstrap);
+  const markdownCopyActions = createMarkdownCopyActions();
+  const memberActions = createMemberActions({
+    ...flow.workspaceRoomActions.members,
+    copyMarkdownWithFallback: markdownCopyActions.copyMarkdownWithFallback
   });
+  useLocalHistoryHydration(flow.historyEffects.hydration);
+  useHistorySearch(flow.historyEffects.search);
+
+  return {
+    ...markdownCopyActions,
+    ...memberActions,
+    ...createWorkspaceCreationActions(flow.workspaceRoomActions.workspaceCreation),
+    ...createTeamDefaultActions(flow.workspaceRoomActions.teamDefaults),
+    ...createLocalHistoryActions(flow.workspaceRoomActions.localHistory),
+    ...createFileActions(flow.workspaceRoomActions.files)
+  };
 }

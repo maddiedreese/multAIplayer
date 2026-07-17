@@ -54,4 +54,5 @@ windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"] }
 
 [dev-dependencies]
 proptest = "=1.11.0"
+tauri = { version = "=2.11.5", features = ["test", "unstable"] }
 tempfile = "=3.27.0"

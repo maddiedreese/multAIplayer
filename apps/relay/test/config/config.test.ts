@@ -211,172 +211,17 @@ test("relay accepts common explicit booleans and rejects empty or unrecognized v
   }
 });
 
-test("production supports primary-only deletion but restore-safe mode requires an external ledger", () => {
-  const names = [
-    "NODE_ENV",
-    "MULTAIPLAYER_RELAY_DELETION_PROTECTION",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"
-  ] as const;
-  const previous = new Map(names.map((name) => [name, process.env[name]]));
-  try {
-    for (const name of names) delete process.env[name];
-    process.env.NODE_ENV = "production";
-    assert.equal(loadRelayConfig().deletionProtection, "primary_only");
-    process.env.MULTAIPLAYER_RELAY_DELETION_PROTECTION = "restore_safe";
-    assert.throws(() => loadRelayConfig(), /requires a complete external deletion ledger/);
-  } finally {
-    for (const name of names) restoreEnv(name, previous.get(name));
-  }
-});
-
 test("production fail-stop exits for supervisor restart unless explicitly overridden", () => {
-  const keys = [
-    "NODE_ENV",
-    "MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"
-  ] as const;
+  const keys = ["NODE_ENV", "MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON"] as const;
   const previous = new Map(keys.map((key) => [key, process.env[key]]));
   try {
     process.env.NODE_ENV = "production";
     delete process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON;
-    delete process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH;
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = "https://ledger.example.test";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET = "relay";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION = "us-test-1";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID = "test-access-key";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY = "test-secret-key-at-least-32-characters";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
     assert.equal(loadRelayConfig().exitOnPersistencePoison, true);
     process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON = "false";
     assert.equal(loadRelayConfig().exitOnPersistencePoison, false);
   } finally {
     for (const key of keys) restoreEnv(key, previous.get(key));
-  }
-});
-
-test("S3 deletion ledger requires independent transport and HMAC keys", () => {
-  const names = [
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY"
-  ] as const;
-  const previous = new Map(names.map((name) => [name, process.env[name]]));
-  const reusedKey = "test-reused-key-with-at-least-32-characters";
-  try {
-    delete process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH;
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = "https://ledger.example.test";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET = "relay";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION = "us-test-1";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID = "test-access-key";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY = reusedKey;
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = reusedKey;
-    assert.throws(() => loadRelayConfig(), /HMAC key must differ from the S3 secret access key/);
-  } finally {
-    for (const name of names) restoreEnv(name, previous.get(name));
-  }
-});
-
-test("production rejects the development filesystem deletion ledger", () => {
-  const previous = {
-    nodeEnv: process.env.NODE_ENV,
-    ledgerPath: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH,
-    ledgerKey: process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY
-  };
-  try {
-    process.env.NODE_ENV = "production";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH = ".multaiplayer/test-deletion-ledger";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
-    assert.throws(() => loadRelayConfig(), /external S3-compatible deletion ledger/);
-  } finally {
-    restoreEnv("NODE_ENV", previous.nodeEnv);
-    restoreEnv("MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH", previous.ledgerPath);
-    restoreEnv("MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY", previous.ledgerKey);
-  }
-});
-
-test("deletion ledger protection horizon rejects malformed and out-of-range values", () => {
-  const names = [
-    "NODE_ENV",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS"
-  ] as const;
-  const previous = new Map(names.map((name) => [name, process.env[name]]));
-  try {
-    for (const name of names) delete process.env[name];
-    process.env.NODE_ENV = "development";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH = ".multaiplayer/test-deletion-ledger";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
-    for (const invalid of ["not-an-integer", "7776000.5", "86399", "31536001"]) {
-      process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS = invalid;
-      assert.throws(
-        () => loadRelayConfig(),
-        /MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS must be an integer between 86400 and 31536000/
-      );
-    }
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS = "31536000";
-    assert.equal(loadRelayConfig().deletionLedger?.protectionSeconds, 31_536_000);
-  } finally {
-    for (const name of names) restoreEnv(name, previous.get(name));
-  }
-});
-
-test("production S3 deletion ledger requires HTTPS while development permits HTTP", () => {
-  const names = [
-    "NODE_ENV",
-    "MULTAIPLAYER_RELAY_DELETION_PROTECTION",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_URL_STYLE",
-    "MULTAIPLAYER_RELAY_DELETION_LEDGER_PROTECTION_SECONDS"
-  ] as const;
-  const previous = new Map(names.map((name) => [name, process.env[name]]));
-  try {
-    for (const name of names) delete process.env[name];
-    process.env.MULTAIPLAYER_RELAY_DELETION_PROTECTION = "restore_safe";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_BUCKET = "relay";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_REGION = "us-test-1";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ACCESS_KEY_ID = "test-access-key";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_SECRET_ACCESS_KEY = "test-secret-key-at-least-32-characters";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_HMAC_KEY = "test-deletion-ledger-key-at-least-32-characters";
-
-    process.env.NODE_ENV = "production";
-    for (const invalidEndpoint of ["http://ledger.example.test", "not-a-url"]) {
-      process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = invalidEndpoint;
-      assert.throws(() => loadRelayConfig(), /S3 endpoint must be a valid HTTPS URL/);
-    }
-
-    process.env.NODE_ENV = "development";
-    process.env.MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT = "http://ledger.example.test";
-    assert.equal(loadRelayConfig().deletionLedger?.backend, "s3");
-  } finally {
-    for (const name of names) restoreEnv(name, previous.get(name));
   }
 });
 

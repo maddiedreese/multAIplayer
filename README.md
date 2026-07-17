@@ -20,7 +20,7 @@
 </p>
 
 > [!IMPORTANT]
-> multAIplayer is a free, open-source alpha tested on Apple-silicon macOS 15. Packages use macOS 11 as their deployment target, but macOS 11–14 are compatibility targets, not tested support. Use only Developer ID-signed, notarized builds published from this repository's release workflow.
+> multAIplayer is a free, open-source macOS alpha. Use only Developer ID-signed, notarized builds published from this repository's release workflow. Current platform and product constraints are listed in [Alpha limitations](docs/alpha-limitations.md).
 
 ## The product
 
@@ -48,9 +48,7 @@ multAIplayer is an independent open-source project. It is **not** an official Op
 
 ## Security posture
 
-Rooms use RFC 9420 MLS through the Rust `mls-rs` implementation, and relevant payloads use exporter-derived encryption in the native boundary. The relay routes encrypted records but necessarily observes bounded identity, routing, size, timing, and lifecycle metadata. The active host remains responsible for local approvals, and admitted members receive meaningful shared context. Complete invite links are capabilities and must remain private. The integration is **unaudited**; behavior tests, property checks, fuzzing, native journeys, and release verification reduce regression risk but do not replace independent review. The [threat model](docs/threat-model.md) is the only normative source for intended properties, assumptions, evidence, and residual risks.
-
-Before private use, read the [alpha limitations](docs/alpha-limitations.md), [cryptography mechanism guide](docs/cryptography.md), and authoritative [threat model](docs/threat-model.md). Report vulnerabilities through [SECURITY.md](SECURITY.md).
+Rooms use RFC 9420 MLS through `mls-rs`; the relay routes encrypted records while observing the metadata required to operate the service. The integration is unaudited. The [threat model](docs/threat-model.md) is the sole source for security properties, assumptions, metadata exposure, and residual risks; [SECURITY.md](SECURITY.md) explains private reporting.
 
 ## Build locally
 
@@ -96,14 +94,10 @@ Pull requests run workspace checks and product journeys when executable code cha
 | `e2e`                                    | UI contracts and multi-process journeys                  |
 | `docs/decisions`                         | Normative architecture decisions                         |
 
-The [architecture guide](docs/product-architecture.md) maps flows to code. SQLite is the relay's sole runtime backend, but the alpha relay keeps its durable working set in memory and stores entity payloads as JSON rows rather than exposing a general relational query model. Mutations are synchronously committed before a successful response or broadcast, and the in-memory durable-entry count has an explicit ceiling. A runtime SQLite write failure makes the relay not ready and stops further product traffic until restart rather than serving memory that may differ from disk. See the [single-node relay ADR](docs/decisions/single-node-relay.md).
+The [architecture guide](docs/product-architecture.md) maps product flows to code. Durable relay behavior and its deliberately single-node boundary are documented in the [single-node relay ADR](docs/decisions/single-node-relay.md).
 
 ## Releases and operations
 
-Supported macOS releases are Developer ID-signed, notarized, published with checksums, and use authenticated updater metadata bound to the exact signed bundle. Verification instructions live in [Verifying releases](docs/reproducible-builds.md).
-
-Before trusting a first install or compromise-recovery key, follow the maintained [release-verification procedure](docs/reproducible-builds.md) to compare the committed updater key with the independently published fingerprint.
-
-The official alpha relay is a deliberately single-node Node/SQLite service with no uptime or recovery guarantee. Keep ordinary Git/project backups. Operators should follow [Self-hosting](docs/self-hosting.md) and the [single-node relay ADR](docs/decisions/single-node-relay.md).
+Release verification is documented in [Verifying releases](docs/reproducible-builds.md). Relay operators should follow [Self-hosting](docs/self-hosting.md); the free hosted relay has no uptime or recovery guarantee.
 
 Contributions are welcome; start with [CONTRIBUTING.md](CONTRIBUTING.md). Apache-2.0 licensed. Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

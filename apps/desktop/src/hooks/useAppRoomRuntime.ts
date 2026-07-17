@@ -6,12 +6,21 @@ import type { useAppRelaySync } from "./useAppRelaySync";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { createRoomActions } from "../application/rooms/roomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
-import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
+import type { SelectedRoomRuntime } from "./useSelectedRoomRuntime";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { createCodexInvokeActions } from "../application/codex/codexInvokeActions";
-import { useRoomBackgroundEffects } from "./useRoomBackgroundEffects";
+import { useCodexProbe } from "./useCodexProbe";
+import { useGitHubActionsDraftReset } from "./useGitHubActionsDraftReset";
+import { useGitHubRemoteInference } from "./useGitHubRemoteInference";
+import { useLocalHistoryPersistence } from "./useLocalHistoryPersistence";
+import { useLocalPreviewPolling } from "./useLocalPreviewPolling";
+import { useProjectFilesSearch } from "./useProjectFilesSearch";
+import { useRoomDraftCleanup } from "./useRoomDraftCleanup";
+import { useRoomGitStatusRefresh } from "./useRoomGitStatusRefresh";
+import { useTerminalAutoOpen } from "./useTerminalAutoOpen";
+import { useTerminalLifecycle } from "./useTerminalLifecycle";
 import { useRoomToolActions } from "./useRoomToolActions";
 import { useCodexTurnActions } from "./useCodexTurnActions";
 import { useAppStore } from "../store/appStore";
@@ -22,7 +31,6 @@ type AppRefs = ReturnType<typeof useAppRefs>;
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
-type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createRoomActions>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
@@ -274,13 +282,19 @@ export function useAppRoomRuntime({
   const { approveCodexTurn, promoteNextCodexApprovalForRoom } = useCodexTurnActions(runtimeOptions.codexActions.turn);
   const codexInvokeActions = createCodexInvokeActions(runtimeOptions.codexActions.invoke);
   const tools = useRoomToolActions(runtimeOptions.toolActions);
-  useRoomBackgroundEffects({
-    ...runtimeOptions.backgroundEffects,
-    terminalAutoOpen: {
-      ...runtimeOptions.backgroundEffects.terminalAutoOpen,
-      openInteractiveTerminal: tools.openInteractiveTerminal
-    }
+  useLocalHistoryPersistence(runtimeOptions.backgroundEffects.localHistoryPersistence);
+  useLocalPreviewPolling(runtimeOptions.backgroundEffects.localPreviewPolling);
+  useRoomGitStatusRefresh(runtimeOptions.backgroundEffects.roomGitStatusRefresh);
+  useGitHubRemoteInference(runtimeOptions.backgroundEffects.gitHubRemoteInference);
+  useGitHubActionsDraftReset(runtimeOptions.backgroundEffects.gitHubActionsDraftReset);
+  useProjectFilesSearch(runtimeOptions.backgroundEffects.projectFilesSearch);
+  useTerminalLifecycle(runtimeOptions.backgroundEffects.terminalLifecycle);
+  useTerminalAutoOpen({
+    ...runtimeOptions.backgroundEffects.terminalAutoOpen,
+    openInteractiveTerminal: tools.openInteractiveTerminal
   });
+  useCodexProbe();
+  useRoomDraftCleanup(runtimeOptions.backgroundEffects.roomDraftCleanup);
   const runtime = {
     approveCodexTurn,
     promoteNextCodexApprovalForRoom,

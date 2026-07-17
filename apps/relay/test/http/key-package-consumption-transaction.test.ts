@@ -340,7 +340,6 @@ test("a consumed hash survives restart and rejects alternate-id reuse", async ()
         accountRestrictions: [],
         accountQuotaRecords: [],
         attachmentBlobs: [],
-        appliedDeletionLedgerEntries: [],
         mlsBacklog: []
       });
     assert.deepEqual(await consumeKeyPackageForInvite({ ...common, persist: persistSnapshot }), {
