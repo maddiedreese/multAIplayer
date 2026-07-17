@@ -6,6 +6,11 @@ updates have two sequential application checks: multAIplayer verifies signed
 metadata that binds the version, archive URL, archive signature, and release
 notes, then Tauri verifies the downloaded archive before installation.
 
+Only the newest release that satisfies those requirements is supported. Once the
+first signed and notarized public alpha is published, earlier unsigned development
+releases must remain marked as prereleases and must not be linked as downloads or
+identified as the latest supported release.
+
 The project does not claim bit-for-bit reproducible macOS artifacts. Apple
 signing, notarization, DMG creation, hosted runner images, and packaging metadata
 can change bytes without a source change.
@@ -66,6 +71,30 @@ but it is not cryptographic proof that the manual observations occurred.
 
 ## Release and updater failure handling
 
+Prepare a release through an ordinary pull request so the same required checks
+run as for every other change. After curating `Unreleased`, run:
+
+```bash
+VERSION="0.2.0-alpha.0"
+npm version "$VERSION" --no-git-tag-version
+npm run sync:release-versions
+npm run finalize:release-changelog
+npm run check:release-versions
+```
+
+After that pull request merges, create the tag from the updated `main`:
+
+```bash
+VERSION="0.2.0-alpha.0"
+git checkout main
+git pull --ff-only
+git tag "v$VERSION"
+git push origin "v$VERSION"
+```
+
+The tag starts the release workflow. Do not tag an unreviewed commit or move a
+published release tag.
+
 If only updater-channel advancement fails after publication, use **Re-run failed
 jobs** on the original GitHub Actions run. That preserves the tagged build and
 retries the channel job. A new full dispatch for a public tag is intentionally
@@ -93,7 +122,7 @@ git checkout --detach "$RELEASE_TAG"
 git status --porcelain
 npm install --global npm@11.16.0 --ignore-scripts
 npm ci
-npm run release:preflight
+npm run check:release-versions
 npm run tauri:build:release -w @multaiplayer/desktop
 ```
 

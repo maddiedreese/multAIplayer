@@ -5,8 +5,8 @@ async function requestAccess(page: Page): Promise<{ host: Locator; guest: Locato
   attachPageDiagnostics(page);
   await page.goto(uiContractScenarioUrl("invite-join"));
 
-  const boundary = page.getByRole("complementary", { name: "E2E coverage boundary" });
-  await expect(boundary).toContainText("UI-contract E2E harness");
+  const boundary = page.getByRole("complementary", { name: "UI contract coverage boundary" });
+  await expect(boundary).toContainText("UI contract harness");
   await expect(boundary).toContainText("native MLS KeyPackage, HPKE, commit, and Welcome processing");
 
   const host = page.getByRole("region", { name: "Host client" });

@@ -4,7 +4,7 @@ import type { Express, Response } from "express";
 import { KeyPackageUpload, pinnedMlsCiphersuite, type KeyPackageRecord, type RoomRecord } from "@multaiplayer/protocol";
 import type { AuthSession, RelayStore } from "../state.js";
 import { isLiveAccountSession } from "../auth/account-mutation-transaction.js";
-import type { KeyPackageValidator } from "../mls/key-package-validator.js";
+import { KeyPackageValidatorBusyError, type KeyPackageValidator } from "../mls/key-package-validator.js";
 import { isCanonicalPaddedBase64 } from "../opaque.js";
 import { hasDeviceSession } from "./device-auth.js";
 import { commitValidatedKeyPackages, type KeyPackageUploadCommitResult } from "./key-package-upload-transaction.js";
@@ -23,6 +23,8 @@ interface Options {
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
   saveRelayStore: () => Promise<void>;
   liveKeyPackageCapPerUser: number;
+  keyPackageValidationCapPerUser: number;
+  keyPackageValidationWindowMs: number;
   recordQuotaRejection?: (type: string) => void;
 }
 
@@ -35,8 +37,14 @@ export function registerKeyPackageRoutes({
   allowMutation,
   saveRelayStore,
   liveKeyPackageCapPerUser,
+  keyPackageValidationCapPerUser,
+  keyPackageValidationWindowMs,
   recordQuotaRejection
 }: Options) {
+  const validationBudget = createKeyPackageValidationBudget(
+    keyPackageValidationCapPerUser,
+    keyPackageValidationWindowMs
+  );
   app.post("/devices/:deviceId/key-packages", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
@@ -77,6 +85,17 @@ export function registerKeyPackageRoutes({
       )
     )
       return;
+    const budget = validationBudget.consume(session.user.id, req.body.keyPackages.length);
+    if (!budget.allowed) {
+      res.setHeader("Retry-After", String(budget.retryAfterSeconds));
+      return void sendRelayError(
+        res,
+        429,
+        "rate_limited",
+        "KeyPackage validation limit exceeded. Slow down before retrying.",
+        { retryAfterSeconds: budget.retryAfterSeconds }
+      );
+    }
     const accepted = await validateKeyPackageBatch(
       req.body.keyPackages as unknown[],
       store,
@@ -284,12 +303,21 @@ async function validateUploadedKeyPackage(
     return keyPackageUploadError(res, 409, "conflict", "KeyPackage was already consumed.");
   const device = store.getDevice(session.user.id, deviceId);
   if (!device) return keyPackageUploadError(res, 400, "key_package_invalid", "Registered device identity is required.");
-  const validated = await validator.validate(parsed.data, {
-    userId: session.user.id,
-    deviceId,
-    signaturePublicKey: device.signaturePublicKey,
-    signatureKeyFingerprint: device.signatureKeyFingerprint
-  });
+  let validated: Awaited<ReturnType<KeyPackageValidator["validate"]>>;
+  try {
+    validated = await validator.validate(parsed.data, {
+      userId: session.user.id,
+      deviceId,
+      signaturePublicKey: device.signaturePublicKey,
+      signatureKeyFingerprint: device.signatureKeyFingerprint
+    });
+  } catch (error) {
+    if (error instanceof KeyPackageValidatorBusyError) {
+      sendRelayError(res, 503, "upstream_unavailable", "KeyPackage validation is busy. Retry shortly.");
+      return null;
+    }
+    throw error;
+  }
   if (!validatedUploaderMatches(validated, session.user.id, deviceId, device)) {
     return keyPackageUploadError(res, 400, "key_package_invalid", "KeyPackage credential does not match its uploader.");
   }
@@ -360,4 +388,36 @@ function constantTimeEqual(left: string, right: string): boolean {
   const a = Buffer.from(left);
   const b = Buffer.from(right);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function createKeyPackageValidationBudget(capacity: number, windowMs: number, now = Date.now) {
+  const accounts = new Map<string, { tokens: number; updatedAt: number; lastSeenAt: number }>();
+  let nextPruneAt = 0;
+  return {
+    consume(userId: string, cost: number): { allowed: true } | { allowed: false; retryAfterSeconds: number } {
+      const currentTime = now();
+      if (currentTime >= nextPruneAt) {
+        let earliestExpiry = Number.POSITIVE_INFINITY;
+        for (const [key, record] of accounts) {
+          const expiresAt = record.lastSeenAt + windowMs * 2;
+          if (expiresAt <= currentTime) accounts.delete(key);
+          else earliestExpiry = Math.min(earliestExpiry, expiresAt);
+        }
+        nextPruneAt = Number.isFinite(earliestExpiry) ? earliestExpiry : currentTime + windowMs * 2;
+      }
+      const refillPerMs = capacity / windowMs;
+      const previous = accounts.get(userId);
+      const tokens = previous
+        ? Math.min(capacity, previous.tokens + Math.max(0, currentTime - previous.updatedAt) * refillPerMs)
+        : capacity;
+      const allowed = tokens >= cost;
+      accounts.set(userId, {
+        tokens: allowed ? tokens - cost : tokens,
+        updatedAt: currentTime,
+        lastSeenAt: currentTime
+      });
+      if (allowed) return { allowed: true };
+      return { allowed: false, retryAfterSeconds: Math.ceil((cost - tokens) / refillPerMs / 1_000) };
+    }
+  };
 }

@@ -36,7 +36,8 @@ Desktop code is organized into domain/platform helpers under `src/lib`, store-aw
 3. The relay validates the envelope and authorization, stores the opaque record, and broadcasts it.
 4. Receiving native clients decrypt and validate it before the desktop projects it into state.
 
-See [message lifecycles](message-lifecycles.md) for code entry points and [cryptography](cryptography.md) for mechanisms.
+See [cryptography](cryptography.md) for mechanisms and the focused tests beside
+each boundary for current code entry points.
 
 ### Invitation
 
@@ -66,15 +67,15 @@ History hydration validates the current schema before enabling persistence and m
 
 ## Verification ladder
 
-Use the narrowest relevant test while iterating, then run the repository gates before publishing:
+Use the narrowest relevant test while iterating. CI runs the complete repository
+gates before merge:
 
 ```sh
 npm run check
 npm test
-npm run verify
 ```
 
-Pull requests run blocking workspace checks and an always-present product-journey aggregate; executable changes run UI, native two-client, and packaged macOS journeys. Scheduled workflows run focused fuzz, relay churn/restore, supply-chain, container, compatibility, and native checks. Releases rerun the full supply-chain workflow against the exact tagged source before verifying signing, notarization, authenticated updater metadata, checksums, and the required asset set. [CONTRIBUTING.md](../CONTRIBUTING.md) owns the current workflow and check policy.
+Pull requests run blocking workspace checks and an always-present product-journey aggregate; executable changes run UI, native two-client, and packaged macOS journeys. Scheduled workflows run focused fuzz, relay churn/restore, supply-chain, container, compatibility, and native checks. Releases rerun the full supply-chain workflow against the exact tagged source before verifying signing, notarization, authenticated updater metadata, checksums, and the required asset set. Workflow definitions are the source of truth for the current gates.
 
 Tests that support security or release claims must assert behavior that actually executed. A green check is not evidence when it only matches output from an otherwise failing command.
 
@@ -89,6 +90,7 @@ A useful 15-minute review follows this route:
 3. Trace one privileged command from its component through `application` and the typed native adapter to Rust authorization.
 4. Inspect the focused tests beside each boundary and the composed journey in `e2e` or `apps/relay/test`.
 5. Read the relevant ADR before changing a locked choice.
-6. Run the focused workspace tests, then `npm run verify`.
+6. Run the focused workspace tests; use the full verification gate for a
+   cross-cutting or release change.
 
 The rule of thumb is simple: behavior belongs in the narrowest owning layer, validation belongs at every trust boundary, and end-to-end tests prove composition rather than replace focused tests.

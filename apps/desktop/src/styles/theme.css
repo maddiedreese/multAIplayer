@@ -1,4 +1,4 @@
-/* Theme tokens and core monochrome surfaces. */
+/* Dark theme tokens and the component treatments that consume them. */
 
 :root[data-theme="dark"] {
   color-scheme: dark;

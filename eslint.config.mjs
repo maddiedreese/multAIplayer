@@ -89,10 +89,10 @@ export default tseslint.config(
       ])
     }
   },
-  ...["codex", "protocol"].map((packageName) => ({
-    files: [`packages/${packageName}/**/*.{ts,tsx}`],
+  {
+    files: ["packages/protocol/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": packageBoundaryRule(`@multaiplayer/${packageName}`)
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/protocol")
     }
-  }))
+  }
 );

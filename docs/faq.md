@@ -36,11 +36,22 @@ Host-local Codex, terminal, browser, filesystem, and Git work becomes unavailabl
 
 ## What platforms and Codex versions are supported?
 
-The public alpha is Apple-silicon-only and declares macOS 11 as its minimum deployment target. Automated packaged-app runtime testing currently runs on macOS 15, so macOS 11–14 remain unverified rather than claimed as tested support. Windows, Linux desktop, and Intel Mac releases are not supported. The exact tested Codex range is maintained in [Codex hosting](codex-hosting.md); newer versions remain unverified until their contracts are reviewed.
+The public alpha is tested on Apple-silicon macOS 15. Its package deployment target is macOS 11, but macOS 11–14 are compatibility targets rather than tested support. Windows, Linux desktop, and Intel Mac releases are not supported. The exact tested Codex range is maintained in [Codex hosting](codex-hosting.md); newer versions remain unverified until their contracts are reviewed.
 
 ## How are updates delivered?
 
 Supported releases use a pinned, signed Tauri updater channel and also publish notarized manual-download artifacts. Verify release checksums and Apple signatures using [Verifying releases](reproducible-builds.md). Development builds are not supported releases.
+
+## Why can a new installation reach a device quota?
+
+Device ids are permanently bound to their first MLS keys in this alpha. A new
+installation or new key material consumes another one of the hosted relay's 25
+registered-device slots per GitHub identity; there is no individual device-retirement
+flow. Preserve an intact installation when possible. If the quota is reached, file
+a non-sensitive support issue without keys, tokens, invite links, or private account
+details. Account deletion removes the whole account and is not a device-management
+workaround. Self-hosted operators should follow the
+[relay configuration guidance](self-hosting.md#relay-configuration).
 
 ## Is the alpha appropriate for private work?
 

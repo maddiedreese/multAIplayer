@@ -2,7 +2,7 @@ import { approvalPolicyLabels } from "../appDefaults";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { createAppRoomActions } from "./appRoomActions";
+import type { createRoomActions } from "../application/rooms/roomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
@@ -14,7 +14,7 @@ type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomActions = ReturnType<typeof createAppRoomActions>;
+type RoomActions = ReturnType<typeof createRoomActions>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
 type RoomSettingsActor = () => { requesterName: string; requesterUserId: string };
 
@@ -68,6 +68,7 @@ export function useAppWorkspaceFlow({
   );
   const { hasSelectedRoom, selectedRoom } = selected;
   const { setSelectedTeamHistoryMessage, setTeamHistoryMessageForTeam, hydrateLocalRoomHistoryForRoom } = roomActions;
+  const actions = useAppStore.getState();
 
   return useWorkspaceFlowContext({
     bootstrap: {
@@ -75,18 +76,18 @@ export function useAppWorkspaceFlow({
         relayHttpUrl,
         authenticatedUserId,
         bootstrapAttempt: workspaceBootstrapAttempt,
-        replaceTeams: storeAction("replaceTeams"),
-        replaceRooms: storeAction("replaceRooms"),
-        selectExistingTeamOrFirst: storeAction("selectExistingTeamOrFirst"),
-        selectExistingRoomOrFirst: storeAction("selectExistingRoomOrFirst"),
-        setWorkspaceStatusError: storeAction("setWorkspaceStatusError"),
-        beginWorkspaceBootstrap: storeAction("beginWorkspaceBootstrap"),
-        completeWorkspaceBootstrap: storeAction("completeWorkspaceBootstrap"),
-        failWorkspaceBootstrap: storeAction("failWorkspaceBootstrap")
+        replaceTeams: actions.replaceTeams,
+        replaceRooms: actions.replaceRooms,
+        selectExistingTeamOrFirst: actions.selectExistingTeamOrFirst,
+        selectExistingRoomOrFirst: actions.selectExistingRoomOrFirst,
+        setWorkspaceStatusError: actions.setWorkspaceStatusError,
+        beginWorkspaceBootstrap: actions.beginWorkspaceBootstrap,
+        completeWorkspaceBootstrap: actions.completeWorkspaceBootstrap,
+        failWorkspaceBootstrap: actions.failWorkspaceBootstrap
       },
       selectedRoomReadReceipt: {
         selectedRoomId,
-        markRoomRead: storeAction("markRoomReadById")
+        markRoomRead: actions.markRoomReadById
       },
       deviceIdentity: {
         relayHttpUrl,
@@ -95,8 +96,8 @@ export function useAppWorkspaceFlow({
         userId: localIdentity.localUser.id,
         displayName: localIdentity.localUser.name,
         deviceIdentity,
-        replaceDeviceIdentity: storeAction("replaceDeviceIdentity"),
-        setDeviceIdentityStatusMessage: storeAction("setDeviceIdentityStatusMessage")
+        replaceDeviceIdentity: actions.replaceDeviceIdentity,
+        setDeviceIdentityStatusMessage: actions.setDeviceIdentityStatusMessage
       },
       selectedTeamDefaults: {
         selectedTeam
@@ -104,20 +105,20 @@ export function useAppWorkspaceFlow({
     },
     workspaceRoomActions: {
       members: {
-        setDeviceIdentityMessage: storeAction("setDeviceIdentityStatusMessage"),
-        recordDeviceFingerprintComparisonForRoom: storeAction("recordDeviceFingerprintComparisonForRoom"),
-        removeDeviceFingerprintComparisonForRoom: storeAction("removeDeviceFingerprintComparisonForRoom"),
-        updateTeamRoleForTeam: storeAction("updateTeamRoleForTeam"),
-        updateTeamMemberCountForTeam: storeAction("updateTeamMemberCountForTeam"),
+        setDeviceIdentityMessage: actions.setDeviceIdentityStatusMessage,
+        recordDeviceFingerprintComparisonForRoom: actions.recordDeviceFingerprintComparisonForRoom,
+        removeDeviceFingerprintComparisonForRoom: actions.removeDeviceFingerprintComparisonForRoom,
+        updateTeamRoleForTeam: actions.updateTeamRoleForTeam,
+        updateTeamMemberCountForTeam: actions.updateTeamMemberCountForTeam,
         removeMembersFromMlsGroup: inviteActions.removeMembersFromMlsGroup
       },
       workspaceCreation: {
-        setWorkspaceStatusError: storeAction("setWorkspaceStatusError"),
-        setSelectedTeam: storeAction("setSelectedTeam"),
-        setSelectedRoomId: storeAction("setSelectedRoomId"),
-        setNewTeamName: storeAction("setNewTeamName"),
-        setNewRoomName: storeAction("setNewRoomName"),
-        setNewRoomProjectPath: storeAction("setNewRoomProjectPath"),
+        setWorkspaceStatusError: actions.setWorkspaceStatusError,
+        setSelectedTeam: actions.setSelectedTeam,
+        setSelectedRoomId: actions.setSelectedRoomId,
+        setNewTeamName: actions.setNewTeamName,
+        setNewRoomName: actions.setNewRoomName,
+        setNewRoomProjectPath: actions.setNewRoomProjectPath,
         upsertTeam: workspaceRecords.upsertTeam,
         upsertRoom: workspaceRecords.upsertRoom,
         roomSettingsActor
@@ -126,16 +127,16 @@ export function useAppWorkspaceFlow({
         approvalPolicyLabels,
         setSelectedTeamHistoryMessage,
         setTeamHistoryMessageForTeam,
-        setTeamHistorySettings: storeAction("setTeamHistorySettings"),
-        setTeamDefaultApprovalPolicy: storeAction("setTeamDefaultApprovalPolicy"),
-        setTeamDefaultCodexModel: storeAction("setTeamDefaultCodexModel"),
-        setTeamDefaultInviteApprovalGate: storeAction("setTeamDefaultInviteApprovalGate")
+        setTeamHistorySettings: actions.setTeamHistorySettings,
+        setTeamDefaultApprovalPolicy: actions.setTeamDefaultApprovalPolicy,
+        setTeamDefaultCodexModel: actions.setTeamDefaultCodexModel,
+        setTeamDefaultInviteApprovalGate: actions.setTeamDefaultInviteApprovalGate
       },
       localHistory: {
         selectedRoomIdRef: appRefs.selectedRoomIdRef,
         settingsBusyRef: appRefs.settingsBusyRef,
         reportRoomSettingsMutationInFlight: roomInteraction.reportRoomSettingsMutationInFlight,
-        replaceHistorySettings: storeAction("setHistorySettings"),
+        replaceHistorySettings: actions.setHistorySettings,
         replaceRoom: workspaceRecords.replaceRoom
       },
       files: {
@@ -151,9 +152,9 @@ export function useAppWorkspaceFlow({
         selectedRoomId,
         selectedRoomTeamId: selectedRoom?.teamId ?? "",
         forgottenRoomIds,
-        replaceHistorySettings: storeAction("setHistorySettings"),
+        replaceHistorySettings: actions.setHistorySettings,
         hydrateLocalRoomHistoryForRoom,
-        hydrateRoomReadState: storeAction("hydrateRoomReadState")
+        hydrateRoomReadState: actions.hydrateRoomReadState
       },
       search: {
         searchActive,
@@ -161,27 +162,9 @@ export function useAppWorkspaceFlow({
         forgottenRoomIds,
         revokedRoomIds,
         revokedTeamIds,
-        startHistorySearch: storeAction("startHistorySearch"),
-        finishHistorySearch: storeAction("finishHistorySearch")
+        startHistorySearch: actions.startHistorySearch,
+        finishHistorySearch: actions.finishHistorySearch
       }
     }
   });
-}
-
-type AppStore = ReturnType<typeof useAppStore.getState>;
-type StoreActionKey = {
-  [K in keyof AppStore]: AppStore[K] extends (...args: never[]) => unknown ? K : never;
-}[keyof AppStore];
-
-const cachedStoreActions = new Map<StoreActionKey, AppStore[StoreActionKey]>();
-
-function storeAction<K extends StoreActionKey>(key: K): AppStore[K] {
-  const cached = cachedStoreActions.get(key);
-  if (cached) return cached as AppStore[K];
-  const action = ((...args: unknown[]) => {
-    const action = useAppStore.getState()[key] as (...values: unknown[]) => unknown;
-    return action(...args);
-  }) as AppStore[K];
-  cachedStoreActions.set(key, action);
-  return action;
 }

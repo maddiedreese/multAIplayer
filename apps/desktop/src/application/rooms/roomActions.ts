@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import { useAppStore, type AppStoreState } from "../../store/appStore";
+import { useAppStore } from "../../store/appStore";
 import { omitRecordKey } from "../../lib/core/setUtils";
 
 type BusyMap = Record<string, boolean>;
@@ -17,26 +17,6 @@ interface RoomBusyActionsOptions {
 
 function updateBusyRef(ref: MutableRefObject<BusyMap>, roomId: string, busy: boolean) {
   ref.current = busy ? { ...ref.current, [roomId]: true } : omitRecordKey(ref.current, roomId);
-}
-
-type AppStoreActionName = {
-  [Key in keyof AppStoreState]: AppStoreState[Key] extends (...args: never[]) => unknown ? Key : never;
-}[keyof AppStoreState];
-
-const cachedStoreActions = new Map<AppStoreActionName, AppStoreState[AppStoreActionName]>();
-
-function storeAction<Key extends AppStoreActionName>(name: Key): AppStoreState[Key] {
-  const cached = cachedStoreActions.get(name);
-  if (cached) return cached as AppStoreState[Key];
-  // Resolve at invocation time so long-lived room adapters never retain an action
-  // implementation replaced by a store reset or runtime reconfiguration. Cache
-  // the adapter itself so React effect dependencies remain stable across renders.
-  const action = ((...args: unknown[]) => {
-    const action = useAppStore.getState()[name] as (...actionArgs: unknown[]) => unknown;
-    return action(...args);
-  }) as AppStoreState[Key];
-  cachedStoreActions.set(name, action);
-  return action;
 }
 
 export function createRoomActions({
@@ -60,79 +40,81 @@ export function createRoomActions({
     const roomId = useAppStore.getState().selectedRoomId;
     if (roomId) action(roomId);
   };
-  const setHostMessageForRoom = storeAction("setHostMessageForRoom");
-  const setChatMessageForRoom = storeAction("setChatMessageForRoom");
-  const setMarkdownCopyFallbackForRoom = storeAction("setMarkdownCopyFallbackForRoom");
-  const setInspectorTabForRoom = storeAction("setInspectorTabForRoom");
-  const setSecretWarningVisibleForRoom = storeAction("setSecretWarningVisibleForRoom");
-  const setHistoryMessageForRoom = storeAction("setHistoryMessageForRoom");
-  const setTeamHistoryMessageForTeam = storeAction("setTeamHistoryMessageForTeam");
-  const setSettingsMessageForRoom = storeAction("setSettingsMessageForRoom");
-  const setPendingAttachmentsForRoom = storeAction("setPendingAttachmentsForRoom");
-  const appendPendingAttachmentForRoom = storeAction("appendPendingAttachmentForRoom");
-  const removePendingAttachmentForRoom = storeAction("removePendingAttachmentForRoom");
-  const clearPendingAttachmentsForRoom = storeAction("clearPendingAttachmentsForRoom");
-  const setDraftForRoom = storeAction("setDraftForRoom");
-  const setReplyToMessageForRoom = storeAction("setReplyToMessageForRoom");
-  const hydrateLocalRoomHistoryForRoom = storeAction("hydrateLocalRoomHistoryForRoom");
-  const setGitWorkflowMessageForRoom = storeAction("setGitWorkflowMessageForRoom");
-  const setGitStatusForRoom = storeAction("setGitStatusForRoom");
-  const editGitWorkflowDraftForRoom = storeAction("editGitWorkflowDraftForRoom");
-  const recordGitHubActionsRefreshForRoom = storeAction("recordGitHubActionsRefreshForRoom");
-  const applyGitHubActionsEventForRoom = storeAction("applyGitHubActionsEventForRoom");
-  const setActionsLastCheckedForRoom = storeAction("setActionsLastCheckedForRoom");
-  const setActionsMessageForRoom = storeAction("setActionsMessageForRoom");
-  const setBrowserUrlForRoom = storeAction("setBrowserUrlForRoom");
-  const setBrowserReasonForRoom = storeAction("setBrowserReasonForRoom");
-  const setBrowserMessageForRoom = storeAction("setBrowserMessageForRoom");
-  const selectBrowserTabForRoom = storeAction("selectBrowserTabForRoom");
-  const closeBrowserTabForRoom = storeAction("closeBrowserTabForRoom");
-  const setInviteLinkForRoom = storeAction("setInviteLinkForRoom");
-  const setInviteApprovalGateForRoom = storeAction("setInviteApprovalGateForRoom");
-  const setInviteMessageForRoom = storeAction("setInviteMessageForRoom");
-  const setCustomCodexModelForRoom = storeAction("setCustomCodexModelForRoom");
-  const setProjectPathDraftForRoom = storeAction("setProjectPathDraftForRoom");
-  const setRoomNotificationsMuted = storeAction("setRoomNotificationsMuted");
-  const setGitWorkflowBusyForRoom = storeAction("setGitWorkflowBusyForRoom");
-  const setActionsBusyForRoom = storeAction("setActionsBusyForRoom");
-  const setLocalPreviewBusyForRoom = storeAction("setLocalPreviewBusyForRoom");
-  const setHostBusyForRoom = storeAction("setHostBusyForRoom");
-  const setSettingsBusyForRoom = storeAction("setSettingsBusyForRoom");
-  const setMembershipCommitBusyForRoom = storeAction("setMembershipCommitBusyForRoom");
-  const setFileBusyForRoom = storeAction("setFileBusyForRoom");
-  const setTerminalBusyForRoom = storeAction("setTerminalBusyForRoom");
-  const updateInviteRequestStatus = storeAction("updateInviteRequestStatus");
-  const appendTerminalRequest = storeAction("appendTerminalRequest");
-  const updateTerminalRequestStatus = storeAction("updateTerminalRequestStatus");
-  const appendBrowserRequest = storeAction("appendBrowserRequest");
-  const updateBrowserRequestStatus = storeAction("updateBrowserRequestStatus");
-  const setApprovalVisibleForRoom = storeAction("setApprovalVisibleForRoom");
-  const setPendingCodexApprovalForRoom = storeAction("setPendingCodexApprovalForRoom");
-  const enqueueCodexApprovalForRoom = storeAction("enqueueCodexApprovalForRoom");
-  const removeQueuedCodexApprovalForRoom = storeAction("removeQueuedCodexApprovalForRoom");
-  const resetCodexApprovalForRoom = storeAction("resetCodexApprovalForRoom");
-  const setCodexRunningForRoom = storeAction("setCodexRunningForRoom");
-  const setRoomGoalForRoom = storeAction("setRoomGoalForRoom");
-  const setFileQueryForRoom = storeAction("setFileQueryForRoom");
-  const setProjectFilesForRoom = storeAction("setProjectFilesForRoom");
-  const setSelectedFileForRoom = storeAction("setSelectedFileForRoom");
-  const setSelectedDiffForRoom = storeAction("setSelectedDiffForRoom");
-  const setFilePreviewTabForRoom = storeAction("setFilePreviewTabForRoom");
-  const setFileMessageForRoom = storeAction("setFileMessageForRoom");
-  const appendFileSaveRequest = storeAction("appendFileSaveRequest");
-  const updateFileSaveRequestStatus = storeAction("updateFileSaveRequestStatus");
-  const resetFileContextForRoom = storeAction("resetFileContextForRoom");
-  const setSelectedTerminalIdForRoom = storeAction("setSelectedTerminalIdForRoom");
-  const setTerminalErrorForRoom = storeAction("setTerminalErrorForRoom");
-  const appendTerminalLinesForRoom = storeAction("appendTerminalLinesForRoom");
-  const appendGitWorkflowEvent = storeAction("appendGitWorkflowEvent");
-  const appendGitHubActionsEvent = storeAction("appendGitHubActionsEvent");
-  const appendLocalPreviewEvent = storeAction("appendLocalPreviewEvent");
-  const appendHostHandoff = storeAction("appendHostHandoff");
-  const applyAcceptedHostHandoffForRoom = storeAction("applyAcceptedHostHandoffForRoom");
-  const appendInviteRequest = storeAction("appendInviteRequest");
-  const appendCodexEvent = storeAction("appendCodexEvent");
-  const upsertCodexActivity = storeAction("upsertCodexActivity");
+  const {
+    setHostMessageForRoom,
+    setChatMessageForRoom,
+    setMarkdownCopyFallbackForRoom,
+    setInspectorTabForRoom,
+    setSecretWarningVisibleForRoom,
+    setHistoryMessageForRoom,
+    setTeamHistoryMessageForTeam,
+    setSettingsMessageForRoom,
+    setPendingAttachmentsForRoom,
+    appendPendingAttachmentForRoom,
+    removePendingAttachmentForRoom,
+    clearPendingAttachmentsForRoom,
+    setDraftForRoom,
+    setReplyToMessageForRoom,
+    hydrateLocalRoomHistoryForRoom,
+    setGitWorkflowMessageForRoom,
+    setGitStatusForRoom,
+    editGitWorkflowDraftForRoom,
+    recordGitHubActionsRefreshForRoom,
+    applyGitHubActionsEventForRoom,
+    setActionsLastCheckedForRoom,
+    setActionsMessageForRoom,
+    setBrowserUrlForRoom,
+    setBrowserReasonForRoom,
+    setBrowserMessageForRoom,
+    selectBrowserTabForRoom,
+    closeBrowserTabForRoom,
+    setInviteLinkForRoom,
+    setInviteApprovalGateForRoom,
+    setInviteMessageForRoom,
+    setCustomCodexModelForRoom,
+    setProjectPathDraftForRoom,
+    setRoomNotificationsMuted,
+    setGitWorkflowBusyForRoom,
+    setActionsBusyForRoom,
+    setLocalPreviewBusyForRoom,
+    setHostBusyForRoom,
+    setSettingsBusyForRoom,
+    setMembershipCommitBusyForRoom,
+    setFileBusyForRoom,
+    setTerminalBusyForRoom,
+    updateInviteRequestStatus,
+    appendTerminalRequest,
+    updateTerminalRequestStatus,
+    appendBrowserRequest,
+    updateBrowserRequestStatus,
+    setApprovalVisibleForRoom,
+    setPendingCodexApprovalForRoom,
+    enqueueCodexApprovalForRoom,
+    removeQueuedCodexApprovalForRoom,
+    resetCodexApprovalForRoom,
+    setCodexRunningForRoom,
+    setRoomGoalForRoom,
+    setFileQueryForRoom,
+    setProjectFilesForRoom,
+    setSelectedFileForRoom,
+    setSelectedDiffForRoom,
+    setFilePreviewTabForRoom,
+    setFileMessageForRoom,
+    appendFileSaveRequest,
+    updateFileSaveRequestStatus,
+    resetFileContextForRoom,
+    setSelectedTerminalIdForRoom,
+    setTerminalErrorForRoom,
+    appendTerminalLinesForRoom,
+    appendGitWorkflowEvent,
+    appendGitHubActionsEvent,
+    appendLocalPreviewEvent,
+    appendHostHandoff,
+    applyAcceptedHostHandoffForRoom,
+    appendInviteRequest,
+    appendCodexEvent,
+    upsertCodexActivity
+  } = useAppStore.getState();
 
   const applyBusyForRoom = (
     ref: MutableRefObject<BusyMap>,

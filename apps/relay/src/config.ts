@@ -74,6 +74,7 @@ export interface RelayConfig {
   registeredDeviceCapPerUser: number;
   retainedAuthSessionCapPerUser: number;
   liveKeyPackageCapPerUser: number;
+  keyPackageValidationCapPerUser: number;
   liveInviteCapPerUser: number;
   maxDurableEntries: number;
   maxDurableEntriesPerTeam: number;
@@ -200,6 +201,12 @@ export function loadRelayConfig(): RelayConfig {
     registeredDeviceCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_REGISTERED_DEVICE_CAP_USER", 25, 1, 10_000),
     retainedAuthSessionCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER", 20, 1, 1_000),
     liveKeyPackageCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER", 250, 1, 100_000),
+    keyPackageValidationCapPerUser: parseIntegerEnv(
+      "MULTAIPLAYER_RELAY_KEY_PACKAGE_VALIDATION_CAP_USER",
+      40,
+      1,
+      10_000
+    ),
     liveInviteCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER", 100, 1, 100_000),
     maxDurableEntries,
     maxDurableEntriesPerTeam: parseIntegerEnv(

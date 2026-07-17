@@ -62,7 +62,7 @@ export function classifyChanges(paths) {
       /^apps\/relay\//,
       /^packages\//,
       /^e2e\/(?!native-shell\/|native-macos\/)/,
-      /^scripts\/run-e2e\.mjs$/,
+      /^scripts\/run-ui-contract\.mjs$/,
       /^package(?:-lock)?\.json$/,
       /^\.npmrc$/,
       /^\.github\/workflows\/journeys\.yml$/,

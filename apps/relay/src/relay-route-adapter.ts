@@ -192,6 +192,8 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
       allowMutation: auth.allowMutation,
       saveRelayStore,
       liveKeyPackageCapPerUser: config.liveKeyPackageCapPerUser,
+      keyPackageValidationCapPerUser: config.keyPackageValidationCapPerUser,
+      keyPackageValidationWindowMs: config.rateLimitWindowMs,
       recordQuotaRejection: metrics.recordQuotaRejection
     },
     teams: {

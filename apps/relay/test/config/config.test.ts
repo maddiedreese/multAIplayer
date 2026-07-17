@@ -124,6 +124,21 @@ test("relay rejects an out-of-range trusted-network rate-limit multiplier", () =
   }
 });
 
+test("relay bounds per-account KeyPackage validation work", () => {
+  const name = "MULTAIPLAYER_RELAY_KEY_PACKAGE_VALIDATION_CAP_USER";
+  const previous = process.env[name];
+  try {
+    delete process.env[name];
+    assert.equal(loadRelayConfig().keyPackageValidationCapPerUser, 40);
+    process.env[name] = "0";
+    assert.throws(() => loadRelayConfig(), /KEY_PACKAGE_VALIDATION_CAP_USER must be an integer between 1 and 10000/);
+    process.env[name] = "10001";
+    assert.throws(() => loadRelayConfig(), /KEY_PACKAGE_VALIDATION_CAP_USER must be an integer between 1 and 10000/);
+  } finally {
+    restoreEnv(name, previous);
+  }
+});
+
 test("authentication defaults on and only the explicit unsafe opt-out disables it", () => {
   const previous = process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH;
   try {

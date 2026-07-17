@@ -34,7 +34,7 @@
     "check:security-exceptions": "node tools/security/check-exception-expiry.mjs",
     "audit:npm": "npm audit --audit-level=high",
     "test": "npm run build:packages && npm run test:workspaces",
-    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:ui-contract": "node scripts/run-ui-contract.mjs",
     "docs:screenshots": "node e2e/capture-readme-screens.mjs",
     "test:e2e:native": "node --import tsx e2e/native-shell/journey.ts",
     "test:e2e:native:macos-smoke": "wdio run e2e/native-macos/wdio.conf.mjs",
@@ -44,7 +44,6 @@
     "test:native": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-features",
     "hooks:install": "git config core.hooksPath .githooks",
     "verify": "npm run lint && npm run format:check && npm run docs:check && npm run check:security-exceptions && npm run test:release-tools && npm run build:packages && npm run test:workspaces && npm run build:apps && npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native",
-    "release:preflight": "node scripts/doctor.mjs && npm run license:check && npm run sqlite:backup-restore-drill && npm run verify",
     "verify:aasa": "node scripts/verify-macos-associated-domains.mjs --live",
     "verify:macos-associated-domains": "node scripts/verify-macos-associated-domains.mjs",
     "check:release-versions": "node scripts/check-release-versions.mjs",
@@ -100,14 +99,6 @@
     "@esbuild/linux-arm64": "0.28.1",
     "@esbuild/linux-x64": "0.28.1",
     "@esbuild/win32-arm64": "0.28.1",
-    "@esbuild/win32-x64": "0.28.1",
-    "@rolldown/binding-darwin-arm64": "1.2.0",
-    "@rolldown/binding-darwin-x64": "1.2.0",
-    "@rolldown/binding-linux-arm64-gnu": "1.2.0",
-    "@rolldown/binding-linux-arm64-musl": "1.2.0",
-    "@rolldown/binding-linux-x64-gnu": "1.2.0",
-    "@rolldown/binding-linux-x64-musl": "1.2.0",
-    "@rolldown/binding-win32-arm64-msvc": "1.2.0",
-    "@rolldown/binding-win32-x64-msvc": "1.2.0"
+    "@esbuild/win32-x64": "0.28.1"
   }
 }

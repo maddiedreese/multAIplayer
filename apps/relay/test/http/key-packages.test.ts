@@ -17,6 +17,7 @@ import { acquireAccountMutationTurn } from "../../src/auth/account-mutation-tran
 import type { KeyPackageRecord } from "@multaiplayer/protocol";
 
 const validatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
+const delayedValidatorPath = fileURLToPath(new URL("../fixtures/delayed-keypackage-validator.mjs", import.meta.url));
 
 test("expired invites cannot create KeyPackage requests", async () => {
   const relay = await startRelayWithWorkspace({
@@ -73,6 +74,86 @@ test("expired invites cannot create KeyPackage requests", async () => {
       ).status,
       410
     );
+  } finally {
+    await relay.close();
+  }
+});
+
+test("rejected KeyPackage batches consume a separate per-account validation budget", async () => {
+  const relay = await startRelayWithWorkspace({
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+    MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath,
+    MULTAIPLAYER_RELAY_KEY_PACKAGE_VALIDATION_CAP_USER: "2",
+    MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS: "60000"
+  });
+  try {
+    const peer = await createAuthenticatedTestDevice(relay.baseUrl, "github:tester", "budget-peer");
+    const headers = { "content-type": "application/json", cookie: peer.cookie, "x-device-session": peer.token };
+    const candidate = (id: string, value: number) => {
+      const keyPackage = Buffer.from([value]).toString("base64");
+      return {
+        id,
+        keyPackage,
+        keyPackageHash: `sha256:${createHash("sha256").update(Buffer.from(keyPackage, "base64")).digest("hex")}`,
+        ciphersuite: 2
+      };
+    };
+    const rejected = await fetch(`${relay.baseUrl}/devices/budget-peer/key-packages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ keyPackages: [candidate("budget-valid", 0), candidate("budget-invalid", 1)] })
+    });
+    assert.equal(rejected.status, 400);
+
+    const limited = await fetch(`${relay.baseUrl}/devices/budget-peer/key-packages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ keyPackages: [candidate("budget-retry", 2)] })
+    });
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.has("retry-after"), true);
+    assert.deepEqual(await limited.json(), {
+      error: "KeyPackage validation limit exceeded. Slow down before retrying.",
+      code: "rate_limited",
+      retryAfterSeconds: 30
+    });
+  } finally {
+    await relay.close();
+  }
+});
+
+test("KeyPackage uploads fail fast when global validator capacity is occupied", async () => {
+  const relay = await startRelayWithWorkspace({
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+    MULTAIPLAYER_MLS_VALIDATOR_PATH: delayedValidatorPath
+  });
+  try {
+    const peer = await createAuthenticatedTestDevice(relay.baseUrl, "github:tester", "capacity-peer");
+    const headers = { "content-type": "application/json", cookie: peer.cookie, "x-device-session": peer.token };
+    const upload = (value: number) => {
+      const keyPackage = Buffer.from([value]).toString("base64");
+      return fetch(`${relay.baseUrl}/devices/capacity-peer/key-packages`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          keyPackages: [
+            {
+              id: `capacity-${value}`,
+              keyPackage,
+              keyPackageHash: `sha256:${createHash("sha256").update(Buffer.from(keyPackage, "base64")).digest("hex")}`,
+              ciphersuite: 2
+            }
+          ]
+        })
+      });
+    };
+    const responses = await Promise.all([upload(3), upload(4), upload(5)]);
+    assert.deepEqual(responses.map((response) => response.status).sort(), [201, 201, 503]);
+    const busy = responses.find((response) => response.status === 503);
+    assert.deepEqual(await busy?.json(), {
+      error: "KeyPackage validation is busy. Retry shortly.",
+      code: "upstream_unavailable"
+    });
   } finally {
     await relay.close();
   }

@@ -1,23 +1,14 @@
 name: Product journeys
 
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
   pull_request:
   schedule:
     - cron: "23 7 * * 2"
   workflow_dispatch:
-    inputs:
-      required_only:
-        description: "When true, run only pull-request journey jobs"
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: journeys-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -39,7 +30,7 @@ jobs:
         id: paths
         uses: ./.github/actions/changed-domains
 
-  web-shell-e2e:
+  ui-contract:
     name: UI contract journeys
     needs: changes
     if: needs.changes.outputs.ui == 'true'
@@ -55,7 +46,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run UI contract journeys
-        run: npm run test:e2e
+        run: npm run test:ui-contract
       - name: Upload journey failure artifacts
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -131,7 +122,7 @@ jobs:
 
   macos-two-client:
     name: Scheduled macOS two-client MLS journey
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.required_only == false)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -160,7 +151,7 @@ jobs:
 
   relay-security-depth:
     name: Scheduled relay security depth
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.required_only == false)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -191,7 +182,7 @@ jobs:
 
   mls-deserialization-fuzz:
     name: Native untrusted-input fuzz smoke tests
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.required_only == false)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -293,7 +284,7 @@ jobs:
   required-journeys:
     name: Required product journeys
     if: always() && github.event_name != 'schedule'
-    needs: [changes, web-shell-e2e, native-shell-e2e, macos-desktop]
+    needs: [changes, ui-contract, native-shell-e2e, macos-desktop]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful journeys when product code changed
@@ -302,7 +293,7 @@ jobs:
           UI_CHANGED: ${{ needs.changes.outputs.ui }}
           NATIVE_CHANGED: ${{ needs.changes.outputs.native }}
           MACOS_CHANGED: ${{ needs.changes.outputs.macos }}
-          UI_RESULT: ${{ needs.web-shell-e2e.result }}
+          UI_RESULT: ${{ needs.ui-contract.result }}
           NATIVE_RESULT: ${{ needs.native-shell-e2e.result }}
           MACOS_RESULT: ${{ needs.macos-desktop.result }}
         run: |

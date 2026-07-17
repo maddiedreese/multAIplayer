@@ -251,3 +251,37 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Settings drawers remain usable at every supported native width. */
+.sidebar-drawer .drawer-content {
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 16px 18px 48px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.sidebar-drawer .drawer-section,
+.sidebar-drawer .drawer-section * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.sidebar-drawer .history-retention {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.sidebar-drawer .drawer-section :where(input:not([type="checkbox"]), select, textarea, button) {
+  width: 100%;
+}
+
+.sidebar-drawer :where(.checkbox-row, .history-defaults) :where(span, strong) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

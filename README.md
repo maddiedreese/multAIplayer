@@ -20,7 +20,7 @@
 </p>
 
 > [!IMPORTANT]
-> multAIplayer is a free, open-source alpha for Apple-silicon Macs. Packages declare macOS 11 as their minimum deployment target; automated packaged-app runtime testing currently runs on macOS 15, so macOS 11–14 remain unverified. Use only Developer ID-signed, notarized builds published from this repository's release workflow.
+> multAIplayer is a free, open-source alpha tested on Apple-silicon macOS 15. Packages use macOS 11 as their deployment target, but macOS 11–14 are compatibility targets, not tested support. Use only Developer ID-signed, notarized builds published from this repository's release workflow.
 
 ## The product
 
@@ -66,15 +66,14 @@ npm run tauri:dev
 
 The root command starts the local relay and Tauri frontend. GitHub sign-in uses a public OAuth client id; no client secret is supported. Custom relay origins require a self-built client as described in [Self-hosting](docs/self-hosting.md).
 
-Run the verification ladder before publishing changes:
+Run focused checks for the area you change; CI runs the complete repository gates:
 
 ```sh
 npm run check
 npm test
-npm run verify
 ```
 
-Pull requests run workspace checks and product journeys when executable code changes. Scheduled workflows provide focused fuzz, supply-chain, container, and Codex-compatibility checks. Releases rerun supply-chain checks against the exact tag before verifying signing, notarization, authenticated updater metadata, the required release asset set, and checksums. [CONTRIBUTING.md](CONTRIBUTING.md) owns the exact workflow policy.
+Pull requests run workspace checks and product journeys when executable code changes. Scheduled workflows provide focused fuzz, supply-chain, container, and Codex-compatibility checks. Releases rerun supply-chain checks against the exact tag before verifying signing, notarization, authenticated updater metadata, the required release asset set, and checksums. Workflow definitions are the source of truth for the current gates.
 
 ## Repository map
 

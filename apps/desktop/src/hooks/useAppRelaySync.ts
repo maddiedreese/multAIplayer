@@ -2,7 +2,7 @@ import { approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
 import { createCodexBrowserOpenCommand } from "../application/codex/codexBrowserOpenCommand";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
-import type { createAppRoomActions } from "./appRoomActions";
+import type { createRoomActions } from "../application/rooms/roomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
@@ -15,7 +15,7 @@ import { useTeamMembersRefresh } from "./useTeamMembersRefresh";
 type AppRefs = ReturnType<typeof useAppRefs>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
-type RoomActions = ReturnType<typeof createAppRoomActions>;
+type RoomActions = ReturnType<typeof createRoomActions>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
 type RoomChatMutations = Pick<
   ReturnType<typeof useAppStore.getState>,

@@ -6,7 +6,7 @@ multAIplayer is an honest alpha. Please treat it as security-sensitive software 
 
 Security reports are welcome for the current `main` branch and latest published alpha release. Older alphas and unreleased branches are unsupported; upgrade or reproduce on `main` when possible.
 
-The [threat model](docs/threat-model.md) is the only normative source for intended security properties, trust assumptions, relay-visible metadata, and residual risks. Please evaluate a report against that exact revision rather than summaries elsewhere. [CONTRIBUTING.md](CONTRIBUTING.md) owns CI, dependency, release, and relay operations.
+The [threat model](docs/threat-model.md) is the only normative source for intended security properties, trust assumptions, relay-visible metadata, and residual risks. Please evaluate a report against that exact revision rather than summaries elsewhere. Workflow definitions, [Self-hosting](docs/self-hosting.md), and [Verifying releases](docs/reproducible-builds.md) own their respective operational procedures.
 
 ## Reporting
 
@@ -20,7 +20,12 @@ Good reports include:
 - expected vs actual behavior;
 - whether the issue affects the relay, native desktop app, browser install notice, or documentation.
 
-We aim to acknowledge reports within 3 business days and provide a status update about every 7 days while a report remains open. These are best-effort response targets for a volunteer-maintained project, not a support SLA. We coordinate fixes and release timing privately, aim to publish a patched release before technical disclosure, and credit reporters who want attribution. Please allow up to 90 days for coordinated disclosure unless active exploitation or another urgent risk requires a shorter timeline.
+This is a volunteer-maintained project without a response-time SLA. Reports are
+reviewed as capacity permits, with exploitable or high-impact findings prioritized.
+We coordinate fixes and release timing privately, aim to publish a patched release
+before technical disclosure, and credit reporters who want attribution. Please allow
+up to 90 days for coordinated disclosure unless active exploitation or another
+urgent risk requires a shorter timeline.
 
 ## Local Verification
 
