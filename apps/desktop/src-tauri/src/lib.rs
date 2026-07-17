@@ -129,7 +129,6 @@ declare_registered_commands! {
     local_preview_start,
     local_preview_status,
     local_preview_stop,
-    local_preview_stop_all,
     open_browser_view,
     position_browser_view,
     close_browser_view,

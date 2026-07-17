@@ -13,8 +13,6 @@ import { useAppStore } from "../store/appStore";
 import { openTrustedAuthenticationUrl } from "../lib/identity/authExternalUrl";
 import { invokeNative } from "../lib/platform/nativeCommandError";
 import { clearDeviceSession } from "../lib/identity/deviceSession";
-import { resumeLocalPreviewSharingAfterAuthentication } from "../application/files/localPreviewActions";
-import { localPreviewTerminationWarning } from "../lib/files/localPreview";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",
@@ -42,11 +40,6 @@ export function useGitHubAuth(relayHttpUrl: string) {
   const setAuthBusy = useAppStore((state) => state.setAuthBusy);
   const identityResolved =
     authConfigResolved && currentUserResolved && (currentUser !== null || authConfig?.mutationsRequireAuth === false);
-  const currentUserId = currentUser?.id;
-
-  useEffect(() => {
-    if (currentUserId) resumeLocalPreviewSharingAfterAuthentication();
-  }, [currentUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,12 +154,8 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [deviceFlow, setAuthBusy, setAuthError, setDeviceFlow]);
 
   const signOutGitHub = useCallback(async () => {
-    let logoutError: unknown = null;
     try {
       await logout();
-    } catch (error) {
-      logoutError = error;
-      throw error;
     } finally {
       clearDeviceSession();
       const store = useAppStore.getState();
@@ -176,22 +165,10 @@ export function useGitHubAuth(relayHttpUrl: string) {
       setCurrentUser(null);
       setDeviceFlow(null);
       setAuthBusy(false);
-      if (logoutError)
-        setAuthError("Signed out locally, but the relay or GitHub credential cleanup reported a failure.");
     }
-  }, [setAuthBusy, setAuthError, setCurrentUser, setDeviceFlow]);
-
-  const reportUnconfirmedPreviewCleanup = useCallback(() => {
-    const existingError = useAppStore.getState().authError;
-    setAuthError(
-      existingError && existingError !== localPreviewTerminationWarning
-        ? `${existingError} ${localPreviewTerminationWarning}`
-        : localPreviewTerminationWarning
-    );
-  }, [setAuthError]);
+  }, [setAuthBusy, setCurrentUser, setDeviceFlow]);
 
   const clearDeletedHostedAccount = useCallback(() => {
-    clearDeviceSession();
     setAuthenticationBrowserOpenFailed(false);
     useAppStore.getState().resetAppStore();
     setCurrentUser(null);
@@ -214,7 +191,6 @@ export function useGitHubAuth(relayHttpUrl: string) {
     beginGitHubSignIn,
     cancelGitHubSignIn,
     signOutGitHub,
-    clearDeletedHostedAccount,
-    reportUnconfirmedPreviewCleanup
+    clearDeletedHostedAccount
   };
 }

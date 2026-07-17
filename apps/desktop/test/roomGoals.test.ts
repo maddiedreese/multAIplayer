@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatRoomGoalDuration, parseRoomGoalCommand, updateRoomGoalElapsed } from "../src/lib/room/roomGoals";
+import {
+  createRoomGoal,
+  editRoomGoal,
+  formatRoomGoalDuration,
+  parseRoomGoalCommand,
+  pauseRoomGoal,
+  resumeRoomGoal,
+  updateRoomGoalElapsed
+} from "../src/lib/room/roomGoals";
 
 test("parseRoomGoalCommand accepts /goal commands only", () => {
   assert.equal(parseRoomGoalCommand("/goal build the editor"), "build the editor");
@@ -9,19 +17,21 @@ test("parseRoomGoalCommand accepts /goal commands only", () => {
   assert.equal(parseRoomGoalCommand("/goal   "), null);
 });
 
-test("room goal elapsed time advances only while active", () => {
-  const goal = {
-    id: "codex-goal-1",
-    text: "Ship the multiplayer IDE",
-    status: "active" as const,
-    startedAt: "2026-07-07T10:00:00.000Z",
-    updatedAt: "2026-07-07T10:00:00.000Z",
-    elapsedMs: 0
-  };
+test("room goal lifecycle tracks elapsed time while paused and resumed", () => {
+  const start = new Date("2026-07-07T10:00:00.000Z");
+  const goal = createRoomGoal("Ship the multiplayer IDE", start);
   const ticked = updateRoomGoalElapsed(goal, new Date("2026-07-07T10:00:05.000Z"));
   assert.equal(ticked.elapsedMs, 5000);
-  const paused = { ...ticked, status: "paused" as const };
-  assert.equal(updateRoomGoalElapsed(paused, new Date("2026-07-07T10:00:20.000Z")).elapsedMs, 5000);
+
+  const paused = pauseRoomGoal(ticked, new Date("2026-07-07T10:00:10.000Z"));
+  assert.equal(paused.status, "paused");
+  assert.equal(paused.elapsedMs, 10000);
+  assert.equal(updateRoomGoalElapsed(paused, new Date("2026-07-07T10:00:20.000Z")).elapsedMs, 10000);
+
+  const resumed = resumeRoomGoal(paused, new Date("2026-07-07T10:01:00.000Z"));
+  const edited = editRoomGoal(resumed, "Ship the alpha", new Date("2026-07-07T10:01:01.000Z"));
+  assert.equal(edited.text, "Ship the alpha");
+  assert.equal(edited.status, "active");
 });
 
 test("formatRoomGoalDuration keeps popup timers compact", () => {

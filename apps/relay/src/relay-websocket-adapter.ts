@@ -1,12 +1,13 @@
 import { isRecord } from "@multaiplayer/protocol";
 import type { createRelayAuthSessionManager } from "./auth/session.js";
+import { isLiveAccountSession } from "./auth/account-mutation-transaction.js";
 import type { loadRelayConfig } from "./config.js";
 import { hasDeviceSession } from "./http/device-auth.js";
 import type { createRelayRequestGuards } from "./http/middleware.js";
 import { isJsonStringifiableWithin, normalizeMetadataText, type RelayLimits } from "./limits.js";
 import type { createRelayMetrics } from "./observability.js";
 import { canPublishMlsMessage, roomKey } from "./relay-domain.js";
-import type { ClientSession, RelayStore } from "./state.js";
+import type { RelayStore } from "./state.js";
 import { registerRelayWebSocketConnection } from "./ws/connection.js";
 import type { createRelayFanout } from "./ws/fanout.js";
 import type { createRelayRoomSocketManager } from "./ws/rooms.js";
@@ -16,7 +17,6 @@ interface RegisterRelayWebSocketAdapterOptions {
   store: RelayStore;
   limits: RelayLimits;
   auth: ReturnType<typeof createRelayAuthSessionManager>;
-  isLiveClientSession: (session: ClientSession) => boolean;
   guards: ReturnType<typeof createRelayRequestGuards>;
   metrics: ReturnType<typeof createRelayMetrics>;
   fanout: ReturnType<typeof createRelayFanout>;
@@ -33,7 +33,9 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
     limits: options.limits,
     authentication: {
       getAuthSessionFromRequest: options.auth.getAuthSessionFromRequest,
-      isLiveClientSession: options.isLiveClientSession,
+      isLiveClientSession: (session) =>
+        !config.mutationsRequireAuth ||
+        Boolean(session.authSession && isLiveAccountSession(store, session.authSession)),
       clientIdentityFromIncomingMessage: options.guards.clientIdentityFromIncomingMessage,
       clientRateLimitIdentitiesFromIncomingMessage: options.guards.clientRateLimitIdentitiesFromIncomingMessage
     },

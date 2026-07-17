@@ -85,7 +85,7 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
         session.userId === room.hostUserId &&
         session.deviceId === room.activeHostDeviceId
       ) {
-        fanout.sendToLiveSession(session, { type: "invite.requested", inviteId, requestId });
+        fanout.send(session.socket, { type: "invite.requested", inviteId, requestId });
       }
     }
   };
@@ -107,7 +107,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
       saveRelayStore,
       revokeTeamMemberSessions: roomManager.revokeTeamMemberSessions,
       revokeUserPresence: roomManager.revokeUserPresence,
-      revokeAuthSessionSockets: roomManager.revokeAuthSessionSockets,
       normalizeMetadataText,
       maxUserIdChars,
       maxDisplayNameChars,

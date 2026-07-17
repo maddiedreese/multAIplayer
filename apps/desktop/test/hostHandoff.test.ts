@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  canAcceptRoomHostHandoff,
   createHandoffSettingsPatch,
   findRoomHostHandoff,
   handoffRepoIdentity,
@@ -85,6 +86,9 @@ test("host handoff acceptance requires an available handoff from the current roo
   const handoffs = [available, accepted];
 
   assert.deepEqual(findRoomHostHandoff(handoffs, available.id), available);
+  assert.equal(canAcceptRoomHostHandoff(handoffs, available.id), true);
+  assert.equal(canAcceptRoomHostHandoff(handoffs, accepted.id), false);
+  assert.equal(canAcceptRoomHostHandoff(handoffs, "missing"), false);
   assert.equal(roomHostHandoffMessage(handoffs, accepted.id), "Host handoff is accepted, not available.");
   assert.equal(roomHostHandoffMessage(handoffs, "missing"), "Host handoff is no longer available in this room.");
 });
