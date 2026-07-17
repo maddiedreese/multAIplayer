@@ -112,6 +112,7 @@ export function ProfileDrawerPanel({
         setDeletionStatus(
           "The configured relay still reports this session as signed in, so deletion is not confirmed. Review any blockers and retry the deletion request."
         );
+        onHostedAccountDeletionRejected();
       } else {
         setDeletionStatus(
           "The configured relay reports this session as signed out. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."

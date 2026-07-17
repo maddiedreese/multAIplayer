@@ -168,6 +168,21 @@ test("hosted-account deletion cleans up previews before an unrecoverable respons
     });
     assert.equal(lifecycle[0], "preview-cleanup");
     assert.ok(lifecycle.slice(1).every((entry) => entry === "request"));
+
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ user: { id: "github:123", login: "octocat", name: "Octo Cat" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    fireEvent.click(view.getByRole("button", { name: "Recheck account status" }));
+
+    await waitFor(() => {
+      assert.match(
+        view.getByText("Account deletion status").parentElement?.textContent ?? "",
+        /still reports this session as signed in/i
+      );
+    });
+    assert.equal(lifecycle.at(-1), "deletion-rejected");
     assert.equal(lifecycle.includes("account-cleared"), false);
   } finally {
     globalThis.fetch = originalFetch;
