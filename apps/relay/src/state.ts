@@ -241,8 +241,8 @@ export class RelayStoreCapacityError extends Error {
 }
 
 const defaultByteLimits: RelayStoreByteLimits = {
-  mlsBacklog: { global: 100_000_000, perTeam: 50_000_000, perRoom: 10_000_000 },
-  attachmentBlobs: { global: 500_000_000, perTeam: 250_000_000 }
+  mlsBacklog: { global: 50_000_000, perTeam: 25_000_000, perRoom: 5_000_000 },
+  attachmentBlobs: { global: 100_000_000, perTeam: 50_000_000 }
 };
 
 export class InMemoryRelayStore implements RelayStore {

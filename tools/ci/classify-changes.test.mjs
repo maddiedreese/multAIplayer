@@ -26,6 +26,21 @@ test("relay changes select JavaScript and both relay-backed journeys", () => {
   });
 });
 
+test("relay-only tests and operator entry points do not rerun product journeys", () => {
+  for (const path of [
+    "apps/relay/test/config/config.test.ts",
+    "apps/relay/src/manage-account-restriction.ts",
+    "apps/relay/src/observability.ts",
+    "apps/relay/src/predeploy-check.ts",
+    "apps/relay/src/reconcile-deletions.ts"
+  ]) {
+    const result = classifyChanges([path]);
+    assert.equal(result.javascript, true, `${path} must retain JavaScript checks`);
+    assert.equal(result.ui_journey, false, `${path} must not select the UI journey`);
+    assert.equal(result.native_journey, false, `${path} must not select the native journey`);
+  }
+});
+
 test("native changes select native checks without an unrelated UI journey", () => {
   assert.deepEqual(classifyChanges(["apps/desktop/src-tauri/src/lib.rs"]), {
     documentation: true,

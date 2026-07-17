@@ -184,7 +184,6 @@ test("attachment upload rolls back its byte quota when real retained bytes exhau
     store,
     attachmentBlobMaxBytes: 1024,
     attachmentBlobLiveQuotaBytes: 4096,
-    attachmentBlobTeamLiveQuotaBytes: 4096,
     attachmentBlobUploadBytesPerWindow: 4096,
     attachmentBlobUploadWindowMs: 60_000,
     attachmentBlobTtlDays: 1,

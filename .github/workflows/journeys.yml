@@ -111,15 +111,6 @@ jobs:
             reports/native-shell-e2e
           if-no-files-found: ignore
           retention-days: 7
-      - name: Explain native journey failure handling
-        if: failure()
-        run: |
-          {
-            echo "### Failure posture"
-            echo
-            echo "Treat intermittent behavior as a product race until the failing stage, screenshots, logs, and duration report identify another cause. Do not rerun blindly."
-          } >> "$GITHUB_STEP_SUMMARY"
-
   macos-two-client:
     name: Scheduled macOS two-client MLS journey
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

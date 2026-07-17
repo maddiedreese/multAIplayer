@@ -79,6 +79,43 @@ test("lowering the global durable-entry cap keeps the absent per-team default va
   }
 });
 
+test("ciphertext defaults fit the hosted memory budget and reject contradictory ceilings", () => {
+  const names = [
+    "MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES",
+    "MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES",
+    "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES",
+    "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM",
+    "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES",
+    "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM",
+    "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM"
+  ] as const;
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  try {
+    for (const name of names) delete process.env[name];
+    const defaults = loadRelayConfig();
+    assert.equal(defaults.maxAttachmentBlobBytes, 100_000_000);
+    assert.equal(defaults.maxAttachmentBlobBytesPerTeam, 50_000_000);
+    assert.equal(defaults.attachmentBlobLiveQuotaBytes, 50_000_000);
+    assert.equal(defaults.maxMlsBacklogBytes, 50_000_000);
+    assert.equal(defaults.maxMlsBacklogBytesPerTeam, 25_000_000);
+    assert.equal(defaults.maxMlsBacklogBytesPerRoom, 5_000_000);
+
+    process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES = "50000000";
+    process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM = "60000000";
+    assert.throws(() => loadRelayConfig(), /Attachment byte ceilings must be ordered team <= relay/);
+
+    process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM = "50000000";
+    process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES = "60000000";
+    assert.throws(() => loadRelayConfig(), /Per-user live attachment quota must not exceed/);
+
+    process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES = "50000000";
+    process.env.MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES = "10000000";
+    assert.throws(() => loadRelayConfig(), /MLS backlog byte ceilings must be ordered/);
+  } finally {
+    for (const name of names) restoreEnv(name, previous.get(name));
+  }
+});
+
 test("relay only enables metrics with a strong bearer token", () => {
   const previous = process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN;
   try {

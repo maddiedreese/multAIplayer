@@ -16,12 +16,17 @@ For a local checkout, install Node.js 24.x and Rust 1.89.x, then run:
 ```sh
 npm install --global npm@11.16.0 --ignore-scripts
 npm ci
+cp .env.example .env
 npm run doctor
-npm run dev
 ```
 
-`npm run dev` starts the relay and Vite frontend. The browser frontend is a
-native-app notice; use `npm run tauri:dev` on macOS to run the product.
+The example environment deliberately disables authentication only for its
+loopback relay. This makes the local product usable without compiling a desktop
+against an HTTPS OAuth relay; GitHub identity sign-in is intentionally unavailable
+in this mode. Run `npm run tauri:dev`; Tauri starts the relay and Vite process for
+the native app. Use `npm run dev` instead for browser-component work; the browser
+frontend is a native-app notice. Authenticated and custom-relay builds follow the
+[self-hosting OAuth setup](docs/self-hosting.md#github-oauth).
 
 Before coding:
 

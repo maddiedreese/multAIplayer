@@ -59,6 +59,27 @@ that existing sessions were evicted and new sessions are denied. The public HTTP
 API has no operator restriction endpoint. A restriction is service denial, not
 retroactive erasure from collaborators' devices.
 
+## Retiring a registered device
+
+When an installation has been lost or replaced, retire its registration so it no
+longer consumes the account's device limit. This is quota recovery, not credential
+revocation. Stop and fence the sole relay writer, back up the database, then run:
+
+```bash
+npm run devices:retire -w @multaiplayer/relay -- \
+  <github-user-id> <device-id> \
+  --data-path=/data/relay-store.sqlite \
+  --confirm-relay-stopped \
+  --confirm-device-id=<device-id>
+```
+
+The command deletes exactly that device registration and its unused KeyPackages.
+It does not delete the account, team membership, shared ciphertext, consumed
+KeyPackage tombstones, or GitHub account sessions. It refuses a device that still
+hosts a room; hand off or delete that room first. Restart the relay and verify that
+the replacement device can register. A copy that remains signed in to GitHub can
+register again; use account restriction or deletion for a compromised account.
+
 ## Account deletion and backup restores
 
 The normal self-hosted mode is:

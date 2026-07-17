@@ -2,15 +2,8 @@ vulnerabilities:
   # Owner: repository maintainers. Every entry must retain an explicit expiry;
   # tools/security/check-exception-expiry.mjs makes expiry a CI failure rather
   # than relying on a comment or a scanner-version-specific default.
-  # Current node:24-bookworm-slim has no newer digest. The Node-bundled Undici
-  # client is not used for WebSocket connections by the relay; recheck at every
-  # Node digest update and remove as soon as Node 24 bundles Undici >= 6.27.0.
   # Reviewed against the release candidate on 2026-07-16; issue #285 owns each
   # upgrade/remove/renew disposition before 2026-10-01.
-  - id: CVE-2026-12151
-    statement: Node-bundled Undici; fixed upstream but not yet available in the current Node 24 image.
-    expired_at: 2026-10-01
-
   # Debian 12 marks these runtime-package findings affected, fix-deferred, or
   # will-not-fix. The relay does not invoke Perl, archive extraction, blkid, or
   # minizip; the container runs only the non-root Node entry point. Keep them

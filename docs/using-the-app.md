@@ -137,7 +137,17 @@ Each approved open starts a private browser session. Closing it discards its coo
 
 Browser opens requested by Codex or other room events go through the host approval boundary. The native download callback denies downloads. A tested initialization guard rejects page Clipboard API calls and cancels file-input and drag/drop events, but that script is best-effort where WebKit or a page prevents injection. Signed-in pages can still expose sensitive content to the room if the host shares or approves that context.
 
-For sharing a running localhost web app through a public URL, see [local-preview-sharing.md](local-preview-sharing.md).
+Local preview sharing runs `cloudflared` on the active host to expose an explicit
+`localhost` or `127.0.0.1` URL with a port. Install it with
+`brew install cloudflare/cloudflare/cloudflared`, restart multAIplayer if needed,
+then choose the local URL in the room and confirm the warning. The relay does not
+proxy preview traffic; it only carries the encrypted event containing the
+temporary `trycloudflare.com` link. Stop sharing to terminate the tunnel.
+
+The tunnel URL is public to anyone who obtains it. Before sharing, review the
+running app for development data, debug or admin routes, test accounts, API
+responses, source maps, stack traces, and other secret-bearing content. Do not use
+preview sharing for sensitive apps unless the host accepts that exposure.
 
 ## Git And GitHub
 

@@ -110,11 +110,11 @@ Hosted or internet-facing relays should place the SQLite database on persistent 
 MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES=250000
 MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM=25000
-MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES=100000000
-MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM=50000000
-MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM=10000000
-MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES=500000000
-MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM=250000000
+MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES=50000000
+MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM=25000000
+MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM=5000000
+MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES=100000000
+MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM=50000000
 MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES=1000000000
 MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON=true
 ```
@@ -129,9 +129,10 @@ for incident response, monitoring, and restores.
 
 The relay hydrates durable state into one process-local store. Entry-count and
 ciphertext-byte ceilings bound that working set globally and per team; startup
-rejects an invalid hierarchy. The defaults are conservative alpha guardrails, not
-benchmark-derived capacity guarantees. Lower them for constrained hosts and
-measure resident memory before raising them.
+rejects an invalid hierarchy. The alpha defaults retain at most 150 MB of combined
+attachment and MLS ciphertext before representation overhead. They replace the
+earlier 600 MB combined defaults, which were not safe for the hosted 1 GB process.
+Lower them for constrained hosts and measure resident memory before raising them.
 
 Run one relay writer per SQLite database. Scale vertically or place whole teams on
 independent relays; see the [single-node relay decision](decisions/single-node-relay.md).
@@ -167,6 +168,14 @@ When enabled, reading workspace metadata, creating teams, creating rooms, creati
 Authenticated workspace reads are membership-scoped. A signed-in user only receives teams and rooms where they are a known team member. Room-level mutations and attachment blob reads also require membership. Invite metadata remains readable by invite id so a joiner can verify that the relay metadata matches the invite fragment; the desktop then presents that invite id during WebSocket join to be admitted as a team member.
 
 Authentication is enabled by default in every environment, even before a native desktop has completed GitHub sign-in.
+
+The repository's `.env.example` is the exception: it is a loopback-only development
+profile with the unsafe auth opt-out enabled. Copy it to the repository-root `.env`,
+run `npm run doctor`, then run `npm run tauri:dev`; Tauri starts the root relay and
+Vite development processes. Those processes load the root environment file.
+GitHub identity sign-in is intentionally unavailable in this mode because native
+identity verification is compiled against one trusted HTTPS relay origin.
+Production startup rejects the auth opt-out.
 
 Session cookies are `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever `NODE_ENV=production`, so an authenticated production deployment requires HTTPS/WSS. The pre-deploy check rejects auth-disabled production configuration. Use `MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH=true` only for a private LAN development relay.
 
@@ -205,7 +214,7 @@ resources. The normal self-hosted mode is `primary_only`: do not restore a backu
 from before a deletion. If restorable backups exist, configure the external
 restore-safe ledger and follow [Relay operations](relay-operations.md#account-deletion-and-backup-restores).
 
-For local development, the desktop app expects:
+For local development, the desktop app expects these values from the root `.env`:
 
 ```bash
 VITE_RELAY_HTTP_URL=http://127.0.0.1:4321

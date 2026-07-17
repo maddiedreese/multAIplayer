@@ -10,7 +10,10 @@ import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import { useRoomRuntimeContext } from "./useRoomRuntimeContext";
+import { createCodexInvokeActions } from "../application/codex/codexInvokeActions";
+import { useRoomBackgroundEffects } from "./useRoomBackgroundEffects";
+import { useRoomToolActions } from "./useRoomToolActions";
+import { useCodexTurnActions } from "./useCodexTurnActions";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -114,7 +117,7 @@ export function useAppRoomRuntime({
   const terminalAutoOpenedRoomsRef = useRef<Set<string>>(new Set());
   const { setActionsBusyForRoom } = roomActions;
 
-  const runtime = useRoomRuntimeContext({
+  const runtimeOptions = {
     codexActions: {
       turn: {
         localUser: localIdentity.localUser,
@@ -267,17 +270,33 @@ export function useAppRoomRuntime({
         selectedCodexModel
       }
     }
+  };
+  const { approveCodexTurn, promoteNextCodexApprovalForRoom } = useCodexTurnActions(runtimeOptions.codexActions.turn);
+  const codexInvokeActions = createCodexInvokeActions(runtimeOptions.codexActions.invoke);
+  const tools = useRoomToolActions(runtimeOptions.toolActions);
+  useRoomBackgroundEffects({
+    ...runtimeOptions.backgroundEffects,
+    terminalAutoOpen: {
+      ...runtimeOptions.backgroundEffects.terminalAutoOpen,
+      openInteractiveTerminal: tools.openInteractiveTerminal
+    }
   });
+  const runtime = {
+    approveCodexTurn,
+    promoteNextCodexApprovalForRoom,
+    ...codexInvokeActions,
+    ...tools
+  };
 
   useEffect(() => {
     if (!selectedRoom) return;
     if (!roomInteraction.isActiveHost) return;
     if (selectedRuntime.activeCodexApproval || selectedRuntime.codexRunning) return;
     if (selectedRuntime.queuedCodexApprovals.length === 0) return;
-    runtime.promoteNextCodexApprovalForRoom(selectedRoom.id);
+    promoteNextCodexApprovalForRoom(selectedRoom.id);
   }, [
     roomInteraction.isActiveHost,
-    runtime,
+    promoteNextCodexApprovalForRoom,
     selectedRoom,
     selectedRuntime.activeCodexApproval,
     selectedRuntime.codexRunning,

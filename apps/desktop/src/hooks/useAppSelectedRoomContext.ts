@@ -1,4 +1,7 @@
-import { useAppSelectedContext } from "./useAppSelectedContext";
+import { useMarkdownSelection } from "./useMarkdownSelection";
+import { useSelectedRoomContext } from "./useSelectedRoomContext";
+import { useSelectedRoomValues } from "./useSelectedRoomValues";
+import { useSelectedTeamData } from "./useSelectedTeamData";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { useAppStore } from "../store/appStore";
@@ -73,40 +76,50 @@ export function useAppSelectedRoomContext({
   const teamMembersMessageByTeam = useMemo(() => projectTeamMembersMessageByTeam(teamRosterMap), [teamRosterMap]);
   const teamMembersBusyByTeam = useMemo(() => projectTeamMembersBusyByTeam(teamRosterMap), [teamRosterMap]);
 
-  return useAppSelectedContext({
-    roomContext: {
-      rooms,
-      selectedRoomId,
-      inspectorTab: historyPresence?.inspectorTab,
-      secretWarningVisible: codexRuntime?.secretWarningVisible,
-      terminals
-    },
-    markdownSelection: {
-      resetKey: selectedRoomId
-    },
-    teamData: {
-      teams,
-      selectedTeam,
-      teamMembersByTeam,
-      teamMembersMessageByTeam,
-      teamMembersBusyByTeam,
-      currentUser: githubAuth.currentUser,
-      localUserId: localIdentity.localUser.id
-    },
-    roomValues: {
-      roomSettings,
-      messages,
-      roomChat,
-      codexRuntime,
-      browser,
-      gitRuntime,
-      terminalRuntime,
-      filePanel,
-      invite,
-      historyMessage: historyPresence?.historyMessage,
-      teamHistoryMessage: teamHistory?.message,
-      defaultBrowserUrl,
-      defaultBrowserReason
-    }
+  const roomContext = useSelectedRoomContext({
+    rooms,
+    selectedRoomId,
+    inspectorTab: historyPresence?.inspectorTab,
+    secretWarningVisible: codexRuntime?.secretWarningVisible,
+    terminals
   });
+  const markdownSelection = useMarkdownSelection({
+    activeRoomId: roomContext.selectedRoom?.id ?? null,
+    enabled: roomContext.hasSelectedRoom,
+    resetKey: selectedRoomId
+  });
+  const teamData = useSelectedTeamData({
+    teams,
+    selectedTeam,
+    teamMembersByTeam,
+    teamMembersMessageByTeam,
+    teamMembersBusyByTeam,
+    currentUser: githubAuth.currentUser,
+    localUserId: localIdentity.localUser.id
+  });
+  const roomValues = useSelectedRoomValues({
+    selectedRoom: roomContext.selectedRoom,
+    selectedMessageIds: markdownSelection.selectedMessageIds,
+    markdownSelectionMode: markdownSelection.markdownSelectionMode,
+    roomSettings,
+    messages,
+    roomChat,
+    codexRuntime,
+    browser,
+    gitRuntime,
+    terminalRuntime,
+    filePanel,
+    invite,
+    historyMessage: historyPresence?.historyMessage,
+    teamHistoryMessage: teamHistory?.message,
+    defaultBrowserUrl,
+    defaultBrowserReason
+  });
+
+  return {
+    ...roomContext,
+    ...markdownSelection,
+    ...teamData,
+    ...roomValues
+  };
 }

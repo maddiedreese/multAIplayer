@@ -6,6 +6,7 @@ const desktopPort = Number.parseInt(process.env.VITE_DESKTOP_PORT ?? "1420", 10)
 
 export default defineConfig({
   plugins: [react(), patchedMonacoDompurify()],
+  envDir: "../..",
   clearScreen: false,
   server: {
     port: Number.isFinite(desktopPort) ? desktopPort : 1420,

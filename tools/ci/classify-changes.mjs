@@ -59,7 +59,7 @@ export function classifyChanges(paths) {
   const uiJourney = executableFiles.some((path) =>
     matches(path, [
       /^apps\/desktop\/(?!src-tauri\/)/,
-      /^apps\/relay\//,
+      /^apps\/relay\/src\/(?!manage-account-restriction\.ts$|observability\.ts$|predeploy-check\.ts$|reconcile-deletions\.ts$)/,
       /^packages\//,
       /^e2e\/(?!native-shell\/|native-macos\/)/,
       /^scripts\/run-ui-contract\.mjs$/,
@@ -73,7 +73,7 @@ export function classifyChanges(paths) {
     matches(path, [
       /^apps\/desktop\/src-tauri\//,
       /^apps\/desktop\/(?:package\.json|native-command-error-codes\.json)$/,
-      /^apps\/relay\//,
+      /^apps\/relay\/src\/(?!manage-account-restriction\.ts$|observability\.ts$|predeploy-check\.ts$|reconcile-deletions\.ts$)/,
       /^packages\//,
       /^e2e\/native-shell\//,
       /^package(?:-lock)?\.json$/,

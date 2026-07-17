@@ -61,10 +61,20 @@ npm install --global npm@11.16.0 --ignore-scripts
 npm ci
 cp .env.example .env
 npm run doctor
+```
+
+Then run the native app:
+
+```sh
 npm run tauri:dev
 ```
 
-The root command starts the local relay and Tauri frontend. GitHub sign-in uses a public OAuth client id; no client secret is supported. Custom relay origins require a self-built client as described in [Self-hosting](docs/self-hosting.md).
+Tauri starts the local relay and Vite process for this command.
+The example environment uses an intentionally unauthenticated loopback relay, so
+GitHub identity sign-in is unavailable in this local mode. An authenticated or
+custom relay requires a self-built client as described in
+[Self-hosting](docs/self-hosting.md#github-oauth); production startup rejects the
+local auth opt-out.
 
 Run focused checks for the area you change; CI runs the complete repository gates:
 

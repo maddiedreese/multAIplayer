@@ -46,12 +46,11 @@ Supported releases use a pinned, signed Tauri updater channel and also publish n
 
 Device ids are permanently bound to their first MLS keys in this alpha. A new
 installation or new key material consumes another one of the hosted relay's 25
-registered-device slots per GitHub identity; there is no individual device-retirement
-flow. Preserve an intact installation when possible. If the quota is reached, file
-a non-sensitive support issue without keys, tokens, invite links, or private account
-details. Account deletion removes the whole account and is not a device-management
-workaround. Self-hosted operators should follow the
-[relay configuration guidance](self-hosting.md#relay-configuration).
+registered-device slots per GitHub identity. Preserve an intact installation when
+possible. There is no self-service device screen in the alpha; support can retire
+a lost registration without deleting the account. Do not include keys, tokens, or
+invite links in a support issue. Self-hosted operators can use the stopped-relay
+procedure in [Relay operations](relay-operations.md#retiring-a-registered-device).
 
 ## Is the alpha appropriate for private work?
 
