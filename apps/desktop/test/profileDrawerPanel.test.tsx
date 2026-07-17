@@ -161,7 +161,10 @@ test("hosted-account deletion cleans up previews before an unrecoverable respons
     fireEvent.click(view.getByRole("button", { name: "Permanently delete hosted account data" }));
 
     await waitFor(() => {
-      assert.match(view.getByText("Account deletion status").parentElement?.textContent ?? "", /could not be confirmed/i);
+      assert.match(
+        view.getByText("Account deletion status").parentElement?.textContent ?? "",
+        /could not be confirmed/i
+      );
     });
     assert.equal(lifecycle[0], "preview-cleanup");
     assert.ok(lifecycle.slice(1).every((entry) => entry === "request"));
