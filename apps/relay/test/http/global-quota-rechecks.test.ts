@@ -8,6 +8,7 @@ import { acquireDurableQuotaTransaction } from "../../src/auth/account-quotas.js
 import { createAccountRestrictionManager } from "../../src/auth/account-restrictions.js";
 import { registerAttachmentRoutes } from "../../src/http/attachments.js";
 import { registerRoomCreateRoute } from "../../src/http/room-create-route.js";
+import type { RoomCreateRouteOptions } from "../../src/http/room-route-types.js";
 import { registerTeamRoutes } from "../../src/http/teams.js";
 import { createRelayStore } from "../../src/state.js";
 
@@ -223,8 +224,8 @@ function roomRouteOptions(
   app: express.Express,
   store: RelayStore,
   session: AuthSession | null,
-  overrides: Record<string, unknown> = {}
-) {
+  overrides: Partial<RoomCreateRouteOptions> = {}
+): RoomCreateRouteOptions {
   return {
     app,
     store,

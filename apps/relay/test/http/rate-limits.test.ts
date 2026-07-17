@@ -132,6 +132,7 @@ test("trusted proxy rate limits prefer the provider-authenticated real IP header
 
 test("token buckets refill continuously and do not permit a fixed-window boundary burst", () => {
   const records = new Map<string, TokenBucketRecord>();
+  let now = 99;
   const guards = createRelayRequestGuards({
     rateLimitsEnabled: true,
     rateLimitWindowMs: 100,
@@ -139,20 +140,15 @@ test("token buckets refill continuously and do not permit a fixed-window boundar
     rateLimitStore: records,
     trustProxyHeaders: false,
     metrics: createRelayMetrics(),
+    now: () => now,
     normalizeSessionId: (value) => (typeof value === "string" ? value : "")
   });
-  const originalNow = Date.now;
-  try {
-    Date.now = () => 99;
-    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
-    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
-    Date.now = () => 100;
-    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, false);
-    Date.now = () => 149;
-    assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
-  } finally {
-    Date.now = originalNow;
-  }
+  assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
+  assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
+  now = 100;
+  assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, false);
+  now = 149;
+  assert.equal(guards.consumeRateLimit("read", "session:boundary").allowed, true);
 });
 
 test("rate-limit identifiers prune after two idle refill windows without scanning on every request", () => {
@@ -170,6 +166,7 @@ test("rate-limit identifiers prune after two idle refill windows without scannin
     ["read:session:expired", { tokens: 0, updatedAt: 700, lastSeenAt: 799 }],
     ["read:session:live", { tokens: 0, updatedAt: 900, lastSeenAt: 900 }]
   ]);
+  let now = 1_000;
   const guards = createRelayRequestGuards({
     rateLimitsEnabled: true,
     rateLimitWindowMs: 100,
@@ -177,23 +174,18 @@ test("rate-limit identifiers prune after two idle refill windows without scannin
     rateLimitStore: records,
     trustProxyHeaders: false,
     metrics: createRelayMetrics(),
+    now: () => now,
     normalizeSessionId: (value) => (typeof value === "string" ? value : "")
   });
-  const originalNow = Date.now;
-  try {
-    Date.now = () => 1_000;
-    guards.consumeRateLimit("read", "session:first");
-    assert.equal(records.has("read:session:expired"), false);
-    assert.equal(records.entryScans, 1);
-    guards.consumeRateLimit("read", "session:second");
-    assert.equal(records.entryScans, 1, "a live window must not trigger another full scan");
-    Date.now = () => 1_100;
-    guards.consumeRateLimit("read", "session:third");
-    assert.equal(records.has("read:session:live"), false);
-    assert.equal(records.entryScans, 2);
-  } finally {
-    Date.now = originalNow;
-  }
+  guards.consumeRateLimit("read", "session:first");
+  assert.equal(records.has("read:session:expired"), false);
+  assert.equal(records.entryScans, 1);
+  guards.consumeRateLimit("read", "session:second");
+  assert.equal(records.entryScans, 1, "a live window must not trigger another full scan");
+  now = 1_100;
+  guards.consumeRateLimit("read", "session:third");
+  assert.equal(records.has("read:session:live"), false);
+  assert.equal(records.entryScans, 2);
 });
 
 test("signed-in rate-limit keys contain only a digest of the bearer session", () => {
@@ -234,6 +226,7 @@ test("signed-in rate-limit keys contain only a digest of the bearer session", ()
 
 test("trusted sessions keep individual caps while sharing a higher bounded network cap", () => {
   const records = new Map<string, TokenBucketRecord>();
+  const now = 1_000;
   const guards = createRelayRequestGuards({
     rateLimitsEnabled: true,
     rateLimitWindowMs: 60_000,
@@ -242,6 +235,7 @@ test("trusted sessions keep individual caps while sharing a higher bounded netwo
     rateLimitStore: records,
     trustProxyHeaders: false,
     metrics: createRelayMetrics(),
+    now: () => now,
     normalizeSessionId: (value) => (typeof value === "string" ? value : ""),
     trustedSessionIdentity: (value) =>
       typeof value === "string" && value.startsWith("valid-") ? `session:${value}` : null

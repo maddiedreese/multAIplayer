@@ -22,6 +22,7 @@ interface RelayRequestGuardsOptions {
   metrics: ReturnType<typeof createRelayMetrics>;
   normalizeSessionId: (value: unknown) => string;
   trustedSessionIdentity?: (sessionId: unknown) => string | null;
+  now?: () => number;
 }
 
 type RateLimitBucket = RelayRequestGuardsOptions["rateLimitCaps"] extends Record<infer Key, number> ? Key : never;
@@ -35,7 +36,8 @@ export function createRelayRequestGuards({
   trustProxyHeaders,
   metrics,
   normalizeSessionId,
-  trustedSessionIdentity = () => null
+  trustedSessionIdentity = () => null,
+  now = Date.now
 }: RelayRequestGuardsOptions) {
   let nextRateLimitPruneAt = 0;
   function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
@@ -51,15 +53,15 @@ export function createRelayRequestGuards({
       return;
     }
     metrics.recordRateLimitRejection(bucket);
-    res.setHeader("Retry-After", String(Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)));
+    res.setHeader("Retry-After", String(Math.ceil(Math.max(0, result.resetAt - now()) / 1000)));
     sendRelayError(res, 429, "rate_limited", "Rate limit exceeded. Slow down before retrying.", {
       bucket,
-      retryAfterSeconds: Math.ceil(Math.max(0, result.resetAt - Date.now()) / 1000)
+      retryAfterSeconds: Math.ceil(Math.max(0, result.resetAt - now()) / 1000)
     });
   }
 
   function consumeRateLimits(bucket: RateLimitBucket, clientIds: readonly string[]) {
-    let result: ReturnType<typeof consumeRateLimit> = { allowed: true, resetAt: Date.now() + rateLimitWindowMs };
+    let result: ReturnType<typeof consumeRateLimit> = { allowed: true, resetAt: now() + rateLimitWindowMs };
     for (const clientId of clientIds) {
       result = consumeRateLimit(bucket, clientId);
       if (!result.allowed) return result;
@@ -81,37 +83,37 @@ export function createRelayRequestGuards({
     bucket: RateLimitBucket,
     clientId: string
   ): { allowed: true; resetAt: number } | { allowed: false; resetAt: number } {
-    if (!rateLimitsEnabled) return { allowed: true, resetAt: Date.now() + rateLimitWindowMs };
-    const now = Date.now();
-    pruneRateLimitStore(now);
+    if (!rateLimitsEnabled) return { allowed: true, resetAt: now() + rateLimitWindowMs };
+    const currentTime = now();
+    pruneRateLimitStore(currentTime);
     const key = `${bucket}:${clientId}`;
     const capacity =
       rateLimitCaps[bucket] * (clientId.startsWith("trusted-network:") ? trustedNetworkRateLimitMultiplier : 1);
     const refillPerMs = capacity / rateLimitWindowMs;
     const current = rateLimitStore.get(key);
     const tokens = current
-      ? Math.min(capacity, current.tokens + Math.max(0, now - current.updatedAt) * refillPerMs)
+      ? Math.min(capacity, current.tokens + Math.max(0, currentTime - current.updatedAt) * refillPerMs)
       : capacity;
     const allowed = tokens >= 1;
     const remaining = allowed ? tokens - 1 : tokens;
     const resetAt = allowed
-      ? now + Math.ceil((capacity - remaining) / refillPerMs)
-      : now + Math.ceil((1 - remaining) / refillPerMs);
-    rateLimitStore.set(key, { tokens: remaining, updatedAt: now, lastSeenAt: now });
-    const pruneAt = now + rateLimitWindowMs * 2;
+      ? currentTime + Math.ceil((capacity - remaining) / refillPerMs)
+      : currentTime + Math.ceil((1 - remaining) / refillPerMs);
+    rateLimitStore.set(key, { tokens: remaining, updatedAt: currentTime, lastSeenAt: currentTime });
+    const pruneAt = currentTime + rateLimitWindowMs * 2;
     nextRateLimitPruneAt = nextRateLimitPruneAt === 0 ? pruneAt : Math.min(nextRateLimitPruneAt, pruneAt);
     return allowed ? { allowed: true, resetAt } : { allowed: false, resetAt };
   }
 
-  function pruneRateLimitStore(now = Date.now()) {
-    if (now < nextRateLimitPruneAt) return;
+  function pruneRateLimitStore(currentTime = now()) {
+    if (currentTime < nextRateLimitPruneAt) return;
     let earliestLiveExpiry = Number.POSITIVE_INFINITY;
     for (const [key, record] of rateLimitStore.entries()) {
       const expiresAt = record.lastSeenAt + rateLimitWindowMs * 2;
-      if (expiresAt <= now) rateLimitStore.delete(key);
+      if (expiresAt <= currentTime) rateLimitStore.delete(key);
       else earliestLiveExpiry = Math.min(earliestLiveExpiry, expiresAt);
     }
-    nextRateLimitPruneAt = Number.isFinite(earliestLiveExpiry) ? earliestLiveExpiry : now + rateLimitWindowMs;
+    nextRateLimitPruneAt = Number.isFinite(earliestLiveExpiry) ? earliestLiveExpiry : currentTime + rateLimitWindowMs;
   }
 
   function clientIdentitiesFromRequest(req: Request): string[] {

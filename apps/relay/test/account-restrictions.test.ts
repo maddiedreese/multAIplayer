@@ -242,16 +242,11 @@ test("startup eviction reports expired restrictions so the caller persists their
   const manager = createAccountRestrictionManager({
     store,
     liveControl: { revokeUserSessions: () => assert.fail("expired restriction must not evict live sessions") },
-    persist: async () => {}
+    persist: async () => {},
+    now: () => Date.parse("2026-01-03T00:00:00Z")
   });
-  const previousNow = Date.now;
-  try {
-    Date.now = () => Date.parse("2026-01-03T00:00:00Z");
-    assert.deepEqual(manager.evictRestrictedAccounts(), { removedAuthSessions: 0, removedRestrictions: 1 });
-    assert.equal(store.accountRestrictions.size, 0);
-  } finally {
-    Date.now = previousNow;
-  }
+  assert.deepEqual(manager.evictRestrictedAccounts(), { removedAuthSessions: 0, removedRestrictions: 1 });
+  assert.equal(store.accountRestrictions.size, 0);
 });
 
 async function runRestrictionCli(action: string, userId: string, reasonCode: string, dataPath: string) {

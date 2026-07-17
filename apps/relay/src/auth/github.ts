@@ -11,7 +11,7 @@ import {
 import { acquireAccountMutationTurn, isLiveAccountSession } from "./account-mutation-transaction.js";
 import type { RelayStore } from "../state.js";
 import type { DeletionLedger } from "./deletion-ledger.js";
-import { hashAuthSessionId } from "./session.js";
+import { hashAuthSessionId, selectAuthSessionsToEvict } from "./session.js";
 
 export interface RegisterGitHubAuthRoutesOptions {
   app: Express;
@@ -89,7 +89,13 @@ export function registerGitHubAuthRoutes({
       const sessionId = nanoid(32);
       const sessionIdHash = hashAuthSessionId(sessionId);
       const expiresAt = Date.now() + authSessionMaxAgeMs;
-      const evicted = sessionsToEvict(store, user.id, retainedAuthSessionCapPerUser, Date.now());
+      const evicted = selectAuthSessionsToEvict(
+        store.authSessions,
+        user.id,
+        retainedAuthSessionCapPerUser,
+        1,
+        Date.now()
+      );
       for (const [hash] of evicted) store.authSessions.delete(hash);
       let inserted = false;
       try {
@@ -286,15 +292,6 @@ export function registerGitHubAuthRoutes({
       releaseAccountMutation();
     }
   });
-}
-
-function sessionsToEvict(store: RelayStore, userId: string, cap: number, now: number): Array<[string, AuthSession]> {
-  const owned = Array.from(store.authSessions.entries())
-    .filter(([, session]) => session.user.id === userId)
-    .sort((left, right) => left[1].expiresAt - right[1].expiresAt || left[0].localeCompare(right[0]));
-  const expired = owned.filter(([, session]) => session.expiresAt <= now);
-  const active = owned.filter(([, session]) => session.expiresAt > now);
-  return [...expired, ...active.slice(0, Math.max(0, active.length - cap + 1))];
 }
 
 function closeEvictedSessionSockets(store: RelayStore, evicted: Set<AuthSession>): void {

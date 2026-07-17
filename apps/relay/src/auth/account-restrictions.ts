@@ -13,6 +13,7 @@ export function createAccountRestrictionManager(options: {
   store: RelayStore;
   liveControl: AccountRestrictionLiveControl;
   persist: () => Promise<void>;
+  now?: () => number;
 }) {
   async function restrictAccount(restriction: AccountRestriction) {
     validateAccountRestriction(restriction);
@@ -45,7 +46,7 @@ export function createAccountRestrictionManager(options: {
   function evictRestrictedAccounts() {
     let removedAuthSessions = 0;
     let removedRestrictions = 0;
-    const now = Date.now();
+    const now = options.now?.() ?? Date.now();
     for (const [userId, restriction] of options.store.accountRestrictions) {
       if (restriction.expiresAt && Date.parse(restriction.expiresAt) <= now) {
         options.store.accountRestrictions.delete(userId);

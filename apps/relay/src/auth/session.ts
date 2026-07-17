@@ -145,6 +145,33 @@ export function hashAuthSessionId(sessionId: string): string {
   return createHash("sha256").update(sessionId, "utf8").digest("hex");
 }
 
+export function selectAuthSessionsToEvict(
+  authSessions: Map<string, AuthSession>,
+  userId: string,
+  cap: number,
+  reservedSlots: number,
+  now: number
+): Array<[string, AuthSession]> {
+  const owned = Array.from(authSessions.entries())
+    .filter(([, session]) => session.user.id === userId)
+    .sort((left, right) => left[1].expiresAt - right[1].expiresAt || left[0].localeCompare(right[0]));
+  const expired = owned.filter(([, session]) => session.expiresAt <= now);
+  const active = owned.filter(([, session]) => session.expiresAt > now);
+  const retainedSlots = Math.max(0, cap - reservedSlots);
+  return [...expired, ...active.slice(0, Math.max(0, active.length - retainedSlots))];
+}
+
+export function pruneRetainedAuthSessions(authSessions: Map<string, AuthSession>, cap: number, now: number): number {
+  const userIds = new Set(Array.from(authSessions.values(), (session) => session.user.id));
+  let removed = 0;
+  for (const userId of userIds) {
+    for (const [sessionIdHash] of selectAuthSessionsToEvict(authSessions, userId, cap, 0, now)) {
+      if (authSessions.delete(sessionIdHash)) removed += 1;
+    }
+  }
+  return removed;
+}
+
 function sessionIdHashesEqual(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left, "hex");
   const rightBytes = Buffer.from(right, "hex");

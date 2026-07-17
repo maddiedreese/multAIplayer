@@ -10,6 +10,7 @@ import {
   waitForStoredState,
   writeFile
 } from "../support/relay.js";
+import { hashAuthSessionId } from "../../src/auth/session.js";
 
 test("relay advertises native OAuth configuration without a secret", async () => {
   const relay = await startRelay({
@@ -195,6 +196,49 @@ globalThis.fetch = async (input, init = {}) =>
     if (restarted) await restarted.close();
     else if (!firstRelayClosed) await relay.close();
     await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("startup prunes and persists legacy sessions above a lowered per-user cap", async () => {
+  const now = Date.now();
+  const sessionIds = ["legacy-oldest", "legacy-middle", "legacy-newest"];
+  const relay = await startRelay(
+    {
+      MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+      MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER: "2"
+    },
+    {
+      version: 1,
+      savedAt: new Date(now).toISOString(),
+      teams: [],
+      rooms: [],
+      invites: [],
+      teamMembers: [],
+      encryptedBacklog: [],
+      authSessions: sessionIds.map((sessionId, index) => ({
+        sessionIdHash: hashAuthSessionId(sessionId),
+        user: { id: "github:legacy", login: "legacy-user" },
+        expiresAt: now + (index + 1) * 60_000
+      }))
+    }
+  );
+  try {
+    const responses = await Promise.all(
+      sessionIds.map((sessionId) =>
+        fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie: `multaiplayer_session=${sessionId}` } })
+      )
+    );
+    assert.deepEqual(
+      responses.map((response) => response.status),
+      [401, 200, 200]
+    );
+    const stored = await waitForStoredState(relay.dataPath, (state) => state.authSessions?.length === 2);
+    assert.deepEqual(
+      stored.authSessions?.map((session) => (session as { sessionIdHash: string }).sessionIdHash).sort(),
+      sessionIds.slice(1).map(hashAuthSessionId).sort()
+    );
+  } finally {
+    await relay.close();
   }
 });
 

@@ -9,7 +9,7 @@ manual review of its row.
 
 ## Review model
 
-All 100 registered commands were read against four questions:
+Every registered command in the exact-set inventory below was read against four questions:
 
 1. Can the return value contain credentials, cryptographic secrets, plaintext,
    local file contents, account identity, or other sensitive material?
