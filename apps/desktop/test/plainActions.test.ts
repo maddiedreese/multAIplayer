@@ -97,6 +97,7 @@ test("account sign-out actions preserve preview cleanup ordering without React",
   const actions = createAccountActions({
     stopOwnedLocalPreviews: async (reason) => {
       calls.push(`preview:${reason}`);
+      return true;
     },
     signOutGitHub: async () => {
       calls.push("github");
@@ -114,6 +115,7 @@ test("hosted-account deletion stops previews before clearing account state", asy
   const actions = createAccountActions({
     stopOwnedLocalPreviews: async (reason) => {
       calls.push(`preview:${reason}`);
+      return true;
     },
     signOutGitHub: async () => undefined,
     clearDeletedHostedAccount: () => calls.push("deleted")
@@ -135,9 +137,10 @@ test("hosted-account deletion clears local identity even when native preview cle
     clearDeletedHostedAccount: () => calls.push("deleted")
   });
 
-  await actions.hostedAccountDeleted();
+  const previewCleanupConfirmed = await actions.hostedAccountDeleted();
 
   assert.deepEqual(calls, ["preview", "deleted"]);
+  assert.equal(previewCleanupConfirmed, false);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {
@@ -748,6 +751,37 @@ test("preview cleanup tolerates stopped-status publication failure after native 
   });
 
   await actions.stopOwnedLocalPreviews("Account exit.");
+});
+
+test("preview cleanup retries stop-all and falls back to every known tunnel", async () => {
+  const nativeCalls: string[] = [];
+  nativeInvoke = async (command) => {
+    nativeCalls.push(command);
+    if (command === "local_preview_stop_all") throw new Error("IPC unavailable");
+    if (command === "local_preview_stop") {
+      return { id: "preview-live", localUrl: "", publicUrl: "", stopped: true };
+    }
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  const preview: LocalPreviewRecord = {
+    eventType: "local.preview",
+    id: "preview-live",
+    sharedBy: "Maddie",
+    sharedByUserId: "github:maddie",
+    sourceUrl: "http://localhost:5173/",
+    publicUrl: "https://example.trycloudflare.com",
+    status: "live",
+    message: "Live",
+    createdAt: "2026-07-17T00:00:00.000Z",
+    updatedAt: "2026-07-17T00:00:00.000Z"
+  };
+  useAppStore.getState().appendLocalPreviewEvent(room.id, preview);
+  const actions = createLocalPreviewActions({ publishLocalPreviewEvent: async () => undefined });
+
+  const confirmed = await actions.stopOwnedLocalPreviews("Account exit.");
+
+  assert.equal(confirmed, false);
+  assert.deepEqual(nativeCalls, ["local_preview_stop_all", "local_preview_stop_all", "local_preview_stop"]);
 });
 
 test("a stopped preview cannot regress to a stale live event", () => {

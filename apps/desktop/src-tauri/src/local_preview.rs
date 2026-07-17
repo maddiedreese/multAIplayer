@@ -288,10 +288,10 @@ pub(crate) fn local_preview_stop(
 pub(crate) fn local_preview_stop_all(
     state: State<'_, LocalPreviewState>,
 ) -> crate::command_error::CommandResult<usize> {
-    let mut registry = state
-        .registry
-        .lock()
-        .map_err(|_| "Local preview state lock is poisoned".to_string())?;
+    let mut registry = match state.registry.lock() {
+        Ok(registry) => registry,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     Ok(registry.cancel_all())
 }
 

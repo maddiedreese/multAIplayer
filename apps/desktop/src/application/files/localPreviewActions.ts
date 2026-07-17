@@ -215,13 +215,6 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
     const activeStarts = Array.from(activeLocalPreviewStarts.values()).filter(
       (active) => active.payload.sharedByUserId === localUser.id
     );
-    let nativeStopError: unknown = null;
-    try {
-      await stopAllLocalPreviewTunnels();
-    } catch (error) {
-      nativeStopError = error;
-      reportExpectedFailure("local preview account cleanup could not stop every native tunnel");
-    }
     const previewsById = new Map<string, { preview: LocalPreviewRecord; room: ClientRoomRecord }>();
     for (const [roomId, runtime] of Object.entries(localPreviewByRoom)) {
       const previews = runtime.previews ?? [];
@@ -232,6 +225,26 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
           continue;
         previewsById.set(preview.id, { preview, room });
       }
+    }
+    let nativeStopConfirmed = false;
+    for (let attempt = 0; attempt < 2 && !nativeStopConfirmed; attempt += 1) {
+      try {
+        await stopAllLocalPreviewTunnels();
+        nativeStopConfirmed = true;
+      } catch {
+        reportExpectedFailure("local preview account cleanup could not stop every native tunnel");
+      }
+    }
+    if (!nativeStopConfirmed) {
+      await Promise.all(
+        [...previewsById.keys(), ...activeStarts.map((active) => active.payload.id)].map(async (previewId) => {
+          try {
+            await stopLocalPreviewTunnel(previewId);
+          } catch {
+            reportExpectedFailure("local preview account cleanup could not confirm an individual tunnel stop");
+          }
+        })
+      );
     }
     await Promise.all(
       activeStarts.map(async (active) => {
@@ -260,7 +273,7 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
         }
       })
     );
-    if (nativeStopError) throw nativeStopError;
+    return nativeStopConfirmed;
   }
 
   return {

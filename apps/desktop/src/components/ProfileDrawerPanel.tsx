@@ -45,9 +45,9 @@ export function ProfileDrawerPanel({
   relaySessionPersistence: string;
   codexAccountPanel?: ReactNode;
   archivePanel?: ReactNode;
-  onHostedAccountDeleted: () => void | Promise<void>;
+  onHostedAccountDeleted: () => boolean | Promise<boolean>;
   onSignIn: () => void;
-  onSignOut: () => void;
+  onSignOut: () => boolean | Promise<boolean>;
 }) {
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null);
   const [deletionOpen, setDeletionOpen] = useState(false);
@@ -55,6 +55,14 @@ export function ProfileDrawerPanel({
   const [deletionBusy, setDeletionBusy] = useState(false);
   const [deletionResult, setDeletionResult] = useState<HostedAccountDeletionResult | null>(null);
   const [deletionStatus, setDeletionStatus] = useState<string | null>(null);
+  const [previewCleanupWarning, setPreviewCleanupWarning] = useState<string | null>(null);
+  const recordPreviewCleanupResult = (confirmed: boolean) => {
+    setPreviewCleanupWarning(
+      confirmed
+        ? null
+        : "A local preview process could not be confirmed stopped. Quit multAIplayer now to guarantee that public sharing ends."
+    );
+  };
   async function exportDiagnostics() {
     const outcome = await saveNativeDiagnosticBundle();
     setDiagnosticsMessage(
@@ -74,18 +82,18 @@ export function ProfileDrawerPanel({
       setDeletionResult(result);
       if (result.status === "deleted") {
         setDeletionConfirmation("");
-        await onHostedAccountDeleted();
+        recordPreviewCleanupResult(await onHostedAccountDeleted());
       } else if (result.status === "pending") {
         setDeletionConfirmation("");
         setDeletionStatus(
           "The relay durably accepted the deletion request and signed this identity out. Primary cleanup is pending and will be retried before the relay next accepts traffic."
         );
-        await onHostedAccountDeleted();
+        recordPreviewCleanupResult(await onHostedAccountDeleted());
       } else if (result.status === "indeterminate") {
         setDeletionStatus(
           "The configured relay reports this session as signed out after the deletion response was lost. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
         );
-        await onHostedAccountDeleted();
+        recordPreviewCleanupResult(await onHostedAccountDeleted());
       }
     } catch (error) {
       setDeletionStatus(
@@ -108,13 +116,17 @@ export function ProfileDrawerPanel({
         setDeletionStatus(
           "The configured relay reports this session as signed out. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
         );
-        await onHostedAccountDeleted();
+        recordPreviewCleanupResult(await onHostedAccountDeleted());
       }
     } catch (error) {
       setDeletionStatus(`Account status could not be rechecked: ${String(error)}. Do not assume deletion completed.`);
     } finally {
       setDeletionBusy(false);
     }
+  }
+
+  async function signOut() {
+    recordPreviewCleanupResult(await onSignOut());
   }
 
   return (
@@ -135,6 +147,11 @@ export function ProfileDrawerPanel({
         Save diagnostics
       </button>
       {diagnosticsMessage && <div className="workflow-message">{diagnosticsMessage}</div>}
+      {previewCleanupWarning && (
+        <div className="workflow-message" role="alert">
+          {previewCleanupWarning}
+        </div>
+      )}
 
       {codexAccountPanel}
 
@@ -147,7 +164,7 @@ export function ProfileDrawerPanel({
         authError={authError}
         deviceFlow={deviceFlow}
         onSignIn={onSignIn}
-        onSignOut={onSignOut}
+        onSignOut={() => void signOut()}
       />
 
       {currentUser && (
