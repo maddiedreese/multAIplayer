@@ -30,7 +30,7 @@ body:
     attributes:
       label: Desktop version or commit
       description: Use the version shown by the installed app, a release tag, or an exact commit SHA.
-      placeholder: 0.1.0-alpha.0 or 5cb636467ca4c4508c1e06b01152f7091e28cff7
+      placeholder: 0.1.0-alpha.1 or 5cb636467ca4c4508c1e06b01152f7091e28cff7
     validations:
       required: true
   - type: input
@@ -38,7 +38,7 @@ body:
     attributes:
       label: Relay version or commit
       description: Ask the relay operator for its release tag or exact commit SHA. Enter "unknown" if unavailable.
-      placeholder: 0.1.0-alpha.0, exact commit SHA, or unknown
+      placeholder: 0.1.0-alpha.1, exact commit SHA, or unknown
     validations:
       required: true
   - type: dropdown

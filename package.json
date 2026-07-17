@@ -1,7 +1,7 @@
 {
   "name": "multaiplayer",
   "private": true,
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "description": "Private group chat for coding with Codex. Open source.",
   "license": "Apache-2.0",
   "type": "module",
