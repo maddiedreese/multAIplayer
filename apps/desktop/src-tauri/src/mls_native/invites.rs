@@ -59,7 +59,7 @@ pub(crate) fn mls_invite_request_seal(
         uploader_github_user_id: request.binding.requester_user_id.clone(),
         uploader_device_id: request.binding.requester_device_id.clone(),
     })
-    .map_err(safe_error)?;
+    .map_err(display_error)?;
     let capability = fixed32_url(&request.capability_url_value)?;
     if !valid_capability_handle(&request.capability_handle) {
         return Err("Invite capability handle is invalid".into());
@@ -79,11 +79,11 @@ pub(crate) fn mls_invite_request_seal(
     ensure_pending_invite_identity(&state, &original_binding)?;
     let payload = InviteRequestPayload {
         capability_handle: request.capability_handle,
-        mac: STANDARD.encode(mac_binding(&capability, &request.binding).map_err(safe_error)?),
+        mac: STANDARD.encode(mac_binding(&capability, &request.binding).map_err(display_error)?),
         binding: request.binding,
         key_package: request.key_package,
     };
-    let aad = encode_capability_binding(&payload.binding).map_err(safe_error)?;
+    let aad = encode_capability_binding(&payload.binding).map_err(display_error)?;
     let sealed_payload = seal(
         &decode(&request.recipient_hpke_public_key)?,
         b"multaiplayer:invite-request:v3",
@@ -91,7 +91,7 @@ pub(crate) fn mls_invite_request_seal(
         &serde_json::to_vec(&payload)
             .map_err(|_| "Invite request payload is invalid".to_string())?,
     )
-    .map_err(safe_error)?;
+    .map_err(display_error)?;
     let sealed_request = serialize_directed_invite_request(&original_binding, &sealed_payload)?;
     with_store(&state, |store| {
         store.put_pending_invite_request(&PendingInviteRequest {
@@ -112,7 +112,7 @@ pub(crate) fn mls_invite_request_open(
     request: InviteRequestOpenRequest,
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<InviteRequestOpenResponse> {
-    let aad = encode_capability_binding(&request.binding).map_err(safe_error)?;
+    let aad = encode_capability_binding(&request.binding).map_err(display_error)?;
     let hpke = state
         .hpke
         .lock()
@@ -124,7 +124,7 @@ pub(crate) fn mls_invite_request_open(
         &aad,
         &request.sealed_payload,
     )
-    .map_err(safe_error)?;
+    .map_err(display_error)?;
     let payload: InviteRequestPayload = serde_json::from_slice(&plaintext)
         .map_err(|_| "Invite request payload is invalid".to_string())?;
     if payload.binding != request.binding {
@@ -142,7 +142,7 @@ pub(crate) fn mls_invite_request_open(
         uploader_github_user_id: payload.binding.requester_user_id.clone(),
         uploader_device_id: payload.binding.requester_device_id.clone(),
     })
-    .map_err(safe_error)?;
+    .map_err(display_error)?;
     Ok(InviteRequestOpenResponse {
         capability_handle: payload.capability_handle,
         binding: payload.binding,
@@ -180,10 +180,10 @@ pub(crate) fn mls_invite_approve(
         uploader_github_user_id: request.binding.requester_user_id.clone(),
         uploader_device_id: request.binding.requester_device_id.clone(),
     })
-    .map_err(safe_error)?;
+    .map_err(display_error)?;
     let binding_hash = format!(
         "{:x}",
-        Sha256::digest(encode_capability_binding(&request.binding).map_err(safe_error)?)
+        Sha256::digest(encode_capability_binding(&request.binding).map_err(display_error)?)
     );
     let entry = keyring::Entry::new(
         MLS_KEYCHAIN_SERVICE,
@@ -200,7 +200,7 @@ pub(crate) fn mls_invite_approve(
             .iter()
             .any(|item| item.id == receipt.commit_outbox_id);
         if !commit_still_pending {
-            let _ = entry.delete_credential();
+            delete_invite_verifier(&request.capability_handle)?;
         }
         return Ok(InviteApproveResponse {
             epoch: receipt.epoch,
@@ -218,13 +218,13 @@ pub(crate) fn mls_invite_approve(
             .map_err(|_| "Invite capability is unavailable".to_string())?,
     )?;
     let mac = fixed32(&request.mac)?;
-    verify_request_binding(&verifier, &request.binding, &mac).map_err(safe_error)?;
+    verify_request_binding(&verifier, &request.binding, &mac).map_err(display_error)?;
     let mut response_binding = request.binding.clone();
     response_binding.phase = "response".into();
     response_binding.status = Some("approved".into());
     response_binding.decided_at = Some(decision_timestamp());
     let response_mac =
-        STANDARD.encode(mac_response_binding(&verifier, &response_binding).map_err(safe_error)?);
+        STANDARD.encode(mac_response_binding(&verifier, &response_binding).map_err(display_error)?);
     let welcome_metadata = WelcomeRetryMetadata {
         invite_id: request.binding.invite_id.clone(),
         request_id: request.binding.request_id.clone(),
@@ -271,7 +271,7 @@ pub(crate) fn mls_invite_deny(
     }
     let binding_hash = format!(
         "{:x}",
-        Sha256::digest(encode_capability_binding(&request.binding).map_err(safe_error)?)
+        Sha256::digest(encode_capability_binding(&request.binding).map_err(display_error)?)
     );
     let entry = keyring::Entry::new(
         MLS_KEYCHAIN_SERVICE,
@@ -286,7 +286,7 @@ pub(crate) fn mls_invite_deny(
         {
             return Err("Invite capability was already consumed for another request".into());
         }
-        let _ = entry.delete_credential();
+        delete_invite_verifier(&request.capability_handle)?;
         return Ok(InviteDenyResponse {
             outbox_id: receipt.response_outbox_id,
             response_binding,
@@ -299,25 +299,23 @@ pub(crate) fn mls_invite_deny(
             .map_err(|_| "Invite capability is unavailable".to_string())?,
     )?;
     verify_request_binding(&verifier, &request.binding, &fixed32(&request.mac)?)
-        .map_err(safe_error)?;
+        .map_err(display_error)?;
     let mut response_binding = request.binding;
     response_binding.phase = "response".into();
     response_binding.status = Some("denied".into());
     response_binding.decided_at = Some(decision_timestamp());
     let response_mac =
-        STANDARD.encode(mac_response_binding(&verifier, &response_binding).map_err(safe_error)?);
+        STANDARD.encode(mac_response_binding(&verifier, &response_binding).map_err(display_error)?);
     let outbox_id = with_engine(&state, |engine| {
         engine.deny_invite(
-            request.capability_handle,
+            request.capability_handle.clone(),
             binding_hash,
             response_binding.key_package_hash.clone(),
             response_binding.clone(),
             response_mac.clone(),
         )
     })?;
-    entry
-        .delete_credential()
-        .map_err(|_| "Invite denied but verifier cleanup failed".to_string())?;
+    delete_invite_verifier(&request.capability_handle)?;
     Ok(InviteDenyResponse {
         outbox_id,
         response_binding,
@@ -344,7 +342,7 @@ fn accept_invite_response(
         &request.response_binding,
         &fixed32(&request.response_mac)?,
     )
-    .map_err(safe_error)?;
+    .map_err(display_error)?;
     let status = request
         .response_binding
         .status

@@ -481,19 +481,16 @@ jobs:
           release_error="$RUNNER_TEMP/release-metadata-error.txt"
           if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
             > "$release_metadata" 2> "$release_error"; then
-            if grep -q '(HTTP 404)' "$release_error"; then
-              exit 0
+            if ! grep -q '(HTTP 404)' "$release_error"; then
+              cat "$release_error" >&2
+              exit 1
             fi
-            cat "$release_error" >&2
-            exit 1
-          fi
-          if [ "$(jq -r .draft "$release_metadata")" != "false" ]; then
-            exit 0
           fi
           remote_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          if [ "$remote_commit" != "$RELEASE_COMMIT" ]; then
-            echo "Release tag moved after source resolution: expected $RELEASE_COMMIT, found $remote_commit" >&2
-            exit 1
+          publication_plan="$(node tools/release/plan-release-publication.mjs \
+            "$release_metadata" "$RELEASE_COMMIT" "$remote_commit")"
+          if [ "$publication_plan" != "verify-public" ]; then
+            exit 0
           fi
 
           mkdir -p "$RUNNER_TEMP/public-release-assets"
@@ -530,10 +527,6 @@ jobs:
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
         run: |
           remote_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          if [ "$remote_commit" != "$RELEASE_COMMIT" ]; then
-            echo "Release tag moved after source resolution: expected $RELEASE_COMMIT, found $remote_commit" >&2
-            exit 1
-          fi
           assert_private_draft() {
             if [ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != "true" ]; then
               echo "Refusing to mutate already-public release $RELEASE_TAG." >&2
@@ -541,28 +534,37 @@ jobs:
             fi
           }
           release_metadata="$RUNNER_TEMP/release-metadata.json"
-          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_metadata" 2>/dev/null; then
-            if [ "$(jq -r .draft "$release_metadata")" != "true" ]; then
-              mkdir -p "$RUNNER_TEMP/public-release-assets"
-              gh release download "$RELEASE_TAG" \
-                --dir "$RUNNER_TEMP/public-release-assets" \
-                --repo "$GITHUB_REPOSITORY"
-              node tools/release/validate-release-asset-digests.mjs \
-                release-assets \
-                "$release_metadata" \
-                "$RUNNER_TEMP/local-release-asset-names.txt"
-              node tools/release/check-release-assets.mjs \
-                published-list "$RUNNER_TEMP/local-release-asset-names.txt"
-              node tools/release/validate-release-asset-digests.mjs \
-                "$RUNNER_TEMP/public-release-assets" \
-                "$release_metadata" \
-                "$RUNNER_TEMP/public-release-asset-names.txt"
-              node tools/release/check-release-assets.mjs \
-                published-list "$RUNNER_TEMP/public-release-asset-names.txt"
-              echo "Release $RELEASE_TAG is already public with the authenticated required asset set; leaving it unchanged."
-              exit 0
+          release_error="$RUNNER_TEMP/release-metadata-error.txt"
+          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            > "$release_metadata" 2> "$release_error"; then
+            if ! grep -q '(HTTP 404)' "$release_error"; then
+              cat "$release_error" >&2
+              exit 1
             fi
-          else
+          fi
+          publication_plan="$(node tools/release/plan-release-publication.mjs \
+            "$release_metadata" "$RELEASE_COMMIT" "$remote_commit")"
+          if [ "$publication_plan" = "verify-public" ]; then
+            mkdir -p "$RUNNER_TEMP/public-release-assets"
+            gh release download "$RELEASE_TAG" \
+              --dir "$RUNNER_TEMP/public-release-assets" \
+              --repo "$GITHUB_REPOSITORY"
+            node tools/release/validate-release-asset-digests.mjs \
+              release-assets \
+              "$release_metadata" \
+              "$RUNNER_TEMP/local-release-asset-names.txt"
+            node tools/release/check-release-assets.mjs \
+              published-list "$RUNNER_TEMP/local-release-asset-names.txt"
+            node tools/release/validate-release-asset-digests.mjs \
+              "$RUNNER_TEMP/public-release-assets" \
+              "$release_metadata" \
+              "$RUNNER_TEMP/public-release-asset-names.txt"
+            node tools/release/check-release-assets.mjs \
+              published-list "$RUNNER_TEMP/public-release-asset-names.txt"
+            echo "Release $RELEASE_TAG is already public with the authenticated required asset set; leaving it unchanged."
+            exit 0
+          fi
+          if [ "$publication_plan" = "create-draft" ]; then
             node tools/release/finalize-changelog.mjs --extract="${RELEASE_TAG#v}" \
               > "$RUNNER_TEMP/release-notes.md"
             release_args=(--notes-file "$RUNNER_TEMP/release-notes.md" --draft)

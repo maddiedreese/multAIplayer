@@ -6,7 +6,7 @@ This workload did not fill the configurable MLS-backlog or attachment-ciphertext
 
 ## Workload and environment
 
-- Source baseline: `c33ed8a477287b4633a71e210fc952f92fb76280` plus the operational-readiness changes under review.
+- Local comparison source commit: `1e582296dba3196efd16c22f4763eca576c191b6`.
 - Apple M3, 16 GiB RAM, Darwin arm64; Node `v24.6.0`; npm `11.16.0`.
 - 50 hydrated rooms and 100 team members; 16 concurrent reconnecting WebSocket clients; one continuous MLS publisher; continuous `GET /teams` requests; two stop/crash-and-reload cycles; live SQLite backup and restore verification.
 - Ten seconds configured workload time per run. Seed `0`, backlog limit `1000`, rate limiting disabled for the benchmark, SQLite WAL enabled.
@@ -38,7 +38,7 @@ The default checkpoint produced a 325 ms worst event-loop stall and a roughly 4 
 
 ## Railway-volume follow-up
 
-The hosted follow-up ran on 2026-07-15 PDT for 905.3 seconds against the 5 GB persistent volume mounted by the production Railway relay. It exercised deployed commit `ca52f4f7` with the default 1000-page WAL checkpoint, 50 rooms, 100 members, 16 concurrent reconnecting clients, two relay start/reload phases, continuous publication and `GET /teams`, and a live backup with an independent SQLite integrity check.
+The hosted follow-up ran on 2026-07-15 PDT for 905.3 seconds against the 5 GB persistent volume mounted by the production Railway relay. It exercised deployed commit `ca52f4f71e658700b662b8e7849db2a5a7b2ea60` with the default 1000-page WAL checkpoint, 50 rooms, 100 members, 16 concurrent reconnecting clients, two relay start/reload phases, continuous publication and `GET /teams`, and a live backup with an independent SQLite integrity check.
 
 To avoid corrupting or measuring against user data, the runner launched a second loopback-only relay on port 4322 and gave it a UUID-named SQLite database under `/data`. It did not address the public listener or open `/data/relay-store.sqlite`. A `finally` cleanup removed the isolated directory; an independent directory scan found no `relay-hosted-soak-*` paths afterward, and the public `/readyz` response returned healthy. Readiness responses no longer expose the configured filesystem path.
 

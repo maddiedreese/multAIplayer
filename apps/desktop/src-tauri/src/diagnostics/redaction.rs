@@ -22,7 +22,16 @@ pub(super) fn build_diagnostic_bundle(
             ),
             ws_origin: normalized_relay_origin(context.relay_ws_origin.as_deref(), &["ws", "wss"]),
         },
-        entries: state.export(now)?,
+        entries: state
+            .export(now)?
+            .into_iter()
+            .map(|mut entry| {
+                // Legacy logs may contain redacted free-form detail. Keep exports
+                // metadata-only so room content is excluded by construction.
+                entry.detail = None;
+                entry
+            })
+            .collect(),
     };
     let mut encoded = serde_json::to_vec_pretty(&bundle)
         .map_err(|error| format!("Failed to serialize diagnostic bundle: {error}"))?;

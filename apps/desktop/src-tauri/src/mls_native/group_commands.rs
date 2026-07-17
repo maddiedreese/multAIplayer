@@ -87,7 +87,7 @@ pub(crate) fn mls_host_transfer_authorization(
         .as_ref()
         .ok_or_else(|| "MLS identity is not initialized".to_string())?
         .sign_host_transfer(&canonical)
-        .map_err(safe_error)?;
+        .map_err(display_error)?;
     Ok(HostTransferAuthorizationResponse {
         authorization,
         signature_der: STANDARD.encode(signature.signature_der),
@@ -156,22 +156,17 @@ pub(crate) fn mls_publish_succeeded(
     request: PublishSucceededRequest,
     state: tauri::State<'_, MlsNativeState>,
 ) -> crate::command_error::CommandResult<u64> {
-    let (epoch, capability_handle) = with_engine(&state, |engine| {
-        let capability_handle = engine
+    let capability_handle = with_engine(&state, |engine| {
+        Ok(engine
             .invite_receipt_for_commit(&request.message_id)?
-            .map(|receipt| receipt.capability_handle);
-        let epoch = engine.publish_succeeded(&request.room_id, &request.message_id)?;
-        Ok((epoch, capability_handle))
+            .map(|receipt| receipt.capability_handle))
     })?;
     if let Some(handle) = capability_handle {
-        if let Ok(entry) = keyring::Entry::new(
-            MLS_KEYCHAIN_SERVICE,
-            &format!("mls-invite-capability:{handle}"),
-        ) {
-            let _ = entry.delete_credential();
-        }
+        delete_invite_verifier(&handle)?;
     }
-    Ok(epoch)
+    Ok(with_engine(&state, |engine| {
+        engine.publish_succeeded(&request.room_id, &request.message_id)
+    })?)
 }
 
 #[typed_tauri_command::command]

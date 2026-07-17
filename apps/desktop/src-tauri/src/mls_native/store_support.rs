@@ -18,7 +18,7 @@ pub(super) fn with_engine<T>(
 pub(super) fn engine_error(error: mls_core::EngineError) -> String {
     match error {
         mls_core::EngineError::RequiresRejoin { .. } => "MLS_REQUIRES_REJOIN".into(),
-        other => safe_error(other),
+        other => display_error(other),
     }
 }
 
@@ -34,7 +34,7 @@ pub(super) fn with_store<T>(
         lock.as_ref()
             .ok_or_else(|| "MLS identity is not initialized".to_string())?,
     )
-    .map_err(safe_error)
+    .map_err(display_error)
 }
 
 pub(super) fn decode(value: &str) -> Result<Vec<u8>, String> {
@@ -50,7 +50,7 @@ pub(super) fn decode(value: &str) -> Result<Vec<u8>, String> {
     Ok(decoded)
 }
 
-pub(super) fn safe_error(error: impl std::fmt::Display) -> String {
+pub(super) fn display_error(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 
@@ -83,15 +83,7 @@ pub(super) fn should_quarantine_store(path: &std::path::Path, wrapping_key: [u8;
     let Err(error) = EncryptedStore::open(path, wrapping_key) else {
         return false;
     };
-    is_corruption_error_message(&error.to_string())
-}
-
-pub(super) fn is_corruption_error_message(message: &str) -> bool {
-    let message = message.to_ascii_lowercase();
-    message.contains("file is not a database")
-        || message.contains("database disk image is malformed")
-        || message.contains("database malformed")
-        || message.contains("not a database")
+    error.is_database_corruption()
 }
 
 pub(super) fn secure_store_permissions(path: &std::path::Path) -> Result<(), String> {
@@ -162,7 +154,7 @@ pub(super) fn load_or_create_store_wrapping_key() -> Result<[u8; 32], String> {
     match entry.get_password() {
         Ok(value) => fixed32(&value),
         Err(keyring::Error::NoEntry) => {
-            let bytes = generate_device_signing_secret().map_err(safe_error)?;
+            let bytes = generate_device_signing_secret().map_err(display_error)?;
             let key: [u8; 32] = bytes
                 .try_into()
                 .map_err(|_| "Failed to generate MLS store key".to_string())?;
@@ -192,7 +184,7 @@ pub(super) fn load_or_create_hpke_key_pair() -> Result<HpkeKeyPair, String> {
                     .decode(parts[1])
                     .map_err(|_| "Stored HPKE identity is corrupt".to_string())?,
             )
-            .map_err(safe_error)
+            .map_err(display_error)
         }
         Err(keyring::Error::NoEntry) => {
             let pair = generate_hpke_key_pair();

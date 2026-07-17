@@ -40,6 +40,8 @@ test("unexpected renderer failures show recovery UI and enter redacted diagnosti
     assert.ok(view.getByTestId("app-recovery-surface"));
     assert.match(view.getByRole("heading").textContent ?? "", /stopped unexpectedly/);
     assert.equal(view.getByRole("button", { name: "Reload interface" }).getAttribute("type"), "button");
+    assert.match(view.getByRole("link", { name: "Report this bug" }).getAttribute("href") ?? "", /bug_report\.yml/);
+    assert.match(view.getByTestId("app-recovery-surface").textContent ?? "", /Nothing is uploaded automatically/);
   } finally {
     console.error = originalError;
   }

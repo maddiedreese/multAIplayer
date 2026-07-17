@@ -1,5 +1,5 @@
-import { BookOpen, CheckCircle2, RotateCcw } from "lucide-react";
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/core/productLinks";
+import { BookOpen, Bug, CheckCircle2, RotateCcw } from "lucide-react";
+import { BUG_REPORT_URL, PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/core/productLinks";
 
 export function HelpDrawerPanel({
   completedSteps,
@@ -65,6 +65,15 @@ export function HelpDrawerPanel({
         <strong>Policies and support</strong>
         <p>
           multAIplayer is a free, open-source alpha provided without guaranteed support or continued hosted service.
+        </p>
+        <p>
+          <a href={BUG_REPORT_URL} target="_blank" rel="noreferrer noopener">
+            <Bug size={14} aria-hidden="true" /> Report a bug
+          </a>
+        </p>
+        <p>
+          Nothing is uploaded automatically. You can save a metadata-only diagnostic bundle from Profile, review it, and
+          decide whether to attach it. Diagnostic exports never include room content.
         </p>
         <p>
           <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener">

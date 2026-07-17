@@ -83,7 +83,14 @@ export function loadDiagnosticEntries(): DiagnosticEntry[] {
 
 function appendDiagnosticEntry(entry: DiagnosticEntry) {
   diagnosticEntries = [...diagnosticEntries, { ...entry }].slice(-maxDiagnosticEntries);
-  recordPersistedDiagnostic(entry satisfies PersistedDiagnosticEntry);
+  // Free-form error detail is useful during the current process, but it can contain
+  // application data supplied by an upstream error. Persist only the stable event
+  // name so an exported report can never include room content.
+  recordPersistedDiagnostic({
+    level: entry.level,
+    message: entry.message,
+    createdAt: entry.createdAt
+  } satisfies PersistedDiagnosticEntry);
 }
 
 export function clearDiagnosticEntries() {

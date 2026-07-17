@@ -68,6 +68,23 @@ pub enum StoreError {
     CorruptValue,
 }
 
+impl StoreError {
+    pub fn is_database_corruption(&self) -> bool {
+        let StoreError::Sqlite(SqLiteDataStorageError::SqlEngineError(error)) = self else {
+            return false;
+        };
+        let Some(rusqlite::Error::SqliteFailure(error, _)) =
+            error.downcast_ref::<rusqlite::Error>()
+        else {
+            return false;
+        };
+        matches!(
+            error.code,
+            rusqlite::ffi::ErrorCode::DatabaseCorrupt | rusqlite::ffi::ErrorCode::NotADatabase
+        )
+    }
+}
+
 impl EncryptedStore {
     pub fn open(path: &Path, wrapping_key: [u8; 32]) -> Result<Self, StoreError> {
         let strategy = CipheredConnectionStrategy::new(
@@ -257,6 +274,20 @@ mod tests {
             key_package_id: format!("package-{request_id}"),
             sealed_request: "{\"version\":3}".into(),
         }
+    }
+
+    fn sqlite_failure(code: i32) -> StoreError {
+        StoreError::Sqlite(SqLiteDataStorageError::SqlEngineError(Box::new(
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(code), None),
+        )))
+    }
+
+    #[test]
+    fn database_corruption_uses_sqlite_error_codes() {
+        assert!(sqlite_failure(rusqlite::ffi::SQLITE_CORRUPT).is_database_corruption());
+        assert!(sqlite_failure(rusqlite::ffi::SQLITE_NOTADB).is_database_corruption());
+        assert!(!sqlite_failure(rusqlite::ffi::SQLITE_BUSY).is_database_corruption());
+        assert!(!StoreError::CorruptValue.is_database_corruption());
     }
 
     #[test]
