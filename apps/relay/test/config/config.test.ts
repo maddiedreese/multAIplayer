@@ -93,12 +93,19 @@ test("ciphertext defaults fit the hosted memory budget and reject contradictory 
   try {
     for (const name of names) delete process.env[name];
     const defaults = loadRelayConfig();
-    assert.equal(defaults.maxAttachmentBlobBytes, 100_000_000);
-    assert.equal(defaults.maxAttachmentBlobBytesPerTeam, 50_000_000);
+    assert.equal(defaults.maxAttachmentBlobBytes, 500_000_000);
+    assert.equal(defaults.maxAttachmentBlobBytesPerTeam, 250_000_000);
     assert.equal(defaults.attachmentBlobLiveQuotaBytes, 50_000_000);
     assert.equal(defaults.maxMlsBacklogBytes, 50_000_000);
     assert.equal(defaults.maxMlsBacklogBytesPerTeam, 25_000_000);
     assert.equal(defaults.maxMlsBacklogBytesPerRoom, 5_000_000);
+
+    process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES = "250000000";
+    const hostedQuota = loadRelayConfig();
+    assert.equal(hostedQuota.attachmentBlobLiveQuotaBytes, 250_000_000);
+    assert.equal(hostedQuota.maxAttachmentBlobBytes, 500_000_000);
+    assert.equal(hostedQuota.maxAttachmentBlobBytesPerTeam, 250_000_000);
+    delete process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES;
 
     process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES = "50000000";
     process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM = "60000000";

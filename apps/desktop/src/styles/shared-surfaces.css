@@ -172,12 +172,17 @@ button:disabled {
 }
 
 .profile-card strong {
+  color: #1f1f1f;
   font-size: 13px;
 }
 
 .profile-card span {
   color: #727272;
   font-size: 12px;
+}
+
+.profile-card > svg {
+  color: #111111;
 }
 
 .device-flow,

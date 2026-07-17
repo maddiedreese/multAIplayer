@@ -66,17 +66,29 @@ function authenticateAssets(directory, metadata, expectedNames) {
   return names;
 }
 
-export function resolveReleaseSource({ tag, eventRef, eventSha, repository, outputPath }) {
+export function validateReleaseEvent({ eventName, eventRef, eventSha, tag, tagCommitSha }) {
+  if (eventName === "push") {
+    assert.equal(eventRef, `refs/tags/${tag}`, `release workflow ref must be refs/tags/${tag}; found ${eventRef}`);
+    assert.equal(
+      tagCommitSha,
+      eventSha,
+      `release event SHA does not match the resolved tag: event ${eventSha}, tag ${tagCommitSha}`
+    );
+    return;
+  }
+  assert.equal(eventName, "workflow_dispatch", `unsupported release event: ${eventName}`);
+}
+
+export function resolveReleaseSource({ tag, eventName, eventRef, eventSha, repository, outputPath }) {
   assert.match(tag, tagPattern, `release tag is invalid: ${tag}`);
-  assert.equal(eventRef, `refs/tags/${tag}`, `release workflow ref must be refs/tags/${tag}; found ${eventRef}`);
   command("git", ["show-ref", "--verify", `refs/tags/${tag}`]);
   command("git", ["fetch", "--no-tags", "origin", "main:refs/remotes/origin/main"]);
   const commit = command("git", ["rev-parse", `refs/tags/${tag}^{commit}`]);
-  assert.equal(commit, eventSha, `release event SHA does not match the resolved tag: event ${eventSha}, tag ${commit}`);
+  validateReleaseEvent({ eventName, eventRef, eventSha, tag, tagCommitSha: commit });
   command("git", ["merge-base", "--is-ancestor", commit, "refs/remotes/origin/main"]);
   const existing = api(`repos/${repository}/releases/tags/${tag}`, { optional: true });
   assert.ok(existing === null || existing.draft, `release ${tag} is already public; refusing to rebuild or replace it`);
-  appendFileSync(outputPath, `prerelease=${isPrereleaseTag(tag)}\ntag=${tag}\n`);
+  appendFileSync(outputPath, `commit=${commit}\nprerelease=${isPrereleaseTag(tag)}\ntag=${tag}\n`);
 }
 
 export function publishRelease({ assetsDirectory, expectedCommit, prerelease, repository, tag }) {
@@ -184,6 +196,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (subcommand === "resolve") {
     resolveReleaseSource({
       tag: env.RELEASE_TAG,
+      eventName: env.RELEASE_EVENT_NAME,
       eventRef: env.RELEASE_EVENT_REF,
       eventSha: env.RELEASE_EVENT_SHA,
       repository: env.GITHUB_REPOSITORY,

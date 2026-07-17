@@ -26,6 +26,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      commit: ${{ steps.release.outputs.commit }}
       prerelease: ${{ steps.release.outputs.prerelease }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
@@ -39,6 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_EVENT_REF: ${{ github.ref }}
           RELEASE_EVENT_SHA: ${{ github.sha }}
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: node tools/release/github-release.mjs resolve
 
@@ -54,7 +56,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.sha }}
+          ref: ${{ needs.resolve.outputs.commit }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Install repository Rust toolchain
@@ -91,7 +93,7 @@ jobs:
       issues: write
     uses: ./.github/workflows/supply-chain.yml
     with:
-      commit: ${{ github.sha }}
+      commit: ${{ needs.resolve.outputs.commit }}
 
   build:
     name: Build signed macOS artifacts
@@ -102,7 +104,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      commit: ${{ github.sha }}
+      commit: ${{ needs.resolve.outputs.commit }}
       prerelease: ${{ needs.resolve.outputs.prerelease }}
       tag: ${{ needs.resolve.outputs.tag }}
     env:
@@ -114,7 +116,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.sha }}
+          ref: ${{ needs.resolve.outputs.commit }}
 
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm

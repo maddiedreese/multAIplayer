@@ -5,6 +5,7 @@
   padding: clamp(18px, 4vw, 48px);
   background: var(--surface-muted);
   color: var(--text);
+  font-family: var(--font-sans);
 }
 
 .onboarding-shell {
@@ -447,6 +448,7 @@
   border-radius: 12px;
   background: var(--surface);
   color: var(--text);
+  font-family: var(--font-sans);
 }
 
 .setup-checklist {
