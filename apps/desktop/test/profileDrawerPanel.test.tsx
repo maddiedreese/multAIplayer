@@ -101,3 +101,66 @@ test("accepted hosted-account deletion is reported as protected and pending clea
     globalThis.fetch = originalFetch;
   }
 });
+
+test("registered-device manager lists and retires a replaced device with exact confirmation", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ input: string; init?: RequestInit }> = [];
+  globalThis.fetch = async (input, init) => {
+    const request = { input: String(input), init };
+    requests.push(request);
+    if (request.input.endsWith("/devices") && !init?.method) {
+      return Response.json({
+        devices: [
+          { deviceId: "device-current", displayName: "Current", lastSeenAt: "2026-07-16T00:00:00.000Z" },
+          { deviceId: "device-old", displayName: "Old Mac", lastSeenAt: "2026-07-01T00:00:00.000Z" }
+        ]
+      });
+    }
+    if (request.input.endsWith("/devices/device-old") && init?.method === "DELETE") {
+      return Response.json({ retiredDeviceId: "device-old" });
+    }
+    return Response.json({}, { status: 404 });
+  };
+
+  try {
+    const view = render(
+      <ProfileDrawerPanel
+        currentUser={{ id: "github:123", login: "octocat" }}
+        authConfig={{
+          provider: "github",
+          configured: true,
+          scopes: ["read:user"],
+          mutationsRequireAuth: true,
+          allowedOrigins: ["tauri://localhost"],
+          sessionPersistence: "identity_only"
+        }}
+        authBusy={false}
+        authError={null}
+        deviceFlow={null}
+        deviceId="device-current"
+        deviceIdentity={null}
+        deviceIdentityMessage={null}
+        relaySessionPersistence="Encrypted"
+        codexAccountPanel={null}
+        onHostedAccountDeleted={() => undefined}
+        onSignIn={() => undefined}
+        onSignOut={() => undefined}
+      />
+    );
+
+    fireEvent.click(view.getByRole("button", { name: "Manage registered devices" }));
+    await waitFor(() => assert.ok(view.getByText("Old Mac")));
+    assert.equal((view.getByRole("button", { name: "Current device" }) as HTMLButtonElement).disabled, true);
+    fireEvent.click(view.getByRole("button", { name: "Retire this device" }));
+    fireEvent.change(view.getByLabelText(/Type device-old to confirm/), { target: { value: "device-old" } });
+    fireEvent.click(view.getByRole("button", { name: "Retire registered device" }));
+
+    await waitFor(() => assert.match(view.getByRole("status").textContent ?? "", /Retired device-old/));
+    assert.equal(view.queryByText("Old Mac"), null);
+    const retirement = requests.find((request) => request.init?.method === "DELETE");
+    assert.equal(retirement?.input, "https://relay.example/devices/device-old");
+    assert.equal(retirement?.init?.body, JSON.stringify({ confirmation: "device-old" }));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
