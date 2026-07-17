@@ -1,6 +1,6 @@
 import type { InviteJoinRequestRecord, InviteRecord, KeyPackageRecord } from "@multaiplayer/protocol";
 import { isActiveRoom } from "../relay-domain.js";
-import type { RelayStore } from "../state.js";
+import type { ConsumedKeyPackageRecord, RelayStore } from "../state.js";
 import { acquireAccountMutationTurns } from "../auth/account-mutation-transaction.js";
 import { persistMutationOrRollback } from "./durable-mutation.js";
 
@@ -16,12 +16,7 @@ type KeyPackageConsumptionResult =
   | { status: "key_package_mismatch" }
   | { status: "persistence_unavailable" };
 
-/**
- * Serialize the check, mutation, durable write, and possible rollback across
- * both affected accounts. Upload, deletion, and consumption therefore cannot
- * invalidate either participant while a consumption commits.
- */
-export async function consumeKeyPackageForInvite(options: {
+interface KeyPackageConsumptionOptions {
   store: RelayStore;
   teamId: string;
   roomId: string;
@@ -34,67 +29,124 @@ export async function consumeKeyPackageForInvite(options: {
   keyPackageHash: string;
   authorizationRemainsValid: () => boolean;
   persist: () => Promise<void>;
-}): Promise<KeyPackageConsumptionResult> {
+}
+
+type ConsumptionFailure = Exclude<KeyPackageConsumptionResult, { status: "accepted" }>;
+
+/**
+ * Serialize the check, mutation, durable write, and possible rollback across
+ * both affected accounts. Upload, deletion, and consumption therefore cannot
+ * invalidate either participant while a consumption commits.
+ */
+export async function consumeKeyPackageForInvite(
+  options: KeyPackageConsumptionOptions
+): Promise<KeyPackageConsumptionResult> {
   const release = await acquireAccountMutationTurns(options.store, [options.expectedHostUserId, options.userId]);
   try {
-    if (!options.authorizationRemainsValid()) return { status: "authorization_changed" };
-    if (!options.store.getDevice(options.userId, options.deviceId)) {
-      return { status: "requester_authorization_changed" };
-    }
-    const room = options.store.getRoom(options.roomId);
-    if (
-      !room ||
-      room.teamId !== options.teamId ||
-      !isActiveRoom(options.store, options.teamId, options.roomId) ||
-      room.hostStatus !== "active" ||
-      room.hostUserId !== options.expectedHostUserId ||
-      room.activeHostDeviceId !== options.expectedHostDeviceId
-    ) {
-      return { status: "authorization_changed" };
-    }
-    const invite = options.store.getInvite(options.inviteId);
-    if (!inviteMatchesRoom(invite, options.teamId, options.roomId)) return { status: "invite_mismatch" };
-    if (invite.expiresAt && Date.parse(invite.expiresAt) <= Date.now()) return { status: "invite_expired" };
-    const request = findMatchingInviteRequest(options.store, invite.id, options);
-    if (!request) return { status: "request_mismatch" };
+    const authorizationFailure = validateConsumptionAuthorization(options);
+    if (authorizationFailure) return authorizationFailure;
+    const inviteResult = validateConsumptionInvite(options);
+    if ("status" in inviteResult) return inviteResult;
+    const { invite } = inviteResult;
+    const keyPackageResult = validateAvailableKeyPackage(options, invite);
+    if ("status" in keyPackageResult) return keyPackageResult;
+    const { item } = keyPackageResult;
 
-    const item = options.store.keyPackages.get(options.keyPackageId);
-    if (!item) {
-      return inviteAlreadyConsumed(invite, options)
-        ? { status: "already_consumed" }
-        : { status: "key_package_unavailable" };
-    }
-    if (!keyPackageMatchesRequest(item, options)) return { status: "key_package_mismatch" };
-    if (options.store.consumedKeyPackages.has(item.keyPackageHash)) return { status: "key_package_unavailable" };
-
-    options.store.deleteKeyPackage(item.id);
-    const consumed = {
+    const consumed: ConsumedKeyPackageRecord = {
       keyPackageHash: item.keyPackageHash,
+      teamId: options.teamId,
       userId: item.userId,
       deviceId: item.deviceId,
       consumedAt: new Date().toISOString()
     };
-    options.store.consumedKeyPackages.set(consumed.keyPackageHash, consumed);
-    options.store.setInvite({
-      ...invite,
-      approvedUserId: item.userId,
-      approvedDeviceId: item.deviceId,
-      keyPackageHash: item.keyPackageHash
-    });
+    const rollback = () => rollbackKeyPackageConsumption(options.store, invite, item, consumed);
+    stageKeyPackageConsumption(options.store, invite, item, consumed);
     const persisted = await persistMutationOrRollback({
       persist: options.persist,
-      rollback: () => {
-        if (options.store.consumedKeyPackages.get(consumed.keyPackageHash) === consumed) {
-          options.store.consumedKeyPackages.delete(consumed.keyPackageHash);
-        }
-        if (!options.store.keyPackages.has(item.id)) options.store.setKeyPackage(item);
-        if (options.store.getInvite(invite.id)?.keyPackageHash === item.keyPackageHash) options.store.setInvite(invite);
-      }
+      rollback
     });
     return persisted ? { status: "accepted", keyPackage: item } : { status: "persistence_unavailable" };
   } finally {
     release();
   }
+}
+
+function validateConsumptionAuthorization(options: KeyPackageConsumptionOptions): ConsumptionFailure | null {
+  if (!options.authorizationRemainsValid()) return { status: "authorization_changed" };
+  if (!options.store.getDevice(options.userId, options.deviceId)) {
+    return { status: "requester_authorization_changed" };
+  }
+  return hostAuthorizationFailure(options);
+}
+
+function hostAuthorizationFailure(options: KeyPackageConsumptionOptions): ConsumptionFailure | null {
+  const room = options.store.getRoom(options.roomId);
+  const hostRemainsAuthorized =
+    room?.teamId === options.teamId &&
+    isActiveRoom(options.store, options.teamId, options.roomId) &&
+    room.hostStatus === "active" &&
+    room.hostUserId === options.expectedHostUserId &&
+    room.activeHostDeviceId === options.expectedHostDeviceId;
+  return hostRemainsAuthorized ? null : { status: "authorization_changed" };
+}
+
+function validateConsumptionInvite(
+  options: KeyPackageConsumptionOptions
+): { invite: InviteRecord } | ConsumptionFailure {
+  const invite = options.store.getInvite(options.inviteId);
+  if (!inviteMatchesRoom(invite, options.teamId, options.roomId)) return { status: "invite_mismatch" };
+  if (invite.expiresAt && Date.parse(invite.expiresAt) <= Date.now()) return { status: "invite_expired" };
+  return findMatchingInviteRequest(options.store, invite.id, options) ? { invite } : { status: "request_mismatch" };
+}
+
+function validateAvailableKeyPackage(
+  options: KeyPackageConsumptionOptions,
+  invite: InviteRecord
+): { item: KeyPackageRecord } | ConsumptionFailure {
+  const item = options.store.keyPackages.get(options.keyPackageId);
+  if (!item) return missingKeyPackageFailure(invite, options);
+  if (!keyPackageMatchesRequest(item, options)) return { status: "key_package_mismatch" };
+  return options.store.consumedKeyPackages.has(item.keyPackageHash) ? { status: "key_package_unavailable" } : { item };
+}
+
+function missingKeyPackageFailure(invite: InviteRecord, options: KeyPackageConsumptionOptions): ConsumptionFailure {
+  return inviteAlreadyConsumed(invite, options)
+    ? { status: "already_consumed" }
+    : { status: "key_package_unavailable" };
+}
+
+function stageKeyPackageConsumption(
+  store: RelayStore,
+  invite: InviteRecord,
+  item: KeyPackageRecord,
+  consumed: ConsumedKeyPackageRecord
+): void {
+  store.deleteKeyPackage(item.id);
+  try {
+    store.consumedKeyPackages.set(consumed.keyPackageHash, consumed);
+    store.setInvite({
+      ...invite,
+      approvedUserId: item.userId,
+      approvedDeviceId: item.deviceId,
+      keyPackageHash: item.keyPackageHash
+    });
+  } catch (error) {
+    rollbackKeyPackageConsumption(store, invite, item, consumed);
+    throw error;
+  }
+}
+
+function rollbackKeyPackageConsumption(
+  store: RelayStore,
+  invite: InviteRecord,
+  item: KeyPackageRecord,
+  consumed: ConsumedKeyPackageRecord
+): void {
+  if (store.consumedKeyPackages.get(consumed.keyPackageHash) === consumed) {
+    store.consumedKeyPackages.delete(consumed.keyPackageHash);
+  }
+  if (!store.keyPackages.has(item.id)) store.setKeyPackage(item);
+  if (store.getInvite(invite.id)?.keyPackageHash === item.keyPackageHash) store.setInvite(invite);
 }
 
 function inviteMatchesRoom(

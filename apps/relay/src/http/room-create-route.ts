@@ -8,7 +8,7 @@ import {
   reserveDurableQuota,
   rollbackDurableQuota
 } from "../auth/account-quotas.js";
-import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
+import type { RoomCreateRouteOptions } from "./room-route-types.js";
 import type { Response } from "express";
 import { RelayStoreCapacityError } from "../state.js";
 import { acquireAccountMutationTurn, isLiveAccountSession } from "../auth/account-mutation-transaction.js";
@@ -25,7 +25,7 @@ const encryptedConfigFields = [
   "codexSandboxLevel"
 ] as const;
 
-export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
+export function registerRoomCreateRoute(options: RoomCreateRouteOptions) {
   const { app, getAuthSession, allowMutation } = options;
 
   app.post("/rooms", async (req, res) => {
@@ -40,8 +40,8 @@ export function registerRoomCreateRoute(options: RegisterRoomRoutesOptions) {
 }
 
 async function persistRoomCreation(
-  options: RegisterRoomRoutesOptions,
-  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>,
+  options: RoomCreateRouteOptions,
+  session: ReturnType<RoomCreateRouteOptions["getAuthSession"]>,
   teamId: string,
   input: NonNullable<ReturnType<typeof parseRoomCreationInput>>,
   res: Response
@@ -56,8 +56,8 @@ async function persistRoomCreation(
 }
 
 async function persistRoomWithinQuotaTransaction(
-  options: RegisterRoomRoutesOptions,
-  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>,
+  options: RoomCreateRouteOptions,
+  session: ReturnType<RoomCreateRouteOptions["getAuthSession"]>,
   teamId: string,
   input: NonNullable<ReturnType<typeof parseRoomCreationInput>>,
   res: Response
@@ -68,6 +68,9 @@ async function persistRoomWithinQuotaTransaction(
   let room: RoomRecord | null = null;
   let durableCommitCompleted = false;
   try {
+    // Shared team lifecycle and room totals can change while this request
+    // waits for the global durable-quota turn; recheck every admission input.
+    if (!allowQueuedRoomCreation(options, session, teamId, res)) return;
     reservation = session
       ? reserveDurableQuota({
           store: options.store,
@@ -126,8 +129,8 @@ async function persistRoomWithinQuotaTransaction(
 }
 
 function allowQueuedRoomCreation(
-  options: RegisterRoomRoutesOptions,
-  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>,
+  options: RoomCreateRouteOptions,
+  session: ReturnType<RoomCreateRouteOptions["getAuthSession"]>,
   teamId: string,
   res: Response
 ) {
@@ -147,7 +150,7 @@ function allowQueuedRoomCreation(
 }
 
 function rollbackRoomCreation(
-  store: RegisterRoomRoutesOptions["store"],
+  store: RoomCreateRouteOptions["store"],
   room: RoomRecord | null,
   reservation: ReturnType<typeof reserveDurableQuota> | null
 ) {
@@ -156,8 +159,8 @@ function rollbackRoomCreation(
 }
 
 function allowRoomCreation(
-  { store, isTeamMember }: RegisterRoomRoutesOptions,
-  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>,
+  { store, isTeamMember }: RoomCreateRouteOptions,
+  session: ReturnType<RoomCreateRouteOptions["getAuthSession"]>,
   teamId: string,
   res: Response
 ) {
@@ -177,7 +180,7 @@ function allowRoomCreation(
   return true;
 }
 
-function parseRoomCreationInput(options: RegisterRoomRoutesOptions, body: unknown, res: Response) {
+function parseRoomCreationInput(options: RoomCreateRouteOptions, body: unknown, res: Response) {
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   if (encryptedConfigFields.some((field) => Object.prototype.hasOwnProperty.call(record, field))) {
     sendRelayError(res, 400, "invalid_request", "Host-local room configuration must be published through MLS.");

@@ -1,7 +1,7 @@
-import { sendRelayError } from "../http/errors.js";
-import type { CookieOptions, Express } from "express";
+import { sendRelayCapacityError, sendRelayError } from "../http/errors.js";
+import type { CookieOptions, Express, Response } from "express";
 import { nanoid } from "nanoid";
-import type { AuthSession, NewAuthSession } from "../state.js";
+import { RelayStoreCapacityError, type AuthSession, type NewAuthSession } from "../state.js";
 import { fetchUpstream } from "../http/upstream.js";
 import {
   accountDeletionConfirmation,
@@ -11,6 +11,7 @@ import {
 import { acquireAccountMutationTurn, isLiveAccountSession } from "./account-mutation-transaction.js";
 import type { RelayStore } from "../state.js";
 import type { DeletionLedger } from "./deletion-ledger.js";
+import { hashAuthSessionId } from "./session.js";
 
 export interface RegisterGitHubAuthRoutesOptions {
   app: Express;
@@ -21,6 +22,7 @@ export interface RegisterGitHubAuthRoutesOptions {
   store: RelayStore;
   deletionLedger: DeletionLedger | null;
   authSessionMaxAgeMs: number;
+  retainedAuthSessionCapPerUser: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   scheduleStoreSave: () => void;
@@ -44,6 +46,7 @@ export function registerGitHubAuthRoutes({
   store,
   deletionLedger,
   authSessionMaxAgeMs,
+  retainedAuthSessionCapPerUser,
   authCookieOptions,
   getAuthSession,
   scheduleStoreSave,
@@ -63,6 +66,51 @@ export function registerGitHubAuthRoutes({
       return [(await deletionLedger.record(userId)).id];
     } catch {
       return null;
+    }
+  }
+
+  async function issueVerifiedSession(user: NewAuthSession["user"], res: Response): Promise<void> {
+    const releaseAccountMutation = await acquireAccountMutationTurn(store, user.id);
+    try {
+      if (isAccountRestricted(user.id)) {
+        sendRelayError(res, 403, "account_restricted", "This account is restricted by the relay operator.");
+        return;
+      }
+      if (deletionLedger?.isProtected(user.id)) {
+        sendRelayError(
+          res,
+          403,
+          "forbidden",
+          "This GitHub identity was deleted from the hosted alpha and cannot sign in while protected backups remain."
+        );
+        return;
+      }
+
+      const sessionId = nanoid(32);
+      const sessionIdHash = hashAuthSessionId(sessionId);
+      const expiresAt = Date.now() + authSessionMaxAgeMs;
+      const evicted = sessionsToEvict(store, user.id, retainedAuthSessionCapPerUser, Date.now());
+      for (const [hash] of evicted) store.authSessions.delete(hash);
+      let inserted = false;
+      try {
+        setAuthSession(sessionId, { user, expiresAt });
+        inserted = true;
+        await saveRelayStore();
+      } catch (error) {
+        if (inserted && store.authSessions.get(sessionIdHash)?.user.id === user.id) {
+          store.authSessions.delete(sessionIdHash);
+        }
+        for (const [hash, session] of evicted) store.authSessions.set(hash, session);
+        if (error instanceof RelayStoreCapacityError) sendRelayCapacityError(res, error);
+        else sendRelayError(res, 503, "persistence_unavailable", "Could not persist the GitHub session.");
+        return;
+      }
+
+      closeEvictedSessionSockets(store, new Set(evicted.map(([, session]) => session)));
+      res.cookie("multaiplayer_session", sessionId, authCookieOptions(authSessionMaxAgeMs));
+      res.json({ user });
+    } finally {
+      releaseAccountMutation();
     }
   }
 
@@ -113,39 +161,18 @@ export function registerGitHubAuthRoutes({
       sendRelayError(res, 502, "upstream_unavailable", "GitHub returned unsupported user metadata");
       return;
     }
-    if (isAccountRestricted(normalizedUserId)) {
-      sendRelayError(res, 403, "account_restricted", "This account is restricted by the relay operator.");
-      return;
-    }
-    if (deletionLedger) {
-      // Startup reconciliation authenticates the complete external ledger before
-      // the listener opens. record()/purgeExpired() keep this single-writer cache
-      // coherent, avoiding an O(all tombstones) S3 scan on every sign-in.
-      if (deletionLedger.isProtected(normalizedUserId)) {
-        sendRelayError(
-          res,
-          403,
-          "forbidden",
-          "This GitHub identity was deleted from the hosted alpha and cannot sign in while protected backups remain."
-        );
-        return;
-      }
-    }
-
-    const sessionId = nanoid(32);
-    const session: NewAuthSession = {
-      user: {
+    // Startup reconciliation authenticates the complete external ledger before
+    // the listener opens. The account turn below rechecks that cache after any
+    // concurrent deletion or operator restriction has finished.
+    await issueVerifiedSession(
+      {
         id: normalizedUserId,
         login,
         ...(name ? { name } : {}),
         ...(avatarUrl ? { avatarUrl } : {})
       },
-      expiresAt: Date.now() + authSessionMaxAgeMs
-    };
-    setAuthSession(sessionId, session);
-    scheduleStoreSave();
-    res.cookie("multaiplayer_session", sessionId, authCookieOptions(authSessionMaxAgeMs));
-    res.json({ user: session.user });
+      res
+    );
   });
 
   app.get("/auth/me", (req, res) => {
@@ -259,6 +286,27 @@ export function registerGitHubAuthRoutes({
       releaseAccountMutation();
     }
   });
+}
+
+function sessionsToEvict(store: RelayStore, userId: string, cap: number, now: number): Array<[string, AuthSession]> {
+  const owned = Array.from(store.authSessions.entries())
+    .filter(([, session]) => session.user.id === userId)
+    .sort((left, right) => left[1].expiresAt - right[1].expiresAt || left[0].localeCompare(right[0]));
+  const expired = owned.filter(([, session]) => session.expiresAt <= now);
+  const active = owned.filter(([, session]) => session.expiresAt > now);
+  return [...expired, ...active.slice(0, Math.max(0, active.length - cap + 1))];
+}
+
+function closeEvictedSessionSockets(store: RelayStore, evicted: Set<AuthSession>): void {
+  if (evicted.size === 0) return;
+  for (const client of store.sessions.values()) {
+    if (!client.authSession || !evicted.has(client.authSession)) continue;
+    try {
+      client.socket.close(1008, "Authentication session replaced");
+    } catch {
+      // Durable revocation is authoritative; a broken socket cannot undo it.
+    }
+  }
 }
 
 function hasAccountDeletionBlockers(blockers: ReturnType<typeof findAccountDeletionBlockers>): boolean {

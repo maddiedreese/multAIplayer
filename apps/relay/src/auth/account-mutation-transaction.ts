@@ -1,4 +1,5 @@
 import type { AuthSession, RelayStore } from "../state.js";
+import { isAccountRestricted } from "./account-restrictions.js";
 
 const accountTurnTails = new WeakMap<object, Map<string, Promise<void>>>();
 
@@ -39,7 +40,12 @@ export async function acquireAccountMutationTurns(store: object, userIds: Iterab
   };
 }
 
-/** Confirm that the session authorizing a queued mutation still exists. */
+/** Confirm that the session authorizing a queued mutation is still usable. */
 export function isLiveAccountSession(store: RelayStore, session: AuthSession): boolean {
-  return store.authSessions.get(session.sessionIdHash) === session && session.expiresAt > Date.now();
+  const now = Date.now();
+  return (
+    store.authSessions.get(session.sessionIdHash) === session &&
+    session.expiresAt > now &&
+    !isAccountRestricted(store, session.user.id, now)
+  );
 }

@@ -71,6 +71,8 @@ export interface RelayConfig {
     roomsPerUser: number;
   };
   totalRoomCapPerUser: number;
+  registeredDeviceCapPerUser: number;
+  retainedAuthSessionCapPerUser: number;
   liveKeyPackageCapPerUser: number;
   liveInviteCapPerUser: number;
   maxDurableEntries: number;
@@ -213,6 +215,18 @@ export function loadRelayConfig(): RelayConfig {
       roomsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP, 100, 0, 100_000)
     },
     totalRoomCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER, 500, 1, 100_000),
+    registeredDeviceCapPerUser: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_REGISTERED_DEVICE_CAP_USER,
+      25,
+      1,
+      10_000
+    ),
+    retainedAuthSessionCapPerUser: parseIntegerEnv(
+      process.env.MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER,
+      20,
+      1,
+      1_000
+    ),
     liveKeyPackageCapPerUser: parseIntegerEnv(
       process.env.MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER,
       250,

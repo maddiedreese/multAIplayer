@@ -29,3 +29,69 @@ export interface RegisterRoomRoutesOptions {
   dailyCreationCaps?: { roomsPerUser: number };
   totalRoomCapPerUser?: number;
 }
+
+export type RoomCreateRouteOptions = Pick<
+  RegisterRoomRoutesOptions,
+  | "app"
+  | "store"
+  | "getAuthSession"
+  | "allowMutation"
+  | "teamIdsForUser"
+  | "isTeamMember"
+  | "scheduleStoreSave"
+  | "saveRelayStore"
+  | "broadcastRoomUpdated"
+  | "recordQuotaRejection"
+  | "recordCapacityRejection"
+  | "isApprovalPolicy"
+  | "normalizeMetadataText"
+  | "displayNameForUser"
+  | "maxHostNameChars"
+  | "maxRoomNameChars"
+  | "dailyCreationCaps"
+  | "totalRoomCapPerUser"
+>;
+
+export type RoomHostRouteOptions = Pick<
+  RegisterRoomRoutesOptions,
+  | "app"
+  | "store"
+  | "getAuthSession"
+  | "allowMutation"
+  | "canAccessRoom"
+  | "scheduleStoreSave"
+  | "broadcastRoomUpdated"
+  | "normalizeMetadataText"
+  | "maxDeviceIdChars"
+  | "maxHostNameChars"
+  | "maxUserIdChars"
+>;
+
+export type RoomSettingsRouteOptions = Pick<
+  RegisterRoomRoutesOptions,
+  | "app"
+  | "store"
+  | "getAuthSession"
+  | "allowMutation"
+  | "canAccessRoom"
+  | "scheduleStoreSave"
+  | "broadcastRoomUpdated"
+  | "requesterFromRequest"
+  | "isRoomHost"
+  | "isApprovalPolicy"
+  | "normalizeMetadataText"
+  | "maxRoomNameChars"
+>;
+
+export type RoomLifecycleRouteOptions = Pick<
+  RegisterRoomRoutesOptions,
+  | "app"
+  | "store"
+  | "getAuthSession"
+  | "allowMutation"
+  | "isTeamMember"
+  | "scheduleStoreSave"
+  | "broadcastRoomUpdated"
+  | "requesterFromRequest"
+  | "isRoomHost"
+>;

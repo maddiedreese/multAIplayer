@@ -13,11 +13,6 @@ export function currentSelectedRoom() {
   return state.rooms.find((room) => room.id === state.selectedRoomId);
 }
 
-export function currentSelectedTeam() {
-  const state = useAppStore.getState();
-  return state.teams.find((team) => team.id === state.selectedTeam);
-}
-
 export function currentSelectedRoomContext() {
   const state = useAppStore.getState();
   const room = state.rooms.find((candidate) => candidate.id === state.selectedRoomId);

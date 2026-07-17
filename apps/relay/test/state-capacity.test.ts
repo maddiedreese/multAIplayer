@@ -35,6 +35,36 @@ test("one team's durable-entry ceiling preserves global capacity for another tea
   assert.doesNotThrow(() => store.setTeam({ id: "team-b", name: "B", members: 0 }));
 });
 
+test("consumed KeyPackage tombstones use their originating team's durable-entry budget", () => {
+  const store = createRelayStore(100, 4);
+  store.setTeam({ id: "team-a", name: "A", members: 1 });
+  store.setTeamMembers(
+    "team-a",
+    new Map([["user-a", { teamId: "team-a", userId: "user-a", role: "owner", joinedAt: new Date().toISOString() }]])
+  );
+  store.consumedKeyPackages.set(`sha256:${"1".repeat(64)}`, {
+    keyPackageHash: `sha256:${"1".repeat(64)}`,
+    teamId: "team-a",
+    consumedAt: new Date().toISOString()
+  });
+
+  assert.throws(
+    () =>
+      store.consumedKeyPackages.set(`sha256:${"2".repeat(64)}`, {
+        keyPackageHash: `sha256:${"2".repeat(64)}`,
+        teamId: "team-a",
+        consumedAt: new Date().toISOString()
+      }),
+    (error: unknown) => error instanceof RelayStoreCapacityError && error.teamId === "team-a"
+  );
+  assert.doesNotThrow(() =>
+    store.consumedKeyPackages.set(`sha256:${"3".repeat(64)}`, {
+      keyPackageHash: `sha256:${"3".repeat(64)}`,
+      consumedAt: new Date().toISOString()
+    })
+  );
+});
+
 test("MLS backlog bytes are bounded by room, team, and relay scope without corrupting accounting", () => {
   const store = createRelayStore(100, 100, {
     mlsBacklog: { global: 1_200, perTeam: 800, perRoom: 600 },

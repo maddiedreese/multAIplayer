@@ -12,6 +12,7 @@ interface RegisterGitHubRoutesOptions {
   store: RelayStore;
   deletionLedger: DeletionLedger | null;
   authSessionMaxAgeMs: number;
+  retainedAuthSessionCapPerUser: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
   scheduleStoreSave: () => void;

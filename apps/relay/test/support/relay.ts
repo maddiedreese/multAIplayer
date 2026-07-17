@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createECDH, createHash, generateKeyPairSync, randomUUID, sign } from "node:crypto";
 import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -315,6 +315,78 @@ export async function createDebugSession(baseUrl: string, id: string, login: str
   const cookie = response.headers.get("set-cookie");
   assert.ok(cookie);
   return cookie.split(";")[0] ?? cookie;
+}
+
+export interface AuthenticatedTestDevice {
+  cookie: string;
+  token: string;
+  signaturePublicKey: string;
+  signatureKeyFingerprint: string;
+}
+
+export async function createAuthenticatedTestDevice(
+  baseUrl: string,
+  userId: string,
+  deviceId: string
+): Promise<AuthenticatedTestDevice> {
+  const cookie = await createDebugSession(baseUrl, userId, userId.split(":").at(-1) ?? userId);
+  const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const signaturePublicKey = publicKey.export({ format: "der", type: "spki" }).toString("base64");
+  const signatureKeyFingerprint = testDeviceFingerprint(signaturePublicKey);
+  const hpke = createECDH("prime256v1");
+  hpke.generateKeys();
+  const hpkePublicKey = hpke.getPublicKey(undefined, "uncompressed").toString("base64");
+  const headers = { "content-type": "application/json", cookie };
+  const registration = await fetch(`${baseUrl}/devices`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      deviceId,
+      signaturePublicKey,
+      signatureKeyFingerprint,
+      hpkePublicKey,
+      hpkeKeyFingerprint: testDeviceFingerprint(hpkePublicKey)
+    })
+  });
+  assert.equal(registration.status, 201);
+  const challengeResponse = await fetch(`${baseUrl}/devices/${deviceId}/challenge`, { method: "POST", headers });
+  assert.equal(challengeResponse.status, 200);
+  const { challenge } = (await challengeResponse.json()) as { challenge: string };
+  const signature = sign(
+    "sha256",
+    testDeviceAuthPayload(userId, deviceId, Buffer.from(challenge, "base64")),
+    privateKey
+  ).toString("base64");
+  const session = await fetch(`${baseUrl}/devices/${deviceId}/session`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ challenge, signature })
+  });
+  assert.equal(session.status, 200);
+  const { deviceSessionToken } = (await session.json()) as { deviceSessionToken: string };
+  return { cookie, token: deviceSessionToken, signaturePublicKey, signatureKeyFingerprint };
+}
+
+function testDeviceFingerprint(encoded: string): string {
+  const hex = createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex");
+  return `sha256:${hex.match(/.{1,4}/g)!.join(":")}`;
+}
+
+function testDeviceAuthPayload(userId: string, deviceId: string, challenge: Buffer): Buffer {
+  const user = Buffer.from(userId);
+  const device = Buffer.from(deviceId);
+  const userLength = Buffer.alloc(2);
+  const deviceLength = Buffer.alloc(2);
+  userLength.writeUInt16BE(user.length);
+  deviceLength.writeUInt16BE(device.length);
+  return Buffer.concat([
+    Buffer.from("multaiplayer:relay-device-auth:v1\0", "ascii"),
+    userLength,
+    user,
+    deviceLength,
+    device,
+    challenge
+  ]);
 }
 
 export async function debugBacklog(baseUrl: string): Promise<

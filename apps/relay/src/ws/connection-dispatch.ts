@@ -243,22 +243,39 @@ async function dispatchMlsPublish(
   }
   const releaseAccountMutation = await acquireAccountMutationTurns(options.state.store, authorityUserIds);
   try {
-    if (!isActiveQueuedClientSession(options, session)) return;
-    if (!hasLiveAuthenticationSession(options, session)) return;
-    if (
-      !options.rooms.hasDeviceSession(session.deviceSessionToken, session.userId, session.deviceId) ||
-      !options.rooms.canAccessRoom(message.message.teamId, message.message.roomId, session.userId) ||
-      !hostHandoffTargetRemainsAuthorized(options, message.message) ||
-      !options.rooms.canPublishMlsMessage(session, message.message)
-    ) {
-      send(session.socket, { type: "error", message: "Device session expired.", code: "not_joined", messageId });
+    const remainsAuthorized = () => mlsPublishRemainsAuthorized(options, session, message.message);
+    if (!remainsAuthorized()) {
+      send(session.socket, {
+        type: "error",
+        message: "Publishing authorization changed.",
+        code: "not_joined",
+        messageId
+      });
       return;
     }
-    await options.rooms.publishMlsMessage(message.message);
+    await options.rooms.publishMlsMessage(message.message, remainsAuthorized);
     send(session.socket, { type: "published", messageId });
   } finally {
     releaseAccountMutation();
   }
+}
+
+function mlsPublishRemainsAuthorized(
+  options: RelayWebSocketConnectionOptions,
+  session: ClientSession,
+  message: Extract<RelayClientMessage, { type: "publish" }>["message"]
+): boolean {
+  return Boolean(
+    isActiveQueuedClientSession(options, session) &&
+    hasLiveAuthenticationSession(options, session) &&
+    session.userId &&
+    session.deviceId &&
+    session.deviceSessionToken &&
+    options.rooms.hasDeviceSession(session.deviceSessionToken, session.userId, session.deviceId) &&
+    options.rooms.canAccessRoom(message.teamId, message.roomId, session.userId) &&
+    hostHandoffTargetRemainsAuthorized(options, message) &&
+    options.rooms.canPublishMlsMessage(session, message)
+  );
 }
 
 function hostHandoffTargetRemainsAuthorized(

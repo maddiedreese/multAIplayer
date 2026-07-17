@@ -1,10 +1,11 @@
-import { createECDH, createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   WebSocket,
   assert,
-  createDebugSession,
+  type AuthenticatedTestDevice,
+  createAuthenticatedTestDevice,
   onceOpen,
   startRelayWithWorkspace,
   waitForJoined,
@@ -23,8 +24,8 @@ test("expired invites cannot create KeyPackage requests", async () => {
     MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath
   });
   try {
-    const host = await device(relay.baseUrl, "github:maddiedreese", "expiry-host");
-    const peer = await device(relay.baseUrl, "github:tester", "expiry-peer");
+    const host = await createAuthenticatedTestDevice(relay.baseUrl, "github:maddiedreese", "expiry-host");
+    const peer = await createAuthenticatedTestDevice(relay.baseUrl, "github:tester", "expiry-peer");
     const hostHeaders = { "content-type": "application/json", cookie: host.cookie, "x-device-session": host.token };
     const peerHeaders = { "content-type": "application/json", cookie: peer.cookie, "x-device-session": peer.token };
     const invite = (
@@ -83,8 +84,8 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
     MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath
   });
   try {
-    const host = await device(relay.baseUrl, "github:maddiedreese", "host-device-1");
-    const peer = await device(relay.baseUrl, "github:tester", "peer-device-1");
+    const host = await createAuthenticatedTestDevice(relay.baseUrl, "github:maddiedreese", "host-device-1");
+    const peer = await createAuthenticatedTestDevice(relay.baseUrl, "github:tester", "peer-device-1");
     const hostHeaders = { "content-type": "application/json", cookie: host.cookie, "x-device-session": host.token };
     const peerHeaders = { "content-type": "application/json", cookie: peer.cookie, "x-device-session": peer.token };
     assert.equal(
@@ -305,7 +306,7 @@ test("KeyPackage consume binds approval and Welcome is one-shot", async () => {
       userId: "github:tester",
       deviceId: "peer-device-1",
       signaturePublicKey: peer.signaturePublicKey,
-      signatureKeyFingerprint: fingerprint(peer.signaturePublicKey)
+      signatureKeyFingerprint: peer.signatureKeyFingerprint
     });
     assert.equal("hpkePublicKey" in pendingBody.requests[0]!.requesterDevice!, false);
     assert.equal("displayName" in pendingBody.requests[0]!.requesterDevice!, false);
@@ -749,9 +750,9 @@ test("live KeyPackage ceilings apply across every device on an account", async (
     MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER: "1"
   });
   try {
-    const first = await device(relay.baseUrl, "github:tester", "quota-device-one");
-    const second = await device(relay.baseUrl, "github:tester", "quota-device-two");
-    const upload = (deviceId: string, auth: Awaited<ReturnType<typeof device>>, id: string, encoded: string) =>
+    const first = await createAuthenticatedTestDevice(relay.baseUrl, "github:tester", "quota-device-one");
+    const second = await createAuthenticatedTestDevice(relay.baseUrl, "github:tester", "quota-device-two");
+    const upload = (deviceId: string, auth: AuthenticatedTestDevice, id: string, encoded: string) =>
       fetch(`${relay.baseUrl}/devices/${deviceId}/key-packages`, {
         method: "POST",
         headers: {
@@ -1006,66 +1007,6 @@ function deferred<T>() {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
-}
-
-async function device(baseUrl: string, userId: string, deviceId: string) {
-  const cookie = await createDebugSession(baseUrl, userId, userId.split(":").at(-1)!);
-  const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-  const signaturePublicKey = publicKey.export({ format: "der", type: "spki" }).toString("base64");
-  const hpke = createECDH("prime256v1");
-  hpke.generateKeys();
-  const hpkePublicKey = hpke.getPublicKey(undefined, "uncompressed").toString("base64");
-  const headers = { "content-type": "application/json", cookie };
-  assert.equal(
-    (
-      await fetch(`${baseUrl}/devices`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          deviceId,
-          signaturePublicKey,
-          signatureKeyFingerprint: fingerprint(signaturePublicKey),
-          hpkePublicKey,
-          hpkeKeyFingerprint: fingerprint(hpkePublicKey)
-        })
-      })
-    ).status,
-    201
-  );
-  const challenge = (
-    (await (await fetch(`${baseUrl}/devices/${deviceId}/challenge`, { method: "POST", headers })).json()) as {
-      challenge: string;
-    }
-  ).challenge;
-  const signature = sign(
-    "sha256",
-    authPayload(userId, deviceId, Buffer.from(challenge, "base64")),
-    privateKey
-  ).toString("base64");
-  const session = await fetch(`${baseUrl}/devices/${deviceId}/session`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ challenge, signature })
-  });
-  return {
-    cookie,
-    token: ((await session.json()) as { deviceSessionToken: string }).deviceSessionToken,
-    privateKey,
-    signaturePublicKey
-  };
-}
-function fingerprint(encoded: string) {
-  const hex = createHash("sha256").update(Buffer.from(encoded, "base64")).digest("hex");
-  return `sha256:${hex.match(/.{1,4}/g)!.join(":")}`;
-}
-function authPayload(user: string, device: string, c: Buffer) {
-  const u = Buffer.from(user),
-    d = Buffer.from(device),
-    ub = Buffer.alloc(2),
-    db = Buffer.alloc(2);
-  ub.writeUInt16BE(u.length);
-  db.writeUInt16BE(d.length);
-  return Buffer.concat([Buffer.from("multaiplayer:relay-device-auth:v1\0", "ascii"), ub, u, db, d, c]);
 }
 
 function directedSealedRequest(input: {

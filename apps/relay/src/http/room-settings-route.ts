@@ -1,6 +1,6 @@
 import { sendRelayError } from "./errors.js";
 import { type RoomRecord } from "@multaiplayer/protocol";
-import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
+import type { RoomSettingsRouteOptions } from "./room-route-types.js";
 
 const encryptedConfigFields = [
   "projectPath",
@@ -14,7 +14,7 @@ const encryptedConfigFields = [
   "codexSandboxLevel"
 ] as const;
 
-export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
+export function registerRoomSettingsRoute(options: RoomSettingsRouteOptions) {
   const {
     app,
     store,
@@ -80,7 +80,7 @@ export function registerRoomSettingsRoute(options: RegisterRoomRoutesOptions) {
 function roomSettingsInputError(
   body: Record<string, unknown> | undefined,
   input: ReturnType<typeof normalizeRoomSettingsInput>,
-  options: RegisterRoomRoutesOptions
+  options: RoomSettingsRouteOptions
 ): string | null {
   if (body?.name !== undefined && !input.name) {
     return `Room name is required and must be up to ${options.maxRoomNameChars} characters`;
@@ -93,7 +93,7 @@ function roomSettingsInputError(
 
 function normalizeRoomSettingsInput(
   body: Record<string, unknown> | undefined,
-  options: Pick<RegisterRoomRoutesOptions, "normalizeMetadataText" | "maxRoomNameChars">
+  options: Pick<RoomSettingsRouteOptions, "normalizeMetadataText" | "maxRoomNameChars">
 ) {
   const name =
     body?.name === undefined ? undefined : options.normalizeMetadataText(body.name, options.maxRoomNameChars);

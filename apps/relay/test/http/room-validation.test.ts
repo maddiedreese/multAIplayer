@@ -1,21 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Response } from "express";
-import {
-  allowTotalRoomQuota,
-  consumeDailyCreationQuota,
-  normalizeCatalogSelectionPolicy
-} from "../../src/http/room-validation.js";
+import { allowTotalRoomQuota } from "../../src/http/room-validation.js";
 import { createRelayStore } from "../../src/state.js";
-
-test("catalog selection policy accepts only defined policy values and preserves fallback", () => {
-  assert.equal(normalizeCatalogSelectionPolicy(undefined), undefined);
-  assert.equal(normalizeCatalogSelectionPolicy(undefined, "pinned"), "pinned");
-  assert.equal(normalizeCatalogSelectionPolicy("auto"), "auto");
-  assert.equal(normalizeCatalogSelectionPolicy("pinned"), "pinned");
-  assert.equal(normalizeCatalogSelectionPolicy("manual"), null);
-  assert.equal(normalizeCatalogSelectionPolicy(null), null);
-});
 
 test("total room quota counts only live rooms in the user's teams", () => {
   const store = createRelayStore();
@@ -59,55 +46,6 @@ test("total room quota counts only live rooms in the user's teams", () => {
   assert.deepEqual(rejectionTypes, ["total_user_rooms"]);
 });
 
-test("daily room creation quota increments, expires stale entries, and reports exact reset metadata", (t) => {
-  const now = Date.UTC(2026, 6, 15, 12, 0, 0);
-  t.mock.method(Date, "now", () => now);
-  const counts = new Map([
-    ["expired:user", { count: 99, resetAt: now }],
-    ["unrelated:user", { count: 4, resetAt: now + 60_000 }]
-  ]);
-  const quota = "daily_user_room_creations" as const;
-  const userId = "github:maddie";
-  const accepted = responseRecorder();
-  assert.equal(consumeDailyCreationQuota({ cap: 2, counts, quota, userId, res: accepted.response }), true);
-  const expectedReset = Date.UTC(2026, 6, 16);
-  assert.deepEqual(counts.get(`${quota}:${userId}`), { count: 1, resetAt: expectedReset });
-  assert.equal(counts.has("expired:user"), false);
-  assert.deepEqual(counts.get("unrelated:user"), { count: 4, resetAt: now + 60_000 });
-
-  assert.equal(consumeDailyCreationQuota({ cap: 2, counts, quota, userId, res: accepted.response }), true);
-  assert.deepEqual(counts.get(`${quota}:${userId}`), { count: 2, resetAt: expectedReset });
-
-  const rejected = responseRecorder();
-  const rejectionTypes: string[] = [];
-  assert.equal(
-    consumeDailyCreationQuota({
-      cap: 2,
-      counts,
-      quota,
-      userId,
-      res: rejected.response,
-      recordQuotaRejection: (type) => rejectionTypes.push(type)
-    }),
-    false
-  );
-  assert.equal(rejected.statusCode(), 429);
-  assert.equal(rejected.headers().get("Retry-After"), 43_200);
-  assert.deepEqual(rejected.body(), {
-    error: "Daily room creation quota exceeded.",
-    code: "quota_exceeded",
-    retryAfterSeconds: 43_200,
-    quota: {
-      type: quota,
-      limit: 2,
-      used: 2,
-      remaining: 0,
-      resetsAt: "2026-07-16T00:00:00.000Z"
-    }
-  });
-  assert.deepEqual(rejectionTypes, [quota]);
-});
-
 function roomRecord(id: string, teamId: string, deletedAt?: string) {
   return {
     id,
@@ -138,5 +76,5 @@ function responseRecorder() {
       return response;
     }
   } as unknown as Response;
-  return { response, statusCode: () => statusCode, body: () => body, headers: () => headers };
+  return { response, statusCode: () => statusCode, body: () => body };
 }

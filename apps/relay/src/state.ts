@@ -139,6 +139,8 @@ export interface AppliedDeletionLedgerEntry {
 
 export interface ConsumedKeyPackageRecord {
   keyPackageHash: string;
+  /** New public-alpha tombstones retain their originating team for tenant capacity accounting. */
+  teamId?: string;
   /** Account deletion removes userId and deviceId; the stable hash remains for one-shot enforcement. */
   userId?: string;
   deviceId?: string;
@@ -271,7 +273,10 @@ export class InMemoryRelayStore implements RelayStore {
   );
   readonly devices = this.trackedMap<string, DeviceRecord>("devices");
   readonly keyPackages = this.trackedMap<string, KeyPackageRecord>("keyPackages");
-  readonly consumedKeyPackages = this.trackedMap<string, ConsumedKeyPackageRecord>("consumedKeyPackages");
+  readonly consumedKeyPackages = this.trackedMap<string, ConsumedKeyPackageRecord>(
+    "consumedKeyPackages",
+    (value) => value.teamId ?? null
+  );
   readonly attachmentBlobs: Map<string, AttachmentBlobRecord>;
   readonly teamMembers: TeamMemberCollectionMap;
   readonly rateLimitStore = new Map<string, TokenBucketRecord>();

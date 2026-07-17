@@ -19,8 +19,6 @@ import { isActiveInviteTarget } from "../relay-domain.js";
 import { persistMutationOrRollback } from "./durable-mutation.js";
 import { ackInviteResponseAtomically, inviteIsExpired } from "./invite-ack-transaction.js";
 
-export { ackInviteResponseAtomically } from "./invite-ack-transaction.js";
-
 const maxOpaqueChars = 1_400_000;
 interface Options {
   app: Express;

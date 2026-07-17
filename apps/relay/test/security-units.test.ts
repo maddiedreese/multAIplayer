@@ -6,17 +6,11 @@ import {
   isJsonStringifiableWithin,
   isMlsMessageWithinLimits,
   maxCiphertextCharactersForBlob,
-  normalizeCodexCatalogSelectionPolicy,
   normalizeCodexModel,
-  normalizeCodexReasoningEffort,
-  normalizeCodexReasoningEffortOrDefault,
-  normalizeCodexSpeed,
-  normalizeCodexSpeedOrDefault,
   normalizeMetadataText,
   normalizeOptionalMetadataText,
   normalizeRelayId,
   normalizeRoomProjectPath,
-  normalizeTeamRole,
   parseIntegerValue,
   pruneMlsBacklog
 } from "../src/limits.js";
@@ -172,14 +166,4 @@ test("scalar and policy normalizers fail closed", () => {
   assert.equal(normalizeRoomProjectPath("\n", 20), null);
   assert.equal(normalizeCodexModel("gpt-custom/1", 30), "gpt-custom/1");
   assert.equal(normalizeCodexModel("bad model", 30), null);
-  assert.equal(normalizeCodexReasoningEffort("medium"), "medium");
-  assert.equal(normalizeCodexReasoningEffort("bad"), null);
-  assert.equal(normalizeCodexSpeed("standard"), "standard");
-  assert.equal(normalizeCodexSpeed("bad"), null);
-  assert.equal(normalizeCodexCatalogSelectionPolicy("pinned"), "pinned");
-  assert.equal(normalizeCodexCatalogSelectionPolicy("bad"), null);
-  assert.equal(normalizeCodexReasoningEffortOrDefault("bad"), "medium");
-  assert.equal(normalizeCodexSpeedOrDefault("bad"), "standard");
-  assert.equal(normalizeTeamRole("admin"), "admin");
-  assert.equal(normalizeTeamRole("bad"), "member");
 });

@@ -1,9 +1,9 @@
 import { sendRelayError } from "./errors.js";
 import type { RoomRecord } from "@multaiplayer/protocol";
-import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
+import type { RoomLifecycleRouteOptions } from "./room-route-types.js";
 import { revokeRoomInvites } from "../relay-domain.js";
 
-export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
+export function registerRoomLifecycleRoute(options: RoomLifecycleRouteOptions) {
   const {
     app,
     store,
@@ -50,15 +50,15 @@ export function registerRoomLifecycleRoute(options: RegisterRoomRoutesOptions) {
   });
 }
 
-function revokeDeletedRoomInvites(store: RegisterRoomRoutesOptions["store"], room: RoomRecord): void {
+function revokeDeletedRoomInvites(store: RoomLifecycleRouteOptions["store"], room: RoomRecord): void {
   if (room.deletedAt) revokeRoomInvites(store, room.teamId, room.id);
 }
 
 function canManageRoomLifecycle(
   role: string | undefined,
   room: RoomRecord,
-  requester: Parameters<RegisterRoomRoutesOptions["isRoomHost"]>[1],
-  isRoomHost: RegisterRoomRoutesOptions["isRoomHost"]
+  requester: Parameters<RoomLifecycleRouteOptions["isRoomHost"]>[1],
+  isRoomHost: RoomLifecycleRouteOptions["isRoomHost"]
 ): boolean {
   if (role === "owner" || role === "admin") return true;
   return room.hostStatus === "active" && isRoomHost(room, requester);

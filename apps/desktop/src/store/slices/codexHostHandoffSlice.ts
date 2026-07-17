@@ -44,11 +44,6 @@ export interface CodexRuntimeMaps {
   codexThreadGraphsByRoom: Record<string, CodexThreadGraph>;
 }
 
-export interface CodexHostHandoffMaps {
-  hostHandoffsByRoom: Record<string, HostHandoffRecord[]>;
-  codexContinuationByRoom: Record<string, HostHandoffRecord>;
-}
-
 export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom): CodexRuntimeMaps {
   const codexEventsByRoom: Record<string, CodexRoomEvent[]> = {};
   const codexActivitiesByRoom: Record<string, CodexActivity[]> = {};
@@ -87,21 +82,6 @@ export function projectCodexRuntimeMaps(codexRuntimeByRoom: CodexRuntimeByRoom):
     secretWarningsVisibleByRoom,
     codexThreadIdsByRoom,
     codexThreadGraphsByRoom
-  };
-}
-
-export function projectCodexHostHandoffMaps(codexRuntimeByRoom: CodexRuntimeByRoom): CodexHostHandoffMaps {
-  const hostHandoffsByRoom: Record<string, HostHandoffRecord[]> = {};
-  const codexContinuationByRoom: Record<string, HostHandoffRecord> = {};
-
-  Object.entries(codexRuntimeByRoom).forEach(([roomId, runtime]) => {
-    if (runtime.hostHandoffs) hostHandoffsByRoom[roomId] = runtime.hostHandoffs;
-    if (runtime.continuation) codexContinuationByRoom[roomId] = runtime.continuation;
-  });
-
-  return {
-    hostHandoffsByRoom,
-    codexContinuationByRoom
   };
 }
 

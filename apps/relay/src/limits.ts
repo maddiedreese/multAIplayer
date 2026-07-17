@@ -1,16 +1,4 @@
-import {
-  defaultCodexReasoningEffort,
-  defaultCodexSpeed,
-  codexReasoningEffortOptions,
-  codexSpeedOptions,
-  type MlsRelayMessage,
-  codexModelOptions,
-  type CodexCatalogSelectionPolicy,
-  type CodexReasoningEffort,
-  type CodexSpeed,
-  type RoomRecord,
-  type TeamRole
-} from "@multaiplayer/protocol";
+import { type MlsRelayMessage, codexModelOptions, type RoomRecord } from "@multaiplayer/protocol";
 import { isCanonicalPaddedBase64 } from "./opaque.js";
 
 export interface RelayLimits {
@@ -106,32 +94,6 @@ export function normalizeCodexModel(value: unknown, maxCodexModelChars: number):
   if (codexModelOptions.some((option) => option.id === model)) return model;
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(model)) return null;
   return model;
-}
-
-export function normalizeCodexReasoningEffort(value: unknown): CodexReasoningEffort | null {
-  const effort = String(value ?? "").trim();
-  return codexReasoningEffortOptions.some((option) => option.id === effort) ? (effort as CodexReasoningEffort) : null;
-}
-
-export function normalizeCodexSpeed(value: unknown): CodexSpeed | null {
-  const speed = String(value ?? "").trim();
-  return codexSpeedOptions.some((option) => option.id === speed) ? (speed as CodexSpeed) : null;
-}
-
-export function normalizeCodexCatalogSelectionPolicy(value: unknown): CodexCatalogSelectionPolicy | null {
-  return value === "auto" || value === "pinned" ? value : null;
-}
-
-export function normalizeCodexReasoningEffortOrDefault(value: unknown): CodexReasoningEffort {
-  return normalizeCodexReasoningEffort(value) ?? defaultCodexReasoningEffort;
-}
-
-export function normalizeCodexSpeedOrDefault(value: unknown): CodexSpeed {
-  return normalizeCodexSpeed(value) ?? defaultCodexSpeed;
-}
-
-export function normalizeTeamRole(value: unknown): TeamRole {
-  return value === "owner" || value === "admin" || value === "member" ? value : "member";
 }
 
 export function isMlsMessageWithinLimits(envelope: MlsRelayMessage, options: MlsMessageLimitOptions): boolean {
