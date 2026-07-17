@@ -3,7 +3,11 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
-import { createRelayAuthSessionManager, createRelayAuthSessionPersistence } from "./auth/session.js";
+import {
+  createRelayAuthSessionManager,
+  createRelayAuthSessionPersistence,
+  pruneRetainedAuthSessions
+} from "./auth/session.js";
 import { createAccountRestrictionManager, isAccountRestricted } from "./auth/account-restrictions.js";
 import { FileDeletionLedger, S3DeletionLedger, type DeletionLedger } from "./auth/deletion-ledger.js";
 import { reconcileDeletionLedger } from "./auth/deletion-reconciliation.js";
@@ -352,8 +356,17 @@ export async function createRelayApp(
   });
 
   await relayStorePersistence.loadRelayStore();
+  const prunedAuthSessions = pruneRetainedAuthSessions(
+    authSessions,
+    relayConfig.retainedAuthSessionCapPerUser,
+    Date.now()
+  );
   const restrictionStartup = accountRestrictionManager.evictRestrictedAccounts();
-  if (restrictionStartup.removedAuthSessions > 0 || restrictionStartup.removedRestrictions > 0) {
+  if (
+    prunedAuthSessions > 0 ||
+    restrictionStartup.removedAuthSessions > 0 ||
+    restrictionStartup.removedRestrictions > 0
+  ) {
     await relayStorePersistence.saveRelayStore();
   }
   const deletionReconciliation = deletionLedger
