@@ -363,7 +363,11 @@ fn append_bounded(output: &mut String, line: &str, max_chars: usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::LocalPreviewRegistry;
+    use super::{LocalPreviewRegistry, LocalPreviewTunnel};
+    use std::fs;
+    use std::process::Command;
+    use std::thread;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     #[test]
     fn stop_all_invalidates_every_in_flight_start_generation() {
@@ -373,5 +377,43 @@ mod tests {
         assert_eq!(registry.cancel_all(), 0);
 
         assert_ne!(registry.generation, start_generation);
+    }
+
+    #[test]
+    fn stop_all_terminates_every_registered_tunnel_process() {
+        let marker = std::env::temp_dir().join(format!(
+            "multaiplayer-preview-stop-all-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("sleep 0.4; touch \"$1\"")
+            .arg("preview-stop-test")
+            .arg(&marker)
+            .spawn()
+            .expect("spawn preview test child");
+        let mut registry = LocalPreviewRegistry::default();
+        registry.tunnels.insert(
+            "preview-test".to_string(),
+            LocalPreviewTunnel {
+                id: "preview-test".to_string(),
+                local_url: "http://localhost:5173/".to_string(),
+                public_url: "https://example.trycloudflare.com".to_string(),
+                child,
+            },
+        );
+
+        assert_eq!(registry.cancel_all(), 1);
+        thread::sleep(Duration::from_millis(650));
+
+        assert!(
+            !marker.exists(),
+            "terminated preview child must not reach its delayed side effect"
+        );
+        let _ = fs::remove_file(marker);
     }
 }

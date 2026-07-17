@@ -9,7 +9,10 @@ import { createFileActions } from "../src/application/files/fileActions";
 import { createGitWorkflowActions } from "../src/application/git/gitWorkflowActions";
 import { createMarkdownCopyActions } from "../src/application/markdown/markdownCopyActions";
 import { createMemberActions } from "../src/application/members/memberActions";
-import { createLocalPreviewActions } from "../src/application/files/localPreviewActions";
+import {
+  createLocalPreviewActions,
+  resumeLocalPreviewSharingAfterAuthentication
+} from "../src/application/files/localPreviewActions";
 import { createLocalHistoryActions } from "../src/application/history/localHistoryActions";
 import { createRoomVisibilityWarningActions } from "../src/application/rooms/roomVisibilityWarningActions";
 import { createRoomSettingsActions } from "../src/application/rooms/roomSettingsActions";
@@ -69,6 +72,7 @@ const room: ClientRoomRecord = {
 };
 
 test.beforeEach(() => {
+  resumeLocalPreviewSharingAfterAuthentication();
   nativeInvoke = async (command) => {
     if (command === "mls_history_delete_all" || command === "mls_history_retention_set") return null;
     throw new Error(`Unexpected native command: ${command}`);
@@ -118,6 +122,22 @@ test("hosted-account deletion stops previews before clearing account state", asy
   await actions.hostedAccountDeleted();
 
   assert.deepEqual(calls, ["preview:Stopped because the sharing user's hosted account was deleted.", "deleted"]);
+});
+
+test("hosted-account deletion clears local identity even when native preview cleanup fails", async () => {
+  const calls: string[] = [];
+  const actions = createAccountActions({
+    stopOwnedLocalPreviews: async () => {
+      calls.push("preview");
+      throw new Error("native stop failed");
+    },
+    signOutGitHub: async () => undefined,
+    clearDeletedHostedAccount: () => calls.push("deleted")
+  });
+
+  await actions.hostedAccountDeleted();
+
+  assert.deepEqual(calls, ["preview", "deleted"]);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {
@@ -635,6 +655,124 @@ test("account cleanup cancels an in-flight preview before it can become public",
     published.map((payload) => payload.status),
     ["starting", "stopped"]
   );
+});
+
+test("account cleanup blocks preview starts until authentication resumes", async () => {
+  const nativeCalls: string[] = [];
+  nativeInvoke = async (command) => {
+    nativeCalls.push(command);
+    if (command === "local_preview_stop_all") return 0;
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  useAppStore.setState({
+    localPreviewDialog: {
+      ...useAppStore.getState().localPreviewDialog,
+      roomId: room.id,
+      selectedUrl: "http://localhost:5173/"
+    }
+  });
+  const actions = createLocalPreviewActions({ publishLocalPreviewEvent: async () => undefined });
+
+  await actions.stopOwnedLocalPreviews("Account exit.");
+  await actions.confirmLocalPreviewShare();
+
+  assert.deepEqual(nativeCalls, ["local_preview_stop_all"]);
+  assert.match(useAppStore.getState().localPreviewDialog.error ?? "", /sign in again/i);
+});
+
+test("account cleanup publishes stopped only after an older starting publication settles", async () => {
+  let resolveStarting: () => void = () => {
+    throw new Error("Starting publication was not invoked.");
+  };
+  let startingInvoked: () => void = () => undefined;
+  const startingInvocation = new Promise<void>((resolve) => {
+    startingInvoked = resolve;
+  });
+  nativeInvoke = async (command) => {
+    if (command === "local_preview_stop_all") return 0;
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  useAppStore.setState({
+    localPreviewDialog: {
+      ...useAppStore.getState().localPreviewDialog,
+      roomId: room.id,
+      selectedUrl: "http://localhost:5173/"
+    }
+  });
+  const statuses: LocalPreviewRecord["status"][] = [];
+  const actions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async (payload) => {
+      statuses.push(payload.status);
+      if (payload.status === "starting") {
+        startingInvoked();
+        await new Promise<void>((resolve) => {
+          resolveStarting = resolve;
+        });
+      }
+    }
+  });
+
+  const share = actions.confirmLocalPreviewShare();
+  await startingInvocation;
+  const cleanup = actions.stopOwnedLocalPreviews("Account exit.");
+  await Promise.resolve();
+  assert.deepEqual(statuses, ["starting"]);
+  resolveStarting();
+  await Promise.all([share, cleanup]);
+
+  assert.deepEqual(statuses, ["starting", "stopped"]);
+});
+
+test("preview cleanup tolerates stopped-status publication failure after native termination", async () => {
+  nativeInvoke = async (command) => {
+    if (command === "local_preview_stop_all") return 1;
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  const preview: LocalPreviewRecord = {
+    eventType: "local.preview",
+    id: "preview-live",
+    sharedBy: "Maddie",
+    sharedByUserId: "github:maddie",
+    sourceUrl: "http://localhost:5173/",
+    publicUrl: "https://example.trycloudflare.com",
+    status: "live",
+    message: "Live",
+    createdAt: "2026-07-17T00:00:00.000Z",
+    updatedAt: "2026-07-17T00:00:00.000Z"
+  };
+  useAppStore.getState().appendLocalPreviewEvent(room.id, preview);
+  const actions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async () => {
+      throw new Error("relay unavailable");
+    }
+  });
+
+  await actions.stopOwnedLocalPreviews("Account exit.");
+});
+
+test("a stopped preview cannot regress to a stale live event", () => {
+  const base: LocalPreviewRecord = {
+    eventType: "local.preview",
+    id: "preview-terminal",
+    sharedBy: "Maddie",
+    sharedByUserId: "github:maddie",
+    sourceUrl: "http://localhost:5173/",
+    status: "stopped",
+    message: "Stopped",
+    createdAt: "2026-07-17T00:00:00.000Z",
+    updatedAt: "2026-07-17T00:01:00.000Z"
+  };
+  useAppStore.getState().appendLocalPreviewEvent(room.id, base);
+
+  useAppStore.getState().appendLocalPreviewEvent(room.id, {
+    ...base,
+    status: "live",
+    publicUrl: "https://example.trycloudflare.com",
+    message: "Late live",
+    updatedAt: "2026-07-17T00:02:00.000Z"
+  });
+
+  assert.equal(useAppStore.getState().localPreviewByRoom[room.id]?.previews?.[0]?.status, "stopped");
 });
 
 test("room settings actions report room locks through the current store without React", async () => {

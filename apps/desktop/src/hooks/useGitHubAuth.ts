@@ -13,6 +13,7 @@ import { useAppStore } from "../store/appStore";
 import { openTrustedAuthenticationUrl } from "../lib/identity/authExternalUrl";
 import { invokeNative } from "../lib/platform/nativeCommandError";
 import { clearDeviceSession } from "../lib/identity/deviceSession";
+import { resumeLocalPreviewSharingAfterAuthentication } from "../application/files/localPreviewActions";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",
@@ -40,6 +41,11 @@ export function useGitHubAuth(relayHttpUrl: string) {
   const setAuthBusy = useAppStore((state) => state.setAuthBusy);
   const identityResolved =
     authConfigResolved && currentUserResolved && (currentUser !== null || authConfig?.mutationsRequireAuth === false);
+  const currentUserId = currentUser?.id;
+
+  useEffect(() => {
+    if (currentUserId) resumeLocalPreviewSharingAfterAuthentication();
+  }, [currentUserId]);
 
   useEffect(() => {
     let cancelled = false;

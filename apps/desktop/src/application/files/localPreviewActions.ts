@@ -18,7 +18,18 @@ interface LocalPreviewActionsOptions {
 }
 
 let localPreviewCleanupGeneration = 0;
-const activeLocalPreviewStarts = new Map<string, { payload: LocalPreviewRecord; room: ClientRoomRecord }>();
+let localPreviewAccountExitBlocked = false;
+interface ActiveLocalPreviewStart {
+  payload: LocalPreviewRecord;
+  room: ClientRoomRecord;
+  pendingPublication: Promise<void>;
+}
+const activeLocalPreviewStarts = new Map<string, ActiveLocalPreviewStart>();
+
+export function resumeLocalPreviewSharingAfterAuthentication() {
+  localPreviewCleanupGeneration += 1;
+  localPreviewAccountExitBlocked = false;
+}
 
 export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPreviewActionsOptions) {
   const selectedRoom = () => {
@@ -81,6 +92,12 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
   }
 
   async function confirmLocalPreviewShare() {
+    if (localPreviewAccountExitBlocked) {
+      useAppStore
+        .getState()
+        .setLocalPreviewDialogPhase("select", "Sign in again before sharing another local preview.");
+      return;
+    }
     const cleanupGeneration = localPreviewCleanupGeneration;
     const { localUser } = currentLocalIdentity();
     const { localPreviewDialog } = useAppStore.getState();
@@ -103,9 +120,19 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
       createdAt: now,
       updatedAt: now
     };
-    activeLocalPreviewStarts.set(previewId, { payload: startingPayload, room });
+    const active: ActiveLocalPreviewStart = {
+      payload: startingPayload,
+      room,
+      pendingPublication: Promise.resolve()
+    };
+    const publishTracked = (payload: LocalPreviewRecord) => {
+      active.payload = payload;
+      active.pendingPublication = Promise.resolve().then(() => publishLocalPreviewEvent(payload, room));
+      return active.pendingPublication;
+    };
+    activeLocalPreviewStarts.set(previewId, active);
     try {
-      await publishLocalPreviewEvent(startingPayload, room);
+      await publishTracked(startingPayload);
       if (cleanupGeneration !== localPreviewCleanupGeneration) return;
       const tunnel = await startLocalPreviewTunnel(previewId, sourceUrl);
       if (cleanupGeneration !== localPreviewCleanupGeneration) {
@@ -124,7 +151,8 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
         message: quickTunnelDisclaimer,
         updatedAt: new Date().toISOString()
       };
-      await publishLocalPreviewEvent(livePayload, room);
+      await publishTracked(livePayload);
+      if (cleanupGeneration !== localPreviewCleanupGeneration) return;
       useAppStore.getState().closeLocalPreviewDialog();
       useAppStore.getState().setChatMessageForRoom(room.id, `Shared local preview: ${tunnel.publicUrl}`);
     } catch (error) {
@@ -180,14 +208,24 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
   }
 
   async function stopOwnedLocalPreviews(message = "This preview is no longer available.") {
+    localPreviewAccountExitBlocked = true;
     localPreviewCleanupGeneration += 1;
-    await stopAllLocalPreviewTunnels();
     const { localUser } = currentLocalIdentity();
-    const { localPreviewByRoom } = useAppStore.getState();
+    const { localPreviewByRoom, rooms } = useAppStore.getState();
+    const activeStarts = Array.from(activeLocalPreviewStarts.values()).filter(
+      (active) => active.payload.sharedByUserId === localUser.id
+    );
+    let nativeStopError: unknown = null;
+    try {
+      await stopAllLocalPreviewTunnels();
+    } catch (error) {
+      nativeStopError = error;
+      reportExpectedFailure("local preview account cleanup could not stop every native tunnel");
+    }
     const previewsById = new Map<string, { preview: LocalPreviewRecord; room: ClientRoomRecord }>();
     for (const [roomId, runtime] of Object.entries(localPreviewByRoom)) {
       const previews = runtime.previews ?? [];
-      const room = useAppStore.getState().rooms.find((item) => item.id === roomId);
+      const room = rooms.find((item) => item.id === roomId);
       if (!room) continue;
       for (const preview of previews) {
         if (preview.sharedByUserId !== localUser.id || (preview.status !== "live" && preview.status !== "starting"))
@@ -195,21 +233,34 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
         previewsById.set(preview.id, { preview, room });
       }
     }
-    for (const [previewId, active] of activeLocalPreviewStarts) {
-      if (active.payload.sharedByUserId === localUser.id)
-        previewsById.set(previewId, { preview: active.payload, room: active.room });
-    }
-    for (const { preview, room } of previewsById.values()) {
-      await publishLocalPreviewEvent(
-        {
-          ...preview,
-          status: "stopped",
-          message,
-          updatedAt: new Date().toISOString()
-        },
-        room
-      );
-    }
+    await Promise.all(
+      activeStarts.map(async (active) => {
+        try {
+          await active.pendingPublication;
+        } catch {
+          reportExpectedFailure("local preview publication ended during account cleanup");
+        }
+        previewsById.set(active.payload.id, { preview: active.payload, room: active.room });
+      })
+    );
+    await Promise.all(
+      Array.from(previewsById.values(), async ({ preview, room }) => {
+        try {
+          await publishLocalPreviewEvent(
+            {
+              ...preview,
+              status: "stopped",
+              message,
+              updatedAt: new Date().toISOString()
+            },
+            room
+          );
+        } catch {
+          reportExpectedFailure("local preview stopped status could not be published during account cleanup");
+        }
+      })
+    );
+    if (nativeStopError) throw nativeStopError;
   }
 
   return {

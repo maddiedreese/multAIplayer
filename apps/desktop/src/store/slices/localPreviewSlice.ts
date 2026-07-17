@@ -166,7 +166,11 @@ export const createLocalPreviewSlice: StateCreator<AppStoreState, [], [], LocalP
     set((state) => {
       const roomEvents = state.localPreviewByRoom[roomId]?.previews ?? [];
       const nextEvents = roomEvents.some((existing) => existing.id === event.id)
-        ? roomEvents.map((existing) => (existing.id === event.id ? event : existing))
+        ? roomEvents.map((existing) => {
+            if (existing.id !== event.id) return existing;
+            if (existing.status === "stopped" && event.status !== "stopped") return existing;
+            return event.updatedAt < existing.updatedAt ? existing : event;
+          })
         : [...roomEvents, event];
       return {
         localPreviewByRoom: updateLocalPreviewForRoom(state.localPreviewByRoom, roomId, (roomPreview) => ({
