@@ -6,7 +6,7 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
-## [0.1.0-alpha.0] - 2026-07-17
+## [0.1.0-alpha.1] - 2026-07-17
 
 ### Added
 
@@ -23,6 +23,7 @@ _No changes recorded._
 
 ### Fixed
 
+- The production relay image no longer includes npm's unused dependency tree, removing a release-blocking high-severity `undici` vulnerability from the deployed runtime.
 - New-room onboarding now persists the local-history preference before native MLS setup and applies retention only after the group exists, preventing false room-creation failures and duplicate-room retries.
 - Invitation lookups now project only the exact host and requester public identities required for pre-membership verification, allowing genuine new members and hosts to verify each other without opening the team device directory.
 
