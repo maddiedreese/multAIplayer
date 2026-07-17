@@ -62,9 +62,6 @@ export function createStoredRelayMutationStream(options: {
         value = liveAttachmentValue(store.attachmentBlobs.get(key), options.isExpiredAttachmentBlob);
         break;
       }
-      case "appliedDeletionLedgerEntries":
-        value = store.appliedDeletionLedgerEntries.get(key);
-        break;
       case "teamMembers": {
         value = storedTeamMembersValue(key, store.teamMembers.get(key));
         break;

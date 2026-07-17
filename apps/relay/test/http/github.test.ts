@@ -27,22 +27,8 @@ test("relay advertises native OAuth configuration without a secret", async () =>
       scopes: ["read:user"],
       mutationsRequireAuth: true,
       allowedOrigins: ["https://multaiplayer.com", "tauri://localhost"],
-      sessionPersistence: "identity_only",
-      accountDeletion: "external_ledger_protected"
+      sessionPersistence: "identity_only"
     });
-  } finally {
-    await relay.close();
-  }
-});
-
-test("primary-only self-hosts expose account deletion without claiming backup restore protection", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
-    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false"
-  });
-  try {
-    const config = (await (await fetch(`${relay.baseUrl}/auth/config`)).json()) as { accountDeletion: string };
-    assert.equal(config.accountDeletion, "primary_store_only");
   } finally {
     await relay.close();
   }
@@ -199,9 +185,9 @@ globalThis.fetch = async (input, init = {}) =>
   }
 });
 
-test("startup prunes and persists legacy sessions above a lowered per-user cap", async () => {
+test("startup prunes and persists excess sessions above a lowered per-user cap", async () => {
   const now = Date.now();
-  const sessionIds = ["legacy-oldest", "legacy-middle", "legacy-newest"];
+  const sessionIds = ["retained-oldest", "retained-middle", "retained-newest"];
   const relay = await startRelay(
     {
       MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
@@ -217,7 +203,7 @@ test("startup prunes and persists legacy sessions above a lowered per-user cap",
       encryptedBacklog: [],
       authSessions: sessionIds.map((sessionId, index) => ({
         sessionIdHash: hashAuthSessionId(sessionId),
-        user: { id: "github:legacy", login: "legacy-user" },
+        user: { id: "github:retained", login: "retained-user" },
         expiresAt: now + (index + 1) * 60_000
       }))
     }

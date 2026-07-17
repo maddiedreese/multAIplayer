@@ -1,7 +1,4 @@
 import test from "node:test";
-import Database from "better-sqlite3";
-import { access, copyFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   deleteAccountOwnedRelayData,
   deleteAccountOwnedRelayDataAtomically,
@@ -9,8 +6,8 @@ import {
 } from "../src/auth/account-deletion.js";
 import { createRelayStore } from "../src/state.js";
 import { commitValidatedKeyPackages } from "../src/http/key-package-upload-transaction.js";
-import { acquireAccountMutationTurns } from "../src/auth/account-mutation-transaction.js";
-import { assert, createDebugSession, delay, startRelay, waitForStoredState } from "./support/relay.js";
+import { acquireAccountMutationTurn, acquireAccountMutationTurns } from "../src/auth/account-mutation-transaction.js";
+import { assert, delay } from "./support/relay.js";
 
 test("account deletion removes identity-owned records while preserving shared encrypted history", () => {
   const store = createRelayStore();
@@ -287,130 +284,55 @@ test("a KeyPackage validated before account deletion cannot commit after deletio
   assert.equal(store.getDevice(userId, deviceId), undefined);
 });
 
-test("account deletion holds its identity turn across the external ledger and rejects queued team and room creation", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
-    MULTAIPLAYER_TEST_DEFER_DELETION_LEDGER_RECORD: "true"
+test("account deletion holds its identity turn until primary persistence completes", async () => {
+  const store = createRelayStore();
+  const userId = "github:deleting";
+  const persistStarted = deferred<void>();
+  const finishPersist = deferred<void>();
+  const deleting = deleteAccountOwnedRelayDataAtomically(store, userId, async () => {
+    persistStarted.resolve();
+    await finishPersist.promise;
   });
-  try {
-    const cookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
-    const deletion = fetch(`${relay.baseUrl}/auth/account`, {
-      method: "DELETE",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ confirmation: "delete my account" })
-    });
-    const recordingPath = `${relay.tempDir}/external-deletion-ledger.recording`;
-    for (let attempt = 0; attempt < 200; attempt += 1) {
-      if (
-        await access(recordingPath).then(
-          () => true,
-          () => false
-        )
-      )
-        break;
-      await delay(10);
-    }
-    await access(recordingPath);
+  await persistStarted.promise;
 
-    let teamSettled = false;
-    let roomSettled = false;
-    const creatingTeam = fetch(`${relay.baseUrl}/teams`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ name: "Must not survive deletion" })
-    }).finally(() => {
-      teamSettled = true;
-    });
-    const creatingRoom = fetch(`${relay.baseUrl}/rooms`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ teamId: "team-core", name: "Must not survive deletion" })
-    }).finally(() => {
-      roomSettled = true;
-    });
-    await delay(75);
-    assert.equal(teamSettled, false);
-    assert.equal(roomSettled, false);
+  let queuedMutationSettled = false;
+  const queuedMutation = acquireAccountMutationTurn(store, userId).then((release) => {
+    queuedMutationSettled = true;
+    release();
+  });
+  await delay(25);
+  assert.equal(queuedMutationSettled, false);
 
-    await writeFile(`${relay.tempDir}/external-deletion-ledger.release`, "release", "utf8");
-    assert.equal((await deletion).status, 200);
-    assert.equal((await creatingTeam).status, 401);
-    assert.equal((await creatingRoom).status, 401);
-
-    const stored = await waitForStoredState(
-      relay.dataPath,
-      (state) =>
-        Array.isArray(state.authSessions) &&
-        !state.authSessions.some((entry) => JSON.stringify(entry).includes("github:tester"))
-    );
-    assert.equal(JSON.stringify(stored.teams).includes("Must not survive deletion"), false);
-    assert.equal(JSON.stringify(stored.rooms).includes("Must not survive deletion"), false);
-    assert.equal(JSON.stringify(stored.teamMembers).includes("github:tester"), false);
-  } finally {
-    await relay.close();
-  }
+  finishPersist.resolve();
+  await deleting;
+  await queuedMutation;
+  assert.equal(queuedMutationSettled, true);
 });
 
-test("team ownership cannot be transferred to an account while that account is being deleted", async () => {
-  const relay = await startRelay({
-    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
-    MULTAIPLAYER_TEST_DEFER_DELETION_LEDGER_RECORD: "true"
+test("account deletion blocks ownership mutations that also lock another account", async () => {
+  const store = createRelayStore();
+  const deletingUserId = "github:deleting";
+  const ownerUserId = "github:owner";
+  const persistStarted = deferred<void>();
+  const finishPersist = deferred<void>();
+  const deleting = deleteAccountOwnedRelayDataAtomically(store, deletingUserId, async () => {
+    persistStarted.resolve();
+    await finishPersist.promise;
   });
-  try {
-    const targetCookie = await createDebugSession(relay.baseUrl, "github:tester", "tester");
-    const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
-    const deletion = fetch(`${relay.baseUrl}/auth/account`, {
-      method: "DELETE",
-      headers: { "content-type": "application/json", cookie: targetCookie },
-      body: JSON.stringify({ confirmation: "delete my account" })
-    });
-    const recordingPath = `${relay.tempDir}/external-deletion-ledger.recording`;
-    for (let attempt = 0; attempt < 200; attempt += 1) {
-      if (
-        await access(recordingPath).then(
-          () => true,
-          () => false
-        )
-      )
-        break;
-      await delay(10);
-    }
-    await access(recordingPath);
+  await persistStarted.promise;
 
-    let transferSettled = false;
-    const transfer = fetch(`${relay.baseUrl}/teams/team-core/members/github%3Atester/transfer-owner`, {
-      method: "POST",
-      headers: { cookie: ownerCookie }
-    }).finally(() => {
-      transferSettled = true;
-    });
-    await delay(75);
-    assert.equal(transferSettled, false);
+  let ownershipMutationSettled = false;
+  const ownershipMutation = acquireAccountMutationTurns(store, [ownerUserId, deletingUserId]).then((release) => {
+    ownershipMutationSettled = true;
+    release();
+  });
+  await delay(25);
+  assert.equal(ownershipMutationSettled, false);
 
-    await writeFile(`${relay.tempDir}/external-deletion-ledger.release`, "release", "utf8");
-    assert.equal((await deletion).status, 200);
-    assert.equal((await transfer).status, 404);
-
-    const stored = await waitForStoredState(relay.dataPath, (state) =>
-      JSON.stringify(state.teamMembers).includes('"role":"owner"')
-    );
-    const coreMembers = (
-      stored.teamMembers as Array<{
-        teamId: string;
-        members: Array<{ userId: string; role: string }>;
-      }>
-    ).find((entry) => entry.teamId === "team-core")?.members;
-    assert.deepEqual(
-      coreMembers?.filter((member) => member.role === "owner").map((member) => member.userId),
-      ["github:maddiedreese"]
-    );
-    assert.equal(
-      coreMembers?.some((member) => member.userId === "github:tester"),
-      false
-    );
-  } finally {
-    await relay.close();
-  }
+  finishPersist.resolve();
+  await deleting;
+  await ownershipMutation;
+  assert.equal(ownershipMutationSettled, true);
 });
 
 test("multi-account mutation turns use one deterministic order", async () => {
@@ -430,42 +352,6 @@ test("multi-account mutation turns use one deterministic order", async () => {
     delay(1_000).then(() => assert.fail("cross-ordered account turns deadlocked"))
   ]);
   assert.deepEqual(completed.sort(), ["forward", "reverse"]);
-});
-
-test("restoring a pre-deletion SQLite backup cannot restore the deleted identity's session", async () => {
-  const userId = "github:tester";
-  const first = await startRelay();
-  const backupPath = join(first.tempDir, "pre-deletion.sqlite");
-  let restored: Awaited<ReturnType<typeof startRelay>> | undefined;
-  try {
-    const cookie = await createDebugSession(first.baseUrl, userId, "tester");
-    await waitForStoredState(
-      first.dataPath,
-      (state) => Array.isArray(state.authSessions) && state.authSessions.length > 0
-    );
-    const source = new Database(first.dataPath, { readonly: true });
-    await source.backup(backupPath);
-    source.close();
-
-    const deleted = await fetch(`${first.baseUrl}/auth/account`, {
-      method: "DELETE",
-      headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ confirmation: "delete my account" })
-    });
-    assert.equal(deleted.status, 200);
-    await first.close({ preserveData: true });
-
-    await copyFile(backupPath, first.dataPath);
-    await Promise.all([rm(`${first.dataPath}-wal`, { force: true }), rm(`${first.dataPath}-shm`, { force: true })]);
-    restored = await startRelay({}, undefined, first.dataPath);
-
-    const rejected = await fetch(`${restored.baseUrl}/auth/me`, { headers: { cookie } });
-    assert.equal(rejected.status, 401);
-    assert.equal(((await rejected.json()) as { code?: string }).code, "authentication_required");
-  } finally {
-    await restored?.close();
-    if (!restored) await first.close().catch(() => undefined);
-  }
 });
 
 function room(id: string, hostUserId: string) {

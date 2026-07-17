@@ -15,9 +15,9 @@ import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
 import { createRoomActions } from "./application/rooms/roomActions";
-import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
+import { useSelectedRoomRuntime } from "./hooks/useSelectedRoomRuntime";
 import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
-import { useAppInviteActions } from "./hooks/useAppInviteActions";
+import { useInviteActions } from "./hooks/useInviteActions";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedRoomContext } from "./hooks/useAppSelectedRoomContext";
 import { useAppWorkspaceFlow } from "./hooks/useAppWorkspaceFlow";
@@ -163,10 +163,17 @@ function NativeApp() {
     selected: selectedContext,
     roomActions
   });
-  const selectedRuntime = useAppSelectedRoomRuntime({
-    localIdentity,
-    selected: selectedContext,
-    roomInteraction
+  const selectedRuntime = useSelectedRoomRuntime({
+    selectedRoom: selectedContext.selectedRoom,
+    localUser: localIdentity.localUser,
+    isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
+    messages: selectedContext.messages,
+    replyToMessageId: selectedContext.replyToMessageId,
+    pendingAttachments: selectedContext.pendingAttachments,
+    pendingAttachmentBytes: selectedContext.pendingAttachmentBytes,
+    browserRequests: selectedContext.browserRequests,
+    roomTerminals: selectedContext.roomTerminals,
+    selectedTerminalId: selectedContext.selectedTerminalId
   });
   const hostHandoffActions = useAppHostHandoffActions({
     appRefs,
@@ -178,10 +185,15 @@ function NativeApp() {
     workspaceRecords,
     roomSettingsActor
   });
-  const inviteActions = useAppInviteActions({
-    appRefs,
-    roomInteraction,
-    workspaceRecords
+  const inviteActions = useInviteActions({
+    selectedRoomIdRef: appRefs.selectedRoomIdRef,
+    relayRef: appRefs.relayRef,
+    seenEnvelopeIds: appRefs.seenEnvelopeIds,
+    reportMembershipCommitInFlight: roomInteraction.reportMembershipCommitInFlight,
+    upsertTeam: workspaceRecords.upsertTeam,
+    upsertRoom: workspaceRecords.upsertRoom,
+    clearInviteSecretInput: () => useAppStore.getState().clearInviteSecretInput(),
+    selectWorkspaceRoom: (teamId, roomId) => useAppStore.getState().selectWorkspaceRoom(teamId, roomId)
   });
 
   const workspaceFlow = useAppWorkspaceFlow({

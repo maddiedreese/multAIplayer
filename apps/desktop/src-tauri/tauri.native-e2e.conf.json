@@ -5,10 +5,11 @@
     "withGlobalTauri": true,
     "security": {
       "capabilities": [
+        "default",
         {
           "identifier": "native-e2e",
           "description": "Test-only permissions for the embedded macOS WebDriver smoke.",
-          "windows": ["main"],
+          "webviews": ["main"],
           "permissions": [
             "core:default",
             "dialog:default",

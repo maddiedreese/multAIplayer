@@ -29,7 +29,7 @@ Object.defineProperty(globalThis, "localStorage", {
 
 afterEach(() => cleanup());
 
-test("accepted hosted-account deletion is reported as protected and pending cleanup", async () => {
+test("hosted-account deletion stops previews before deleting and clears signed-in state", async () => {
   const originalFetch = globalThis.fetch;
   let deleted = 0;
   let previewsStopped = 0;
@@ -40,11 +40,10 @@ test("accepted hosted-account deletion is reported as protected and pending clea
     return new Response(
       JSON.stringify({
         ok: true,
-        status: "pending",
         deleted: null,
         retainedSharedData: ["team_and_room_records"]
       }),
-      { status: 202, headers: { "content-type": "application/json" } }
+      { status: 200, headers: { "content-type": "application/json" } }
     );
   };
 
@@ -95,14 +94,13 @@ test("accepted hosted-account deletion is reported as protected and pending clea
     fireEvent.click(submit);
 
     await waitFor(() => {
-      assert.ok(view.getByText(/Deletion request protected and pending primary cleanup/i));
+      assert.ok(view.getByText(/Hosted account data deleted/i));
     });
     assert.equal(deleted, 1);
     const deletionRequest = deletionRequests.at(-1);
     assert.equal(deletionRequest?.input, "https://relay.example/auth/account");
     assert.equal(deletionRequest?.init?.method, "DELETE");
     assert.equal(deletionRequest?.init?.body, JSON.stringify({ confirmation: "delete my account" }));
-    assert.match(view.getByText("Account deletion status").parentElement?.textContent ?? "", /durably accepted/i);
   } finally {
     globalThis.fetch = originalFetch;
   }

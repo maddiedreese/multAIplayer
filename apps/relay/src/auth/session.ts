@@ -13,7 +13,6 @@ interface RelayAuthSessionManagerOptions {
   nodeEnv: string;
   normalizeSessionId: (value: unknown) => string;
   scheduleStoreSave: () => void;
-  isDeletedIdentity?: (userId: string) => boolean;
   isRestrictedIdentity?: (userId: string) => boolean;
 }
 
@@ -59,7 +58,6 @@ export function createRelayAuthSessionManager({
   nodeEnv,
   normalizeSessionId,
   scheduleStoreSave,
-  isDeletedIdentity = () => false,
   isRestrictedIdentity = () => false
 }: RelayAuthSessionManagerOptions): RelayAuthSessionManager {
   function authCookieOptions(maxAge?: number): CookieOptions {
@@ -83,7 +81,7 @@ export function createRelayAuthSessionManager({
       scheduleStoreSave();
       return null;
     }
-    if (isDeletedIdentity(session.user.id) || isRestrictedIdentity(session.user.id)) {
+    if (isRestrictedIdentity(session.user.id)) {
       authSessions.delete(sessionIdHash);
       scheduleStoreSave();
       return null;

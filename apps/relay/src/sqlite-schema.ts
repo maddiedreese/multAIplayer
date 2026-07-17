@@ -24,7 +24,6 @@ export function openRelayDatabase(dataPath: string, walAutoCheckpointPages = 1_0
     create table if not exists relay_account_restrictions (user_id text primary key, data_json text not null);
     create table if not exists relay_account_quota_records (quota_key text primary key, data_json text not null);
     create table if not exists relay_attachment_blobs (id text primary key, data_json text not null);
-    create table if not exists relay_applied_deletion_ledger_entries (id text primary key, data_json text not null);
     create table if not exists relay_mls_messages (
       room_key text not null,
       message_id text not null,

@@ -31,8 +31,7 @@ test("relay-only tests and operator entry points do not rerun product journeys",
     "apps/relay/test/config/config.test.ts",
     "apps/relay/src/manage-account-restriction.ts",
     "apps/relay/src/observability.ts",
-    "apps/relay/src/predeploy-check.ts",
-    "apps/relay/src/reconcile-deletions.ts"
+    "apps/relay/src/predeploy-check.ts"
   ]) {
     const result = classifyChanges([path]);
     assert.equal(result.javascript, true, `${path} must retain JavaScript checks`);

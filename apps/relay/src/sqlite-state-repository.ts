@@ -32,7 +32,6 @@ export function loadNormalizedRelayState(db: Database.Database): unknown | null 
     accountRestrictions: loadJsonRows(db, "relay_account_restrictions", "user_id"),
     accountQuotaRecords: loadJsonRows(db, "relay_account_quota_records", "quota_key"),
     attachmentBlobs: loadJsonRows(db, "relay_attachment_blobs", "id"),
-    appliedDeletionLedgerEntries: loadJsonRows(db, "relay_applied_deletion_ledger_entries", "id"),
     mlsBacklog: loadMlsBacklogRows(db)
   };
 }
@@ -55,8 +54,7 @@ const relayEntityTables: Record<
   authSessions: { table: "relay_auth_sessions", keyColumn: "session_id" },
   accountRestrictions: { table: "relay_account_restrictions", keyColumn: "user_id" },
   accountQuotaRecords: { table: "relay_account_quota_records", keyColumn: "quota_key" },
-  attachmentBlobs: { table: "relay_attachment_blobs", keyColumn: "id" },
-  appliedDeletionLedgerEntries: { table: "relay_applied_deletion_ledger_entries", keyColumn: "id" }
+  attachmentBlobs: { table: "relay_attachment_blobs", keyColumn: "id" }
 };
 
 export function applyStoredRelayMutations(db: Database.Database, changes: StoredRelayMutation[]) {
@@ -173,9 +171,6 @@ export function saveNormalizedRelayState(db: Database.Database, state: unknown) 
       relayId(item, "key")
     );
     saveJsonRows(db, "relay_attachment_blobs", "id", state.attachmentBlobs, (item) => relayId(item, "id"));
-    saveJsonRows(db, "relay_applied_deletion_ledger_entries", "id", state.appliedDeletionLedgerEntries, (item) =>
-      relayId(item, "entryId")
-    );
     pruneMlsMessageRows(db, state.mlsBacklog);
   })();
 }
@@ -197,8 +192,7 @@ function clearNormalizedRelayTables(db: Database.Database) {
     "relay_auth_sessions",
     "relay_account_restrictions",
     "relay_account_quota_records",
-    "relay_attachment_blobs",
-    "relay_applied_deletion_ledger_entries"
+    "relay_attachment_blobs"
   ]) {
     db.prepare(`delete from ${table}`).run();
   }
@@ -372,8 +366,7 @@ function storageKeyForRow(table: string, value: Record<string, unknown>): string
     relay_team_members: "teamId",
     relay_account_restrictions: "userId",
     relay_account_quota_records: "key",
-    relay_attachment_blobs: "id",
-    relay_applied_deletion_ledger_entries: "entryId"
+    relay_attachment_blobs: "id"
   };
   if (table === "relay_auth_sessions") return stringField("sessionIdHash") ?? stringField("sessionId");
   const field = fieldByTable[table];
@@ -397,7 +390,6 @@ function relayDatabaseContainsDurableState(db: Database.Database): boolean {
     "relay_account_restrictions",
     "relay_account_quota_records",
     "relay_attachment_blobs",
-    "relay_applied_deletion_ledger_entries",
     "relay_mls_messages",
     "relay_room_epochs",
     "relay_meta"

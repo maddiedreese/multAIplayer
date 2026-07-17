@@ -11,7 +11,6 @@ import type {
 import type {
   AuthSession,
   AccountQuotaRecord,
-  AppliedDeletionLedgerEntry,
   ByteQuotaRecord,
   DeviceChallengeRecord,
   DeviceSessionRecord,
@@ -64,18 +63,16 @@ interface AccountDeletionStateSnapshot {
   accountQuotaRecords: Map<string, AccountQuotaRecord>;
   rateLimitStore: Map<string, TokenBucketRecord>;
   deviceChallenges: Map<string, DeviceChallengeRecord>;
-  appliedDeletionLedgerEntries: Map<string, AppliedDeletionLedgerEntry>;
 }
 
 export async function deleteAccountOwnedRelayDataAtomically(
   store: RelayStore,
   userId: string,
-  persist: () => Promise<void>,
-  ledgerEntryIds: string[] = []
+  persist: () => Promise<void>
 ): Promise<AccountDeletionSummary> {
   const release = await acquireAccountMutationTurn(store, userId);
   try {
-    return await deleteAccountOwnedRelayDataWithinTurnAtomically(store, userId, persist, ledgerEntryIds);
+    return await deleteAccountOwnedRelayDataWithinTurnAtomically(store, userId, persist);
   } finally {
     release();
   }
@@ -84,24 +81,19 @@ export async function deleteAccountOwnedRelayDataAtomically(
 /**
  * Delete one account while the caller already owns its mutation turn.
  *
- * Route-level deletion uses this form so the blocker decision and external
- * deletion-ledger commit are protected by the same turn as the primary-store
- * deletion. Other callers should use deleteAccountOwnedRelayDataAtomically.
+ * Route-level deletion uses this form so its blocker decision and primary-store
+ * deletion share one account mutation turn. Other callers should use
+ * deleteAccountOwnedRelayDataAtomically.
  */
 export async function deleteAccountOwnedRelayDataWithinTurnAtomically(
   store: RelayStore,
   userId: string,
-  persist: () => Promise<void>,
-  ledgerEntryIds: string[] = []
+  persist: () => Promise<void>
 ): Promise<AccountDeletionSummary> {
   const snapshot = snapshotAccountDeletionState(store, userId);
   let deletedState: AccountDeletionStateSnapshot | null = null;
   try {
     const summary = deleteAccountOwnedRelayData(store, userId);
-    const appliedAt = new Date().toISOString();
-    for (const entryId of ledgerEntryIds) {
-      store.appliedDeletionLedgerEntries.set(entryId, { entryId, appliedAt });
-    }
     deletedState = snapshotAccountDeletionState(store, userId, snapshot);
     await persist();
     return summary;
@@ -293,8 +285,7 @@ function snapshotAccountDeletionState(
     rateLimitStore: select(store.rateLimitStore, (key) =>
       Array.from(sessionIds).some((sessionId) => key.endsWith(`:session:${sessionId}`))
     ),
-    deviceChallenges: select(store.deviceChallenges, (_key, challenge) => challenge.userId === userId),
-    appliedDeletionLedgerEntries: new Map(store.appliedDeletionLedgerEntries)
+    deviceChallenges: select(store.deviceChallenges, (_key, challenge) => challenge.userId === userId)
   };
 }
 
@@ -360,11 +351,6 @@ function restoreAccountDeletionState(
   restoreChangedEntries(store.accountQuotaRecords, before.accountQuotaRecords, after.accountQuotaRecords);
   restoreChangedEntries(store.rateLimitStore, before.rateLimitStore, after.rateLimitStore);
   restoreChangedEntries(store.deviceChallenges, before.deviceChallenges, after.deviceChallenges);
-  restoreChangedEntries(
-    store.appliedDeletionLedgerEntries,
-    before.appliedDeletionLedgerEntries,
-    after.appliedDeletionLedgerEntries
-  );
 }
 
 function restoreChangedEntries<Key, Value>(

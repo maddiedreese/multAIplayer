@@ -10,7 +10,6 @@ import {
 } from "./account-deletion.js";
 import { acquireAccountMutationTurn, isLiveAccountSession } from "./account-mutation-transaction.js";
 import type { RelayStore } from "../state.js";
-import type { DeletionLedger } from "./deletion-ledger.js";
 import { hashAuthSessionId, selectAuthSessionsToEvict } from "./session.js";
 
 export interface RegisterGitHubAuthRoutesOptions {
@@ -20,7 +19,6 @@ export interface RegisterGitHubAuthRoutesOptions {
   setAuthSession: (sessionId: string, session: NewAuthSession) => void;
   deleteAuthSession: (sessionId: unknown) => boolean;
   store: RelayStore;
-  deletionLedger: DeletionLedger | null;
   authSessionMaxAgeMs: number;
   retainedAuthSessionCapPerUser: number;
   authCookieOptions: (maxAge?: number) => CookieOptions;
@@ -44,7 +42,6 @@ export function registerGitHubAuthRoutes({
   setAuthSession,
   deleteAuthSession,
   store,
-  deletionLedger,
   authSessionMaxAgeMs,
   retainedAuthSessionCapPerUser,
   authCookieOptions,
@@ -60,15 +57,6 @@ export function registerGitHubAuthRoutes({
   maxAccessTokenChars,
   isAccountRestricted
 }: RegisterGitHubAuthRoutesOptions) {
-  async function recordDeletionProtection(userId: string): Promise<string[] | null> {
-    if (!deletionLedger) return [];
-    try {
-      return [(await deletionLedger.record(userId)).id];
-    } catch {
-      return null;
-    }
-  }
-
   async function issueVerifiedSession(user: NewAuthSession["user"], res: Response): Promise<void> {
     const releaseAccountMutation = await acquireAccountMutationTurn(store, user.id);
     try {
@@ -76,16 +64,6 @@ export function registerGitHubAuthRoutes({
         sendRelayError(res, 403, "account_restricted", "This account is restricted by the relay operator.");
         return;
       }
-      if (deletionLedger?.isProtected(user.id)) {
-        sendRelayError(
-          res,
-          403,
-          "forbidden",
-          "This GitHub identity was deleted from the hosted alpha and cannot sign in while protected backups remain."
-        );
-        return;
-      }
-
       const sessionId = nanoid(32);
       const sessionIdHash = hashAuthSessionId(sessionId);
       const expiresAt = Date.now() + authSessionMaxAgeMs;
@@ -127,8 +105,7 @@ export function registerGitHubAuthRoutes({
       scopes: ["read:user"],
       mutationsRequireAuth,
       allowedOrigins: allowedCorsOrigins,
-      sessionPersistence: "identity_only",
-      accountDeletion: deletionLedger ? "external_ledger_protected" : "primary_store_only"
+      sessionPersistence: "identity_only"
     });
   });
 
@@ -167,9 +144,6 @@ export function registerGitHubAuthRoutes({
       sendRelayError(res, 502, "upstream_unavailable", "GitHub returned unsupported user metadata");
       return;
     }
-    // Startup reconciliation authenticates the complete external ledger before
-    // the listener opens. The account turn below rechecks that cache after any
-    // concurrent deletion or operator restriction has finished.
     await issueVerifiedSession(
       {
         id: normalizedUserId,
@@ -234,43 +208,11 @@ export function registerGitHubAuthRoutes({
       const memberTeamIds = Array.from(store.teamMembers.entries())
         .filter(([, members]) => members.has(userId))
         .map(([teamId]) => teamId);
-      const ledgerEntryIds = await recordDeletionProtection(userId);
-      if (!ledgerEntryIds) {
-        sendRelayError(
-          res,
-          503,
-          "persistence_unavailable",
-          "Hosted account deletion was not started because its external deletion record could not be committed."
-        );
-        return;
-      }
       let deleted;
       try {
-        deleted = await deleteAccountOwnedRelayDataWithinTurnAtomically(store, userId, saveRelayStore, ledgerEntryIds);
+        deleted = await deleteAccountOwnedRelayDataWithinTurnAtomically(store, userId, saveRelayStore);
       } catch {
-        for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
-        revokeUserPresence(userId);
-        for (const client of store.sessions.values()) {
-          if (client.authSession?.user.id === userId || client.userId === userId) {
-            client.socket.close(1008, "Hosted account deletion pending");
-          }
-        }
-        res.clearCookie("multaiplayer_session", authCookieOptions());
-        if (!deletionLedger) {
-          return void sendRelayError(res, 503, "persistence_unavailable", "Account deletion could not be persisted.");
-        }
-        res.status(202).json({
-          ok: true,
-          status: "pending",
-          deleted: null,
-          retainedSharedData: [
-            "team_and_room_records",
-            "mls_ciphertext_and_routing_metadata",
-            "encrypted_attachment_blobs",
-            "accepted_message_receipts"
-          ]
-        });
-        return;
+        return void sendRelayError(res, 503, "persistence_unavailable", "Account deletion could not be persisted.");
       }
       for (const teamId of memberTeamIds) revokeTeamMemberSessions(teamId, userId);
       revokeUserPresence(userId);

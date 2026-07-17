@@ -1,7 +1,7 @@
 import { LocalPreviewDialog } from "./LocalPreviewDialog";
-import { useLocalPreviewDialogProps } from "../hooks/useLocalPreviewDialogProps";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
+import { quickTunnelDisclaimer, quickTunnelSafetyText } from "../lib/files/localPreview";
 
 export interface LocalPreviewDialogActions {
   prepareLocalPreviewConfirmation: () => Promise<void>;
@@ -24,15 +24,19 @@ export function LocalPreviewDialogContainer(actions: LocalPreviewDialogActions) 
     setLocalPreviewDialogManualUrl: setManualUrl,
     setLocalPreviewDialogPhase: setPhase
   } = useAppStore.getState();
-  const { localPreviewDialogOpen, localPreviewDialogProps } = useLocalPreviewDialogProps({
-    localPreviewDialog: state.dialog,
-    closeLocalPreviewDialog: close,
-    setLocalPreviewDialogSelectedUrl: setSelectedUrl,
-    setLocalPreviewDialogManualUrl: setManualUrl,
-    setLocalPreviewDialogPhase: setPhase,
-    localPreviewBusy: state.busy,
-    ...actions
-  });
-
-  return localPreviewDialogOpen ? <LocalPreviewDialog {...localPreviewDialogProps} /> : null;
+  if (!state.dialog.open) return null;
+  return (
+    <LocalPreviewDialog
+      dialog={state.dialog}
+      busy={state.busy}
+      disclaimer={quickTunnelDisclaimer}
+      safetyText={quickTunnelSafetyText}
+      onClose={close}
+      onSelectedUrlChange={setSelectedUrl}
+      onManualUrlChange={setManualUrl}
+      onBackToSelect={() => setPhase("select")}
+      onContinue={() => void actions.prepareLocalPreviewConfirmation()}
+      onStartSharing={() => void actions.confirmLocalPreviewShare()}
+    />
+  );
 }
