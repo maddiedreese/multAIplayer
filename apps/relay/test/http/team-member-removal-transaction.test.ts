@@ -231,7 +231,8 @@ function publishConnectionFixture(
   return {
     transport: {
       wss: new WebSocketServer({ noServer: true }),
-      send: (_socket, message) => onSend(message)
+      send: (_socket, message) => onSend(message),
+      sendConnectionError: (_socket, message) => onSend(message)
     },
     state: {
       store,

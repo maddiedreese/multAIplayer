@@ -75,6 +75,7 @@ export interface BrowserSlice {
   openEmbeddedBrowserForRoom: (roomId: string, url: string) => void;
   selectBrowserTabForRoom: (roomId: string, tabId: string) => void;
   closeBrowserTabForRoom: (roomId: string, tabId: string) => void;
+  recordBrowserNavigationForRoom: (roomId: string, tabId: string, url: string) => void;
   setBrowserUrlForRoom: (roomId: string, url: string, defaultBrowserUrl: string) => void;
   setBrowserReasonForRoom: (roomId: string, reason: string, defaultBrowserReason: string) => void;
   setBrowserMessageForRoom: (roomId: string, message: string | null) => void;
@@ -154,6 +155,23 @@ export const createBrowserSlice: StateCreator<AppStoreState, [], [], BrowserSlic
           tabs: nextTabs,
           activeTabId: nextActiveTab?.id ?? null,
           activeUrl: nextActiveTab?.url ?? null
+        };
+      })
+    }));
+  },
+  recordBrowserNavigationForRoom: (roomId, tabId, url) => {
+    set((state) => ({
+      browserByRoom: updateBrowserForRoom(state.browserByRoom, roomId, (roomState) => {
+        if (roomState.activeTabId !== tabId) return roomState;
+        const activeTab = (roomState.tabs ?? []).find((tab) => tab.id === tabId);
+        if (!activeTab) return roomState;
+        return {
+          ...roomState,
+          url,
+          activeUrl: url,
+          tabs: (roomState.tabs ?? []).map((tab) =>
+            tab.id === activeTab.id ? { ...tab, url, title: browserTabTitle(url) } : tab
+          )
         };
       })
     }));

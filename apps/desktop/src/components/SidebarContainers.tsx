@@ -45,7 +45,10 @@ function sidebarRoomDisplay(room: ClientRoomRecord | null) {
 
 export interface SidebarSources {
   githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn" | "clearDeletedHostedAccount">;
-  roomRuntime: Pick<ReturnType<typeof useRoomRuntimeContext>, "signOut" | "chooseProjectPath">;
+  roomRuntime: Pick<
+    ReturnType<typeof useRoomRuntimeContext>,
+    "signOut" | "chooseProjectPath" | "stopOwnedLocalPreviews"
+  >;
   workspaceFlow: Pick<
     ReturnType<typeof useWorkspaceFlowContext>,
     | "addTeam"
@@ -304,6 +307,8 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
             hasSelectedRoom={hasSelectedRoom}
           />
         ),
+        onBeforeHostedAccountDeletion: () =>
+          sources.roomRuntime.stopOwnedLocalPreviews("Stopped because the sharing user deleted their account."),
         onHostedAccountDeleted: sources.githubAuth.clearDeletedHostedAccount,
         onSignIn: sources.githubAuth.beginGitHubSignIn,
         onSignOut: sources.roomRuntime.signOut

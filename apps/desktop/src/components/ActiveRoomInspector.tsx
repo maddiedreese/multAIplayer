@@ -76,6 +76,7 @@ export function ActiveRoomInspector({
   const inviteSecretInput = useAppStore((state) => state.inviteSecretInput);
   const {
     setBrowserUrlForRoom,
+    recordBrowserNavigationForRoom,
     selectBrowserTabForRoom,
     closeBrowserTabForRoom,
     setProjectPathDraftForRoom,
@@ -414,6 +415,7 @@ export function ActiveRoomInspector({
     browserUrl: valueOr(browser.url, defaultBrowserUrl),
     canHostBrowser: access.canHostBrowser,
     onBrowserUrlChange: (url) => setBrowserUrlForRoom(selectedRoom.id, url, defaultBrowserUrl),
+    onBrowserNavigation: (tabId, url) => recordBrowserNavigationForRoom(selectedRoom.id, tabId, url),
     onOpenBrowserNow: sources.roomRuntime.openRoomBrowserNow,
     onApproveBrowserRequest: sources.roomRuntime.approveBrowserRequest,
     onDenyBrowserRequest: sources.roomRuntime.denyBrowserRequest,

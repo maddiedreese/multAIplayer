@@ -6,7 +6,7 @@ import { parseRelayClientMessage } from "./connection-validation.js";
 import { RelayStoreByteCapacityError, RelayStoreCapacityError } from "../state.js";
 
 export function registerRelayWebSocketConnection(options: RelayWebSocketConnectionOptions) {
-  const { wss, send } = options.transport;
+  const { wss, send, sendConnectionError } = options.transport;
   wss.on("connection", (socket, request) => {
     const session = admitRelayWebSocketConnection(options, socket, request);
     if (!session) return;
@@ -18,20 +18,26 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
         let publishMessageId: string | undefined;
         try {
           if (options.transport.isReady && !options.transport.isReady()) {
-            send(socket, { type: "error", message: "Relay is not ready. Restart or reconnect before continuing." });
+            sendConnectionError(socket, {
+              type: "error",
+              message: "Relay is not ready. Restart or reconnect before continuing."
+            });
             socket.close(1012, "Relay not ready");
             return;
           }
           const rateClientIds = session.rateClientIds ?? [session.rateClientId];
           if (rateClientIds.some((clientId) => !options.rateLimiting.consume("websocket", clientId).allowed)) {
             options.metrics.recordRateLimitRejection?.("websocket");
-            send(socket, { type: "error", message: "Rate limit exceeded. Slow down before sending more room events." });
+            sendConnectionError(socket, {
+              type: "error",
+              message: "Rate limit exceeded. Slow down before sending more room events."
+            });
             return;
           }
           options.metrics.recordRateLimitAllowed?.("websocket");
           const parsed = parseRelayClientMessage(options, raw);
           if (parsed.preflightError) {
-            send(socket, { type: "error", message: parsed.preflightError });
+            sendConnectionError(socket, { type: "error", message: parsed.preflightError });
             return;
           }
           if (!parsed.message) return;

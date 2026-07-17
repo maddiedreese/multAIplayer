@@ -42,11 +42,14 @@ export function admitRelayWebSocketConnection(
   socket: ClientSession["socket"],
   request: IncomingMessage
 ): ClientSession | null {
-  const { send, isReady = () => true } = options.transport;
+  const { sendConnectionError, isReady = () => true } = options.transport;
   options.metrics.recordConnectionAttempt?.();
   if (!isReady()) {
     options.metrics.recordConnectionRejection?.("not_ready");
-    send(socket, { type: "error", message: "Relay is shutting down. Reconnect to another relay instance." });
+    sendConnectionError(socket, {
+      type: "error",
+      message: "Relay is shutting down. Reconnect to another relay instance."
+    });
     socket.close(1012, "Relay shutting down");
     return null;
   }
@@ -57,7 +60,7 @@ export function admitRelayWebSocketConnection(
   if (rateClientIds.some((clientId) => !options.rateLimiting.consume("websocketConnect", clientId).allowed)) {
     options.metrics.recordRateLimitRejection?.("websocketConnect");
     options.metrics.recordConnectionRejection?.("rate_limit");
-    send(socket, {
+    sendConnectionError(socket, {
       type: "error",
       message: "WebSocket connection rate limit exceeded. Slow down before reconnecting."
     });
@@ -78,7 +81,7 @@ export function admitRelayWebSocketConnection(
   const quotaError = socketConnectionQuotaError(options, session);
   if (quotaError) {
     options.metrics.recordConnectionRejection?.("quota_initial");
-    send(socket, { type: "error", message: quotaError });
+    sendConnectionError(socket, { type: "error", message: quotaError });
     socket.close(1008, "WebSocket connection quota exceeded");
     return null;
   }

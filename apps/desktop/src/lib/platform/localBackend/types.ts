@@ -316,7 +316,7 @@ export interface LocalPreviewStartResult {
 export interface LocalPreviewStopResult {
   id: string;
   localUrl: string;
-  publicUrl: string;
+  publicUrl: string | null;
   stopped: boolean;
 }
 

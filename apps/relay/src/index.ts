@@ -1,4 +1,4 @@
-import { createRelayApp } from "./server.js";
+import { createRelayApp } from "./relay-app.js";
 import { logRelayEvent } from "./observability.js";
 
 const relay = await createRelayApp();

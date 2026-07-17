@@ -3,6 +3,7 @@ import {
   detectLocalPreviewServers,
   probeCloudflared,
   startLocalPreviewTunnel,
+  stopAllLocalPreviewTunnels,
   stopLocalPreviewTunnel
 } from "../../lib/platform/localBackend";
 import { localPreviewLabel, normalizeLocalPreviewUrl, quickTunnelDisclaimer } from "../../lib/files/localPreview";
@@ -10,10 +11,38 @@ import { roomLockMessage } from "../runtime/appRuntime";
 import { useAppStore } from "../../store/appStore";
 import type { LocalPreviewRecord } from "../../types";
 import { currentLocalIdentity } from "../workspace/selectedWorkspace";
-import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
+import type { LocalPreviewStartResult } from "../../lib/platform/localBackend";
 
 interface LocalPreviewActionsOptions {
   publishLocalPreviewEvent: (payload: LocalPreviewRecord, room?: ClientRoomRecord) => Promise<void>;
+}
+
+// Action factories are recreated during React renders; cancellation must outlive any one factory instance.
+const cancelledLocalPreviewIds = new Set<string>();
+const pendingLocalPreviewStarts = new Map<string, Promise<LocalPreviewStartResult>>();
+const localPreviewCancellationConfirmations = new Map<
+  string,
+  { promise: Promise<void>; resolve: () => void; reject: (error: unknown) => void }
+>();
+
+function cancellationConfirmation(previewId: string) {
+  const existing = localPreviewCancellationConfirmations.get(previewId);
+  if (existing) return existing;
+  let resolve: () => void = () => undefined;
+  let reject: (error: unknown) => void = () => undefined;
+  const promise = new Promise<void>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  void promise.catch(() => undefined);
+  const confirmation = { promise, resolve, reject };
+  localPreviewCancellationConfirmations.set(previewId, confirmation);
+  return confirmation;
+}
+
+function cancelLocalPreviewStart(previewId: string) {
+  cancelledLocalPreviewIds.add(previewId);
+  return cancellationConfirmation(previewId);
 }
 
 export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPreviewActionsOptions) {
@@ -98,9 +127,26 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
       createdAt: now,
       updatedAt: now
     };
-    await publishLocalPreviewEvent(startingPayload, room);
+    let tunnelStarted = false;
     try {
-      const tunnel = await startLocalPreviewTunnel(previewId, sourceUrl);
+      await publishLocalPreviewEvent(startingPayload, room);
+      if (cancelledLocalPreviewIds.has(previewId)) {
+        await cancellationConfirmation(previewId).promise;
+        return;
+      }
+      const start = startLocalPreviewTunnel(previewId, sourceUrl);
+      pendingLocalPreviewStarts.set(previewId, start);
+      let tunnel: LocalPreviewStartResult;
+      try {
+        tunnel = await start;
+      } finally {
+        if (pendingLocalPreviewStarts.get(previewId) === start) pendingLocalPreviewStarts.delete(previewId);
+      }
+      tunnelStarted = true;
+      if (cancelledLocalPreviewIds.has(previewId)) {
+        await cancellationConfirmation(previewId).promise;
+        return;
+      }
       const livePayload: LocalPreviewRecord = {
         ...startingPayload,
         sourceUrl: tunnel.localUrl,
@@ -113,15 +159,44 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
       useAppStore.getState().closeLocalPreviewDialog();
       useAppStore.getState().setChatMessageForRoom(room.id, `Shared local preview: ${tunnel.publicUrl}`);
     } catch (error) {
+      if (cancelledLocalPreviewIds.has(previewId)) {
+        await cancellationConfirmation(previewId).promise;
+        return;
+      }
+      let cleanupError: unknown;
+      if (tunnelStarted) {
+        try {
+          await stopLocalPreviewTunnel(previewId);
+        } catch (stopError) {
+          cleanupError = stopError;
+        }
+      }
       const errorPayload: LocalPreviewRecord = {
         ...startingPayload,
         status: "error",
-        message: String(error),
+        message:
+          cleanupError === undefined
+            ? String(error)
+            : `${String(error)} The public tunnel also could not be confirmed stopped: ${String(cleanupError)}`,
         updatedAt: new Date().toISOString()
       };
-      await publishLocalPreviewEvent(errorPayload, room);
       useAppStore.getState().setLocalPreviewDialogPhase("select", String(error));
+      if (cleanupError === undefined) {
+        await publishLocalPreviewEvent(errorPayload, room);
+      } else {
+        try {
+          await publishLocalPreviewEvent(errorPayload, room);
+        } catch (publishError) {
+          throw new AggregateError(
+            [cleanupError, publishError],
+            "The public tunnel could not be confirmed stopped and its error status could not be published."
+          );
+        }
+        throw cleanupError;
+      }
     } finally {
+      cancelledLocalPreviewIds.delete(previewId);
+      localPreviewCancellationConfirmations.delete(previewId);
       useAppStore.getState().setLocalPreviewBusyForRoom(room.id, false);
     }
   }
@@ -133,9 +208,13 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
       (item) => item.id === previewId
     );
     if (!preview) return;
+    const cancellation = preview.status === "starting" ? cancelLocalPreviewStart(previewId) : null;
     useAppStore.getState().setLocalPreviewBusyForRoom(room.id, true);
     try {
+      const pendingStart = pendingLocalPreviewStarts.get(previewId);
+      if (pendingStart) await Promise.allSettled([pendingStart]);
       await stopLocalPreviewTunnel(previewId);
+      cancellation?.resolve();
       await publishLocalPreviewEvent(
         {
           ...preview,
@@ -146,6 +225,7 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
         room
       );
     } catch (error) {
+      cancellation?.reject(error);
       await publishLocalPreviewEvent(
         {
           ...preview,
@@ -155,7 +235,9 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
         },
         room
       );
+      if (cancellation) throw error;
     } finally {
+      if (preview.status === "live") cancelledLocalPreviewIds.delete(previewId);
       useAppStore.getState().setLocalPreviewBusyForRoom(room.id, false);
     }
   }
@@ -163,6 +245,7 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
   async function stopOwnedLocalPreviews(message = "This preview is no longer available.") {
     const { localUser } = currentLocalIdentity();
     const { localPreviewByRoom } = useAppStore.getState();
+    const ownedPreviews: Array<{ preview: LocalPreviewRecord; room: ClientRoomRecord }> = [];
     for (const [roomId, runtime] of Object.entries(localPreviewByRoom)) {
       const previews = runtime.previews ?? [];
       const room = useAppStore.getState().rooms.find((item) => item.id === roomId);
@@ -170,22 +253,47 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
       for (const preview of previews) {
         if (preview.sharedByUserId !== localUser.id || (preview.status !== "live" && preview.status !== "starting"))
           continue;
-        try {
-          await stopLocalPreviewTunnel(preview.id);
-        } catch {
-          // The app may already be exiting or the tunnel may have already stopped.
-          reportExpectedFailure("local preview tunnel was already stopped during shutdown");
-        }
+        cancelLocalPreviewStart(preview.id);
+        ownedPreviews.push({ preview, room });
+      }
+    }
+    for (const previewId of pendingLocalPreviewStarts.keys()) cancelLocalPreviewStart(previewId);
+    const cancelledIds = [...cancelledLocalPreviewIds];
+    await Promise.allSettled(
+      cancelledIds.flatMap((previewId) => {
+        const pending = pendingLocalPreviewStarts.get(previewId);
+        return pending ? [pending] : [];
+      })
+    );
+    try {
+      await stopAllLocalPreviewTunnels();
+      for (const previewId of cancelledIds) cancellationConfirmation(previewId).resolve();
+    } catch (error) {
+      for (const previewId of cancelledIds) cancellationConfirmation(previewId).reject(error);
+      for (const { preview, room } of ownedPreviews) {
         await publishLocalPreviewEvent(
           {
             ...preview,
-            status: "stopped",
-            message,
+            status: "error",
+            message: `Tunnel process could not be confirmed stopped: ${String(error)}`,
             updatedAt: new Date().toISOString()
           },
           room
         );
       }
+      throw error;
+    }
+    for (const { preview, room } of ownedPreviews) {
+      await publishLocalPreviewEvent(
+        {
+          ...preview,
+          status: "stopped",
+          message,
+          updatedAt: new Date().toISOString()
+        },
+        room
+      );
+      if (preview.status === "live") cancelledLocalPreviewIds.delete(preview.id);
     }
   }
 

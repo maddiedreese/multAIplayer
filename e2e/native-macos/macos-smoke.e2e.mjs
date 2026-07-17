@@ -28,6 +28,8 @@ describe("packaged macOS WKWebView smoke", () => {
     const roomBrowserRequest = {
       roomId: "native-smoke-room",
       projectPath: "/tmp/multaiplayer-native-smoke",
+      navigationId: "native-smoke-navigation",
+      tabId: "native-smoke-tab",
       bounds: { x: 24, y: 80, width: 360, height: 240 }
     };
     await browser.tauri.execute(async ({ core }, request) => {

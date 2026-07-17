@@ -6,7 +6,6 @@ import type { createAppRoomActions } from "./appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import type { createRoomSettingsActor } from "../application/workspace/roomSettingsActor";
 import { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
@@ -17,7 +16,7 @@ type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
-type RoomSettingsActor = ReturnType<typeof createRoomSettingsActor>;
+type RoomSettingsActor = () => { requesterName: string; requesterUserId: string };
 
 export function useAppWorkspaceFlow({
   appRefs,

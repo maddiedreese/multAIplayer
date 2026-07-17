@@ -49,6 +49,7 @@ test("room browser exposes host controls, tab selection, and safe fallback ifram
       browserUrl="https://preview.example/"
       canHostBrowser
       onBrowserUrlChange={(url) => events.push(`url:${url}`)}
+      onBrowserNavigation={() => undefined}
       onOpenBrowserNow={() => events.push("open")}
       onApproveBrowserRequest={(request) => events.push(`approve:${request.id}`)}
       onDenyBrowserRequest={(requestId) => events.push(`deny:${requestId}`)}
@@ -88,6 +89,7 @@ test("room browser history navigation is not overwritten by the active tab synch
       browserUrl={activeBrowserUrl}
       canHostBrowser
       onBrowserUrlChange={(url) => visited.push(url)}
+      onBrowserNavigation={() => undefined}
       onOpenBrowserNow={() => undefined}
       onApproveBrowserRequest={() => undefined}
       onDenyBrowserRequest={() => undefined}
@@ -137,6 +139,7 @@ test("room browser exposes pending request provenance and explicit host approval
       browserUrl="https://default.example/"
       canHostBrowser
       onBrowserUrlChange={() => undefined}
+      onBrowserNavigation={() => undefined}
       onOpenBrowserNow={() => undefined}
       onApproveBrowserRequest={(request) => events.push(`approve:${request.id}`)}
       onDenyBrowserRequest={(requestId) => events.push(`deny:${requestId}`)}

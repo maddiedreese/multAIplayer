@@ -81,15 +81,3 @@ claims, audit status, metadata exposure, and residual risks.
   host state.
 - Local preview sharing creates a temporary public `trycloudflare.com` URL.
   Anyone with the URL may be able to view the preview until the tunnel stops.
-
-## Deferred product work
-
-- Real multi-device, multi-account dogfooding remains required before broad
-  promotion of the first supported build.
-- Independently branded builds need their own domains, Apple identity, bundle id,
-  associated-domain configuration, signing, and native allowlists.
-- A room intentionally binds one primary repository. Multi-repository rooms wait
-  for a stable multi-root execution and sandbox contract; use separate rooms in
-  the meantime.
-- Native layout, resizable columns, and embedded-browser behavior still require
-  review on real macOS screens.

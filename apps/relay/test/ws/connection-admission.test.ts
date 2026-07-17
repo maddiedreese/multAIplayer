@@ -11,7 +11,7 @@ function fixture(overrides: { ready?: boolean; allowed?: boolean; perUser?: numb
   const socket = { close: (code: number, reason: string) => closed.push([code, reason]) };
   const options = {
     transport: {
-      send: (_socket: unknown, message: unknown) => sent.push(message),
+      sendConnectionError: (_socket: unknown, message: unknown) => sent.push(message),
       isReady: () => overrides.ready ?? true
     },
     state: { sessions },

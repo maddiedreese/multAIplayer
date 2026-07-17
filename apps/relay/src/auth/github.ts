@@ -193,7 +193,9 @@ export function registerGitHubAuthRoutes({
   app.post("/auth/logout", (req, res) => {
     const sessionId = req.cookies?.multaiplayer_session;
     if (sessionId) {
+      const session = getAuthSession(sessionId);
       deleteAuthSession(sessionId);
+      if (session) closeAuthSessionSockets(store, new Set([session]), "Authentication session logged out");
       scheduleStoreSave();
     }
     res.clearCookie("multaiplayer_session", authCookieOptions());
@@ -295,11 +297,15 @@ export function registerGitHubAuthRoutes({
 }
 
 function closeEvictedSessionSockets(store: RelayStore, evicted: Set<AuthSession>): void {
-  if (evicted.size === 0) return;
+  closeAuthSessionSockets(store, evicted, "Authentication session replaced");
+}
+
+function closeAuthSessionSockets(store: RelayStore, sessions: Set<AuthSession>, reason: string): void {
+  if (sessions.size === 0) return;
   for (const client of store.sessions.values()) {
-    if (!client.authSession || !evicted.has(client.authSession)) continue;
+    if (!client.authSession || !sessions.has(client.authSession)) continue;
     try {
-      client.socket.close(1008, "Authentication session replaced");
+      client.socket.close(1008, reason);
     } catch {
       // Durable revocation is authoritative; a broken socket cannot undo it.
     }

@@ -19,7 +19,6 @@ import { createAppRoomActions } from "./hooks/appRoomActions";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
 import { useAppInviteActions } from "./hooks/useAppInviteActions";
-import { createRoomSettingsActor } from "./application/workspace/roomSettingsActor";
 import { useAppRefs } from "./hooks/useAppRefs";
 import { useAppSelectedRoomContext } from "./hooks/useAppSelectedRoomContext";
 import { useAppWorkspaceFlow } from "./hooks/useAppWorkspaceFlow";
@@ -49,6 +48,24 @@ export function App() {
 
 function NativeApp() {
   React.useEffect(() => useAppStore.getState().loadDeviceFingerprintComparisonsOnce(), []);
+  React.useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<string>("local-preview://shutdown-blocked", (event) => {
+      useAppStore.getState().setWorkspaceStatusError(event.payload);
+    })
+      .then((stop) => {
+        if (disposed) stop();
+        else unlisten = stop;
+      })
+      .catch((error) => {
+        reportNonFatal("install local-preview shutdown listener", error);
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
   React.useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -88,7 +105,10 @@ function NativeApp() {
   );
   const githubAuth = useGitHubAuth(relayHttpUrl);
   const localIdentity = useLocalIdentity(githubAuth.currentUser);
-  const roomSettingsActor = createRoomSettingsActor(localIdentity.localUser);
+  const roomSettingsActor = () => ({
+    requesterName: localIdentity.localUser.name,
+    requesterUserId: localIdentity.localUser.id
+  });
 
   const selectedContext = useAppSelectedRoomContext({
     githubAuth,

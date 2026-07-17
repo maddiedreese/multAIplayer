@@ -5,7 +5,6 @@ import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import type { createRoomSettingsActor } from "../application/workspace/roomSettingsActor";
 import { useHostHandoffActions } from "./useHostHandoffActions";
 import { useAppStore } from "../store/appStore";
 import { isLocalUserActiveHostForRoom } from "../lib/access/roomHost";
@@ -16,7 +15,7 @@ type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
-type RoomSettingsActor = ReturnType<typeof createRoomSettingsActor>;
+type RoomSettingsActor = () => { requesterName: string; requesterUserId: string };
 
 export function useAppHostHandoffActions({
   appRefs,

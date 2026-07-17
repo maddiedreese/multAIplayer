@@ -15,14 +15,19 @@ import { closeRoomBrowserSurfaceEvent } from "../lib/browser/browserSurfaceEvent
 import type { BrowserTab } from "../store/slices/browserSlice";
 import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 import { formatBrowserAccessLabel } from "../lib/browser/browserUi";
-import { closeBrowserView, openBrowserView, positionBrowserView } from "../lib/platform/localBackend";
+import {
+  closeBrowserView,
+  listenBrowserNavigation,
+  navigateBrowserView,
+  openBrowserView,
+  positionBrowserView,
+  readBrowserViewState,
+  type BrowserNavigationEvent
+} from "../lib/platform/localBackend";
 import { isTauriRuntime } from "../lib/platform/localBackend/runtime";
 import type { BrowserAccessRequest } from "../types";
 
-interface BrowserHistoryState {
-  entries: string[];
-  index: number;
-}
+type BrowserHistoryState = { entries: string[]; index: number };
 
 interface BrowserViewBounds {
   x: number;
@@ -31,7 +36,17 @@ interface BrowserViewBounds {
   height: number;
 }
 
+type BrowserViewSession = Pick<BrowserNavigationEvent, "navigationId" | "tabId">;
+
 const emptyBrowserHistory: BrowserHistoryState = { entries: [], index: -1 };
+
+function recordBrowserHistoryNavigation(current: BrowserHistoryState, url: string): BrowserHistoryState {
+  if (current.entries[current.index] === url) return current;
+  if (current.entries[current.index - 1] === url) return { ...current, index: current.index - 1 };
+  if (current.entries[current.index + 1] === url) return { ...current, index: current.index + 1 };
+  const entries = current.index >= 0 ? current.entries.slice(0, current.index + 1) : [];
+  return { entries: [...entries, url], index: entries.length };
+}
 
 function browserSurfaceTop(slot: HTMLElement) {
   const rect = slot.getBoundingClientRect();
@@ -66,6 +81,7 @@ export function BrowserAccessPanel({
   browserUrl,
   canHostBrowser,
   onBrowserUrlChange,
+  onBrowserNavigation,
   onOpenBrowserNow,
   onApproveBrowserRequest,
   onDenyBrowserRequest,
@@ -84,6 +100,7 @@ export function BrowserAccessPanel({
   browserUrl: string;
   canHostBrowser: boolean;
   onBrowserUrlChange: (url: string) => void;
+  onBrowserNavigation: (tabId: string, url: string) => void;
   onOpenBrowserNow: () => void;
   onApproveBrowserRequest: (request: BrowserAccessRequest) => void;
   onDenyBrowserRequest: (requestId: string) => void;
@@ -94,10 +111,20 @@ export function BrowserAccessPanel({
   const browserViewportRef = useRef<HTMLDivElement | null>(null);
   const browserWebviewOpenRef = useRef(false);
   const browserOperationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const browserNavigationListenerRef = useRef<Promise<() => void> | null>(null);
+  const activeBrowserSessionRef = useRef<BrowserViewSession | null>(null);
+  const observedBrowserRef = useRef<{ tabId: string; url: string } | null>(null);
+  const onBrowserNavigationRef = useRef(onBrowserNavigation);
+  const observeBrowserNavigationRef = useRef<(event: BrowserNavigationEvent) => void>(() => undefined);
   const lastBrowserBoundsRef = useRef<BrowserViewBounds | null>(null);
   const [browserSurfaceError, setBrowserSurfaceError] = useState<string | null>(null);
   const [browserExpanded, setBrowserExpanded] = useState(false);
   const [browserSurfaceUrl, setBrowserSurfaceUrl] = useState(activeBrowserUrl);
+  const [browserOpenRequest, setBrowserOpenRequest] = useState<{
+    url: string;
+    tabId: string;
+    sequence: number;
+  } | null>(null);
   const [browserSurfaceRevision, setBrowserSurfaceRevision] = useState(0);
   const [browserHistory, setBrowserHistory] = useState<BrowserHistoryState>(emptyBrowserHistory);
   const tauriRuntime = isTauriRuntime();
@@ -121,31 +148,59 @@ export function BrowserAccessPanel({
     return queued;
   }, []);
 
-  const closeBrowserWebviewImmediately = useCallback(async () => {
-    browserWebviewOpenRef.current = false;
-    lastBrowserBoundsRef.current = null;
-    if (!tauriRuntime) return;
-    await closeBrowserView(roomId, projectPath).catch(() =>
-      reportExpectedFailure("room browser WebView was already closed")
-    );
-  }, [projectPath, roomId, tauriRuntime]);
-
-  const closeBrowserWebview = useCallback(
-    () => enqueueBrowserOperation(closeBrowserWebviewImmediately),
-    [closeBrowserWebviewImmediately, enqueueBrowserOperation]
+  const closeBrowserSessionImmediately = useCallback(
+    async (session: BrowserViewSession | null) => {
+      if (!session || !tauriRuntime) return;
+      await closeBrowserView(roomId, projectPath, session.navigationId, session.tabId).catch(() =>
+        reportExpectedFailure("room browser WebView was already closed")
+      );
+    },
+    [projectPath, roomId, tauriRuntime]
   );
+
+  const closeBrowserWebview = useCallback(() => {
+    const session = activeBrowserSessionRef.current;
+    if (session && activeBrowserSessionRef.current === session) {
+      activeBrowserSessionRef.current = null;
+      browserWebviewOpenRef.current = false;
+      lastBrowserBoundsRef.current = null;
+    }
+    return enqueueBrowserOperation(() => closeBrowserSessionImmediately(session));
+  }, [closeBrowserSessionImmediately, enqueueBrowserOperation]);
 
   function navigateBrowserHistory(delta: -1 | 1) {
     const nextIndex = browserHistory.index + delta;
     const nextUrl = browserHistory.entries[nextIndex];
     if (!nextUrl) return;
-    setBrowserHistory((current) => ({ ...current, index: nextIndex }));
-    setBrowserSurfaceUrl(nextUrl);
-    onBrowserUrlChange(nextUrl);
+    if (!tauriRuntime) {
+      setBrowserHistory((current) => ({ ...current, index: nextIndex }));
+      setBrowserSurfaceUrl(nextUrl);
+      onBrowserUrlChange(nextUrl);
+      return;
+    }
+    const session = activeBrowserSessionRef.current;
+    if (!session) return;
+    void enqueueBrowserOperation(() =>
+      navigateBrowserView(roomId, projectPath, session.navigationId, session.tabId, delta < 0 ? "back" : "forward")
+    ).catch((error) => {
+      if (activeBrowserSessionRef.current === session)
+        setBrowserSurfaceError(`Could not navigate in-app browser: ${String(error)}`);
+    });
   }
 
   function refreshBrowserSurface() {
     if (!browserSurfaceUrl) return;
+    if (tauriRuntime) {
+      const session = activeBrowserSessionRef.current;
+      if (!session) return;
+      void enqueueBrowserOperation(() =>
+        navigateBrowserView(roomId, projectPath, session.navigationId, session.tabId, "reload")
+      ).catch((error) => {
+        if (activeBrowserSessionRef.current === session)
+          setBrowserSurfaceError(`Could not refresh in-app browser: ${String(error)}`);
+      });
+      return;
+    }
     setBrowserSurfaceRevision((revision) => revision + 1);
   }
 
@@ -155,21 +210,60 @@ export function BrowserAccessPanel({
   }
 
   useEffect(() => {
+    onBrowserNavigationRef.current = onBrowserNavigation;
+  }, [onBrowserNavigation]);
+
+  useEffect(() => {
     if (!activeBrowserUrl) {
+      observedBrowserRef.current = null;
       setBrowserSurfaceUrl(null);
+      setBrowserOpenRequest(null);
       setBrowserHistory(emptyBrowserHistory);
       return;
     }
     setBrowserSurfaceUrl(activeBrowserUrl);
-    setBrowserHistory((current) => {
-      const existingIndex = current.entries.indexOf(activeBrowserUrl);
-      if (existingIndex >= 0) {
-        return { ...current, index: existingIndex };
-      }
-      const next = current.index >= 0 ? current.entries.slice(0, current.index + 1) : current.entries;
-      return { entries: [...next, activeBrowserUrl], index: next.length };
+    if (!tauriRuntime) {
+      setBrowserHistory((current) => recordBrowserHistoryNavigation(current, activeBrowserUrl));
+      return;
+    }
+    if (!activeBrowserTabId) {
+      setBrowserOpenRequest(null);
+      setBrowserHistory(emptyBrowserHistory);
+      return;
+    }
+    if (observedBrowserRef.current?.tabId === activeBrowserTabId && observedBrowserRef.current.url === activeBrowserUrl)
+      return;
+    setBrowserOpenRequest((current) => ({
+      url: activeBrowserUrl,
+      tabId: activeBrowserTabId,
+      sequence: (current?.sequence ?? 0) + 1
+    }));
+    setBrowserHistory(emptyBrowserHistory);
+  }, [activeBrowserTabId, activeBrowserUrl, tauriRuntime]);
+
+  observeBrowserNavigationRef.current = (event) => {
+    const session = activeBrowserSessionRef.current;
+    if (!session || event.navigationId !== session.navigationId || event.tabId !== session.tabId) return;
+    observedBrowserRef.current = { tabId: event.tabId, url: event.url };
+    setBrowserSurfaceUrl(event.url);
+    setBrowserHistory((current) => recordBrowserHistoryNavigation(current, event.url));
+    onBrowserNavigationRef.current(event.tabId, event.url);
+  };
+
+  useEffect(() => {
+    if (!tauriRuntime) return;
+    let disposed = false;
+    const subscription = listenBrowserNavigation((event) => {
+      if (disposed || event.roomId !== roomId || (event.projectPath ?? "") !== projectPath) return;
+      observeBrowserNavigationRef.current(event);
     });
-  }, [activeBrowserUrl]);
+    browserNavigationListenerRef.current = subscription;
+    return () => {
+      disposed = true;
+      if (browserNavigationListenerRef.current === subscription) browserNavigationListenerRef.current = null;
+      void subscription.then((stop) => stop());
+    };
+  }, [projectPath, roomId, tauriRuntime]);
 
   useEffect(() => {
     const close = () => {
@@ -181,7 +275,7 @@ export function BrowserAccessPanel({
 
   useEffect(() => {
     let cancelled = false;
-    let cleanupPositioning: (() => void) | null = null;
+    let cleanupBrowserView: (() => void) | null = null;
 
     function browserBounds(): BrowserViewBounds | null {
       const slot = browserViewportRef.current;
@@ -196,41 +290,47 @@ export function BrowserAccessPanel({
       };
     }
 
-    async function positionBrowserWebview() {
+    async function positionBrowserWebview(session: BrowserViewSession) {
       const bounds = browserBounds();
       if (!bounds || !browserWebviewOpenRef.current) return;
       if (browserBoundsEqual(bounds, lastBrowserBoundsRef.current)) return;
       try {
-        await positionBrowserView(roomId, projectPath, bounds);
+        await positionBrowserView(roomId, projectPath, session.navigationId, session.tabId, bounds);
         lastBrowserBoundsRef.current = bounds;
       } catch {
         reportExpectedFailure("room browser WebView was unavailable while positioning");
       }
     }
 
-    if (!tauriRuntime || hidden || !browserSurfaceUrl) {
+    if (!tauriRuntime || hidden || !browserOpenRequest) {
       void closeBrowserWebview();
       return;
     }
 
     setBrowserSurfaceError(null);
+    const navigationListener = browserNavigationListenerRef.current;
     void enqueueBrowserOperation(async () => {
-      await closeBrowserWebviewImmediately();
+      await navigationListener;
       if (cancelled || !browserViewportRef.current) return;
       const bounds = browserBounds();
       if (!bounds) return;
+      const session = { navigationId: crypto.randomUUID(), tabId: browserOpenRequest.tabId };
+      activeBrowserSessionRef.current = session;
+      observedBrowserRef.current = null;
+      setBrowserHistory(emptyBrowserHistory);
       try {
-        await openBrowserView(roomId, projectPath, browserSurfaceUrl, bounds);
+        await openBrowserView(roomId, projectPath, session.navigationId, session.tabId, browserOpenRequest.url, bounds);
         if (cancelled) return;
         browserWebviewOpenRef.current = true;
         lastBrowserBoundsRef.current = bounds;
       } catch (error) {
+        if (activeBrowserSessionRef.current === session) activeBrowserSessionRef.current = null;
         if (!cancelled) setBrowserSurfaceError(`Could not open in-app browser: ${String(error)}`);
         return;
       }
 
       const reposition = () => {
-        void positionBrowserWebview();
+        void positionBrowserWebview(session);
       };
       const observer = new ResizeObserver(reposition);
       observer.observe(browserViewportRef.current);
@@ -241,33 +341,40 @@ export function BrowserAccessPanel({
       const secondAnimationFrame = window.requestAnimationFrame(() => {
         nestedAnimationFrame = window.requestAnimationFrame(reposition);
       });
+      let stateReadInFlight = false;
+      const synchronizeUrl = async () => {
+        if (stateReadInFlight || cancelled || activeBrowserSessionRef.current !== session) return;
+        stateReadInFlight = true;
+        try {
+          const current = await readBrowserViewState(roomId, projectPath, session.navigationId, session.tabId);
+          observeBrowserNavigationRef.current({ roomId, projectPath, ...current });
+        } catch {
+          if (!cancelled && activeBrowserSessionRef.current === session)
+            reportExpectedFailure("room browser URL was temporarily unavailable");
+        } finally {
+          stateReadInFlight = false;
+        }
+      };
+      void synchronizeUrl();
+      const urlPoll = window.setInterval(() => void synchronizeUrl(), 250);
 
-      cleanupPositioning = () => {
+      cleanupBrowserView = () => {
         observer.disconnect();
         window.removeEventListener("resize", reposition);
         window.removeEventListener("scroll", reposition, true);
         window.cancelAnimationFrame(animationFrame);
         window.cancelAnimationFrame(secondAnimationFrame);
         if (nestedAnimationFrame !== null) window.cancelAnimationFrame(nestedAnimationFrame);
+        window.clearInterval(urlPoll);
       };
     });
 
     return () => {
       cancelled = true;
-      cleanupPositioning?.();
+      cleanupBrowserView?.();
       void closeBrowserWebview();
     };
-  }, [
-    browserSurfaceRevision,
-    browserSurfaceUrl,
-    closeBrowserWebview,
-    closeBrowserWebviewImmediately,
-    enqueueBrowserOperation,
-    hidden,
-    projectPath,
-    roomId,
-    tauriRuntime
-  ]);
+  }, [browserOpenRequest, closeBrowserWebview, enqueueBrowserOperation, hidden, projectPath, roomId, tauriRuntime]);
 
   return (
     <section className={panelClassName} hidden={hidden}>

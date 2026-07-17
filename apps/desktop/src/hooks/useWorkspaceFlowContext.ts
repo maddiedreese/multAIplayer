@@ -1,10 +1,14 @@
 import { useAppBootstrapEffects } from "./useAppBootstrapEffects";
 import { createMarkdownCopyActions } from "../application/markdown/markdownCopyActions";
-import { useWorkspaceHistoryEffects } from "./useWorkspaceHistoryEffects";
+import { useHistorySearch } from "./useHistorySearch";
+import { useLocalHistoryHydration } from "./useLocalHistoryHydration";
 import { createWorkspaceRoomActions } from "../application/workspace/workspaceRoomActions";
 
 type AppBootstrapOptions = Parameters<typeof useAppBootstrapEffects>[0];
-type WorkspaceHistoryOptions = Parameters<typeof useWorkspaceHistoryEffects>[0];
+interface WorkspaceHistoryOptions {
+  hydration: Parameters<typeof useLocalHistoryHydration>[0];
+  search: Parameters<typeof useHistorySearch>[0];
+}
 type WorkspaceRoomActionOptions = Parameters<typeof createWorkspaceRoomActions>[0];
 type WorkspaceMemberOptions = WorkspaceRoomActionOptions["members"];
 
@@ -28,7 +32,8 @@ export function useWorkspaceFlowContext({
       copyMarkdownWithFallback: markdownCopyActions.copyMarkdownWithFallback
     }
   });
-  useWorkspaceHistoryEffects(historyEffects);
+  useLocalHistoryHydration(historyEffects.hydration);
+  useHistorySearch(historyEffects.search);
 
   return {
     ...markdownCopyActions,

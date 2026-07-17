@@ -467,6 +467,19 @@ test("desktop store supports multiple room browser tabs", () => {
   assert.equal(state.browserByRoom["room-a"]?.activeUrl, "https://example.com");
   assert.equal(state.browserByRoom["room-a"]?.activeTabId, firstTab.id);
 
+  store.recordBrowserNavigationForRoom("room-a", firstTab.id, "https://docs.example.com/redirected");
+  state = useAppStore.getState();
+  assert.equal(state.browserByRoom["room-a"]?.activeUrl, "https://docs.example.com/redirected");
+  assert.equal(state.browserByRoom["room-a"]?.url, "https://docs.example.com/redirected");
+  assert.equal(
+    state.browserByRoom["room-a"]?.tabs?.find((tab) => tab.id === firstTab.id)?.url,
+    "https://docs.example.com/redirected"
+  );
+  assert.equal(state.browserByRoom["room-a"]?.tabs?.find((tab) => tab.id === firstTab.id)?.title, "docs.example.com");
+
+  store.recordBrowserNavigationForRoom("room-a", secondTab.id, "https://stale.example.com");
+  assert.equal(useAppStore.getState().browserByRoom["room-a"]?.activeUrl, "https://docs.example.com/redirected");
+
   store.closeBrowserTabForRoom("room-a", firstTab.id);
   state = useAppStore.getState();
   assert.equal(state.browserByRoom["room-a"]?.tabs?.length, 1);

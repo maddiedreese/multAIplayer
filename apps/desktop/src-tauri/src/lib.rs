@@ -53,7 +53,7 @@ use project::*;
 use room_archive::*;
 use shell::*;
 use shell_authorization::*;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use terminal::*;
 use trusted_auth::*;
 use updater_auth::take_updater_auth_failure;
@@ -129,7 +129,10 @@ declare_registered_commands! {
     local_preview_start,
     local_preview_status,
     local_preview_stop,
+    local_preview_stop_all,
     open_browser_view,
+    navigate_browser_view,
+    browser_view_state,
     position_browser_view,
     close_browser_view,
     mls_identity_initialize,
@@ -203,6 +206,7 @@ pub fn run() {
         .manage(TerminalState::default())
         .manage(ShellAuthorizationState::default())
         .manage(LocalPreviewState::default())
+        .manage(BrowserState::default())
         .manage(CodexRpcState::default())
         .manage(CodexAuthorizationState::default())
         .manage(CodexHostState::default())
@@ -249,6 +253,24 @@ pub fn run() {
         }
     };
     app.run(|app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = &event {
+            let state = app_handle.state::<LocalPreviewState>();
+            if let Err(error) = stop_all_local_previews_with_retry(
+                &state,
+                3,
+                std::time::Duration::from_millis(100),
+            ) {
+                api.prevent_exit();
+                eprintln!("Failed to stop all local previews during shutdown: {error}");
+                if let Err(emit_error) = app_handle.emit_to(
+                    "main",
+                    "local-preview://shutdown-blocked",
+                    "The app stayed open because a public local-preview tunnel could not be confirmed stopped. Try closing again.",
+                ) {
+                    eprintln!("Failed to report blocked local-preview shutdown: {emit_error}");
+                }
+            }
+        }
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Opened { urls } = event {
             handle_opened_invite_urls(app_handle, &urls);

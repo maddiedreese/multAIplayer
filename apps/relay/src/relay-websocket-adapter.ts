@@ -28,7 +28,12 @@ interface RegisterRelayWebSocketAdapterOptions {
 export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAdapterOptions) {
   const { config, store, roomManager, fanout } = options;
   registerRelayWebSocketConnection({
-    transport: { wss: options.wss, send: fanout.send, isReady: options.isReady },
+    transport: {
+      wss: options.wss,
+      send: fanout.send,
+      sendConnectionError: fanout.sendConnectionError,
+      isReady: options.isReady
+    },
     state: { store, sessions: store.sessions, roomPresence: store.roomPresence },
     limits: options.limits,
     authentication: {
