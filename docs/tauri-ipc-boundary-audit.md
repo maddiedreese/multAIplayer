@@ -1,8 +1,8 @@
 # Tauri IPC boundary audit
 
-Status: manual review completed 2026-07-15 at commit
-`5cb636467ca4c4508c1e06b01152f7091e28cff7` (repository tree
-`0dee45c98fd4de70c5df8b60aaa4542441971747`). Registration source:
+Status: manual review completed 2026-07-16 at commit
+`59b941f7c9770949e7649b0759efa1d5d390403b` (repository tree
+`fe3077f25354829f75669f2409211eb8ec594d24`). Registration source:
 `apps/desktop/src-tauri/src/lib.rs` (`declare_registered_commands!`). This is a
 review snapshot, not a claim that the command surface is automatically proven
 safe. A Rust test requires the audited command rows to match that compiler-owned
