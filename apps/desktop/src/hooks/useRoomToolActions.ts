@@ -6,10 +6,7 @@ import { createRoomSettingsActions } from "../application/rooms/roomSettingsActi
 import { createTerminalActions } from "../application/terminal/terminalActions";
 import { useGitHubActionsRefresh } from "./useGitHubActionsRefresh";
 
-type AccountActionsOptions = Omit<
-  Parameters<typeof createAccountActions>[0],
-  "stopOwnedLocalPreviews" | "resumeLocalPreviewSharing"
->;
+type AccountActionsOptions = Omit<Parameters<typeof createAccountActions>[0], "stopOwnedLocalPreviews">;
 type GitWorkflowActionsOptions = Omit<Parameters<typeof createGitWorkflowActions>[0], "refreshGitHubActions">;
 
 export function useRoomToolActions({
@@ -34,8 +31,7 @@ export function useRoomToolActions({
   const localPreviewActions = createLocalPreviewActions(localPreview);
   const accountActions = createAccountActions({
     ...account,
-    stopOwnedLocalPreviews: localPreviewActions.stopOwnedLocalPreviews,
-    resumeLocalPreviewSharing: localPreviewActions.resumeLocalPreviewSharingAfterAuthentication
+    stopOwnedLocalPreviews: localPreviewActions.stopOwnedLocalPreviews
   });
   const { refreshGitHubActions } = useGitHubActionsRefresh(githubActions);
   const gitWorkflowActions = createGitWorkflowActions({

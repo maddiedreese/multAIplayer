@@ -75,6 +75,11 @@ export function findRoomHostHandoff<T extends HostHandoffCandidate>(handoffs: T[
   return handoffs.find((handoff) => handoff.id === handoffId) ?? null;
 }
 
+export function canAcceptRoomHostHandoff<T extends HostHandoffCandidate>(handoffs: T[], handoffId: string): boolean {
+  const handoff = findRoomHostHandoff(handoffs, handoffId);
+  return handoff?.status === "available";
+}
+
 export function roomHostHandoffMessage<T extends HostHandoffCandidate>(handoffs: T[], handoffId: string): string {
   const handoff = findRoomHostHandoff(handoffs, handoffId);
   if (!handoff) return "Host handoff is no longer available in this room.";

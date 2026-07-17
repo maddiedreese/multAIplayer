@@ -9,17 +9,14 @@ import { createFileActions } from "../src/application/files/fileActions";
 import { createGitWorkflowActions } from "../src/application/git/gitWorkflowActions";
 import { createMarkdownCopyActions } from "../src/application/markdown/markdownCopyActions";
 import { createMemberActions } from "../src/application/members/memberActions";
-import {
-  createLocalPreviewActions,
-  resumeLocalPreviewSharingAfterAuthentication
-} from "../src/application/files/localPreviewActions";
+import { createLocalPreviewActions } from "../src/application/files/localPreviewActions";
 import { createLocalHistoryActions } from "../src/application/history/localHistoryActions";
 import { createRoomVisibilityWarningActions } from "../src/application/rooms/roomVisibilityWarningActions";
 import { createRoomSettingsActions } from "../src/application/rooms/roomSettingsActions";
 import { createTeamDefaultActions } from "../src/application/teams/teamDefaultActions";
 import { createWorkspaceCreationActions } from "../src/application/workspace/workspaceCreationActions";
 import { useAppStore } from "../src/store/appStore";
-import type { ChatMessage, LocalPreviewRecord } from "../src/types";
+import type { ChatMessage } from "../src/types";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -72,7 +69,6 @@ const room: ClientRoomRecord = {
 };
 
 test.beforeEach(() => {
-  resumeLocalPreviewSharingAfterAuthentication();
   nativeInvoke = async (command) => {
     if (command === "mls_history_delete_all" || command === "mls_history_retention_set") return null;
     throw new Error(`Unexpected native command: ${command}`);
@@ -97,76 +93,15 @@ test("account sign-out actions preserve preview cleanup ordering without React",
   const actions = createAccountActions({
     stopOwnedLocalPreviews: async (reason) => {
       calls.push(`preview:${reason}`);
-      return true;
     },
-    resumeLocalPreviewSharing: () => calls.push("resumed"),
     signOutGitHub: async () => {
       calls.push("github");
-    },
-    clearDeletedHostedAccount: () => calls.push("deleted"),
-    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
+    }
   });
 
   await actions.signOut();
 
   assert.deepEqual(calls, ["preview:Stopped because the sharing user signed out.", "github"]);
-});
-
-test("hosted-account deletion stops previews before clearing account state", async () => {
-  const calls: string[] = [];
-  const actions = createAccountActions({
-    stopOwnedLocalPreviews: async (reason) => {
-      calls.push(`preview:${reason}`);
-      return true;
-    },
-    resumeLocalPreviewSharing: () => calls.push("resumed"),
-    signOutGitHub: async () => undefined,
-    clearDeletedHostedAccount: () => calls.push("deleted"),
-    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
-  });
-
-  await actions.prepareHostedAccountDeletion();
-  await actions.hostedAccountDeleted();
-
-  assert.deepEqual(calls, ["preview:Stopped because the sharing user requested hosted account deletion.", "deleted"]);
-});
-
-test("hosted-account deletion clears local identity even when native preview cleanup fails", async () => {
-  const calls: string[] = [];
-  const actions = createAccountActions({
-    stopOwnedLocalPreviews: async () => {
-      calls.push("preview");
-      throw new Error("native stop failed");
-    },
-    resumeLocalPreviewSharing: () => calls.push("resumed"),
-    signOutGitHub: async () => undefined,
-    clearDeletedHostedAccount: () => calls.push("deleted"),
-    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
-  });
-
-  await actions.prepareHostedAccountDeletion();
-  await actions.hostedAccountDeleted();
-
-  assert.deepEqual(calls, ["preview", "warning", "deleted", "warning"]);
-});
-
-test("a rejected hosted-account deletion re-enables preview sharing", async () => {
-  const calls: string[] = [];
-  const actions = createAccountActions({
-    stopOwnedLocalPreviews: async () => {
-      calls.push("preview");
-      return true;
-    },
-    resumeLocalPreviewSharing: () => calls.push("resumed"),
-    signOutGitHub: async () => undefined,
-    clearDeletedHostedAccount: () => calls.push("deleted"),
-    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
-  });
-
-  await actions.prepareHostedAccountDeletion();
-  actions.hostedAccountDeletionRejected();
-
-  assert.deepEqual(calls, ["preview", "resumed"]);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {
@@ -628,211 +563,6 @@ test("local preview confirmation validation writes through the current store", a
   await actions.prepareLocalPreviewConfirmation();
 
   assert.match(useAppStore.getState().localPreviewDialog.error ?? "", /valid.*URL/i);
-});
-
-test("account cleanup cancels an in-flight preview before it can become public", async () => {
-  type StartResult = { id: string; localUrl: string; publicUrl: string; startupLog: string };
-  let resolveStart: (value: StartResult) => void = () => {
-    throw new Error("Local preview start was not invoked.");
-  };
-  let startInvoked: (() => void) | null = null;
-  const startInvocation = new Promise<void>((resolve) => {
-    startInvoked = resolve;
-  });
-  const nativeCalls: string[] = [];
-  nativeInvoke = async (command, args) => {
-    nativeCalls.push(command);
-    if (command === "local_preview_start") {
-      startInvoked?.();
-      return new Promise((resolve) => {
-        resolveStart = resolve;
-      });
-    }
-    if (command === "local_preview_stop_all") return 0;
-    if (command === "local_preview_stop") {
-      return { id: published[0]?.id ?? "preview", localUrl: "", publicUrl: "", stopped: true };
-    }
-    throw new Error(`Unexpected native command: ${command} ${JSON.stringify(args)}`);
-  };
-  useAppStore.setState({
-    localPreviewDialog: {
-      ...useAppStore.getState().localPreviewDialog,
-      roomId: room.id,
-      selectedUrl: "http://localhost:5173/"
-    }
-  });
-  const published: LocalPreviewRecord[] = [];
-  const actions = createLocalPreviewActions({
-    publishLocalPreviewEvent: async (payload) => {
-      published.push(payload);
-    }
-  });
-
-  const share = actions.confirmLocalPreviewShare();
-  await startInvocation;
-  await actions.stopOwnedLocalPreviews("Stopped during account cleanup.");
-  resolveStart({
-    id: published[0]?.id ?? "preview",
-    localUrl: "http://localhost:5173/",
-    publicUrl: "https://example.trycloudflare.com",
-    startupLog: "ready"
-  });
-  await share;
-
-  assert.deepEqual(nativeCalls, ["local_preview_start", "local_preview_stop_all", "local_preview_stop"]);
-  assert.deepEqual(
-    published.map((payload) => payload.status),
-    ["starting", "stopped"]
-  );
-});
-
-test("account cleanup blocks preview starts until authentication resumes", async () => {
-  const nativeCalls: string[] = [];
-  nativeInvoke = async (command) => {
-    nativeCalls.push(command);
-    if (command === "local_preview_stop_all") return 0;
-    throw new Error(`Unexpected native command: ${command}`);
-  };
-  useAppStore.setState({
-    localPreviewDialog: {
-      ...useAppStore.getState().localPreviewDialog,
-      roomId: room.id,
-      selectedUrl: "http://localhost:5173/"
-    }
-  });
-  const actions = createLocalPreviewActions({ publishLocalPreviewEvent: async () => undefined });
-
-  await actions.stopOwnedLocalPreviews("Account exit.");
-  await actions.confirmLocalPreviewShare();
-
-  assert.deepEqual(nativeCalls, ["local_preview_stop_all"]);
-  assert.match(useAppStore.getState().localPreviewDialog.error ?? "", /sign in again/i);
-});
-
-test("account cleanup publishes stopped only after an older starting publication settles", async () => {
-  let resolveStarting: () => void = () => {
-    throw new Error("Starting publication was not invoked.");
-  };
-  let startingInvoked: () => void = () => undefined;
-  const startingInvocation = new Promise<void>((resolve) => {
-    startingInvoked = resolve;
-  });
-  nativeInvoke = async (command) => {
-    if (command === "local_preview_stop_all") return 0;
-    throw new Error(`Unexpected native command: ${command}`);
-  };
-  useAppStore.setState({
-    localPreviewDialog: {
-      ...useAppStore.getState().localPreviewDialog,
-      roomId: room.id,
-      selectedUrl: "http://localhost:5173/"
-    }
-  });
-  const statuses: LocalPreviewRecord["status"][] = [];
-  const actions = createLocalPreviewActions({
-    publishLocalPreviewEvent: async (payload) => {
-      statuses.push(payload.status);
-      if (payload.status === "starting") {
-        startingInvoked();
-        await new Promise<void>((resolve) => {
-          resolveStarting = resolve;
-        });
-      }
-    }
-  });
-
-  const share = actions.confirmLocalPreviewShare();
-  await startingInvocation;
-  const cleanup = actions.stopOwnedLocalPreviews("Account exit.");
-  await Promise.resolve();
-  assert.deepEqual(statuses, ["starting"]);
-  resolveStarting();
-  await Promise.all([share, cleanup]);
-
-  assert.deepEqual(statuses, ["starting", "stopped"]);
-});
-
-test("preview cleanup tolerates stopped-status publication failure after native termination", async () => {
-  nativeInvoke = async (command) => {
-    if (command === "local_preview_stop_all") return 1;
-    throw new Error(`Unexpected native command: ${command}`);
-  };
-  const preview: LocalPreviewRecord = {
-    eventType: "local.preview",
-    id: "preview-live",
-    sharedBy: "Maddie",
-    sharedByUserId: "github:maddie",
-    sourceUrl: "http://localhost:5173/",
-    publicUrl: "https://example.trycloudflare.com",
-    status: "live",
-    message: "Live",
-    createdAt: "2026-07-17T00:00:00.000Z",
-    updatedAt: "2026-07-17T00:00:00.000Z"
-  };
-  useAppStore.getState().appendLocalPreviewEvent(room.id, preview);
-  const actions = createLocalPreviewActions({
-    publishLocalPreviewEvent: async () => {
-      throw new Error("relay unavailable");
-    }
-  });
-
-  await actions.stopOwnedLocalPreviews("Account exit.");
-});
-
-test("preview cleanup retries stop-all and falls back to every known tunnel", async () => {
-  const nativeCalls: string[] = [];
-  nativeInvoke = async (command) => {
-    nativeCalls.push(command);
-    if (command === "local_preview_stop_all") throw new Error("IPC unavailable");
-    if (command === "local_preview_stop") {
-      return { id: "preview-live", localUrl: "", publicUrl: "", stopped: true };
-    }
-    throw new Error(`Unexpected native command: ${command}`);
-  };
-  const preview: LocalPreviewRecord = {
-    eventType: "local.preview",
-    id: "preview-live",
-    sharedBy: "Maddie",
-    sharedByUserId: "github:maddie",
-    sourceUrl: "http://localhost:5173/",
-    publicUrl: "https://example.trycloudflare.com",
-    status: "live",
-    message: "Live",
-    createdAt: "2026-07-17T00:00:00.000Z",
-    updatedAt: "2026-07-17T00:00:00.000Z"
-  };
-  useAppStore.getState().appendLocalPreviewEvent(room.id, preview);
-  const actions = createLocalPreviewActions({ publishLocalPreviewEvent: async () => undefined });
-
-  const confirmed = await actions.stopOwnedLocalPreviews("Account exit.");
-
-  assert.equal(confirmed, false);
-  assert.deepEqual(nativeCalls, ["local_preview_stop_all", "local_preview_stop_all", "local_preview_stop"]);
-});
-
-test("a stopped preview cannot regress to a stale live event", () => {
-  const base: LocalPreviewRecord = {
-    eventType: "local.preview",
-    id: "preview-terminal",
-    sharedBy: "Maddie",
-    sharedByUserId: "github:maddie",
-    sourceUrl: "http://localhost:5173/",
-    status: "stopped",
-    message: "Stopped",
-    createdAt: "2026-07-17T00:00:00.000Z",
-    updatedAt: "2026-07-17T00:01:00.000Z"
-  };
-  useAppStore.getState().appendLocalPreviewEvent(room.id, base);
-
-  useAppStore.getState().appendLocalPreviewEvent(room.id, {
-    ...base,
-    status: "live",
-    publicUrl: "https://example.trycloudflare.com",
-    message: "Late live",
-    updatedAt: "2026-07-17T00:02:00.000Z"
-  });
-
-  assert.equal(useAppStore.getState().localPreviewByRoom[room.id]?.previews?.[0]?.status, "stopped");
 });
 
 test("room settings actions report room locks through the current store without React", async () => {

@@ -130,12 +130,6 @@ test("workspace updates are sent only to current team members", () => {
   store.workspaceSockets.clear();
   const authDisabled = recordingSocket();
   store.workspaceSockets.add(authDisabled.socket);
-  store.sessions.set(authDisabled.socket, {
-    socket: authDisabled.socket,
-    rateClientId: "unauthenticated-test",
-    subscribedTeamIds: new Set(),
-    workspaceSubscribed: true
-  });
   fanoutFor(store, "team-core:room-desktop", async () => undefined, undefined, false).broadcastWorkspaceUpdated(team);
   assert.equal(authDisabled.sent.length, 1);
 });
@@ -219,12 +213,6 @@ test("successful publishes record queue-to-fanout and WebSocket send latency", a
     }
   } as unknown as WebSocket;
   store.roomSockets.set(key, new Set([socket]));
-  store.sessions.set(socket, {
-    socket,
-    rateClientId: "metrics-test",
-    subscribedTeamIds: new Set(),
-    workspaceSubscribed: false
-  });
   const fanout = fanoutFor(
     store,
     key,
@@ -389,7 +377,6 @@ function fanoutFor(
     roomPresence: store.roomPresence,
     mutationsRequireAuth,
     metrics,
-    isLiveClientSession: () => true,
     roomKey: () => key,
     pruneMlsBacklog: (items) => items,
     ...(reclaimDurableCapacity ? { reclaimDurableCapacity } : {}),

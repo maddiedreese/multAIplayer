@@ -58,7 +58,6 @@ test(
       },
       revokeTeamMemberSessions: () => undefined,
       revokeUserPresence: () => undefined,
-      revokeAuthSessionSockets: () => undefined,
       normalizeMetadataText: (value, maximum) =>
         typeof value === "string" && value.length > 0 && value.length <= maximum ? value : null,
       maxUserIdChars: 160,

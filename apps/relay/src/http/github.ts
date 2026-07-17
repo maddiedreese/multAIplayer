@@ -1,6 +1,6 @@
 import type { CookieOptions, Express } from "express";
 import type { AuthSession, NewAuthSession, RelayStore } from "../state.js";
-import { registerGitHubAuthRoutes, type RegisterGitHubAuthRoutesOptions } from "../auth/github.js";
+import { registerGitHubAuthRoutes } from "../auth/github.js";
 import type { DeletionLedger } from "../auth/deletion-ledger.js";
 
 interface RegisterGitHubRoutesOptions {
@@ -19,7 +19,6 @@ interface RegisterGitHubRoutesOptions {
   saveRelayStore: () => Promise<void>;
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
   revokeUserPresence: (userId: string) => void;
-  revokeAuthSessionSockets: RegisterGitHubAuthRoutesOptions["revokeAuthSessionSockets"];
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxUserIdChars: number;
   maxDisplayNameChars: number;
