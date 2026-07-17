@@ -1,6 +1,7 @@
 {
   "crypto_error": true,
   "internal_error": true,
+  "identity_scope_mismatch": true,
   "invalid_argument": true,
   "not_found": true,
   "process_error": true,

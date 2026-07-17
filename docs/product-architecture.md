@@ -16,12 +16,11 @@ The alpha intentionally supports Apple-silicon macOS, GitHub identity, Codex app
 
 | Path                                     | Owner                                                                |
 | ---------------------------------------- | -------------------------------------------------------------------- |
-| `apps/desktop`                           | React presentation, application workflows, and Tauri desktop shell   |
+| `apps/desktop`                           | React presentation, app and host workflows, and Tauri desktop shell  |
 | `apps/desktop/src-tauri`                 | Native capability boundary, local integrations, and secure storage   |
 | `apps/desktop/src-tauri/crates/mls-core` | MLS lifecycle, invite cryptography, exporters, and encrypted state   |
 | `apps/relay`                             | Authenticated HTTP/WebSocket routing, quotas, and SQLite persistence |
 | `packages/protocol`                      | Shared wire records and runtime validation                           |
-| `packages/git`, `packages/github`        | Host-side repository and GitHub adapters                             |
 | `e2e`                                    | UI contracts and multi-process desktop journeys                      |
 | `tools`                                  | Focused verification, release, and maintenance utilities             |
 | `docs/decisions`                         | Normative architecture decision records                              |

@@ -73,7 +73,7 @@ test("recoverable failures preserve redacted error context", () => {
   assert.doesNotMatch(entry.detail ?? "", /token_abcdefghijklmnopqrstuvwxyz123456/);
 });
 
-test("expected failures emit a static debug breadcrumb", () => {
+test("expected failures stay quiet in the test runtime", () => {
   const originalDebug = console.debug;
   const calls: unknown[][] = [];
   console.debug = (...args: unknown[]) => calls.push(args);
@@ -82,7 +82,7 @@ test("expected failures emit a static debug breadcrumb", () => {
   } finally {
     console.debug = originalDebug;
   }
-  assert.deepEqual(calls, [["[expected failure] URL validation rejected malformed input"]]);
+  assert.deepEqual(calls, []);
 });
 
 test("web-preview diagnostics remain memory-only", () => {

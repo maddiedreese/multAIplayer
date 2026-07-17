@@ -11,7 +11,7 @@
     "restrictions:manage": "node dist/manage-account-restriction.js",
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
-    "test": "npm run test:typecheck && tsx --test test/*.test.ts test/auth/*.test.ts test/config/*.test.ts test/http/*.test.ts test/persistence/*.test.ts test/ws/*.test.ts",
+    "test": "npm run test:typecheck && NODE_ENV=test tsx --test test/*.test.ts test/auth/*.test.ts test/config/*.test.ts test/http/*.test.ts test/persistence/*.test.ts test/ws/*.test.ts",
     "test:typecheck": "tsc -p tsconfig.test.json",
     "test:fuzz": "MULTAIPLAYER_RELAY_FUZZ_ITERATIONS=${MULTAIPLAYER_RELAY_FUZZ_ITERATIONS:-100000} tsx --test test/fuzz/*.test.ts",
     "test:soak": "tsx --test test/soak/relay-chaos.test.ts"

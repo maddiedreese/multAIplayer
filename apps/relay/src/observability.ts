@@ -495,6 +495,7 @@ function logJson(record: Record<string, unknown>) {
 }
 
 function defaultRelayLogSink(level: RelayLogLevel): RelayLogSink {
+  if (process.env.NODE_ENV === "test") return () => undefined;
   const stream = level === "info" ? process.stdout : process.stderr;
   return (line) => stream.write(`${line}\n`);
 }

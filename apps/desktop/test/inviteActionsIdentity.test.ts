@@ -132,6 +132,8 @@ test("failed pending invite recovery is reported once and retries only after rec
   let starts = 0;
   const reports: string[] = [];
   const originalDebug = console.debug;
+  const originalNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
   console.debug = (message?: unknown) => reports.push(String(message));
   const resume = async () => {
     starts += 1;
@@ -158,6 +160,8 @@ test("failed pending invite recovery is reported once and retries only after rec
       false
     );
   } finally {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
     console.debug = originalDebug;
   }
 });

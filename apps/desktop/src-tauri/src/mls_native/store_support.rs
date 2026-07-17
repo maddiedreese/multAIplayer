@@ -107,13 +107,14 @@ pub(super) fn secure_store_permissions(path: &std::path::Path) -> Result<(), Str
 pub(super) fn load_or_create_signing_secret(
     github_user_id: &str,
     device_id: &str,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, SigningSecretLoadError> {
     let entry = keyring::Entry::new(MLS_KEYCHAIN_SERVICE, MLS_IDENTITY_ACCOUNT)
-        .map_err(|_| "Failed to open MLS identity".to_string())?;
+        .map_err(|_| SigningSecretLoadError::Internal)?;
     match entry.get_password() {
         Ok(value) => decode_stored_signing_secret(&value, github_user_id, device_id),
         Err(keyring::Error::NoEntry) => {
-            let secret = generate_device_signing_secret().map_err(safe_error)?;
+            let secret =
+                generate_device_signing_secret().map_err(|_| SigningSecretLoadError::Internal)?;
             let stored = StoredMlsIdentity {
                 version: 1,
                 github_user_id: github_user_id.to_owned(),
@@ -123,29 +124,37 @@ pub(super) fn load_or_create_signing_secret(
             entry
                 .set_password(
                     &serde_json::to_string(&stored)
-                        .map_err(|_| "Failed to encode MLS identity".to_string())?,
+                        .map_err(|_| SigningSecretLoadError::Internal)?,
                 )
-                .map_err(|_| "Failed to save MLS identity".to_string())?;
+                .map_err(|_| SigningSecretLoadError::Internal)?;
             Ok(secret)
         }
-        Err(_) => Err("Failed to read MLS identity".to_string()),
+        Err(_) => Err(SigningSecretLoadError::Internal),
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum SigningSecretLoadError {
+    ScopeMismatch,
+    Internal,
 }
 
 pub(super) fn decode_stored_signing_secret(
     value: &str,
     github_user_id: &str,
     device_id: &str,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, SigningSecretLoadError> {
     let stored: StoredMlsIdentity =
-        serde_json::from_str(value).map_err(|_| "Stored MLS identity is corrupt".to_string())?;
+        serde_json::from_str(value).map_err(|_| SigningSecretLoadError::Internal)?;
     if stored.version != 1
         || stored.github_user_id != github_user_id
         || stored.device_id != device_id
     {
-        return Err("MLS identity belongs to another signed-in device identity".into());
+        return Err(SigningSecretLoadError::ScopeMismatch);
     }
-    fixed32(&stored.signing_secret).map(Vec::from)
+    fixed32(&stored.signing_secret)
+        .map(Vec::from)
+        .map_err(|_| SigningSecretLoadError::Internal)
 }
 pub(super) fn load_or_create_store_wrapping_key() -> Result<[u8; 32], String> {
     let entry = keyring::Entry::new(MLS_KEYCHAIN_SERVICE, "mls-store-wrap:v1")

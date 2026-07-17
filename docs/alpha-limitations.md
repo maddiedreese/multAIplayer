@@ -9,8 +9,10 @@ claims, audit status, metadata exposure, and residual risks.
 
 - Treat a build as supported only when it passes the signed, notarized release
   process in [Verifying releases](reproducible-builds.md) and is published from this repository.
-- Public packages target Apple-silicon Macs on macOS 11 or later. Intel Macs,
-  Windows, and Linux are not supported release targets.
+- Public packages are Apple-silicon-only and declare macOS 11 as their minimum
+  deployment target. Automated packaged-app runtime testing currently runs on
+  macOS 15; macOS 11–14 remain unverified rather than claimed as tested support.
+  Intel Macs, Windows, and Linux are not release targets.
 - Official invitations use macOS universal links. Each release still needs a
   cold-start and warm-app test; static entitlement and parser checks do not prove
   operating-system dispatch.

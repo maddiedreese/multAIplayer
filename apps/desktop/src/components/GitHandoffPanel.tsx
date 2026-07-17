@@ -1,6 +1,6 @@
 import { Copy } from "lucide-react";
 import { GitHubIcon } from "./GitHubIcon";
-import type { GitWorkflowApprovalPreview } from "@multaiplayer/git";
+import type { GitWorkflowApprovalPreview } from "../lib/git/gitApprovalPlan";
 import type { GitHubWorkflowReadiness } from "../lib/git/githubWorkflowReadiness";
 import type { GitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
 

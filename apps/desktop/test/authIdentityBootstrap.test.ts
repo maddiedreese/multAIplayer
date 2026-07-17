@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { JSDOM } from "jsdom";
-import { useDeviceIdentityLifecycle } from "../src/hooks/useDeviceIdentityLifecycle";
+import { deviceIdentityFailureMessage, useDeviceIdentityLifecycle } from "../src/hooks/useDeviceIdentityLifecycle";
 import { useGitHubAuth } from "../src/hooks/useGitHubAuth";
 import { useAppStore } from "../src/store/appStore";
+import { NativeCommandError } from "../src/lib/platform/nativeCommandError";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:1420/"
@@ -179,6 +180,21 @@ test("device identity lifecycle never invokes native MLS before identity resolut
     command: "mls_identity_initialize",
     args: { request: { githubUserId: "github:native-host", deviceId: "device-native-host" } }
   });
+});
+
+test("device identity remediation reserves account-switching copy for a typed scope mismatch", () => {
+  const mismatch = deviceIdentityFailureMessage(
+    new NativeCommandError("identity_scope_mismatch", "Native copy may change")
+  );
+  assert.match(mismatch, /Sign back into the original account/);
+  assert.match(mismatch, /account switching .* is not supported/i);
+
+  const storageFailure = deviceIdentityFailureMessage(
+    new NativeCommandError("storage_error", "Keychain access was denied")
+  );
+  assert.match(storageFailure, /Keychain access and local storage/);
+  assert.doesNotMatch(storageFailure, /Keychain access was denied/);
+  assert.doesNotMatch(storageFailure, /original account|account switching/i);
 });
 
 test("an old identity registration cannot restore its device session after identity is unresolved", async () => {

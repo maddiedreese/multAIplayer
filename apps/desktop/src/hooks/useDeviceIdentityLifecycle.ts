@@ -4,6 +4,7 @@ import { keyPackageCount, publishKeyPackages, registerDevice } from "../applicat
 import { clearDeviceSession, establishDeviceSession } from "../lib/identity/deviceSession";
 import { useAppStore } from "../store/appStore";
 import { generateMlsKeyPackage } from "../lib/mls/mlsClient";
+import { isNativeCommandErrorCode } from "../lib/platform/nativeCommandError";
 
 interface UseDeviceIdentityLifecycleOptions {
   relayHttpUrl: string;
@@ -50,10 +51,7 @@ export function useDeviceIdentityLifecycle({
         }
       })
       .catch((error) => {
-        if (!cancelled)
-          setDeviceIdentityStatusMessage(
-            `Device identity unavailable: ${String(error)}. This alpha binds one GitHub identity to an installation; sign back into the original account. Account switching on an existing installation is not supported.`
-          );
+        if (!cancelled) setDeviceIdentityStatusMessage(deviceIdentityFailureMessage(error));
       });
     return () => {
       cancelled = true;
@@ -113,6 +111,13 @@ export function useDeviceIdentityLifecycle({
       if (state.rooms !== previous.rooms) quarantineRooms();
     });
   }, [deviceIdentity?.requiresRejoin]);
+}
+
+export function deviceIdentityFailureMessage(error: unknown): string {
+  if (isNativeCommandErrorCode(error, "identity_scope_mismatch")) {
+    return "Device identity belongs to another GitHub account or device. Sign back into the original account; account switching on an existing installation is not supported in this alpha.";
+  }
+  return "Device identity could not be prepared. Retry after checking that Keychain access and local storage are available.";
 }
 
 async function replenishKeyPackages(deviceId: string): Promise<void> {

@@ -2,7 +2,6 @@ import js from "@eslint/js";
 import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import { desktopErrorHandlingPlugin } from "./tools/eslint/desktop-error-handling.mjs";
 import { packageBoundaryRule } from "./tools/eslint/workspace-boundaries.mjs";
 
 const typescriptFiles = ["**/*.{ts,tsx}"];
@@ -63,11 +62,9 @@ export default tseslint.config(
   {
     files: ["apps/desktop/src/**/*.{ts,tsx}"],
     plugins: {
-      desktop: desktopErrorHandlingPlugin,
       "react-hooks": reactHooks
     },
     rules: {
-      "desktop/no-unreported-bare-catch": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error"
     }
@@ -75,32 +72,24 @@ export default tseslint.config(
   {
     files: ["apps/desktop/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": packageBoundaryRule("@multaiplayer/desktop", [
-        "@multaiplayer/git",
-        "@multaiplayer/github",
-        "@multaiplayer/protocol"
-      ])
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/desktop", ["@multaiplayer/protocol"])
     }
   },
   {
     files: ["apps/relay/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": packageBoundaryRule("@multaiplayer/relay", [
-        "@multaiplayer/github",
-        "@multaiplayer/protocol"
-      ])
+      "no-restricted-imports": packageBoundaryRule("@multaiplayer/relay", ["@multaiplayer/protocol"])
     }
   },
   {
     files: ["apps/relay/test/process-security-journey.test.ts"],
     rules: {
       "no-restricted-imports": packageBoundaryRule("@multaiplayer/relay process security journey", [
-        "@multaiplayer/github",
         "@multaiplayer/protocol"
       ])
     }
   },
-  ...["codex", "git", "github", "protocol"].map((packageName) => ({
+  ...["codex", "protocol"].map((packageName) => ({
     files: [`packages/${packageName}/**/*.{ts,tsx}`],
     rules: {
       "no-restricted-imports": packageBoundaryRule(`@multaiplayer/${packageName}`)

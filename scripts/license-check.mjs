@@ -7,9 +7,7 @@ const projectPackagePaths = [
   "package.json",
   "apps/desktop/package.json",
   "apps/relay/package.json",
-  "packages/protocol/package.json",
-  "packages/git/package.json",
-  "packages/github/package.json"
+  "packages/protocol/package.json"
 ];
 const internalPackagePrefix = "@multaiplayer/";
 // npm omits license metadata for this exact legacy package even though its

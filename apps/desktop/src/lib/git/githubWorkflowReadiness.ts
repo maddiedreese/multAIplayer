@@ -1,4 +1,4 @@
-import { normalizeGitHubBranchName, normalizeGitHubRepoRef } from "@multaiplayer/github";
+import { normalizeGitHubBranchName, normalizeGitHubRepoRef } from "./githubValidation";
 import type { GitHubAuthConfig, SignedInUser } from "../identity/authClient";
 
 export interface GitHubWorkflowReadinessInput {
