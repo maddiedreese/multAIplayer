@@ -23,6 +23,7 @@ interface Options {
   roomPresence: Map<RoomKey, Map<string, PresenceRecord>>;
   mutationsRequireAuth: boolean;
   metrics: RelayMetrics;
+  isLiveClientSession: (session: ClientSession) => boolean;
   roomKey: (teamId: string, roomId: string) => RoomKey;
   pruneMlsBacklog: (messages: MlsRelayMessage[]) => MlsRelayMessage[];
   reclaimDurableCapacity?: () => Promise<void>;
@@ -44,17 +45,34 @@ export function createRelayFanout(options: Options) {
       options.metrics.recordWebSocketSendDuration(performance.now() - startedAt);
     });
   };
+  const keepLiveSession = (session: ClientSession): boolean => {
+    if (options.isLiveClientSession(session)) return true;
+    session.socket.close(1008, "Authentication session expired");
+    return false;
+  };
+  const sendToLiveSession = (session: ClientSession, message: RelayServerMessage): boolean => {
+    if (!keepLiveSession(session)) return false;
+    send(session.socket, message);
+    return true;
+  };
   const broadcast = (key: RoomKey, message: RelayServerMessage) => {
-    for (const socket of options.roomSockets.get(key) ?? []) send(socket, message);
+    for (const socket of options.roomSockets.get(key) ?? []) {
+      const session = options.sessions.get(socket);
+      if (session) sendToLiveSession(session, message);
+    }
   };
   function broadcastRoomUpdated(room: RoomRecord) {
     const sockets = new Set<WebSocket>(options.roomSockets.get(options.roomKey(room.teamId, room.id)) ?? []);
     for (const socket of options.teamSockets.get(room.teamId) ?? []) sockets.add(socket);
-    for (const socket of sockets) send(socket, { type: "room.updated", room });
+    for (const socket of sockets) {
+      const session = options.sessions.get(socket);
+      if (session) sendToLiveSession(session, { type: "room.updated", room });
+    }
   }
   function broadcastWorkspaceUpdated(team: TeamRecord) {
     for (const socket of options.workspaceSockets) {
       const session = options.sessions.get(socket);
+      if (!session || !keepLiveSession(session)) continue;
       const userId = session?.authSession?.user.id ?? session?.userId;
       if (options.mutationsRequireAuth && (!userId || !options.store.hasTeamMember(team.id, userId))) continue;
       send(socket, {
@@ -159,7 +177,15 @@ export function createRelayFanout(options: Options) {
     options.roomPresence.set(key, roster);
     broadcast(key, { type: "presence", ...verified, status: "online" });
   }
-  return { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publishMlsMessage, publishPresence };
+  return {
+    send,
+    sendToLiveSession,
+    broadcast,
+    broadcastRoomUpdated,
+    broadcastWorkspaceUpdated,
+    publishMlsMessage,
+    publishPresence
+  };
 }
 
 function assertQueuedPublishAuthorized(remainsAuthorized: () => boolean): void {

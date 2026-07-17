@@ -29,6 +29,7 @@ export interface RegisterGitHubAuthRoutesOptions {
   saveRelayStore: () => Promise<void>;
   revokeTeamMemberSessions: (teamId: string, userId: string) => void;
   revokeUserPresence: (userId: string) => void;
+  revokeAuthSessionSockets: (session: AuthSession) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   maxUserIdChars: number;
   maxDisplayNameChars: number;
@@ -53,6 +54,7 @@ export function registerGitHubAuthRoutes({
   saveRelayStore,
   revokeTeamMemberSessions,
   revokeUserPresence,
+  revokeAuthSessionSockets,
   normalizeMetadataText,
   maxUserIdChars,
   maxDisplayNameChars,
@@ -192,10 +194,12 @@ export function registerGitHubAuthRoutes({
 
   app.post("/auth/logout", (req, res) => {
     const sessionId = req.cookies?.multaiplayer_session;
+    const session = getAuthSession(sessionId);
     if (sessionId) {
       deleteAuthSession(sessionId);
       scheduleStoreSave();
     }
+    if (session) revokeAuthSessionSockets(session);
     res.clearCookie("multaiplayer_session", authCookieOptions());
     res.json({ ok: true });
   });
