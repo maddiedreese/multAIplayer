@@ -4,6 +4,10 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 ## [Unreleased]
 
+_No changes recorded._
+
+## [0.1.0-alpha.0] - 2026-07-17
+
 ### Added
 
 - Native RFC 9420 MLS rooms with pinned `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`, active-host commits, KeyPackage invite approval, retained exporter-derived history secrets, and encrypted chat and attachments.
