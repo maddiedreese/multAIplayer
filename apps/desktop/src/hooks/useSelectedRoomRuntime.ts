@@ -49,7 +49,7 @@ export interface SelectedRoomRuntimeValues {
   membershipCommitBusy: boolean;
 }
 
-interface UseSelectedRoomRuntimeOptions extends SelectedRoomRuntimeValues {
+interface SelectedRoomRuntimeOptions extends SelectedRoomRuntimeValues {
   selectedRoom: ClientRoomRecord | null;
   localUser: LocalHostUser;
   isSelectedRoomLocked: boolean;
@@ -62,7 +62,7 @@ interface UseSelectedRoomRuntimeOptions extends SelectedRoomRuntimeValues {
   selectedTerminalId: string | null;
 }
 
-export function useSelectedRoomRuntime({
+export function deriveSelectedRoomRuntime({
   selectedRoom,
   localUser,
   isSelectedRoomLocked,
@@ -91,7 +91,7 @@ export function useSelectedRoomRuntime({
   hostBusy,
   settingsBusy,
   membershipCommitBusy
-}: UseSelectedRoomRuntimeOptions) {
+}: SelectedRoomRuntimeOptions) {
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const selectedTerminalCanControl = selectedRoom

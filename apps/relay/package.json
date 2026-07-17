@@ -9,6 +9,7 @@
     "start": "node dist/production-entrypoint.js",
     "deletions:reconcile": "node dist/reconcile-deletions.js",
     "restrictions:manage": "node dist/manage-account-restriction.js",
+    "devices:retire": "node dist/retire-device.js",
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit",
     "test": "npm run test:typecheck && NODE_ENV=test tsx --test test/*.test.ts test/auth/*.test.ts test/config/*.test.ts test/http/*.test.ts test/persistence/*.test.ts test/ws/*.test.ts",

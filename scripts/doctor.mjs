@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { platform } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { parseEnv } from "node:util";
 import {
   assessCodexVersion,
   latestContractTestedCodexVersion,
@@ -13,9 +14,9 @@ const checks = [];
 checkNode();
 checkNpmVersion();
 checkLocalFile("package-lock.json", "package-lock.json is present for npm ci.");
-checkLocalFile(".env.example", ".env.example is present for relay/self-host configuration.");
-checkOptionalFile(".env", "optional: copy .env.example to .env for local relay/GitHub configuration.");
-checkOptionalFile(join("apps", "relay", ".env"), "optional: relay-local env file for package-specific runs.");
+checkLocalFile(".env.example", ".env.example is present for loopback development.");
+checkLocalFile(".env", "copy .env.example to .env for the local relay and desktop.");
+checkLocalRelayConfiguration();
 
 checkCommand("cargo", ["--version"], "Cargo is required for the Tauri desktop shell.");
 checkRustVersion();
@@ -157,10 +158,40 @@ function checkLocalFile(path, detail) {
   });
 }
 
-function checkOptionalFile(path, detail) {
+function checkLocalRelayConfiguration() {
+  if (!existsSync(".env")) return;
+
+  const environment = parseEnv(readFileSync(".env", "utf8"));
+  const relayHttpUrl = environment.VITE_RELAY_HTTP_URL;
+  const relayWebSocketUrl = environment.VITE_RELAY_URL;
+  const authDisabled = environment.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH === "true";
+  const localHttp = isLoopbackUrl(relayHttpUrl, ["http:"]);
+  const localWebSocket = isLoopbackUrl(relayWebSocketUrl, ["ws:"]);
+
+  if (!localHttp || !localWebSocket) {
+    checks.push({
+      ok: false,
+      label: "local relay configuration",
+      detail:
+        "doctor supports the loopback development relay; use docs/self-hosting.md to build for a custom HTTPS relay."
+    });
+    return;
+  }
+
   checks.push({
-    ok: true,
-    label: path,
-    detail: existsSync(path) ? "present" : detail
+    ok: authDisabled,
+    label: "local relay configuration",
+    detail: authDisabled
+      ? "loopback relay uses the explicit development-only auth opt-out; GitHub sign-in is intentionally unavailable."
+      : "the loopback relay cannot complete native GitHub verification; set MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH=true in .env for local development."
   });
+}
+
+function isLoopbackUrl(value, protocols) {
+  try {
+    const url = new URL(value);
+    return protocols.includes(url.protocol) && (url.hostname === "127.0.0.1" || url.hostname === "localhost");
+  } catch {
+    return false;
+  }
 }

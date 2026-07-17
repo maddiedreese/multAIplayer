@@ -115,8 +115,7 @@ test("attachment byte quotas charge stored ciphertext rather than attacker-contr
   const relay = await startRelayWithWorkspace({
     MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
     MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES: "1024",
-    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "1024",
-    MULTAIPLAYER_ATTACHMENT_BLOB_TEAM_LIVE_QUOTA_BYTES: "1024"
+    MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES: "1024"
   });
   try {
     const cookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");

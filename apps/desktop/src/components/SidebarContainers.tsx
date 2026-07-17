@@ -21,7 +21,7 @@ import { projectHistorySearchMessagesByRoom } from "../store/slices/historyPrese
 import { projectTerminalRuntimeRequestsByRoom } from "../store/slices/terminalSlice";
 import { deriveOnboardingProgress, onboardingRestartEvent } from "../lib/onboarding/onboardingState";
 import type { useGitHubAuth } from "../hooks/useGitHubAuth";
-import type { useRoomRuntimeContext } from "../hooks/useRoomRuntimeContext";
+import type { useAppRoomRuntime } from "../hooks/useAppRoomRuntime";
 import type { useWorkspaceFlowContext } from "../hooks/useWorkspaceFlowContext";
 
 function sidebarRoomDisplay(room: ClientRoomRecord | null) {
@@ -45,10 +45,7 @@ function sidebarRoomDisplay(room: ClientRoomRecord | null) {
 
 export interface SidebarSources {
   githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn" | "clearDeletedHostedAccount">;
-  roomRuntime: Pick<
-    ReturnType<typeof useRoomRuntimeContext>,
-    "signOut" | "chooseProjectPath" | "stopOwnedLocalPreviews"
-  >;
+  roomRuntime: Pick<ReturnType<typeof useAppRoomRuntime>, "signOut" | "chooseProjectPath" | "stopOwnedLocalPreviews">;
   workspaceFlow: Pick<
     ReturnType<typeof useWorkspaceFlowContext>,
     | "addTeam"

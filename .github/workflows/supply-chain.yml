@@ -9,8 +9,6 @@ on:
         type: string
   schedule:
     - cron: "47 8 * * 4"
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:

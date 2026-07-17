@@ -1,7 +1,7 @@
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import { useSelectedRoomRuntime, type SelectedRoomRuntimeValues } from "./useSelectedRoomRuntime";
+import { deriveSelectedRoomRuntime, type SelectedRoomRuntimeValues } from "./useSelectedRoomRuntime";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -40,7 +40,7 @@ export function useAppSelectedRoomRuntime({
     }))
   );
 
-  return useSelectedRoomRuntime({
+  return deriveSelectedRoomRuntime({
     selectedRoom,
     localUser: localIdentity.localUser,
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,

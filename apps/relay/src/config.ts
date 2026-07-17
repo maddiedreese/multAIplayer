@@ -14,7 +14,6 @@ export interface RelayConfig {
   attachmentBlobTtlDays: number;
   attachmentBlobMaxBytes: number;
   attachmentBlobLiveQuotaBytes: number;
-  attachmentBlobTeamLiveQuotaBytes: number;
   attachmentBlobUploadBytesPerWindow: number;
   attachmentBlobUploadWindowMs: number;
   jsonBodyLimitBytes: number;
@@ -92,6 +91,51 @@ export function loadRelayConfig(): RelayConfig {
   const attachmentBlobMaxBytes = parseIntegerEnv("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000, 1, 50_000_000);
   const maxDurableEntries = parseIntegerEnv("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES", 250_000, 1_000, 10_000_000);
   const jsonBodyLimitBytes = Math.ceil(Math.max(1_000_000, attachmentBlobMaxBytes * 1.5 + 100_000));
+  const maxMlsBacklogBytes = parseIntegerEnv(
+    "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES",
+    50_000_000,
+    1_000_000,
+    10_000_000_000
+  );
+  const maxMlsBacklogBytesPerTeam = parseIntegerEnv(
+    "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM",
+    25_000_000,
+    500_000,
+    10_000_000_000
+  );
+  const maxMlsBacklogBytesPerRoom = parseIntegerEnv(
+    "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM",
+    5_000_000,
+    100_000,
+    1_000_000_000
+  );
+  const maxAttachmentBlobBytes = parseIntegerEnv(
+    "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES",
+    100_000_000,
+    attachmentBlobMaxBytes,
+    10_000_000_000
+  );
+  const maxAttachmentBlobBytesPerTeam = parseIntegerEnv(
+    "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM",
+    50_000_000,
+    attachmentBlobMaxBytes,
+    10_000_000_000
+  );
+  const attachmentBlobLiveQuotaBytes = parseIntegerEnv(
+    "MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES",
+    50_000_000,
+    attachmentBlobMaxBytes,
+    10_000_000_000
+  );
+  validateCiphertextByteCeilings({
+    attachmentBlobMaxBytes,
+    attachmentBlobLiveQuotaBytes,
+    maxAttachmentBlobBytes,
+    maxAttachmentBlobBytesPerTeam,
+    maxMlsBacklogBytes,
+    maxMlsBacklogBytesPerTeam,
+    maxMlsBacklogBytesPerRoom
+  });
 
   const deletionLedger = parseDeletionLedgerConfig(nodeEnv);
   const deletionProtection = parseDeletionProtection(deletionLedger);
@@ -134,21 +178,10 @@ export function loadRelayConfig(): RelayConfig {
     inviteTtlDays: parseIntegerEnv("MULTAIPLAYER_RELAY_INVITE_TTL_DAYS", 7, 1, 365),
     attachmentBlobTtlDays: parseIntegerEnv("MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS", 30, 1, 365),
     attachmentBlobMaxBytes,
-    attachmentBlobLiveQuotaBytes: parseIntegerEnv(
-      "MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES",
-      250_000_000,
-      attachmentBlobMaxBytes,
-      10_000_000_000
-    ),
-    attachmentBlobTeamLiveQuotaBytes: parseIntegerEnv(
-      "MULTAIPLAYER_ATTACHMENT_BLOB_TEAM_LIVE_QUOTA_BYTES",
-      1_000_000_000,
-      attachmentBlobMaxBytes,
-      10_000_000_000
-    ),
+    attachmentBlobLiveQuotaBytes,
     attachmentBlobUploadBytesPerWindow: parseIntegerEnv(
       "MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW",
-      100_000_000,
+      50_000_000,
       attachmentBlobMaxBytes,
       10_000_000_000
     ),
@@ -217,37 +250,38 @@ export function loadRelayConfig(): RelayConfig {
     ),
     // Byte ceilings complement record-count ceilings because ciphertext-bearing
     // records can differ by orders of magnitude in retained memory.
-    maxMlsBacklogBytes: parseIntegerEnv(
-      "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES",
-      100_000_000,
-      1_000_000,
-      10_000_000_000
-    ),
-    maxMlsBacklogBytesPerTeam: parseIntegerEnv(
-      "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM",
-      50_000_000,
-      500_000,
-      10_000_000_000
-    ),
-    maxMlsBacklogBytesPerRoom: parseIntegerEnv(
-      "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM",
-      10_000_000,
-      100_000,
-      1_000_000_000
-    ),
-    maxAttachmentBlobBytes: parseIntegerEnv(
-      "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES",
-      500_000_000,
-      attachmentBlobMaxBytes,
-      10_000_000_000
-    ),
-    maxAttachmentBlobBytesPerTeam: parseIntegerEnv(
-      "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM",
-      250_000_000,
-      attachmentBlobMaxBytes,
-      10_000_000_000
-    )
+    maxMlsBacklogBytes,
+    maxMlsBacklogBytesPerTeam,
+    maxMlsBacklogBytesPerRoom,
+    maxAttachmentBlobBytes,
+    maxAttachmentBlobBytesPerTeam
   };
+}
+
+function validateCiphertextByteCeilings(values: {
+  attachmentBlobMaxBytes: number;
+  attachmentBlobLiveQuotaBytes: number;
+  maxAttachmentBlobBytes: number;
+  maxAttachmentBlobBytesPerTeam: number;
+  maxMlsBacklogBytes: number;
+  maxMlsBacklogBytesPerTeam: number;
+  maxMlsBacklogBytesPerRoom: number;
+}) {
+  if (
+    values.maxMlsBacklogBytesPerRoom > values.maxMlsBacklogBytesPerTeam ||
+    values.maxMlsBacklogBytesPerTeam > values.maxMlsBacklogBytes
+  ) {
+    throw new Error("MLS backlog byte ceilings must be ordered room <= team <= relay.");
+  }
+  if (values.maxAttachmentBlobBytesPerTeam > values.maxAttachmentBlobBytes) {
+    throw new Error("Attachment byte ceilings must be ordered team <= relay.");
+  }
+  if (values.attachmentBlobMaxBytes > values.maxAttachmentBlobBytesPerTeam) {
+    throw new Error("A single attachment must fit within the per-team attachment byte ceiling.");
+  }
+  if (values.attachmentBlobLiveQuotaBytes > values.maxAttachmentBlobBytes) {
+    throw new Error("Per-user live attachment quota must not exceed the relay attachment byte ceiling.");
+  }
 }
 
 function parseDeletionProtection(ledger: RelayConfig["deletionLedger"]): RelayConfig["deletionProtection"] {

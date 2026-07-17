@@ -21,7 +21,6 @@ interface RegisterAttachmentRoutesOptions {
   store: RelayStore;
   attachmentBlobMaxBytes: number;
   attachmentBlobLiveQuotaBytes: number;
-  attachmentBlobTeamLiveQuotaBytes: number;
   attachmentBlobUploadBytesPerWindow: number;
   attachmentBlobUploadWindowMs: number;
   attachmentBlobTtlDays: number;
@@ -133,7 +132,6 @@ async function persistAttachmentWithinQuotaTransaction(
   const {
     store,
     attachmentBlobLiveQuotaBytes,
-    attachmentBlobTeamLiveQuotaBytes,
     attachmentBlobUploadBytesPerWindow,
     attachmentBlobUploadWindowMs,
     attachmentBlobTtlDays,
@@ -157,10 +155,8 @@ async function persistAttachmentWithinQuotaTransaction(
       ? reserveAttachmentQuota({
           store,
           session,
-          teamId,
           storageBytes,
           liveLimit: attachmentBlobLiveQuotaBytes,
-          teamLiveLimit: attachmentBlobTeamLiveQuotaBytes,
           uploadLimit: attachmentBlobUploadBytesPerWindow,
           uploadWindowMs: attachmentBlobUploadWindowMs,
           isExpiredAttachmentBlob,
@@ -359,10 +355,8 @@ type AllowedQuotaReservation = {
 function reserveAttachmentQuota({
   store,
   session,
-  teamId,
   storageBytes,
   liveLimit,
-  teamLiveLimit,
   uploadLimit,
   uploadWindowMs,
   isExpiredAttachmentBlob,
@@ -372,10 +366,8 @@ function reserveAttachmentQuota({
 }: {
   store: RelayStore;
   session: AuthSession;
-  teamId: string;
   storageBytes: number;
   liveLimit: number;
-  teamLiveLimit: number;
   uploadLimit: number;
   uploadWindowMs: number;
   isExpiredAttachmentBlob: (blob: AttachmentBlobRecordType) => boolean;
@@ -393,20 +385,6 @@ function reserveAttachmentQuota({
         limit: liveLimit,
         used: usedBytes,
         remaining: Math.max(0, liveLimit - usedBytes)
-      }
-    });
-    return null;
-  }
-  const teamUsedBytes = liveAttachmentBlobBytesForTeam(store, teamId, isExpiredAttachmentBlob);
-  if (teamUsedBytes + storageBytes > teamLiveLimit) {
-    recordQuotaRejection?.("team_live_attachment_blob_bytes");
-    recordUploadRejection?.("team_live_quota");
-    sendRelayError(res, 413, "quota_exceeded", "Team encrypted attachment blob storage quota exceeded.", {
-      quota: {
-        type: "team_live_attachment_blob_bytes",
-        limit: teamLiveLimit,
-        used: teamUsedBytes,
-        remaining: Math.max(0, teamLiveLimit - teamUsedBytes)
       }
     });
     return null;
@@ -478,19 +456,6 @@ function liveAttachmentBlobBytesForUser(
   let total = 0;
   for (const blob of store.attachmentBlobs.values()) {
     if (blob.uploadedByUserId !== userId || isExpiredAttachmentBlob(blob)) continue;
-    total += attachmentBlobStorageBytes(blob);
-  }
-  return total;
-}
-
-function liveAttachmentBlobBytesForTeam(
-  store: RelayStore,
-  teamId: string,
-  isExpiredAttachmentBlob: (blob: AttachmentBlobRecordType) => boolean
-): number {
-  let total = 0;
-  for (const blob of store.attachmentBlobs.values()) {
-    if (blob.teamId !== teamId || isExpiredAttachmentBlob(blob)) continue;
     total += attachmentBlobStorageBytes(blob);
   }
   return total;

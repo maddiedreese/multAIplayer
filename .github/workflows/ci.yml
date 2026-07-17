@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, edited]
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 concurrency:
@@ -89,8 +89,6 @@ jobs:
         uses: ./.github/actions/setup-node-npm
       - name: Install dependencies
         run: npm ci
-      - name: Set up repository Rust toolchain
-        uses: ./.github/actions/setup-rust
       - name: Derive the relay runtime closure from the real locked npm tree
         run: |
           npm ls --omit=dev --all --json -w @multaiplayer/relay > "$RUNNER_TEMP/relay-production-tree.json"

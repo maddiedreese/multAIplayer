@@ -54,11 +54,12 @@ claims, audit status, metadata exposure, and residual risks.
 - Each device has its own MLS state. State loss requires a clean rejoin and loses
   access to pre-rejoin history; multi-device recovery and backfill remain limited.
 - A new installation or new device keys consume another registered-device slot.
-  The hosted relay currently permits 25 registrations per GitHub identity and has
-  no device-retirement flow. Reuse an intact installation rather than deleting its
-  local state; if the quota is reached, report it through a non-sensitive support
-  issue. Account deletion removes the account and its registrations but is not a
-  device-management workaround.
+  The hosted relay currently permits 25 registrations per GitHub identity. Reuse
+  an intact installation rather than deleting its local state. The alpha has no
+  self-service device screen, but an operator can retire a lost registration and
+  its unused KeyPackages with the stopped-relay recovery command. Account deletion
+  removes the account and its registrations but is not a device-management
+  workaround.
 - Pre-v2 rooms and pre-v3 invite authenticators are intentionally incompatible.
   Browser builds are an install notice and initialize no workspace, identity,
   relay, or MLS state.
