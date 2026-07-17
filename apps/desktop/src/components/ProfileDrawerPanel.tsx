@@ -3,12 +3,15 @@ import { GitHubIcon } from "./GitHubIcon";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import type { DeviceIdentity } from "../lib/identity/deviceIdentity";
+import type { DeviceRecord } from "@multaiplayer/protocol";
 import { saveNativeDiagnosticBundle } from "../lib/platform/diagnostics";
 import { InfoRow } from "./common";
 import { CodexAccountPanel } from "./CodexAccountPanel";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/core/productLinks";
 import {
   deleteHostedAccount,
+  listHostedDevices,
+  retireHostedDevice,
   recheckHostedAccountDeletion,
   hostedAccountDeletionConfirmation,
   summarizeGitHubOAuthPurposes,
@@ -55,6 +58,12 @@ export function ProfileDrawerPanel({
   const [deletionBusy, setDeletionBusy] = useState(false);
   const [deletionResult, setDeletionResult] = useState<HostedAccountDeletionResult | null>(null);
   const [deletionStatus, setDeletionStatus] = useState<string | null>(null);
+  const [deviceManagerOpen, setDeviceManagerOpen] = useState(false);
+  const [hostedDevices, setHostedDevices] = useState<DeviceRecord[]>([]);
+  const [deviceManagementBusy, setDeviceManagementBusy] = useState(false);
+  const [deviceManagementStatus, setDeviceManagementStatus] = useState<string | null>(null);
+  const [retirementTarget, setRetirementTarget] = useState<string | null>(null);
+  const [retirementConfirmation, setRetirementConfirmation] = useState("");
   async function exportDiagnostics() {
     const outcome = await saveNativeDiagnosticBundle();
     setDiagnosticsMessage(
@@ -117,6 +126,36 @@ export function ProfileDrawerPanel({
     }
   }
 
+  async function openDeviceManager() {
+    setDeviceManagerOpen(true);
+    setDeviceManagementBusy(true);
+    setDeviceManagementStatus(null);
+    try {
+      setHostedDevices(await listHostedDevices());
+    } catch (error) {
+      setDeviceManagementStatus(String(error));
+    } finally {
+      setDeviceManagementBusy(false);
+    }
+  }
+
+  async function retireDevice() {
+    if (!retirementTarget || retirementConfirmation !== retirementTarget) return;
+    setDeviceManagementBusy(true);
+    setDeviceManagementStatus(null);
+    try {
+      await retireHostedDevice(retirementTarget);
+      setHostedDevices((devices) => devices.filter((device) => device.deviceId !== retirementTarget));
+      setDeviceManagementStatus(`Retired ${retirementTarget}. Its old MLS state was not recovered.`);
+      setRetirementTarget(null);
+      setRetirementConfirmation("");
+    } catch (error) {
+      setDeviceManagementStatus(String(error));
+    } finally {
+      setDeviceManagementBusy(false);
+    }
+  }
+
   return (
     <div className="drawer-content">
       <ProfileIdentity currentUser={currentUser} />
@@ -149,6 +188,31 @@ export function ProfileDrawerPanel({
         onSignIn={onSignIn}
         onSignOut={onSignOut}
       />
+
+      {currentUser && (
+        <RegisteredDevicesSection
+          open={deviceManagerOpen}
+          devices={hostedDevices}
+          currentDeviceId={deviceId}
+          busy={deviceManagementBusy}
+          status={deviceManagementStatus}
+          retirementTarget={retirementTarget}
+          retirementConfirmation={retirementConfirmation}
+          onOpen={() => void openDeviceManager()}
+          onRetirementTargetChange={(target) => {
+            setRetirementTarget(target);
+            setRetirementConfirmation("");
+          }}
+          onRetirementConfirmationChange={setRetirementConfirmation}
+          onRetire={() => void retireDevice()}
+          onClose={() => {
+            setDeviceManagerOpen(false);
+            setRetirementTarget(null);
+            setRetirementConfirmation("");
+            setDeviceManagementStatus(null);
+          }}
+        />
+      )}
 
       {currentUser && (
         <HostedAccountDeletionSection
@@ -292,6 +356,108 @@ function ProfileSignInControls({
       )}
       {authError && <div className="auth-error">{authError}</div>}
     </>
+  );
+}
+
+function RegisteredDevicesSection({
+  open,
+  devices,
+  currentDeviceId,
+  busy,
+  status,
+  retirementTarget,
+  retirementConfirmation,
+  onOpen,
+  onRetirementTargetChange,
+  onRetirementConfirmationChange,
+  onRetire,
+  onClose
+}: {
+  open: boolean;
+  devices: DeviceRecord[];
+  currentDeviceId: string;
+  busy: boolean;
+  status: string | null;
+  retirementTarget: string | null;
+  retirementConfirmation: string;
+  onOpen: () => void;
+  onRetirementTargetChange: (deviceId: string | null) => void;
+  onRetirementConfirmationChange: (value: string) => void;
+  onRetire: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <section className="drawer-section">
+      <strong>Registered devices</strong>
+      <p>Retire a lost or replaced device to revoke its relay credentials and recover a device slot.</p>
+      {!open ? (
+        <button className="ghost-wide" type="button" onClick={onOpen}>
+          Manage registered devices
+        </button>
+      ) : (
+        <div className="account-deletion-confirmation">
+          {busy && devices.length === 0 ? <p>Loading registered devices…</p> : null}
+          {!busy && devices.length === 0 ? <p>No registered devices were found for this account.</p> : null}
+          {devices.map((device) => {
+            const isCurrent = device.deviceId === currentDeviceId;
+            return (
+              <div key={device.deviceId}>
+                <strong>{device.displayName || device.deviceId}</strong>
+                <p>
+                  <code>{device.deviceId}</code>
+                  {isCurrent ? " · This device" : ` · Last seen ${new Date(device.lastSeenAt).toLocaleDateString()}`}
+                </p>
+                <button
+                  className="ghost-wide"
+                  type="button"
+                  disabled={busy || isCurrent}
+                  onClick={() => onRetirementTargetChange(device.deviceId)}
+                >
+                  {isCurrent ? "Current device" : "Retire this device"}
+                </button>
+              </div>
+            );
+          })}
+          {retirementTarget && (
+            <>
+              <label htmlFor="registered-device-retirement-confirmation">
+                Type <strong>{retirementTarget}</strong> to confirm
+              </label>
+              <input
+                id="registered-device-retirement-confirmation"
+                value={retirementConfirmation}
+                onChange={(event) => onRetirementConfirmationChange(event.target.value)}
+                autoComplete="off"
+              />
+              <button
+                className="ghost-wide"
+                type="button"
+                disabled={busy || retirementConfirmation !== retirementTarget}
+                onClick={onRetire}
+              >
+                {busy ? "Retiring…" : "Retire registered device"}
+              </button>
+              <button
+                className="ghost-wide"
+                type="button"
+                disabled={busy}
+                onClick={() => onRetirementTargetChange(null)}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+          <button className="ghost-wide" type="button" disabled={busy} onClick={onClose}>
+            Close device manager
+          </button>
+        </div>
+      )}
+      {status && (
+        <div className="workflow-message" role="status">
+          {status}
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -3,6 +3,7 @@ import { readJsonResponse } from "../core/httpResponse";
 import { trustedAuthenticationUrl } from "./authExternalUrl";
 import { invokeNative } from "../platform/nativeCommandError";
 import { isTauriRuntime } from "../platform/localBackend/runtime";
+import type { DeviceRecord } from "@multaiplayer/protocol";
 
 export interface GitHubAuthConfig {
   provider: "github";
@@ -62,6 +63,22 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
   if (response.status === 401) return null;
   const body = await readJsonResponse<{ user: SignedInUser }>(response, "Failed to load current user");
   return body.user;
+}
+
+export async function listHostedDevices(): Promise<DeviceRecord[]> {
+  const response = await fetch(`${getRelayHttpUrl()}/devices`, { credentials: "include" });
+  const body = await readJsonResponse<{ devices: DeviceRecord[] }>(response, "Failed to load registered devices");
+  return body.devices;
+}
+
+export async function retireHostedDevice(deviceId: string): Promise<void> {
+  const response = await fetch(`${getRelayHttpUrl()}/devices/${encodeURIComponent(deviceId)}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ confirmation: deviceId })
+  });
+  await readJsonResponse(response, "Failed to retire registered device");
 }
 
 export type HostedAccountDeletionRecheck =
