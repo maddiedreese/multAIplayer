@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { seededRooms } from "./support/workspaceFixtures";
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import {
   buildRoomNotificationPreview,
   getRoomNotificationEligibility,
@@ -11,7 +11,7 @@ import { useAppStore } from "../src/store/appStore";
 import { projectRoomSettingsPanelMaps } from "../src/store/slices/roomSettingsSlice";
 import type { ChatMessage } from "../src/types";
 
-const room = seededRooms[0];
+const room = defaultTestRoom;
 const message: ChatMessage = {
   id: "message-1",
   author: "Avery",

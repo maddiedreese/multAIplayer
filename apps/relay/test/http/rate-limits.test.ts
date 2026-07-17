@@ -158,7 +158,7 @@ test("rate-limit identifiers prune after two idle refill windows without scannin
       this.entryScans += 1;
       return super.entries();
     }
-    override [Symbol.iterator](): MapIterator<[string, RateLimitRecord]> {
+    override [Symbol.iterator](): MapIterator<[string, TokenBucketRecord]> {
       return this.entries();
     }
   }

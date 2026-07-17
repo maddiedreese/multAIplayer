@@ -180,7 +180,7 @@ test("admission coordinator skips projection I/O when no admission belongs to th
       calls.push("snapshot");
       return [];
     },
-    complete: async () => calls.push("complete")
+    complete: async () => void calls.push("complete")
   });
   assert.deepEqual(result, { attempted: 0, completed: 0, failed: 0, failedAdmissions: [] });
   assert.deepEqual(calls, []);
@@ -229,6 +229,7 @@ test("a new socket retries after inheriting an obsolete coalesced completion", a
     publish() {},
     publishAndWaitForAck: async () => undefined,
     joinAndWaitForAck: async () => void calls.push("joined"),
+    rejoinForBacklog: async () => undefined,
     close() {}
   };
   const dependencies = {
@@ -336,6 +337,7 @@ test("admission recovery preserves ACK, joined, native-clear ordering", async ()
     publish() {},
     publishAndWaitForAck: async () => undefined,
     joinAndWaitForAck: async () => void calls.push("joined"),
+    rejoinForBacklog: async () => undefined,
     close() {}
   };
   await completeMlsRelayAdmission(client, admission, "session-1", () => void calls.push("restore"), {
@@ -354,6 +356,7 @@ test("failed relay join retains the native admission receipt", async () => {
       calls.push("joined");
       throw new Error("offline");
     },
+    rejoinForBacklog: async () => undefined,
     close() {}
   };
   await assert.rejects(
@@ -372,6 +375,7 @@ test("failed local restore retains the native admission receipt", async () => {
     publish() {},
     publishAndWaitForAck: async () => undefined,
     joinAndWaitForAck: async () => void calls.push("joined"),
+    rejoinForBacklog: async () => undefined,
     close() {}
   };
   await assert.rejects(
@@ -403,6 +407,7 @@ test("concurrent recovery coalesces by durable admission and only the winner upd
     publish() {},
     publishAndWaitForAck: async () => undefined,
     joinAndWaitForAck: async () => void calls.push("joined"),
+    rejoinForBacklog: async () => undefined,
     close() {}
   };
   const first = completeMlsRelayAdmission(client, admission, "session-1", () => void calls.push("winner-ui"), {

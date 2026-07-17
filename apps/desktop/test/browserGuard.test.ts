@@ -30,8 +30,14 @@ test("room browser guard replaces every page clipboard operation", async () => {
   const dom = guardedDocument();
   dom.window.eval(guardSource);
 
-  for (const operation of ["read", "readText", "write", "writeText"] as const) {
-    await assert.rejects(dom.window.navigator.clipboard[operation](), (error: unknown) => {
+  const operations = [
+    () => dom.window.navigator.clipboard.read(),
+    () => dom.window.navigator.clipboard.readText(),
+    () => dom.window.navigator.clipboard.write([]),
+    () => dom.window.navigator.clipboard.writeText("secret")
+  ];
+  for (const operation of operations) {
+    await assert.rejects(operation(), (error: unknown) => {
       return error instanceof dom.window.DOMException && error.name === "NotAllowedError";
     });
   }
@@ -48,7 +54,7 @@ test("room browser guard cancels file input, drag, and drop events", () => {
   assert.equal(click.defaultPrevented, true);
 
   for (const name of ["input", "change", "dragover", "drop"] as const) {
-    const target = name === "input" || name === "change" ? input : dom.window;
+    const target: EventTarget = name === "input" || name === "change" ? input : dom.window;
     const event = new dom.window.Event(name, { bubbles: true, cancelable: true });
     assert.equal(target.dispatchEvent(event), false);
     assert.equal(event.defaultPrevented, true);

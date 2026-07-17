@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -20,6 +21,7 @@ import {
 } from "../src/lib/codex/codexTurn";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-alpha",
   teamId: "team-alpha",
   name: "Alpha",

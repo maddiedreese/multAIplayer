@@ -70,7 +70,13 @@ test("WebSocket admission records accepted sessions and enforces user/device quo
     { existing: true },
     { socket: {}, rateClientId: "ip:test", deviceId: "device-1", subscribedTeamIds: new Set() }
   );
-  const deviceCandidate = { ...candidate, deviceId: "device-1" } as never;
+  const deviceCandidate = {
+    socket: deviceQuota.socket,
+    rateClientId: "ip:test",
+    deviceId: "device-1",
+    subscribedTeamIds: new Set<string>(),
+    workspaceSubscribed: false
+  } as never;
   assert.match(socketConnectionQuotaError(deviceQuota.options, deviceCandidate) ?? "", /device \(1 max\)/);
   assert.deepEqual(deviceQuota.metrics, ["quota:websocket_connections_per_device"]);
 });

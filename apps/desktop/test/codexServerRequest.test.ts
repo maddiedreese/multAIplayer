@@ -7,6 +7,8 @@ test("Codex server request display produces schema-specific approval decisions",
     requestKey: "rpc-1",
     roomId: "room-1",
     expiresAtMs: Date.now() + 60_000,
+    proposedBy: null,
+    contextSummary: null,
     method: "item/commandExecution/requestApproval",
     params: { command: ["npm", "test"], cwd: "/workspace" }
   });
@@ -19,6 +21,8 @@ test("Codex server request display produces schema-specific approval decisions",
     requestKey: "rpc-2",
     roomId: "room-1",
     expiresAtMs: Date.now() + 60_000,
+    proposedBy: null,
+    contextSummary: null,
     method: "execCommandApproval",
     params: {}
   });
@@ -31,6 +35,8 @@ test("Codex command approval never claims interpreter text is safe", () => {
     requestKey: "rpc-interpreter",
     roomId: "room-1",
     expiresAtMs: Date.now() + 60_000,
+    proposedBy: null,
+    contextSummary: null,
     method: "item/commandExecution/requestApproval",
     params: { command: ["python", "-c", "import socket"] }
   });
@@ -43,6 +49,8 @@ test("Codex user input stays local and maps only bounded question ids", () => {
     requestKey: "rpc-3",
     roomId: "room-1",
     expiresAtMs: Date.now() + 60_000,
+    proposedBy: null,
+    contextSummary: null,
     method: "item/tool/requestUserInput",
     params: {
       questions: [
@@ -54,7 +62,7 @@ test("Codex user input stays local and maps only bounded question ids", () => {
     }
   });
   assert.equal(display.questions.length, 3);
-  assert.equal(display.questions[1].secret, true);
+  assert.equal(display.questions.at(1)?.secret, true);
   assert.equal(display.canAccept({ choice: "A", secret: "private", third: "C" }), true);
   assert.deepEqual(display.accept({ choice: "A", secret: "private", third: "C" }), {
     result: {
@@ -73,6 +81,8 @@ test("Codex permission acceptance returns only the requested profile", () => {
     requestKey: "rpc-4",
     roomId: "room-1",
     expiresAtMs: Date.now() + 60_000,
+    proposedBy: null,
+    contextSummary: null,
     method: "item/permissions/requestApproval",
     params: { permissions }
   });
@@ -85,6 +95,8 @@ test("MCP URL elicitations expose only a safe clickable web URL", () => {
     requestKey: "rpc-url",
     roomId: "room-1",
     expiresAtMs: Date.now() + 60_000,
+    proposedBy: null,
+    contextSummary: null,
     method: "mcpServer/elicitation/request",
     params: { mode: "url", message: "Sign in", url: "https://example.com/oauth" }
   });
@@ -98,6 +110,8 @@ test("MCP form elicitations render typed bounded fields and structured content",
     requestKey: "rpc-form",
     roomId: "room-1",
     expiresAtMs: Date.now() + 60_000,
+    proposedBy: null,
+    contextSummary: null,
     method: "mcpServer/elicitation/request",
     params: {
       mode: "form",

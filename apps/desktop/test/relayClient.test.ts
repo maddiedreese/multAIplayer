@@ -53,7 +53,9 @@ test("publishAndWaitForAck resolves only for the matching persisted MLS acknowle
   const received: string[] = [];
   const client = connectRelay(
     "ws://relay",
-    (message) => received.push(message.type),
+    (message) => {
+      received.push(message.type);
+    },
     () => undefined
   );
   FakeWebSocket.latest.open();

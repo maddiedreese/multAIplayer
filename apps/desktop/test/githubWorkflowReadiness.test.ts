@@ -35,7 +35,7 @@ test("checkGitHubWorkflowReadiness allows local-only git workflows without GitHu
 
   assert.equal(readiness.ready, true);
   assert.equal(readiness.target, null);
-  assert.match(readiness.messages[0], /Local branch and commit only/);
+  assert.match(readiness.messages.at(0) ?? "", /Local branch and commit only/);
 });
 
 test("checkGitHubWorkflowReadiness requires GitHub sign-in and valid repo target for PR workflows", () => {

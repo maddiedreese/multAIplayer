@@ -187,11 +187,13 @@ test("desktop store exposes room request actions", () => {
   const store = useAppStore.getState();
 
   store.appendInviteRequest("room-a", {
-    eventType: "invite.request",
     id: "invite-request-a",
+    inviteId: "invite-a",
     requester: "Avery",
     requesterUserId: "github:avery",
     requesterDeviceId: "device-a",
+    keyPackageId: "key-package-a",
+    keyPackageHash: "sha256:key-package-a",
     requestedAt: "2026-07-06T00:02:00.000Z",
     status: "pending"
   });
@@ -456,17 +458,21 @@ test("desktop store supports multiple room browser tabs", () => {
   assert.equal(state.browserByRoom["room-a"]?.activeUrl, "http://localhost:5173");
   assert.equal(state.browserByRoom["room-b"]?.tabs?.length, 1);
 
-  store.selectBrowserTabForRoom("room-a", roomATabs[0].id);
+  const firstTab = roomATabs.at(0);
+  const secondTab = roomATabs.at(1);
+  assert.ok(firstTab);
+  assert.ok(secondTab);
+  store.selectBrowserTabForRoom("room-a", firstTab.id);
   state = useAppStore.getState();
   assert.equal(state.browserByRoom["room-a"]?.activeUrl, "https://example.com");
-  assert.equal(state.browserByRoom["room-a"]?.activeTabId, roomATabs[0].id);
+  assert.equal(state.browserByRoom["room-a"]?.activeTabId, firstTab.id);
 
-  store.closeBrowserTabForRoom("room-a", roomATabs[0].id);
+  store.closeBrowserTabForRoom("room-a", firstTab.id);
   state = useAppStore.getState();
   assert.equal(state.browserByRoom["room-a"]?.tabs?.length, 1);
   assert.equal(state.browserByRoom["room-a"]?.activeUrl, "http://localhost:5173");
 
-  store.closeBrowserTabForRoom("room-a", roomATabs[1].id);
+  store.closeBrowserTabForRoom("room-a", secondTab.id);
   state = useAppStore.getState();
   assert.equal(state.browserByRoom["room-a"]?.tabs, undefined);
   assert.equal(state.browserByRoom["room-a"]?.activeUrl, undefined);

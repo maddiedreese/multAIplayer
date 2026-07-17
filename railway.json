@@ -9,6 +9,8 @@
       "/apps/desktop/src-tauri/Cargo.toml",
       "/apps/desktop/src-tauri/crates/mls-core/**",
       "/packages/**",
+      "/tools/release/relay-runtime-dependency-closure.mjs",
+      "/.dockerignore",
       "/package.json",
       "/package-lock.json",
       "/tsconfig.base.json",

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
+import type { Readable } from "node:stream";
 import { createECDH, createHash, generateKeyPairSync, randomUUID, sign } from "node:crypto";
 import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -158,8 +159,10 @@ async function prepareRelayStorage(storedState?: StoredRelayStateFixture, existi
   return { tempDir, dataPath };
 }
 
+type RelayChildProcess = ChildProcessByStdio<null, Readable, Readable>;
+
 function createRelayHarness(
-  child: ChildProcessWithoutNullStreams,
+  child: RelayChildProcess,
   baseUrl: string,
   port: number,
   dataPath: string,
@@ -271,7 +274,7 @@ export function defaultWorkspaceFixture(roomCount = 2, memberCount = 4): StoredR
 
 export async function patchHostStatus(
   baseUrl: string,
-  body: { host: string; hostUserId: string; hostStatus: "active" }
+  body: { host: string; hostUserId: string; hostStatus: "active" | "offline" }
 ): Promise<number> {
   const response = await fetch(`${baseUrl}/rooms/room-desktop/host`, {
     method: "PATCH",
@@ -284,7 +287,7 @@ export async function patchHostStatus(
 
 export async function patchRoomSettings(
   baseUrl: string,
-  body: { requesterName: string; requesterUserId: string; codexModel?: string; projectPath?: string }
+  body: { requesterName: string; requesterUserId: string; name?: string; codexModel?: string; projectPath?: string }
 ): Promise<number> {
   const response = await fetch(`${baseUrl}/rooms/room-desktop/settings`, {
     method: "PATCH",
@@ -520,7 +523,7 @@ export async function waitForDebugBacklog(baseUrl: string, envelopes: number) {
   assert.fail(`Timed out waiting for debug backlog with ${envelopes} envelope(s)`);
 }
 
-export async function waitForReady(baseUrl: string, child: ChildProcessWithoutNullStreams, getOutput: () => string) {
+export async function waitForReady(baseUrl: string, child: RelayChildProcess, getOutput: () => string) {
   for (let attempt = 0; attempt < 150; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`Relay exited before ready: ${getOutput()}`);
@@ -681,6 +684,7 @@ export function waitForPresence(
         deviceId?: string;
         publicKeyFingerprint?: string;
         status?: string;
+        message?: string;
       };
       if (message.type === "error") {
         clearTimeout(timer);
@@ -698,7 +702,7 @@ export function waitForPresence(
         resolvePresence({
           userId: message.userId,
           deviceId: message.deviceId,
-          publicKeyFingerprint: message.publicKeyFingerprint,
+          ...(message.publicKeyFingerprint ? { publicKeyFingerprint: message.publicKeyFingerprint } : {}),
           status: message.status
         });
       }
@@ -828,12 +832,12 @@ export function deviceSealedPayload() {
   };
 }
 
-export async function stopProcess(child: ChildProcessWithoutNullStreams) {
+export async function stopProcess(child: RelayChildProcess) {
   if (child.exitCode !== null) return;
   await beginProcessShutdown(child);
 }
 
-export async function beginProcessShutdown(child: ChildProcessWithoutNullStreams) {
+export async function beginProcessShutdown(child: RelayChildProcess) {
   if (child.exitCode !== null) return;
   child.kill("SIGTERM");
   await Promise.race([
@@ -844,7 +848,7 @@ export async function beginProcessShutdown(child: ChildProcessWithoutNullStreams
   ]);
 }
 
-export async function crashProcess(child: ChildProcessWithoutNullStreams) {
+export async function crashProcess(child: RelayChildProcess) {
   if (child.exitCode !== null) return;
   child.kill("SIGKILL");
   await new Promise<void>((resolveExit) => child.once("exit", () => resolveExit()));

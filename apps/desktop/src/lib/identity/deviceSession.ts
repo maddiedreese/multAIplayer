@@ -15,6 +15,13 @@ let activeScopeKey: string | null = null;
 let establishmentGeneration = 0;
 const renewals = new Map<string, Promise<DeviceSession>>();
 
+export function clearDeviceSession(): void {
+  currentSession = null;
+  activeScopeKey = null;
+  establishmentGeneration += 1;
+  renewals.clear();
+}
+
 function deviceSessionScopeKey(relayHttpUrl: string, deviceId: string): string {
   return `${relayHttpUrl}\0${deviceId}`;
 }

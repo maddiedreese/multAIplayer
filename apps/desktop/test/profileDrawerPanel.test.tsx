@@ -32,9 +32,9 @@ afterEach(() => cleanup());
 test("accepted hosted-account deletion is reported as protected and pending cleanup", async () => {
   const originalFetch = globalThis.fetch;
   let deleted = 0;
-  let deletionRequest: { input: string; init?: RequestInit } | null = null;
+  const deletionRequests: Array<{ input: string; init?: RequestInit }> = [];
   globalThis.fetch = async (input, init) => {
-    deletionRequest = { input: String(input), init };
+    deletionRequests.push({ input: String(input), ...(init === undefined ? {} : { init }) });
     return new Response(
       JSON.stringify({
         ok: true,
@@ -93,6 +93,7 @@ test("accepted hosted-account deletion is reported as protected and pending clea
       assert.ok(view.getByText(/Deletion request protected and pending primary cleanup/i));
     });
     assert.equal(deleted, 1);
+    const deletionRequest = deletionRequests.at(-1);
     assert.equal(deletionRequest?.input, "https://relay.example/auth/account");
     assert.equal(deletionRequest?.init?.method, "DELETE");
     assert.equal(deletionRequest?.init?.body, JSON.stringify({ confirmation: "delete my account" }));

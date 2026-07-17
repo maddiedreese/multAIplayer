@@ -132,21 +132,14 @@ test("room creation rolls back its durable quota when capacity rejects the room"
     allowMutation: () => true,
     teamIdsForUser: () => new Set(["team-capacity"]),
     isTeamMember: () => true,
-    canAccessRoom: () => true,
     scheduleStoreSave: () => assert.fail("capacity rejection must happen before persistence"),
     saveRelayStore: async () => assert.fail("capacity rejection must happen before persistence"),
     broadcastRoomUpdated: () => assert.fail("capacity rejection must not broadcast"),
-    requesterFromRequest: () => ({ id: session.user.id, name: session.user.login }),
-    isRoomHost: () => false,
     isApprovalPolicy: (value): value is "ask_every_turn" => value === "ask_every_turn",
     normalizeMetadataText: boundedText,
-    normalizeOptionalMetadataText: boundedText,
     displayNameForUser: () => "Capacity",
-    maxDeviceIdChars: 160,
     maxHostNameChars: 120,
-    maxRoomNameChars: 120,
-    maxUserIdChars: 160,
-    deviceAuthRequired: false
+    maxRoomNameChars: 120
   });
   const server = await listen(app);
   try {

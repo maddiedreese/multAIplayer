@@ -10,7 +10,7 @@ test("manual input delegates to the real MLS join port and reports only pending 
   const calls: Array<{ encoded: string; inviteId?: string | null }> = [];
   const adapter = createOnboardingInviteJoinAdapter({
     requestNoSecretInviteAccess: async (encoded, inviteId) => {
-      calls.push({ encoded, inviteId });
+      calls.push(inviteId === undefined ? { encoded } : { encoded, inviteId });
     }
   });
 
@@ -28,7 +28,9 @@ test("manual input delegates to the real MLS join port and reports only pending 
 test("native protected payload delegates without reconstructing or rendering a URL", async () => {
   const calls: Array<{ encoded: string; inviteId?: string | null }> = [];
   const adapter = createOnboardingInviteJoinAdapter({
-    requestNoSecretInviteAccess: async (encoded, inviteId) => calls.push({ encoded, inviteId })
+    requestNoSecretInviteAccess: async (encoded, inviteId) => {
+      calls.push(inviteId === undefined ? { encoded } : { encoded, inviteId });
+    }
   });
   const outcome = await adapter.joinProtectedPayload("protected-fragment", "invite_123");
   assert.deepEqual(calls, [{ encoded: "protected-fragment", inviteId: "invite_123" }]);

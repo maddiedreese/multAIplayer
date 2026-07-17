@@ -46,11 +46,11 @@ test("sidebar visibility projects active and archived team-room state", () => {
     ["archived-team", "mixed-team"]
   );
   assert.deepEqual(
-    visibleSidebarRooms(rooms, teams[0], false).map((room) => room.id),
+    visibleSidebarRooms(rooms, teams[0]!, false).map((room) => room.id),
     ["active-room"]
   );
   assert.deepEqual(
-    visibleSidebarRooms(rooms, teams[2], true).map((room) => room.id),
+    visibleSidebarRooms(rooms, teams[2]!, true).map((room) => room.id),
     ["archived-room"]
   );
 });

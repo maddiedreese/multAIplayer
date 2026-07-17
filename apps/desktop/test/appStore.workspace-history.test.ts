@@ -1,3 +1,4 @@
+import { defaultTestHandoff, emptyTestHistory } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { useAppStore } from "../src/store/appStore";
@@ -69,12 +70,15 @@ test("desktop store hydrates local room history through one room-scoped action",
       name: "shell",
       cwd: "/tmp/b",
       command: "zsh -l",
-      status: "running",
-      output: []
+      running: true,
+      exitStatus: null,
+      startedAt: "2026-07-06T00:00:00.000Z",
+      lines: []
     }
   ]);
 
   store.hydrateLocalRoomHistoryForRoom("room-a", {
+    ...emptyTestHistory,
     version: 3,
     messages: [
       {
@@ -128,11 +132,13 @@ test("desktop store hydrates local room history through one room-scoped action",
     ],
     inviteRequests: [
       {
-        eventType: "invite.request",
         id: "invite-request-a",
+        inviteId: "invite-a",
         requester: "Jordan",
         requesterUserId: "github:jordan",
         requesterDeviceId: "device-jordan",
+        keyPackageId: "key-package-a",
+        keyPackageHash: "sha256:key-package-a",
         requestedAt: "2026-07-06T00:05:00.000Z",
         status: "pending"
       }
@@ -204,12 +210,15 @@ test("desktop store hydrates local room history through one room-scoped action",
         name: "shell",
         cwd: "/tmp/a",
         command: "zsh -l",
-        status: "running",
-        output: []
+        running: true,
+        exitStatus: null,
+        startedAt: "2026-07-06T00:00:00.000Z",
+        lines: []
       }
     ],
     hostHandoffs: [
       {
+        ...defaultTestHandoff,
         id: "handoff-a",
         fromHost: "Maddie",
         fromUserId: "github:maddie",
@@ -314,6 +323,7 @@ test("desktop store preserves live Codex state that arrives while an empty histo
     createdAt: "2026-07-06T00:20:00.000Z"
   });
   store.appendHostHandoff("room-a", {
+    ...defaultTestHandoff,
     id: "handoff-stale",
     fromHost: "Maddie",
     fromUserId: "github:maddie",
@@ -330,6 +340,7 @@ test("desktop store preserves live Codex state that arrives while an empty histo
   store.setCodexThreadIdForRoom("room-a", "thread-stale");
 
   store.hydrateLocalRoomHistoryForRoom("room-a", {
+    ...emptyTestHistory,
     version: 3,
     messages: [],
     terminalRequests: [],
@@ -374,6 +385,7 @@ test("history hydration preserves monotonic stored state over stale live replay"
     status: "pending"
   });
   store.hydrateLocalRoomHistoryForRoom("room-a", {
+    ...emptyTestHistory,
     version: 3,
     messages: [],
     terminalRequests: [],
@@ -456,12 +468,13 @@ test("desktop store exposes room chat message actions", () => {
   store.initializeMessagesForRoom("room-b");
   store.initializeMessagesForRoom("room-a");
   store.applyMessageReaction("room-a", {
-    eventType: "chat.reaction",
+    id: "reaction-add",
     messageId: message.id,
     emoji: "+1",
     reactor: "Maddie",
     reactorUserId: "github:maddie",
-    action: "add"
+    action: "add",
+    createdAt: "2026-07-06T00:00:00.000Z"
   });
 
   let state = useAppStore.getState();
@@ -470,12 +483,13 @@ test("desktop store exposes room chat message actions", () => {
   assert.equal(state.messagesByRoom["room-a"]?.[0]?.reactions?.[0]?.reactors[0]?.name, "Maddie");
 
   store.applyMessageReaction("room-a", {
-    eventType: "chat.reaction",
+    id: "reaction-remove",
     messageId: message.id,
     emoji: "+1",
     reactor: "Maddie",
     reactorUserId: "github:maddie",
-    action: "remove"
+    action: "remove",
+    createdAt: "2026-07-06T00:01:00.000Z"
   });
 
   state = useAppStore.getState();

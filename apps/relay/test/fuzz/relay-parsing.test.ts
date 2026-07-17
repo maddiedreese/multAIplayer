@@ -150,7 +150,7 @@ test("truncated, reordered, and bit-flipped valid frames cannot crash the connec
       const frame = new TextEncoder().encode(JSON.stringify(message));
       const position = offset % frame.length;
       const flipped = frame.slice();
-      flipped[position] ^= 1 << bit;
+      flipped[position] = flipped[position]! ^ (1 << bit);
       const midpoint = Math.floor(frame.length / 2);
       const reordered = Buffer.concat([frame.slice(midpoint), frame.slice(0, midpoint)]).toString("utf8");
       assert.doesNotThrow(() => parseRealBoundary(Buffer.from(flipped).toString("utf8")));

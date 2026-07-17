@@ -12,6 +12,7 @@ import {
 import { useAppStore } from "../store/appStore";
 import { openTrustedAuthenticationUrl } from "../lib/identity/authExternalUrl";
 import { invokeNative } from "../lib/platform/nativeCommandError";
+import { clearDeviceSession } from "../lib/identity/deviceSession";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",
@@ -153,11 +154,18 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [deviceFlow, setAuthBusy, setAuthError, setDeviceFlow]);
 
   const signOutGitHub = useCallback(async () => {
-    await logout();
-    setAuthenticationBrowserOpenFailed(false);
-    setCurrentUser(null);
-    setDeviceFlow(null);
-    setAuthBusy(false);
+    try {
+      await logout();
+    } finally {
+      clearDeviceSession();
+      const store = useAppStore.getState();
+      store.replaceDeviceIdentity(null);
+      store.replaceDeviceSessionToken(null);
+      setAuthenticationBrowserOpenFailed(false);
+      setCurrentUser(null);
+      setDeviceFlow(null);
+      setAuthBusy(false);
+    }
   }, [setAuthBusy, setCurrentUser, setDeviceFlow]);
 
   const clearDeletedHostedAccount = useCallback(() => {

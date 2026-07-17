@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -9,6 +10,7 @@ const defaultBrowserUrl = "https://example.com/default";
 const defaultBrowserReason = "Default browser reason.";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-browser-actions",
   teamId: "team-browser-actions",
   name: "Browser Actions",
@@ -25,19 +27,9 @@ function createOptions(
   overrides: Partial<Parameters<typeof createBrowserActions>[0]> = {}
 ): Parameters<typeof createBrowserActions>[0] {
   return {
-    hasSelectedRoom: true,
-    isActiveHost: true,
-    canRequestBrowser: true,
-    canHostBrowser: true,
-    browserAccessMessage: "Browser access is unavailable.",
-    hostGateMessage: "Only the active host can control the browser.",
-    selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
     defaultBrowserUrl,
     defaultBrowserReason,
-    localUser: { id: "github:maddie", name: "Maddie" },
-    deviceId: "device-browser-actions",
-    relayStatus: "closed",
     relayRef: { current: null },
     seenEnvelopeIds: { current: new Set<string>() },
     publishRequestStatus: async () => undefined,

@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord, GitWorkflowEventPlaintextPayload } from "@multaiplayer/protocol";
@@ -28,6 +29,7 @@ class MemoryStorage {
 }
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-host-actions",
   teamId: "team-host-actions",
   name: "Host actions",
@@ -111,11 +113,11 @@ test("Codex approval preserves prompt-injection-shaped input as untrusted room d
     ["../../.env"]
   );
   assert.equal(
-    approval?.riskFlags.some((flag) => flag.risk === "Agent-directed phrasing"),
+    approval?.riskFlags?.some((flag) => flag.risk === "Agent-directed phrasing"),
     true
   );
   assert.equal(
-    approval?.riskFlags.some((flag) => flag.risk === "Workspace-boundary request"),
+    approval?.riskFlags?.some((flag) => flag.risk === "Workspace-boundary request"),
     true
   );
 });

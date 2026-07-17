@@ -274,8 +274,12 @@ test("readiness surfaces ephemeral GitHub and ChatGPT authorization controls wit
   assert.equal(view.getAllByRole("button", { name: /Copy sign-in link/ }).length, 2);
   const cancelButtons = view.getAllByRole("button", { name: "Cancel sign-in" });
   assert.ok(cancelButtons.every((button) => !(button as HTMLButtonElement).disabled));
-  fireEvent.click(cancelButtons[0]);
-  fireEvent.click(cancelButtons[1]);
+  const githubCancel = cancelButtons.at(0);
+  const codexCancel = cancelButtons.at(1);
+  assert.ok(githubCancel);
+  assert.ok(codexCancel);
+  fireEvent.click(githubCancel);
+  fireEvent.click(codexCancel);
   assert.deepEqual([githubCancelled, codexCancelled], [1, 1]);
   assert.equal(
     (view.getByRole("button", { name: /Open GitHub in your browser/ }) as HTMLButtonElement).disabled,

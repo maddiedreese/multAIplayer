@@ -7,8 +7,8 @@ claims, audit status, metadata exposure, and residual risks.
 
 ## Releases and platforms
 
-- No supported public build has shipped yet. A supported build must pass the
-  signed, notarized release process in [Verifying releases](reproducible-builds.md).
+- Treat a build as supported only when it passes the signed, notarized release
+  process in [Verifying releases](reproducible-builds.md) and is published from this repository.
 - Public packages target Apple-silicon Macs on macOS 11 or later. Intel Macs,
   Windows, and Linux are not supported release targets.
 - Official invitations use macOS universal links. Each release still needs a
@@ -20,6 +20,7 @@ claims, audit status, metadata exposure, and residual risks.
 
 ## Accounts, hosting, and storage
 
+- One native installation is bound to one GitHub identity because its MLS signing, HPKE, and encrypted-room state share that identity boundary. Signing out and back into the same account is supported; switching GitHub accounts on an existing installation is not. The app rejects a mismatched identity instead of reusing keys across accounts.
 - GitHub identity authorizes hosted-relay membership. The current alpha requests the separate broad `repo` permission in the same grant for optional repository workflows; identity-only sign-in followed by later permission escalation is not implemented.
   ChatGPT separately authorizes Codex on the active host. Joining a room does not
   require a Codex login until that device becomes the host.

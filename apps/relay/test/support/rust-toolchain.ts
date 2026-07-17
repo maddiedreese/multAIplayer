@@ -10,5 +10,8 @@ export function probeRustToolchain(command = "cargo"): RustToolchainProbe {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"]
   });
-  return { command, missing: result.error?.code === "ENOENT" };
+  return {
+    command,
+    missing: result.error instanceof Error && "code" in result.error && result.error.code === "ENOENT"
+  };
 }

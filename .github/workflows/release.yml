@@ -94,6 +94,7 @@ jobs:
           RELEASE_BRANCH="$(jq --exit-status --raw-output '.headBranchName | select(type == "string" and length > 0)' <<< "$RELEASE_PR")"
           gh workflow run ci.yml --ref "$RELEASE_BRANCH"
           gh workflow run journeys.yml --ref "$RELEASE_BRANCH" --field required_only=true
+          gh workflow run codeql.yml --ref "$RELEASE_BRANCH"
       - name: Dispatch the signed release build when using the built-in token
         if: steps.release.outputs.release_created == 'true' && steps.credential.outputs.uses_custom_token == 'false'
         env:

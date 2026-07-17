@@ -38,7 +38,9 @@ async function readOrderedStylesheet(indexPath: URL): Promise<string> {
       imports.map(async ({ params }) => {
         const match = params.match(/^["'](.+)["']$/);
         assert.ok(match, `Expected a relative quoted stylesheet import, received: ${params}`);
-        return readFile(new URL(match[1], indexPath), "utf8");
+        const importPath = match.at(1);
+        assert.ok(importPath);
+        return readFile(new URL(importPath, indexPath), "utf8");
       })
     )
   ).join("\n");

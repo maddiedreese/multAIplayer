@@ -38,6 +38,7 @@ Object.defineProperty(globalThis, "fetch", {
 });
 
 const {
+  clearDeviceSession,
   deviceSessionHeaders,
   establishDeviceSession,
   recoverDeviceSessionForRelayError,
@@ -45,9 +46,18 @@ const {
 } = await import("../src/lib/identity/deviceSession");
 
 beforeEach(() => {
+  clearDeviceSession();
   challengeRequests = 0;
   sessionRequests = 0;
   deferredSessionResponse = null;
+});
+
+test("clearing a device session prevents same-scope cache reuse", async () => {
+  assert.equal((await establishDeviceSession("http://relay", "device-a")).token, "renewed-token");
+  clearDeviceSession();
+  assert.equal((await establishDeviceSession("http://relay", "device-a")).token, "renewed-token");
+  assert.equal(challengeRequests, 2);
+  assert.equal(sessionRequests, 2);
 });
 
 test("renews and retries once after the relay loses an ephemeral device session", async () => {
@@ -80,7 +90,7 @@ test("coalesces concurrent reconnect recovery onto one signed device challenge",
       "http://relay",
       "device-a",
       async () => {
-        attempts[index] += 1;
+        attempts[index] = (attempts[index] ?? 0) + 1;
         if (attempts[index] === 1) throw new RelayHttpError("renew device proof", 403, "device_auth_required");
         return index;
       },

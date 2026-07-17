@@ -7,15 +7,27 @@ export interface DeviceIdentity extends MlsIdentityPublic {
   hpkeKeyFingerprint: string;
 }
 
-let nativeIdentityPromise: Promise<DeviceIdentity> | null = null;
+const nativeIdentityPromises = new Map<string, Promise<DeviceIdentity>>();
 
 export async function loadOrCreateDeviceIdentity(githubUserId: string, deviceId: string): Promise<DeviceIdentity> {
   if (!isTauriRuntime()) throw new Error("Device identities are available only in the native desktop app");
-  nativeIdentityPromise ??= initializeMlsIdentity(githubUserId, deviceId).then(normalizeIdentity);
-  return nativeIdentityPromise;
+  const scope = `${githubUserId}\u0000${deviceId}`;
+  const existing = nativeIdentityPromises.get(scope);
+  if (existing) return existing;
+  const pending = initializeMlsIdentity(githubUserId, deviceId)
+    .then((identity) => normalizeIdentity(identity, githubUserId, deviceId))
+    .catch((error: unknown) => {
+      if (nativeIdentityPromises.get(scope) === pending) nativeIdentityPromises.delete(scope);
+      throw error;
+    });
+  nativeIdentityPromises.set(scope, pending);
+  return pending;
 }
 
-function normalizeIdentity(identity: MlsIdentityPublic): DeviceIdentity {
+function normalizeIdentity(identity: MlsIdentityPublic, githubUserId: string, deviceId: string): DeviceIdentity {
+  if (identity.githubUserId !== githubUserId || identity.deviceId !== deviceId) {
+    throw new Error("Native MLS identity does not match the requested account and device");
+  }
   if (
     identity.ciphersuite !== 2 ||
     !identity.signaturePublicKey ||

@@ -23,7 +23,7 @@ const pending: PendingMlsInviteRequest = {
 };
 
 const response = {
-  responseBinding: { phase: "response" },
+  responseBinding: { phase: "response" as const },
   responseMac: "opaque-response-mac",
   welcome: "opaque-welcome"
 };
@@ -103,7 +103,10 @@ test("denied recovery acknowledges the relay response before clearing native sta
   const result = await processPendingInviteRecoveryAttempt(
     pending,
     dependencies({
-      loadResponse: async () => ({ ...response, welcome: undefined }),
+      loadResponse: async () => ({
+        responseBinding: response.responseBinding,
+        responseMac: response.responseMac
+      }),
       acceptResponse: async () => {
         events.push("accept");
         return { status: "denied" };
@@ -207,7 +210,10 @@ test("transient denial ACK failure retries without clearing native recovery earl
   const result = await runPendingInviteRecoveryLoop(
     pending,
     dependencies({
-      loadResponse: async () => ({ ...response, welcome: undefined }),
+      loadResponse: async () => ({
+        responseBinding: response.responseBinding,
+        responseMac: response.responseMac
+      }),
       acceptResponse: async () => {
         events.push("accept");
         return { status: "denied" };

@@ -289,7 +289,12 @@ test("host transfer requires an outgoing-host signature bound to exact commit an
   });
   store.setTeamMembers(
     "team-core",
-    new Map([["github:next", { userId: "github:next", role: "member", joinedAt: new Date().toISOString() }]])
+    new Map([
+      [
+        "github:next",
+        { teamId: "team-core", userId: "github:next", role: "member", joinedAt: new Date().toISOString() }
+      ]
+    ])
   );
   const commit = message("outer", "commit", 0);
   const authorization = {
@@ -374,7 +379,7 @@ function fanoutFor(
     metrics,
     roomKey: () => key,
     pruneMlsBacklog: (items) => items,
-    reclaimDurableCapacity,
+    ...(reclaimDurableCapacity ? { reclaimDurableCapacity } : {}),
     saveMlsMessage,
     saveMlsCommit,
     teamRecordForUser: (team) => team

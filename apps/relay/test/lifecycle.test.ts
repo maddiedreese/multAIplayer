@@ -91,7 +91,10 @@ test("shutdown drains before closing listeners, sockets, or the store", async ()
   assert.deepEqual(events, ["server.close", "wss.close"]);
   assert.deepEqual(socket.closeCalls, [{ code: 1012, reason: "Relay shutting down" }]);
   assert.equal(socket.terminateCalls, 0);
-  assert.equal(events.includes("store.close"), false);
+  assert.equal(
+    events.some((event) => event === "store.close"),
+    false
+  );
 
   socket.readyState = WebSocket.CLOSED;
   socket.emit("close");

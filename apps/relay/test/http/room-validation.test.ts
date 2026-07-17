@@ -24,7 +24,7 @@ test("total room quota counts only live rooms in the user's teams", () => {
   );
   assert.equal(belowCap.statusCode(), 200);
   assert.equal(belowCap.body(), undefined);
-  assert.deepEqual(rejectionTypes, []);
+  assert.equal(rejectionTypes.length, 0);
 
   const atCap = responseRecorder();
   assert.equal(

@@ -1,9 +1,11 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { canControlRoomTerminal, roomTerminalControlMessage } from "../src/lib/terminal/terminalAccess";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-terminal",
   teamId: "team-alpha",
   name: "Terminal",

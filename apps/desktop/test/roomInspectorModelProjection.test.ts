@@ -4,7 +4,8 @@ import {
   defaultCodexModel,
   defaultCodexReasoningEffort,
   defaultCodexSandboxLevel,
-  defaultCodexSpeed
+  defaultCodexSpeed,
+  type ClientRoomRecord
 } from "@multaiplayer/protocol";
 import { buildRoomInspectorModelProjection } from "../src/presentation/rooms/roomInspectorModelProjection";
 import { seededRooms } from "./support/workspaceFixtures";
@@ -12,17 +13,17 @@ import { seededRooms } from "./support/workspaceFixtures";
 test("room inspector model projection applies protocol defaults without duplicating state", () => {
   const room = seededRooms[0];
   assert.ok(room);
-  const projection = buildRoomInspectorModelProjection(
-    {
+  const legacyRoom = JSON.parse(
+    JSON.stringify({
       ...room,
       codexModel: undefined,
       codexReasoningEffort: undefined,
       codexRawReasoningEnabled: undefined,
       codexSpeed: undefined,
       codexSandboxLevel: undefined
-    },
-    null
-  );
+    })
+  ) as ClientRoomRecord;
+  const projection = buildRoomInspectorModelProjection(legacyRoom, null);
 
   assert.equal(projection.selectedModel, defaultCodexModel);
   assert.equal(projection.selectedReasoningEffort, defaultCodexReasoningEffort);

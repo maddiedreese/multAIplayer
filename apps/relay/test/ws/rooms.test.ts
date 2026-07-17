@@ -40,17 +40,9 @@ test("invite admission requires the exact durable Welcome, approved user, and de
     id: "room",
     teamId: "team",
     name: "Room",
-    projectPath: "/",
     host: "Host",
     hostStatus: "active",
     approvalPolicy: "ask_every_turn",
-    codexModel: "gpt-5.4",
-    codexModelPolicy: "pinned",
-    codexReasoningEffort: "medium",
-    codexReasoningEffortPolicy: "pinned",
-    codexSpeed: "standard",
-    codexServiceTierPolicy: "pinned",
-    codexSandboxLevel: "workspace-write",
     acceptedMlsEpoch: 0
   });
   const invite = {
@@ -66,6 +58,7 @@ test("invite admission requires the exact durable Welcome, approved user, and de
   const session = {
     socket: {} as never,
     authSession: {
+      sessionIdHash: "joiner-session",
       user: { id: "github:joiner", login: "joiner" },
       expiresAt: Date.now() + 60_000
     },
