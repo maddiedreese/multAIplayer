@@ -31,6 +31,11 @@ export async function stopLocalPreviewTunnel(id: string): Promise<LocalPreviewSt
   return invokeNative<LocalPreviewStopResult>("local_preview_stop", { id });
 }
 
+export async function stopAllLocalPreviewTunnels(): Promise<number> {
+  if (!isTauriRuntime()) return requireNativeRuntime("Local preview tunnels");
+  return invokeNative<number>("local_preview_stop_all");
+}
+
 export async function readLocalPreviewTunnelStatus(id: string): Promise<LocalPreviewStatusResult> {
   if (!isTauriRuntime()) return requireNativeRuntime("Local preview tunnels");
   return invokeNative<LocalPreviewStatusResult>("local_preview_status", { id });

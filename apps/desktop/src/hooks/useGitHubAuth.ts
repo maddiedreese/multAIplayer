@@ -169,6 +169,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [setAuthBusy, setCurrentUser, setDeviceFlow]);
 
   const clearDeletedHostedAccount = useCallback(() => {
+    clearDeviceSession();
     setAuthenticationBrowserOpenFailed(false);
     useAppStore.getState().resetAppStore();
     setCurrentUser(null);

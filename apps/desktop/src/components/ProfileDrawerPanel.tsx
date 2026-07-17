@@ -45,7 +45,7 @@ export function ProfileDrawerPanel({
   relaySessionPersistence: string;
   codexAccountPanel?: ReactNode;
   archivePanel?: ReactNode;
-  onHostedAccountDeleted: () => void;
+  onHostedAccountDeleted: () => void | Promise<void>;
   onSignIn: () => void;
   onSignOut: () => void;
 }) {
@@ -74,18 +74,18 @@ export function ProfileDrawerPanel({
       setDeletionResult(result);
       if (result.status === "deleted") {
         setDeletionConfirmation("");
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
       } else if (result.status === "pending") {
         setDeletionConfirmation("");
         setDeletionStatus(
           "The relay durably accepted the deletion request and signed this identity out. Primary cleanup is pending and will be retried before the relay next accepts traffic."
         );
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
       } else if (result.status === "indeterminate") {
         setDeletionStatus(
           "The configured relay reports this session as signed out after the deletion response was lost. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
         );
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
       }
     } catch (error) {
       setDeletionStatus(
@@ -108,7 +108,7 @@ export function ProfileDrawerPanel({
         setDeletionStatus(
           "The configured relay reports this session as signed out. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
         );
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
       }
     } catch (error) {
       setDeletionStatus(`Account status could not be rechecked: ${String(error)}. Do not assume deletion completed.`);

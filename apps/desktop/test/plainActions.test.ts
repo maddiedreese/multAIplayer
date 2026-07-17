@@ -16,7 +16,7 @@ import { createRoomSettingsActions } from "../src/application/rooms/roomSettings
 import { createTeamDefaultActions } from "../src/application/teams/teamDefaultActions";
 import { createWorkspaceCreationActions } from "../src/application/workspace/workspaceCreationActions";
 import { useAppStore } from "../src/store/appStore";
-import type { ChatMessage } from "../src/types";
+import type { ChatMessage, LocalPreviewRecord } from "../src/types";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -96,12 +96,28 @@ test("account sign-out actions preserve preview cleanup ordering without React",
     },
     signOutGitHub: async () => {
       calls.push("github");
-    }
+    },
+    clearDeletedHostedAccount: () => calls.push("deleted")
   });
 
   await actions.signOut();
 
   assert.deepEqual(calls, ["preview:Stopped because the sharing user signed out.", "github"]);
+});
+
+test("hosted-account deletion stops previews before clearing account state", async () => {
+  const calls: string[] = [];
+  const actions = createAccountActions({
+    stopOwnedLocalPreviews: async (reason) => {
+      calls.push(`preview:${reason}`);
+    },
+    signOutGitHub: async () => undefined,
+    clearDeletedHostedAccount: () => calls.push("deleted")
+  });
+
+  await actions.hostedAccountDeleted();
+
+  assert.deepEqual(calls, ["preview:Stopped because the sharing user's hosted account was deleted.", "deleted"]);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {
@@ -563,6 +579,62 @@ test("local preview confirmation validation writes through the current store", a
   await actions.prepareLocalPreviewConfirmation();
 
   assert.match(useAppStore.getState().localPreviewDialog.error ?? "", /valid.*URL/i);
+});
+
+test("account cleanup cancels an in-flight preview before it can become public", async () => {
+  type StartResult = { id: string; localUrl: string; publicUrl: string; startupLog: string };
+  let resolveStart: (value: StartResult) => void = () => {
+    throw new Error("Local preview start was not invoked.");
+  };
+  let startInvoked: (() => void) | null = null;
+  const startInvocation = new Promise<void>((resolve) => {
+    startInvoked = resolve;
+  });
+  const nativeCalls: string[] = [];
+  nativeInvoke = async (command, args) => {
+    nativeCalls.push(command);
+    if (command === "local_preview_start") {
+      startInvoked?.();
+      return new Promise((resolve) => {
+        resolveStart = resolve;
+      });
+    }
+    if (command === "local_preview_stop_all") return 0;
+    if (command === "local_preview_stop") {
+      return { id: published[0]?.id ?? "preview", localUrl: "", publicUrl: "", stopped: true };
+    }
+    throw new Error(`Unexpected native command: ${command} ${JSON.stringify(args)}`);
+  };
+  useAppStore.setState({
+    localPreviewDialog: {
+      ...useAppStore.getState().localPreviewDialog,
+      roomId: room.id,
+      selectedUrl: "http://localhost:5173/"
+    }
+  });
+  const published: LocalPreviewRecord[] = [];
+  const actions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async (payload) => {
+      published.push(payload);
+    }
+  });
+
+  const share = actions.confirmLocalPreviewShare();
+  await startInvocation;
+  await actions.stopOwnedLocalPreviews("Stopped during account cleanup.");
+  resolveStart({
+    id: published[0]?.id ?? "preview",
+    localUrl: "http://localhost:5173/",
+    publicUrl: "https://example.trycloudflare.com",
+    startupLog: "ready"
+  });
+  await share;
+
+  assert.deepEqual(nativeCalls, ["local_preview_start", "local_preview_stop_all", "local_preview_stop"]);
+  assert.deepEqual(
+    published.map((payload) => payload.status),
+    ["starting", "stopped"]
+  );
 });
 
 test("room settings actions report room locks through the current store without React", async () => {

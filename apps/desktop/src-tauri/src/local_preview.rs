@@ -19,7 +19,22 @@ const TRYCLOUDFLARE_MARKER: &str = ".trycloudflare.com";
 
 #[derive(Default)]
 pub(crate) struct LocalPreviewState {
-    tunnels: Mutex<HashMap<String, LocalPreviewTunnel>>,
+    registry: Mutex<LocalPreviewRegistry>,
+}
+
+#[derive(Default)]
+struct LocalPreviewRegistry {
+    generation: u64,
+    tunnels: HashMap<String, LocalPreviewTunnel>,
+}
+
+impl LocalPreviewRegistry {
+    fn cancel_all(&mut self) -> usize {
+        self.generation = self.generation.wrapping_add(1);
+        let stopped = self.tunnels.len();
+        self.tunnels.clear();
+        stopped
+    }
 }
 
 struct LocalPreviewTunnel {
@@ -139,18 +154,18 @@ pub(crate) fn local_preview_start(
     request: LocalPreviewStartRequest,
 ) -> crate::command_error::CommandResult<LocalPreviewStartResult> {
     ensure_preview_id(&request.id)?;
-    let local_url = validate_local_preview_url(&request.local_url)?;
-    ensure_local_preview_reachable(&local_url)?;
-
-    {
-        let mut tunnels = state
-            .tunnels
+    let start_generation = {
+        let mut registry = state
+            .registry
             .lock()
             .map_err(|_| "Local preview state lock is poisoned".to_string())?;
-        if let Some(mut existing) = tunnels.remove(&request.id) {
+        if let Some(mut existing) = registry.tunnels.remove(&request.id) {
             terminate_child(&mut existing.child);
         }
-    }
+        registry.generation
+    };
+    let local_url = validate_local_preview_url(&request.local_url)?;
+    ensure_local_preview_reachable(&local_url)?;
 
     let mut child = Command::new("cloudflared")
         .arg("tunnel")
@@ -220,11 +235,15 @@ pub(crate) fn local_preview_start(
     };
 
     {
-        let mut tunnels = state
-            .tunnels
+        let mut registry = state
+            .registry
             .lock()
             .map_err(|_| "Local preview state lock is poisoned".to_string())?;
-        tunnels.insert(
+        if registry.generation != start_generation {
+            terminate_child(&mut child);
+            return Err("Local preview startup was cancelled during account cleanup.".into());
+        }
+        registry.tunnels.insert(
             request.id.clone(),
             LocalPreviewTunnel {
                 id: request.id.clone(),
@@ -249,11 +268,11 @@ pub(crate) fn local_preview_stop(
     id: String,
 ) -> crate::command_error::CommandResult<LocalPreviewStopResult> {
     ensure_preview_id(&id)?;
-    let mut tunnels = state
-        .tunnels
+    let mut registry = state
+        .registry
         .lock()
         .map_err(|_| "Local preview state lock is poisoned".to_string())?;
-    let Some(mut tunnel) = tunnels.remove(&id) else {
+    let Some(mut tunnel) = registry.tunnels.remove(&id) else {
         return Err("Local preview tunnel is not running on this device.".into());
     };
     terminate_child(&mut tunnel.child);
@@ -266,16 +285,27 @@ pub(crate) fn local_preview_stop(
 }
 
 #[typed_tauri_command::command]
+pub(crate) fn local_preview_stop_all(
+    state: State<'_, LocalPreviewState>,
+) -> crate::command_error::CommandResult<usize> {
+    let mut registry = state
+        .registry
+        .lock()
+        .map_err(|_| "Local preview state lock is poisoned".to_string())?;
+    Ok(registry.cancel_all())
+}
+
+#[typed_tauri_command::command]
 pub(crate) fn local_preview_status(
     state: State<'_, LocalPreviewState>,
     id: String,
 ) -> crate::command_error::CommandResult<LocalPreviewStatusResult> {
     ensure_preview_id(&id)?;
-    let mut tunnels = state
-        .tunnels
+    let mut registry = state
+        .registry
         .lock()
         .map_err(|_| "Local preview state lock is poisoned".to_string())?;
-    let Some(tunnel) = tunnels.get_mut(&id) else {
+    let Some(tunnel) = registry.tunnels.get_mut(&id) else {
         return Err("Local preview tunnel is not running on this device.".into());
     };
     let status = tunnel
@@ -328,5 +358,20 @@ fn append_bounded(output: &mut String, line: &str, max_chars: usize) {
     if output.len() > max_chars {
         let excess = output.len() - max_chars;
         output.drain(..excess);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LocalPreviewRegistry;
+
+    #[test]
+    fn stop_all_invalidates_every_in_flight_start_generation() {
+        let mut registry = LocalPreviewRegistry::default();
+        let start_generation = registry.generation;
+
+        assert_eq!(registry.cancel_all(), 0);
+
+        assert_ne!(registry.generation, start_generation);
     }
 }

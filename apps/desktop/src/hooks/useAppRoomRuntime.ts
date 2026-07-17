@@ -153,7 +153,8 @@ export function useAppRoomRuntime({
         publishLocalPreviewEvent: relaySync.publishLocalPreviewEvent
       },
       account: {
-        signOutGitHub: githubAuth.signOutGitHub
+        signOutGitHub: githubAuth.signOutGitHub,
+        clearDeletedHostedAccount: githubAuth.clearDeletedHostedAccount
       },
       githubActions: {
         selectedRoom,
