@@ -1,4 +1,4 @@
-import type { RelayClientMessage, RelayServerMessage } from "@multaiplayer/protocol";
+import { RelayServerMessage, type RelayClientMessage } from "@multaiplayer/protocol";
 
 export class RelayPublishRejectedError extends Error {
   constructor(
@@ -157,7 +157,23 @@ export function connectRelay(
       onStatus("error");
     });
     socket.addEventListener("message", (event) => {
-      const message = JSON.parse(event.data) as RelayServerMessage;
+      if (typeof event.data !== "string") {
+        rejectInvalidServerMessage(event.currentTarget as WebSocket);
+        return;
+      }
+      let decoded: unknown;
+      try {
+        decoded = JSON.parse(event.data);
+      } catch {
+        rejectInvalidServerMessage(event.currentTarget as WebSocket);
+        return;
+      }
+      const parsed = RelayServerMessage.safeParse(decoded);
+      if (!parsed.success) {
+        rejectInvalidServerMessage(event.currentTarget as WebSocket);
+        return;
+      }
+      const message = parsed.data;
       if (message.type === "published") {
         const pending = pendingAcks.get(message.messageId);
         if (pending) {
@@ -189,6 +205,12 @@ export function connectRelay(
         })
         .catch((error) => console.warn("Non-fatal failure: apply an ordered relay server message", error));
     });
+  }
+
+  function rejectInvalidServerMessage(source: WebSocket) {
+    rejectPendingAcks(new Error("Relay sent an invalid server message."));
+    onStatus("error");
+    source.close(1002, "Invalid relay server message");
   }
 
   function resolvePendingJoin(key: string, pending: { resolve: () => void; timeout: number }) {

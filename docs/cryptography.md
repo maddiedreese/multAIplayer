@@ -69,6 +69,6 @@ The resumable onboarding record is a bounded webview workflow record. Its schema
 | RFC 9180 device sealing          | `crates/mls-core/src/hpke_seal.rs`                                       | RFC Appendix A.3 vector and context/recipient cases                      |
 | Invite authenticator/capability  | `crates/mls-core/src/invite_capability.rs`, `engine/invite_admission.rs` | canonical encoding, phase separation, replay/restart cases               |
 | Exporter/history/blob records    | `engine/exporter.rs`, retained-material storage                          | round trips, epoch transitions, plaintext-marker journey                 |
-| Tauri exposure                   | `apps/desktop/src-tauri/src/lib.rs`, `mls_native*`                       | [command audit](tauri-ipc-boundary-audit.md), native command tests       |
+| Tauri exposure                   | `apps/desktop/src-tauri/src/lib.rs`, `mls_native*`                       | [boundary notes](tauri-ipc-boundary.md), native command tests            |
 
 Protocol or storage compatibility decisions are recorded under [docs/decisions](decisions/README.md).

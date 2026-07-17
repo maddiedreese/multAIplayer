@@ -3,7 +3,7 @@ import test from "node:test";
 import { allDomains, classifyChanges } from "./classify-changes.mjs";
 
 test("documentation-only changes do not select executable checks", () => {
-  assert.deepEqual(classifyChanges(["README.md", "docs/using-the-app.md"]), {
+  assert.deepEqual(classifyChanges(["README.md", "docs/using-the-app.md", "e2e/README.md"]), {
     documentation: true,
     workflow: false,
     javascript: false,
@@ -38,6 +38,43 @@ test("native changes select native checks without an unrelated UI journey", () =
   });
 });
 
+test("desktop frontend changes select UI coverage without native or packaged-app journeys", () => {
+  for (const path of [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/styles.css",
+    "apps/desktop/test/productSurfaces.test.tsx"
+  ]) {
+    const result = classifyChanges([path]);
+    assert.equal(result.javascript, true, `${path} must select JavaScript checks`);
+    assert.equal(result.ui_journey, true, `${path} must select UI journeys`);
+    assert.equal(result.native_journey, false, `${path} must not select the native-shell journey`);
+    assert.equal(result.macos, false, `${path} must not select packaged macOS coverage`);
+  }
+});
+
+test("native, protocol, manifest, and lockfile changes retain expensive journey coverage", () => {
+  for (const path of [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src-tauri/tauri.conf.json",
+    "apps/desktop/package.json",
+    "apps/desktop/native-command-error-codes.json",
+    "packages/protocol/src/relay-messages.ts",
+    "package-lock.json"
+  ]) {
+    const result = classifyChanges([path]);
+    assert.equal(result.native_journey, true, `${path} must select the native-shell journey`);
+    assert.equal(result.macos, true, `${path} must select packaged macOS coverage`);
+  }
+});
+
+test("macOS build configuration selects packaging without an unrelated native-shell journey", () => {
+  const result = classifyChanges(["apps/desktop/vite.config.ts"]);
+  assert.equal(result.javascript, true);
+  assert.equal(result.ui_journey, true);
+  assert.equal(result.native_journey, false);
+  assert.equal(result.macos, true);
+});
+
 test("workflow changes select policy checks and manual runs can opt into all domains", () => {
   assert.deepEqual(classifyChanges([".github/workflows/supply-chain.yml"]), {
     documentation: false,
@@ -62,22 +99,38 @@ test("workflow changes select policy checks and manual runs can opt into all dom
 test("documentation checks follow every maintained source of truth", () => {
   for (const path of [
     "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
     "docs/reproducible-builds.md",
+    ".github/pull_request_template.md",
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/config.yml",
     "scripts/check-maintained-docs.mjs",
+    "scripts/check-repository-content.mjs",
     "contracts/codex-app-server/support-policy.json",
     "apps/desktop/src-tauri/updater-public.key",
     "apps/desktop/src-tauri/src/lib.rs"
   ]) {
     assert.equal(classifyChanges([path]).documentation, true, `${path} must select documentation checks`);
   }
-  assert.equal(classifyChanges(["CONTRIBUTING.md"]).documentation, false);
   const supportPolicy = classifyChanges(["contracts/codex-app-server/support-policy.json"]);
   assert.equal(supportPolicy.javascript, true);
   assert.equal(supportPolicy.native, true);
 });
 
 test("GitHub templates are documentation, while workflow code selects workflow checks", () => {
-  assert.equal(classifyChanges([".github/ISSUE_TEMPLATE/bug_report.yml"]).workflow, false);
+  const issueTemplate = classifyChanges([".github/ISSUE_TEMPLATE/bug_report.yml"]);
+  assert.equal(issueTemplate.documentation, true);
+  assert.equal(issueTemplate.workflow, false);
+  assert.deepEqual(classifyChanges([".github/actions/setup-rust/README.md"]), {
+    documentation: true,
+    workflow: false,
+    javascript: false,
+    native: false,
+    ui_journey: false,
+    native_journey: false,
+    macos: false
+  });
   assert.equal(classifyChanges([".github/actions/setup-rust/action.yml"]).workflow, true);
 });
 

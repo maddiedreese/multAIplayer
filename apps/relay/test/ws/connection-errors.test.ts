@@ -5,6 +5,7 @@ import { createRelayStore, RelayStoreByteCapacityError, RelayStoreCapacityError 
 import { registerRelayWebSocketConnection, relayWebSocketError } from "../../src/ws/connection.js";
 import { dispatchRelayClientMessage } from "../../src/ws/connection-dispatch.js";
 import type { RelayWebSocketConnectionOptions } from "../../src/ws/connection-types.js";
+import { RelayPublishError } from "../../src/ws/fanout.js";
 import { deleteAccountOwnedRelayDataAtomically } from "../../src/auth/account-deletion.js";
 import { isLiveAccountSession } from "../../src/auth/account-mutation-transaction.js";
 
@@ -18,6 +19,28 @@ test("WebSocket capacity failures use a stable code without exposing internal ce
     assert.equal(response.message, "Relay durable capacity is exhausted.");
     assert.equal(response.messageId, "message-one");
     assert.equal(JSON.stringify(response).includes("10"), false);
+  }
+});
+
+test("WebSocket publish failures preserve their stable public code and message", () => {
+  const response = relayWebSocketError(
+    new RelayPublishError("stale_epoch", "A competing Commit already advanced this room epoch."),
+    "message-one"
+  );
+
+  assert.equal(response.code, "stale_epoch");
+  assert.equal(response.message, "A competing Commit already advanced this room epoch.");
+  assert.equal(response.messageId, "message-one");
+});
+
+test("unexpected WebSocket failures never expose arbitrary internal messages", () => {
+  for (const error of [new Error("sqlite path /private/relay.sqlite failed"), "secret rejection", null]) {
+    const response = relayWebSocketError(error, "message-one");
+    assert.equal(response.code, undefined);
+    assert.equal(response.message, "Relay request failed.");
+    assert.equal(response.messageId, "message-one");
+    assert.equal(JSON.stringify(response).includes("private"), false);
+    assert.equal(JSON.stringify(response).includes("secret"), false);
   }
 });
 

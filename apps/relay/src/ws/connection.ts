@@ -4,6 +4,7 @@ import { dispatchRelayClientMessage, isActiveQueuedClientSession } from "./conne
 import type { RelayWebSocketConnectionOptions } from "./connection-types.js";
 import { parseRelayClientMessage } from "./connection-validation.js";
 import { RelayStoreByteCapacityError, RelayStoreCapacityError } from "../state.js";
+import { logRelayEvent } from "../observability.js";
 
 export function registerRelayWebSocketConnection(options: RelayWebSocketConnectionOptions) {
   const { wss, send, sendConnectionError } = options.transport;
@@ -49,6 +50,8 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
               error instanceof RelayStoreByteCapacityError ? error.resource : "durable_entries",
               error instanceof RelayStoreByteCapacityError ? error.scope : error.teamId ? "team" : "relay"
             );
+          } else if (!(error instanceof RelayPublishError)) {
+            logRelayEvent("error", "websocket_request_failed");
           }
           send(socket, relayWebSocketError(error, publishMessageId));
         }
@@ -65,20 +68,15 @@ export function registerRelayWebSocketConnection(options: RelayWebSocketConnecti
 }
 
 export function relayWebSocketError(error: unknown, messageId?: string) {
+  const capacityError = error instanceof RelayStoreCapacityError || error instanceof RelayStoreByteCapacityError;
   return {
     type: "error" as const,
-    message:
-      error instanceof RelayStoreCapacityError || error instanceof RelayStoreByteCapacityError
-        ? "Relay durable capacity is exhausted."
-        : error instanceof Error
-          ? error.message
-          : "Invalid relay message",
-    code:
-      error instanceof RelayStoreCapacityError || error instanceof RelayStoreByteCapacityError
-        ? ("capacity_exceeded" as const)
-        : error instanceof RelayPublishError
-          ? error.code
-          : undefined,
+    message: capacityError
+      ? "Relay durable capacity is exhausted."
+      : error instanceof RelayPublishError
+        ? error.message
+        : "Relay request failed.",
+    code: capacityError ? ("capacity_exceeded" as const) : error instanceof RelayPublishError ? error.code : undefined,
     ...(messageId ? { messageId } : {})
   };
 }

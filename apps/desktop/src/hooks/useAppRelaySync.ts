@@ -6,7 +6,6 @@ import type { createAppRoomActions } from "./appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import type { useRoomChatMutations } from "./useRoomChatMutations";
 import { useRelaySubscription } from "./relay/useRelaySubscription";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
@@ -18,7 +17,10 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
 type InviteActions = ReturnType<typeof useAppInviteActions>;
-type RoomChatMutations = ReturnType<typeof useRoomChatMutations>;
+type RoomChatMutations = Pick<
+  ReturnType<typeof useAppStore.getState>,
+  "appendRoomMessage" | "editRoomMessage" | "deleteRoomMessage" | "applyMessageReaction"
+>;
 
 export function useAppRelaySync({
   appRefs,

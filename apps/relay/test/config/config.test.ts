@@ -14,20 +14,24 @@ test("production requires a configured MLS KeyPackage validator", () => {
   }
 });
 
-test("relay validates PORT with the bounded integer parser", () => {
+test("relay defaults absent integers and rejects malformed or out-of-range values", () => {
   const previous = process.env.PORT;
   try {
-    process.env.PORT = "not-a-port";
+    delete process.env.PORT;
     assert.equal(loadRelayConfig().port, 4321);
-    process.env.PORT = "999999";
-    assert.equal(loadRelayConfig().port, 65_535);
+    for (const invalid of ["", "not-a-port", "4321.5", "1e3", "999999"]) {
+      process.env.PORT = invalid;
+      assert.throws(() => loadRelayConfig(), /PORT must be an integer between 1 and 65535/);
+    }
+    process.env.PORT = " 4321 ";
+    assert.equal(loadRelayConfig().port, 4321);
   } finally {
     if (previous === undefined) delete process.env.PORT;
     else process.env.PORT = previous;
   }
 });
 
-test("relay bounds durable per-account device and retained-session caps", () => {
+test("relay rejects invalid durable per-account device and retained-session caps", () => {
   const registeredDeviceName = "MULTAIPLAYER_RELAY_REGISTERED_DEVICE_CAP_USER";
   const retainedSessionName = "MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER";
   const previousRegisteredDeviceCap = process.env[registeredDeviceName];
@@ -40,21 +44,38 @@ test("relay bounds durable per-account device and retained-session caps", () => 
 
     process.env[registeredDeviceName] = "0";
     process.env[retainedSessionName] = "0";
-    assert.equal(loadRelayConfig().registeredDeviceCapPerUser, 1);
-    assert.equal(loadRelayConfig().retainedAuthSessionCapPerUser, 1);
+    assert.throws(() => loadRelayConfig(), /REGISTERED_DEVICE_CAP_USER must be an integer between 1 and 10000/);
 
     process.env[registeredDeviceName] = "10001";
     process.env[retainedSessionName] = "1001";
-    assert.equal(loadRelayConfig().registeredDeviceCapPerUser, 10_000);
-    assert.equal(loadRelayConfig().retainedAuthSessionCapPerUser, 1_000);
+    assert.throws(() => loadRelayConfig(), /REGISTERED_DEVICE_CAP_USER must be an integer between 1 and 10000/);
 
-    process.env[registeredDeviceName] = "invalid";
+    process.env[registeredDeviceName] = "25";
     process.env[retainedSessionName] = "invalid";
-    assert.equal(loadRelayConfig().registeredDeviceCapPerUser, 25);
-    assert.equal(loadRelayConfig().retainedAuthSessionCapPerUser, 20);
+    assert.throws(() => loadRelayConfig(), /RETAINED_AUTH_SESSION_CAP_USER must be an integer between 1 and 1000/);
   } finally {
     restoreEnv(registeredDeviceName, previousRegisteredDeviceCap);
     restoreEnv(retainedSessionName, previousRetainedSessionCap);
+  }
+});
+
+test("lowering the global durable-entry cap keeps the absent per-team default valid", () => {
+  const globalName = "MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES";
+  const teamName = "MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM";
+  const previousGlobal = process.env[globalName];
+  const previousTeam = process.env[teamName];
+  try {
+    process.env[globalName] = "1000";
+    delete process.env[teamName];
+    assert.equal(loadRelayConfig().maxDurableEntriesPerTeam, 999);
+    process.env[teamName] = "1000";
+    assert.throws(
+      () => loadRelayConfig(),
+      /MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM must be an integer between 100 and 999/
+    );
+  } finally {
+    restoreEnv(globalName, previousGlobal);
+    restoreEnv(teamName, previousTeam);
   }
 });
 
@@ -73,30 +94,31 @@ test("relay only enables metrics with a strong bearer token", () => {
   }
 });
 
-test("relay falls back safely for invalid shutdown drain values", () => {
+test("relay rejects invalid shutdown drain values", () => {
   const previous = process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS;
   try {
-    process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = "not-a-number";
-    assert.equal(loadRelayConfig().shutdown.drainMs, 0);
-    process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = "-1";
-    assert.equal(loadRelayConfig().shutdown.drainMs, 0);
-    process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = "60001";
-    assert.equal(loadRelayConfig().shutdown.drainMs, 60_000);
+    for (const invalid of ["", "not-a-number", "1.5", "-1", "60001"]) {
+      process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = invalid;
+      assert.throws(
+        () => loadRelayConfig(),
+        /MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS must be an integer between 0 and 60000/
+      );
+    }
   } finally {
     if (previous === undefined) delete process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS;
     else process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS = previous;
   }
 });
 
-test("relay bounds the trusted-network rate-limit multiplier", () => {
+test("relay rejects an out-of-range trusted-network rate-limit multiplier", () => {
   const previous = process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER;
   try {
     delete process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER;
     assert.equal(loadRelayConfig().trustedNetworkRateLimitMultiplier, 8);
     process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER = "0";
-    assert.equal(loadRelayConfig().trustedNetworkRateLimitMultiplier, 1);
+    assert.throws(() => loadRelayConfig(), /TRUSTED_NETWORK_MULTIPLIER must be an integer between 1 and 100/);
     process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER = "500";
-    assert.equal(loadRelayConfig().trustedNetworkRateLimitMultiplier, 100);
+    assert.throws(() => loadRelayConfig(), /TRUSTED_NETWORK_MULTIPLIER must be an integer between 1 and 100/);
   } finally {
     restoreEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER", previous);
   }
@@ -111,6 +133,29 @@ test("authentication defaults on and only the explicit unsafe opt-out disables i
     assert.equal(loadRelayConfig().mutationsRequireAuth, false);
   } finally {
     restoreEnv("MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH", previous);
+  }
+});
+
+test("relay accepts common explicit booleans and rejects empty or unrecognized values", () => {
+  const name = "MULTAIPLAYER_RELAY_DEBUG";
+  const previous = process.env[name];
+  try {
+    delete process.env[name];
+    assert.equal(loadRelayConfig().debugEndpointsEnabled, false);
+    for (const enabled of ["1", "true", "yes", "on", " TRUE "]) {
+      process.env[name] = enabled;
+      assert.equal(loadRelayConfig().debugEndpointsEnabled, true);
+    }
+    for (const disabled of ["0", "false", "no", "off"]) {
+      process.env[name] = disabled;
+      assert.equal(loadRelayConfig().debugEndpointsEnabled, false);
+    }
+    for (const invalid of ["", "enabled", "2"]) {
+      process.env[name] = invalid;
+      assert.throws(() => loadRelayConfig(), /MULTAIPLAYER_RELAY_DEBUG must be true or false/);
+    }
+  } finally {
+    restoreEnv(name, previous);
   }
 });
 

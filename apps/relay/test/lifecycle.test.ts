@@ -136,3 +136,69 @@ test("shutdown terminates sockets that remain open through the grace period", as
   assert.equal(socket.terminateCalls, 1);
   assert.deepEqual(events, ["server.close", "wss.close", "store.close"]);
 });
+
+test("shutdown reports listener failures after sockets and the store are closed", async () => {
+  const events: string[] = [];
+  const socket = new TestSocket();
+  socket.readyState = WebSocket.CLOSED;
+  const serverError = new Error("server close failed");
+  const webSocketServerError = new Error("WebSocket server close failed");
+  const lifecycle = createRelayLifecycle({
+    server: {
+      close(callback: (error?: Error) => void) {
+        events.push("server.close");
+        callback(serverError);
+      }
+    } as unknown as Server,
+    wss: {
+      clients: new Set([socket]),
+      close(callback: (error?: Error) => void) {
+        events.push("wss.close");
+        callback(webSocketServerError);
+      }
+    } as unknown as WebSocketServer,
+    drainMs: 0,
+    graceMs: 500,
+    closeStore: async () => {
+      events.push("store.close");
+    }
+  });
+
+  await assert.rejects(lifecycle.shutdown(), (error: unknown) => {
+    assert(error instanceof AggregateError);
+    assert.equal(error.message, "Relay shutdown failed.");
+    assert.deepEqual(error.errors, [serverError, webSocketServerError]);
+    return true;
+  });
+  assert.deepEqual(events, ["server.close", "wss.close", "store.close"]);
+});
+
+test("shutdown attempts store cleanup and preserves every cleanup failure", async () => {
+  const events: string[] = [];
+  const socket = new TestSocket();
+  socket.readyState = WebSocket.CLOSED;
+  const serverError = new Error("server close failed");
+  const storeError = new Error("store close failed");
+  const lifecycle = createRelayLifecycle({
+    server: {
+      close(callback: (error?: Error) => void) {
+        events.push("server.close");
+        callback(serverError);
+      }
+    } as unknown as Server,
+    wss: createWebSocketServer(socket, () => events.push("wss.close")),
+    drainMs: 0,
+    graceMs: 500,
+    closeStore: async () => {
+      events.push("store.close");
+      throw storeError;
+    }
+  });
+
+  await assert.rejects(lifecycle.shutdown(), (error: unknown) => {
+    assert(error instanceof AggregateError);
+    assert.deepEqual(error.errors, [serverError, storeError]);
+    return true;
+  });
+  assert.deepEqual(events, ["server.close", "wss.close", "store.close"]);
+});

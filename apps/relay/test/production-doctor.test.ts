@@ -112,3 +112,31 @@ test("production doctor accepts only the packaged desktop custom origin", () => 
   assert.notEqual(mixedInvalidResult.status, 0);
   assert.match(mixedInvalidResult.output, /must be a bare origin without path, query, or hash/);
 });
+
+test("production doctor rejects configuration the relay would reject at startup", () => {
+  const invalidBoolean = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_DEBUG: ""
+  });
+  assert.notEqual(invalidBoolean.status, 0);
+  assert.match(invalidBoolean.output, /production MULTAIPLAYER_RELAY_DEBUG: must be true or false/);
+
+  const invalidInteger = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES: "1e9"
+  });
+  assert.notEqual(invalidInteger.status, 0);
+  assert.match(
+    invalidInteger.output,
+    /production MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES: must be a decimal integer/
+  );
+});
+
+test("production doctor derives a valid per-team default from a lowered global durable cap", () => {
+  const result = runDoctor({
+    MULTAIPLAYER_RELAY_DELETION_PROTECTION: "primary_only",
+    MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES: "1000"
+  });
+  assert.equal(result.status, 0, result.output);
+  assert.match(result.output, /per-team ceiling 999; global ceiling 1000/);
+});

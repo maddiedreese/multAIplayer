@@ -2,7 +2,7 @@ import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { maxEmbeddedAttachmentBytes, type ClientRoomRecord } from "@multaiplayer/protocol";
-import { createAccountActions } from "../src/application/account/accountActions";
+import { signOutAfterStoppingPreviews } from "../src/hooks/useRoomToolActions";
 import { createChatActions } from "../src/application/chat/chatActions";
 import { createCodexInvokeActions } from "../src/application/codex/codexInvokeActions";
 import { createFileActions } from "../src/application/files/fileActions";
@@ -11,7 +11,7 @@ import { createMarkdownCopyActions } from "../src/application/markdown/markdownC
 import { createMemberActions } from "../src/application/members/memberActions";
 import { createLocalPreviewActions } from "../src/application/files/localPreviewActions";
 import { createLocalHistoryActions } from "../src/application/history/localHistoryActions";
-import { createRoomVisibilityWarningActions } from "../src/application/rooms/roomVisibilityWarningActions";
+import { acknowledgeSelectedRoomVisibilityWarning } from "../src/hooks/useAppRoomInteractionContext";
 import { createRoomSettingsActions } from "../src/application/rooms/roomSettingsActions";
 import { createTeamDefaultActions } from "../src/application/teams/teamDefaultActions";
 import { createWorkspaceCreationActions } from "../src/application/workspace/workspaceCreationActions";
@@ -105,7 +105,7 @@ test.beforeEach(() => {
 
 test("account sign-out actions preserve preview cleanup ordering without React", async () => {
   const calls: string[] = [];
-  const actions = createAccountActions({
+  await signOutAfterStoppingPreviews({
     stopOwnedLocalPreviews: async (reason) => {
       calls.push(`preview:${reason}`);
     },
@@ -114,16 +114,12 @@ test("account sign-out actions preserve preview cleanup ordering without React",
     }
   });
 
-  await actions.signOut();
-
   assert.deepEqual(calls, ["preview:Stopped because the sharing user signed out.", "github"]);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {
   useAppStore.getState().setSecretWarningVisibleForRoom(room.id, true);
-  const actions = createRoomVisibilityWarningActions();
-
-  actions.acknowledgeRoomVisibilityWarning();
+  acknowledgeSelectedRoomVisibilityWarning();
 
   assert.equal(localStorage.getItem(`multaiplayer:room-visibility-warning:${room.id}`), "acknowledged");
   assert.equal(useAppStore.getState().codexRuntimeByRoom[room.id]?.secretWarningVisible ?? false, false);

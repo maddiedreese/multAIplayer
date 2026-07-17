@@ -47,8 +47,12 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Check generated and single-source documentation
-        run: node scripts/check-maintained-docs.mjs
+      - name: Set up Node and npm
+        uses: ./.github/actions/setup-node-npm
+      - name: Install documentation-check dependency
+        run: npm ci --ignore-scripts
+      - name: Check maintained documentation, links, and issue templates
+        run: npm run docs:check
 
   workflow-policy:
     name: GitHub Actions syntax and repository policy

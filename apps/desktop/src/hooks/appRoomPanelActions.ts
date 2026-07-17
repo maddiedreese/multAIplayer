@@ -2,7 +2,10 @@ import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContex
 import type { useRoomRuntimeContext } from "./useRoomRuntimeContext";
 import type { useAppRelaySync } from "./useAppRelaySync";
 import type { useWorkspaceFlowContext } from "./useWorkspaceFlowContext";
-import { createRoomPanelActions } from "../application/rooms/roomPanelActions";
+import { createRoomChatPanelActions } from "../application/chat/roomChatPanelActions";
+import { createRoomHeaderActions } from "../application/rooms/roomHeaderActions";
+import { createTerminalPanelActions } from "../application/terminal/terminalPanelActions";
+import { createWorkspaceFilesPanelActions } from "../application/files/workspaceFilesPanelActions";
 
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
 type RoomRuntime = ReturnType<typeof useRoomRuntimeContext>;
@@ -20,8 +23,8 @@ export function createAppRoomPanelActions({
   relaySync: RelaySync;
   workspaceFlow: WorkspaceFlow;
 }) {
-  return createRoomPanelActions({
-    chat: {
+  return {
+    roomChatPanelActions: createRoomChatPanelActions({
       copyMessageMarkdown: workspaceFlow.copyMessageMarkdown,
       copyCodexOutputMarkdown: workspaceFlow.copyCodexOutputMarkdown,
       openEncryptedAttachmentBlob: workspaceFlow.openEncryptedAttachmentBlob,
@@ -41,11 +44,11 @@ export function createAppRoomPanelActions({
       copyMarkdownWithFallback: workspaceFlow.copyMarkdownWithFallback,
       stopLocalPreview: roomRuntime.stopLocalPreview,
       openBrowserUrl: roomRuntime.openRoomBrowserForUrl
-    },
-    header: {
+    }),
+    roomHeaderActions: createRoomHeaderActions({
       openRoomBrowserNow: roomRuntime.openRoomBrowserNow
-    },
-    terminal: {
+    }),
+    terminalPanelActions: createTerminalPanelActions({
       copyTerminalMarkdown: workspaceFlow.copyTerminalMarkdown,
       openInteractiveTerminal: roomRuntime.openInteractiveTerminal,
       approveTerminalRequest: roomRuntime.approveTerminalRequest,
@@ -54,8 +57,8 @@ export function createAppRoomPanelActions({
       restartSelectedTerminal: roomRuntime.restartSelectedTerminal,
       stopSelectedTerminal: roomRuntime.stopSelectedTerminal,
       revokeExactCommandGrants: roomRuntime.revokeExactCommandGrants
-    },
-    workspaceFiles: {
+    }),
+    workspaceFilesPanelActions: createWorkspaceFilesPanelActions({
       copyProjectMarkdown: workspaceFlow.copyProjectMarkdown,
       openProjectFile: workspaceFlow.openProjectFile,
       copyDiffSummaryMarkdown: workspaceFlow.copyDiffSummaryMarkdown,
@@ -63,6 +66,6 @@ export function createAppRoomPanelActions({
       saveSelectedFileContent: workspaceFlow.saveSelectedFileContent,
       approveFileSaveRequest: workspaceFlow.approveFileSaveRequest,
       denyFileSaveRequest: workspaceFlow.denyFileSaveRequest
-    }
-  });
+    })
+  };
 }

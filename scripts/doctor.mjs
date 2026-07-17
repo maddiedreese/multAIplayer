@@ -183,6 +183,7 @@ function checkProductionRelayEnv() {
 }
 
 function readProductionRelayConfig() {
+  const maxDurableEntries = envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES", 250_000);
   return {
     deletionLedgerFilePath: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_FILE_PATH"),
     deletionLedgerEndpoint: envValue("MULTAIPLAYER_RELAY_DELETION_LEDGER_S3_ENDPOINT"),
@@ -211,8 +212,11 @@ function readProductionRelayConfig() {
     websocketConnectionCap: envInteger("MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER", 20),
     websocketConnectRateLimit: envInteger("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT", 120),
     totalRoomCap: envInteger("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500),
-    maxDurableEntries: envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES", 250_000),
-    maxDurableEntriesPerTeam: envInteger("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM", 25_000),
+    maxDurableEntries,
+    maxDurableEntriesPerTeam: envInteger(
+      "MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM",
+      Math.min(25_000, maxDurableEntries - 1)
+    ),
     maxMlsBacklogBytes: envInteger("MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES", 100_000_000),
     maxMlsBacklogBytesPerTeam: envInteger("MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM", 50_000_000),
     maxMlsBacklogBytesPerRoom: envInteger("MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM", 10_000_000),
@@ -480,18 +484,33 @@ function envValue(name) {
 }
 
 function envBoolean(name, fallback) {
-  const value = envValue(name).toLowerCase();
-  if (!value) return fallback;
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const value = raw.trim().toLowerCase();
   if (["1", "true", "yes", "on"].includes(value)) return true;
   if (["0", "false", "no", "off"].includes(value)) return false;
+  checks.push({
+    ok: false,
+    label: `production ${name}`,
+    detail: "must be true or false"
+  });
   return fallback;
 }
 
 function envInteger(name, fallback) {
-  const raw = envValue(name);
-  if (!raw) return fallback;
-  const value = Number(raw);
-  return Number.isSafeInteger(value) ? value : NaN;
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const normalized = raw.trim();
+  if (/^-?(?:0|[1-9]\d*)$/.test(normalized)) {
+    const value = Number(normalized);
+    if (Number.isSafeInteger(value)) return value;
+  }
+  checks.push({
+    ok: false,
+    label: `production ${name}`,
+    detail: "must be a decimal integer"
+  });
+  return NaN;
 }
 
 function validateAllowedOrigins(value) {
