@@ -117,9 +117,10 @@ button:not(:disabled):active {
   align-items: center;
   gap: 9px;
   padding: 9px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: #ffffff;
+  color: #1f1f1f;
   box-shadow: none;
 }
 
@@ -130,9 +131,9 @@ button:not(:disabled):active {
   border-radius: 7px;
   font-size: 12px;
   font-weight: 680;
-  border-color: var(--border);
-  background: var(--surface-muted);
-  color: var(--text-muted);
+  border-color: #2a2a2a;
+  background: #242424;
+  color: #f5f5f5;
 }
 
 .search-box input,

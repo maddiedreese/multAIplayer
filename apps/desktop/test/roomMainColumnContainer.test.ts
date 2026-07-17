@@ -120,6 +120,21 @@ test("main-column container reads and mutates selected-room state at its compone
   assert.equal(useAppStore.getState().historyPresenceByRoom[selectedRoom.id]?.inspectorTab, "terminal");
 });
 
+test("room controls fold away while the room identity and restore control remain available", () => {
+  const view = render(createElement(RoomMainColumnContainer, { sources }));
+
+  assert.ok(view.getByRole("navigation", { name: "Room tools" }));
+  fireEvent.click(view.getByRole("button", { name: "Collapse room controls" }));
+
+  assert.equal(view.queryByRole("navigation", { name: "Room tools" }), null);
+  assert.ok(view.getByLabelText("Room title"));
+  const expand = view.getByRole("button", { name: "Expand room controls" });
+  assert.equal(expand.getAttribute("aria-expanded"), "false");
+
+  fireEvent.click(expand);
+  assert.ok(view.getByRole("navigation", { name: "Room tools" }));
+});
+
 test("browser selection opens a session only when the selected room has no active URL", () => {
   const selectedRoom = seededRooms[0];
   assert.ok(selectedRoom);

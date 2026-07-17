@@ -118,9 +118,37 @@ select {
   padding: 22px var(--page-gutter) 18px;
 }
 
+.room-header[data-controls-collapsed="true"] {
+  row-gap: 0;
+  padding-block: 10px;
+}
+
 .room-heading {
+  position: relative;
   grid-area: heading;
   min-width: 0;
+  padding-right: 40px;
+}
+
+.room-controls-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  transform: translateY(-50%);
+}
+
+.room-controls-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 
 .crumb {
@@ -501,6 +529,7 @@ select {
   min-height: 58px;
   padding: 18px 18px 14px;
   border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
 }
 
 .inspector-context span {
@@ -513,8 +542,9 @@ select {
 
 .inspector-context strong {
   color: var(--text);
-  font-size: 14px;
-  font-weight: 640;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
   text-transform: none;
 }
 

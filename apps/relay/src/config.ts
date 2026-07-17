@@ -90,13 +90,13 @@ export function loadRelayConfig(): RelayConfig {
   );
   const maxAttachmentBlobBytes = parseIntegerEnv(
     "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES",
-    100_000_000,
+    500_000_000,
     attachmentBlobMaxBytes,
     10_000_000_000
   );
   const maxAttachmentBlobBytesPerTeam = parseIntegerEnv(
     "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM",
-    50_000_000,
+    250_000_000,
     attachmentBlobMaxBytes,
     10_000_000_000
   );

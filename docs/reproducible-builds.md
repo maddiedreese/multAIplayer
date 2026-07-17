@@ -6,10 +6,9 @@ updates have two sequential application checks: multAIplayer verifies signed
 metadata that binds the version, archive URL, archive signature, and release
 notes, then Tauri verifies the downloaded archive before installation.
 
-Only the newest release that satisfies those requirements is supported. Once the
-first signed and notarized public alpha is published, earlier unsigned development
-releases must remain marked as prereleases and must not be linked as downloads or
-identified as the latest supported release.
+Only the newest release that satisfies those requirements is supported. Unsigned
+development artifacts are not releases, must not be linked as downloads, and must
+never be identified as the latest supported release.
 
 The project does not claim bit-for-bit reproducible macOS artifacts. Apple
 signing, notarization, DMG creation, hosted runner images, and packaging metadata

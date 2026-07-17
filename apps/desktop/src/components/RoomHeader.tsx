@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, FileText, Globe2, MonitorUp, Terminal, UsersRound, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Copy, FileText, Globe2, MonitorUp, Terminal, UsersRound, X } from "lucide-react";
 import React, { useEffect, useState, type ReactNode } from "react";
 import type { InspectorTab } from "../lib/core/uiTypes";
 import { closeRoomBrowserSurface } from "../lib/browser/browserSurfaceEvents";
@@ -87,6 +87,7 @@ export function RoomHeader({
   onShareLocalPreview: () => void;
 }) {
   const [roomNameDraft, setRoomNameDraft] = useState(roomName);
+  const [controlsCollapsed, setControlsCollapsed] = useState(false);
   useEffect(() => setRoomNameDraft(roomName), [roomName]);
   const commitRoomName = () => {
     const nextName = roomNameDraft.trim();
@@ -94,7 +95,7 @@ export function RoomHeader({
     else setRoomNameDraft(roomName);
   };
   return (
-    <header className="room-header">
+    <header className="room-header" data-controls-collapsed={controlsCollapsed}>
       <div className="room-heading">
         <div className="crumb">
           <select
@@ -130,52 +131,69 @@ export function RoomHeader({
             }
           }}
         />
+        <button
+          type="button"
+          className="room-controls-toggle"
+          aria-expanded={!controlsCollapsed}
+          aria-label={controlsCollapsed ? "Expand room controls" : "Collapse room controls"}
+          title={controlsCollapsed ? "Expand room controls" : "Collapse room controls"}
+          onClick={() => setControlsCollapsed((collapsed) => !collapsed)}
+        >
+          {controlsCollapsed ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+        </button>
       </div>
-      <RoomToolNav activeTab={activeInspectorTab} onSelect={onSelectInspectorTab} />
-      <div className="header-actions">
-        <div className="host-controls">
-          <button
-            onClick={() => onSetHost("active")}
-            disabled={!hasRoom || roomLocked || hostBusy || hostStatus === "active"}
-          >
-            Host
-          </button>
-          <button onClick={() => onSetHost("handoff")} disabled={!hasRoom || roomLocked || hostBusy || !isActiveHost}>
-            Handoff
-          </button>
-        </div>
-        <CodexHeaderSelectors
-          {...{
-            hasRoom,
-            roomLocked,
-            settingsBusy,
-            isActiveHost,
-            selectedModel,
-            modelLabel,
-            modelOptions,
-            selectedReasoningEffort,
-            reasoningLabel,
-            reasoningOptions,
-            selectedSpeed,
-            speedLabel,
-            speedOptions,
-            onSelectModel,
-            onSelectReasoningEffort,
-            onSelectSpeed
-          }}
-        />
-        <HeaderMarkdownActions
-          hasRoom={hasRoom}
-          roomLocked={roomLocked}
-          selectionMode={markdownSelectionMode}
-          selectedCount={selectedCount}
-          onCopyRoom={onCopyRoomMarkdown}
-          onSharePreview={onShareLocalPreview}
-          onCopySelected={onCopySelectedMarkdown}
-          onToggleSelection={onToggleMarkdownSelection}
-          onClearSelection={onClearSelectedMessages}
-        />
-      </div>
+      {!controlsCollapsed && (
+        <>
+          <RoomToolNav activeTab={activeInspectorTab} onSelect={onSelectInspectorTab} />
+          <div className="header-actions">
+            <div className="host-controls">
+              <button
+                onClick={() => onSetHost("active")}
+                disabled={!hasRoom || roomLocked || hostBusy || hostStatus === "active"}
+              >
+                Host
+              </button>
+              <button
+                onClick={() => onSetHost("handoff")}
+                disabled={!hasRoom || roomLocked || hostBusy || !isActiveHost}
+              >
+                Handoff
+              </button>
+            </div>
+            <CodexHeaderSelectors
+              {...{
+                hasRoom,
+                roomLocked,
+                settingsBusy,
+                isActiveHost,
+                selectedModel,
+                modelLabel,
+                modelOptions,
+                selectedReasoningEffort,
+                reasoningLabel,
+                reasoningOptions,
+                selectedSpeed,
+                speedLabel,
+                speedOptions,
+                onSelectModel,
+                onSelectReasoningEffort,
+                onSelectSpeed
+              }}
+            />
+            <HeaderMarkdownActions
+              hasRoom={hasRoom}
+              roomLocked={roomLocked}
+              selectionMode={markdownSelectionMode}
+              selectedCount={selectedCount}
+              onCopyRoom={onCopyRoomMarkdown}
+              onSharePreview={onShareLocalPreview}
+              onCopySelected={onCopySelectedMarkdown}
+              onToggleSelection={onToggleMarkdownSelection}
+              onClearSelection={onClearSelectedMessages}
+            />
+          </div>
+        </>
+      )}
     </header>
   );
 }
