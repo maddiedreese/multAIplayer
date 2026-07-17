@@ -233,6 +233,28 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build:release -w @multaiplayer/desktop
 
+      - name: Notarize and staple release DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          bundle_root="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle"
+          release_version="$(node -p "require('./apps/desktop/package.json').version")"
+          dmg_path="$bundle_root/dmg/multAIplayer_${release_version}_aarch64.dmg"
+          dmg_count="$(find "$bundle_root/dmg" -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')"
+          if [ "$dmg_count" != "1" ] || [ ! -f "$dmg_path" ]; then
+            echo "Expected exactly one DMG at $dmg_path; found $dmg_count DMG file(s)." >&2
+            exit 1
+          fi
+          xcrun notarytool submit "$dmg_path" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --no-progress
+          xcrun stapler staple "$dmg_path"
+
       - name: Verify signed and notarized app
         run: |
           bundle_root="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle"
