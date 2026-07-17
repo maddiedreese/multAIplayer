@@ -182,7 +182,12 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [setAuthBusy, setAuthError, setCurrentUser, setDeviceFlow]);
 
   const reportUnconfirmedPreviewCleanup = useCallback(() => {
-    setAuthError(localPreviewTerminationWarning);
+    const existingError = useAppStore.getState().authError;
+    setAuthError(
+      existingError && existingError !== localPreviewTerminationWarning
+        ? `${existingError} ${localPreviewTerminationWarning}`
+        : localPreviewTerminationWarning
+    );
   }, [setAuthError]);
 
   const clearDeletedHostedAccount = useCallback(() => {
