@@ -1,5 +1,5 @@
-import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "@multaiplayer/git";
-import { normalizeGitHubBranchName } from "@multaiplayer/github";
+import { createGitWorkflowApprovalPlan, formatGitWorkflowApprovalPreview } from "./gitApprovalPlan";
+import { normalizeGitHubBranchName } from "./githubValidation";
 import { reportExpectedFailure } from "../core/nonFatalReporting";
 
 export interface GitWorkflowDraft {

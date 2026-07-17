@@ -1,4 +1,5 @@
 import { invokeNative } from "../nativeCommandError";
+import { reportExpectedFailure } from "../../core/nonFatalReporting";
 
 import { isTauriRuntime } from "./runtime";
 
@@ -26,7 +27,7 @@ export function recordPersistedDiagnostic(entry: PersistedDiagnosticEntry): void
   const persistedEntry = { ...entry };
   diagnosticWriteQueue = diagnosticWriteQueue
     .then(() => invokeNative<void>("record_diagnostic", { entry: persistedEntry }))
-    .catch(() => console.debug("[expected failure] native diagnostic persistence was unavailable"));
+    .catch(() => reportExpectedFailure("native diagnostic persistence was unavailable"));
 }
 
 export async function savePersistedDiagnosticBundle(
@@ -38,7 +39,7 @@ export async function savePersistedDiagnosticBundle(
     const outcome = await invokeNative<"saved" | "cancelled">("save_diagnostic_bundle", { context });
     return outcome === "saved" || outcome === "cancelled" ? outcome : "failed";
   } catch {
-    console.debug("[expected failure] native diagnostic bundle could not be saved");
+    reportExpectedFailure("native diagnostic bundle could not be saved");
     return "failed";
   }
 }

@@ -14,7 +14,9 @@ pub(crate) fn mls_identity_initialize(
         if user == &request.github_user_id && device == &request.device_id {
             return Ok(public.clone());
         }
-        return Err("MLS identity is already initialized for another device".into());
+        return Err(crate::command_error::CommandError::identity_scope_mismatch(
+            "This installation is already bound to another GitHub account or device identity.",
+        ));
     }
     let identity = BasicAppCredential {
         github_user_id: request.github_user_id.clone(),
@@ -24,7 +26,8 @@ pub(crate) fn mls_identity_initialize(
         &serde_json::to_vec(&identity).map_err(|_| "MLS identity is invalid".to_string())?,
     )
     .map_err(safe_error)?;
-    let secret = load_or_create_signing_secret(&request.github_user_id, &request.device_id)?;
+    let secret = load_or_create_signing_secret(&request.github_user_id, &request.device_id)
+        .map_err(identity_initialization_error)?;
     let wrapping_key = load_or_create_store_wrapping_key()?;
     let data_dir = app
         .path()
@@ -101,4 +104,38 @@ pub(crate) fn mls_identity_initialize(
     };
     *identity_lock = Some((request.github_user_id, request.device_id, public.clone()));
     Ok(public)
+}
+
+fn identity_initialization_error(
+    error: SigningSecretLoadError,
+) -> crate::command_error::CommandError {
+    match error {
+        SigningSecretLoadError::ScopeMismatch => {
+            crate::command_error::CommandError::identity_scope_mismatch(
+                "This installation is already bound to another GitHub account or device identity.",
+            )
+        }
+        SigningSecretLoadError::Internal => "MLS identity could not be loaded".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_stored_identity_scope_mismatch_gets_scope_remediation() {
+        let mismatch = identity_initialization_error(SigningSecretLoadError::ScopeMismatch);
+        assert_eq!(
+            mismatch.code,
+            crate::command_error::CommandErrorCode::IdentityScopeMismatch
+        );
+
+        let keychain = identity_initialization_error(SigningSecretLoadError::Internal);
+        assert_eq!(
+            keychain.code,
+            crate::command_error::CommandErrorCode::InternalError
+        );
+        assert_ne!(keychain.code, mismatch.code);
+    }
 }

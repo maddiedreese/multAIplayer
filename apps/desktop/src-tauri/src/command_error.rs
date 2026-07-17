@@ -21,6 +21,7 @@ macro_rules! define_command_error_codes {
 define_command_error_codes! {
     CryptoError => "crypto_error",
     InternalError => "internal_error",
+    IdentityScopeMismatch => "identity_scope_mismatch",
     InvalidArgument => "invalid_argument",
     NotFound => "not_found",
     ProcessError => "process_error",
@@ -57,6 +58,10 @@ impl CommandError {
 
     pub(crate) fn invalid_argument(message: impl Into<String>) -> Self {
         Self::new(CommandErrorCode::InvalidArgument, message)
+    }
+
+    pub(crate) fn identity_scope_mismatch(message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::IdentityScopeMismatch, message)
     }
 
     pub(crate) fn not_found(message: impl Into<String>) -> Self {
@@ -160,6 +165,10 @@ mod tests {
         let cases = [
             (CommandError::crypto("message"), "crypto_error"),
             (CommandError::from("message"), "internal_error"),
+            (
+                CommandError::identity_scope_mismatch("message"),
+                "identity_scope_mismatch",
+            ),
             (
                 CommandError::invalid_argument("message"),
                 "invalid_argument",

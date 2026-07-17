@@ -20,7 +20,7 @@
 </p>
 
 > [!IMPORTANT]
-> multAIplayer is a free, open-source alpha for Apple-silicon Macs running macOS 11 or later. Use only Developer ID-signed, notarized builds published from this repository's release workflow.
+> multAIplayer is a free, open-source alpha for Apple-silicon Macs. Packages declare macOS 11 as their minimum deployment target; automated packaged-app runtime testing currently runs on macOS 15, so macOS 11–14 remain unverified. Use only Developer ID-signed, notarized builds published from this repository's release workflow.
 
 ## The product
 
@@ -78,15 +78,14 @@ Pull requests run workspace checks and product journeys when executable code cha
 
 ## Repository map
 
-| Path                                     | Responsibility                                          |
-| ---------------------------------------- | ------------------------------------------------------- |
-| `apps/desktop`                           | React/Tauri desktop and native capability boundary      |
-| `apps/desktop/src-tauri/crates/mls-core` | MLS, invite cryptography, exporters, encrypted state    |
-| `apps/relay`                             | Authenticated transport, SQLite persistence, and quotas |
-| `packages/protocol`                      | Shared wire records and runtime validation              |
-| `packages/git`, `packages/github`        | Host-side integrations                                  |
-| `e2e`                                    | UI contracts and multi-process journeys                 |
-| `docs/decisions`                         | Normative architecture decisions                        |
+| Path                                     | Responsibility                                           |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `apps/desktop`                           | React/Tauri desktop, host workflows, native capabilities |
+| `apps/desktop/src-tauri/crates/mls-core` | MLS, invite cryptography, exporters, encrypted state     |
+| `apps/relay`                             | Authenticated transport, SQLite persistence, and quotas  |
+| `packages/protocol`                      | Shared wire records and runtime validation               |
+| `e2e`                                    | UI contracts and multi-process journeys                  |
+| `docs/decisions`                         | Normative architecture decisions                         |
 
 The [architecture guide](docs/product-architecture.md) maps flows to code. SQLite is the relay's sole runtime backend, but the alpha relay keeps its durable working set in memory and stores entity payloads as JSON rows rather than exposing a general relational query model. Mutations are synchronously committed before a successful response or broadcast, and the in-memory durable-entry count has an explicit ceiling. A runtime SQLite write failure makes the relay not ready and stops further product traffic until restart rather than serving memory that may differ from disk. See the [single-node relay ADR](docs/decisions/single-node-relay.md).
 

@@ -17,6 +17,10 @@ for (const [name, value] of Object.entries({
 })) {
   Object.defineProperty(globalThis, name, { configurable: true, value });
 }
+Object.defineProperty(dom.window.HTMLCanvasElement.prototype, "getContext", {
+  configurable: true,
+  value: () => null
+});
 
 const { cleanup, render, screen } = await import("@testing-library/react");
 const { App } = await import("../src/App");

@@ -8,9 +8,9 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build && node ../../tools/security/verify-desktop-security-deps.mjs && node ../../tools/release/check-desktop-bundle-size.mjs",
     "check": "tsc --noEmit",
-    "test": "npm run test:typecheck && node --import tsx --test --test-timeout=180000 --test-force-exit 'test/*.test.ts' 'test/*.test.tsx'",
+    "test": "npm run test:typecheck && NODE_ENV=test node --import tsx --test --test-timeout=180000 'test/*.test.ts' 'test/*.test.tsx'",
     "test:typecheck": "tsc --noEmit -p tsconfig.test.json",
-    "test:smoke": "node --import tsx --test --test-timeout=30000 --test-force-exit test/appSmoke.test.ts",
+    "test:smoke": "NODE_ENV=test node --import tsx --test --test-timeout=30000 test/appSmoke.test.ts",
     "preview": "vite preview",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "tauri build",
@@ -19,8 +19,6 @@
     "tauri:build:native-e2e": "tauri build --debug --bundles app --features native-e2e --config src-tauri/tauri.native-e2e.conf.json"
   },
   "dependencies": {
-    "@multaiplayer/git": "0.1.0-alpha.0",
-    "@multaiplayer/github": "0.1.0-alpha.0",
     "@multaiplayer/protocol": "0.1.0-alpha.0",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.1",
