@@ -4,7 +4,6 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CodexActivityTimelineView } from "../src/components/CodexActivityTimeline";
 import {
-  emptyLocalRoomHistoryPayload,
   maxLocalHistoryItemsPerContainer,
   normalizeLocalRoomHistory,
   normalizeRetainedLocalRoomHistory,
@@ -14,6 +13,7 @@ import {
 } from "../src/lib/history/localRoomHistoryPayload";
 import { useAppStore } from "../src/store/appStore";
 import type { CodexActivity } from "../src/types";
+import { emptyTestHistoryPayload } from "./support/workspaceFixtures";
 
 function activity(overrides: Partial<CodexActivity> = {}): CodexActivity {
   return {
@@ -66,7 +66,7 @@ test("activity timeline retains only the newest bounded room items", () => {
 });
 
 test("current local-history includes its required read state", () => {
-  const empty = emptyLocalRoomHistoryPayload();
+  const empty = emptyTestHistoryPayload();
   assert.deepEqual(empty.readState, { unread: 0 });
 
   const roundTripped = normalizeLocalRoomHistory(JSON.parse(JSON.stringify(empty)));
@@ -87,7 +87,7 @@ test("local-history normalization rejects non-objects and unknown schema version
 });
 
 test("current local-history schema fails closed on malformed required containers and entries", () => {
-  const current = emptyLocalRoomHistoryPayload();
+  const current = emptyTestHistoryPayload();
   for (const field of ["chatEdits", "chatDeletes", "readState", "codexActivities", "queuedCodexTurns"]) {
     const incomplete = { ...current } as Record<string, unknown>;
     delete incomplete[field];
@@ -114,7 +114,7 @@ test("current local-history schema fails closed on malformed required containers
 test("canonical history retains the newest bounded messages and round trips through strict v3", () => {
   const createdAt = new Date().toISOString();
   const payload = {
-    ...emptyLocalRoomHistoryPayload(),
+    ...emptyTestHistoryPayload(),
     messages: Array.from({ length: maxLocalHistoryItemsPerContainer + 1 }, (_, index) => ({
       id: `message-${index}`,
       author: "Maddie",
@@ -137,7 +137,7 @@ test("local history preserves messages that match former demo copy", () => {
   const createdAt = new Date().toISOString();
   const body = "Ciphertext-only debug check.";
   const normalized = normalizeLocalRoomHistory({
-    ...emptyLocalRoomHistoryPayload(),
+    ...emptyTestHistoryPayload(),
     messages: [
       {
         id: "message-demo-copy",

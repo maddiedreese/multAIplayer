@@ -5,6 +5,7 @@ import {
   Database,
   assert,
   createDebugSession,
+  delay,
   join,
   randomUUID,
   onceOpen,
@@ -194,8 +195,12 @@ test("relay bounds debug auth session metadata before storing", async () => {
 
 test("relay logout clears the session cookie with matching attributes", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
+  let socket: WebSocket | null = null;
   try {
     const cookie = await createDebugSession(relay.baseUrl, "github:logout", "logout");
+    socket = new WebSocket(relay.wsUrl, { headers: { cookie } });
+    await onceOpen(socket);
+    const socketClosed = waitForSocketClose(socket);
     const response = await fetch(`${relay.baseUrl}/auth/logout`, {
       method: "POST",
       headers: { cookie }
@@ -207,12 +212,47 @@ test("relay logout clears the session cookie with matching attributes", async ()
     assert.match(setCookie, /Path=\//);
     assert.match(setCookie, /HttpOnly/);
     assert.match(setCookie, /SameSite=Lax/);
+    assert.deepEqual(await socketClosed, { code: 1008, reason: "Authentication session ended" });
 
     const me = await fetch(`${relay.baseUrl}/auth/me`, {
       headers: { cookie }
     });
     assert.equal(me.status, 401);
   } finally {
+    socket?.close();
+    await relay.close();
+  }
+});
+
+test("relay closes a passive subscribed socket before fanout after its auth session expires", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
+  let socket: WebSocket | null = null;
+  try {
+    const staleCookie = await createDebugSession(relay.baseUrl, "github:tester", "tester", 100);
+    const ownerCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    socket = new WebSocket(relay.wsUrl, { headers: { cookie: staleCookie } });
+    await onceOpen(socket);
+    const subscribed = waitForSocketMessage(socket, "workspace.subscribed");
+    socket.send(JSON.stringify({ type: "subscribe.workspace", userId: "github:tester", deviceId: "passive-device" }));
+    await subscribed;
+    await delay(150);
+
+    let receivedExpiredFanout = false;
+    socket.on("message", (raw) => {
+      const message = JSON.parse(raw.toString()) as { type?: string };
+      if (message.type === "team.updated") receivedExpiredFanout = true;
+    });
+    const socketClosed = waitForSocketClose(socket);
+    const archive = await fetch(`${relay.baseUrl}/teams/team-core/lifecycle`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ action: "archive" })
+    });
+    assert.equal(archive.status, 200);
+    assert.deepEqual(await socketClosed, { code: 1008, reason: "Authentication session expired" });
+    assert.equal(receivedExpiredFanout, false);
+  } finally {
+    socket?.close();
     await relay.close();
   }
 });
@@ -456,3 +496,27 @@ test("relay requires auth in production while native GitHub OAuth remains availa
     await relay.close();
   }
 });
+
+function waitForSocketMessage(socket: WebSocket, expectedType: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`Timed out waiting for ${expectedType}`)), 5_000);
+    socket.on("message", (raw) => {
+      const message = JSON.parse(raw.toString()) as { type?: string };
+      if (message.type !== expectedType) return;
+      clearTimeout(timeout);
+      resolve();
+    });
+    socket.once("error", reject);
+  });
+}
+
+function waitForSocketClose(socket: WebSocket): Promise<{ code: number; reason: string }> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Timed out waiting for socket close")), 5_000);
+    socket.once("close", (code, reason) => {
+      clearTimeout(timeout);
+      resolve({ code, reason: reason.toString() });
+    });
+    socket.once("error", reject);
+  });
+}

@@ -63,25 +63,29 @@ export const defaultTestHandoff: HostHandoffRecord = {
   status: "available"
 };
 
-export const emptyTestHistory: LocalRoomHistoryPayload = {
-  version: 3,
-  messages: [],
-  chatEdits: [],
-  chatDeletes: [],
-  readState: { unread: 0 },
-  terminalRequests: [],
-  fileSaveRequests: [],
-  browserRequests: [],
-  inviteRequests: [],
-  codexEvents: [],
-  codexActivities: [],
-  gitWorkflowEvents: [],
-  githubActionsEvents: [],
-  localPreviews: [],
-  terminalSnapshots: [],
-  hostHandoffs: [],
-  queuedCodexTurns: []
-};
+export function emptyTestHistoryPayload(): LocalRoomHistoryPayload {
+  return {
+    version: 3,
+    messages: [],
+    chatEdits: [],
+    chatDeletes: [],
+    readState: { unread: 0 },
+    terminalRequests: [],
+    fileSaveRequests: [],
+    browserRequests: [],
+    inviteRequests: [],
+    codexEvents: [],
+    codexActivities: [],
+    gitWorkflowEvents: [],
+    githubActionsEvents: [],
+    localPreviews: [],
+    terminalSnapshots: [],
+    hostHandoffs: [],
+    queuedCodexTurns: []
+  };
+}
+
+export const emptyTestHistory: LocalRoomHistoryPayload = emptyTestHistoryPayload();
 
 export const seededRooms: ClientRoomRecord[] = [
   {

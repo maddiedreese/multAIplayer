@@ -9,6 +9,7 @@ import {
   pruneRetainedAuthSessions
 } from "./auth/session.js";
 import { createAccountRestrictionManager, isAccountRestricted } from "./auth/account-restrictions.js";
+import { isLiveAccountSession } from "./auth/account-mutation-transaction.js";
 import { FileDeletionLedger, S3DeletionLedger, type DeletionLedger } from "./auth/deletion-ledger.js";
 import { reconcileDeletionLedger } from "./auth/deletion-reconciliation.js";
 import {
@@ -54,7 +55,7 @@ import {
 } from "./relay-domain.js";
 import { registerRelayRouteAdapter } from "./relay-route-adapter.js";
 import { registerRelayWebSocketAdapter } from "./relay-websocket-adapter.js";
-import { createRelayStore } from "./state.js";
+import { createRelayStore, type ClientSession } from "./state.js";
 import { createRelayStoreCodec } from "./store-codec.js";
 import { createRelayStorePersistenceCoordinator } from "./store-persistence.js";
 import { createRelayFanout } from "./ws/fanout.js";
@@ -264,6 +265,8 @@ export async function createRelayApp(
   app.use(express.json({ limit: `${ordinaryJsonBodyLimitBytes}b` }));
   let addTeamMemberImpl: ReturnType<typeof createTeamMutationHelpers>["addTeamMember"] = () => {};
   const addTeamMember: typeof addTeamMemberImpl = (...args) => addTeamMemberImpl(...args);
+  const isLiveClientSession = (session: ClientSession) =>
+    !mutationsRequireAuth || Boolean(session.authSession && isLiveAccountSession(relayStore, session.authSession));
   const relayFanout = createRelayFanout({
     store: relayStore,
     roomSockets,
@@ -273,6 +276,7 @@ export async function createRelayApp(
     roomPresence,
     mutationsRequireAuth,
     metrics: relayMetrics,
+    isLiveClientSession,
     roomKey,
     pruneMlsBacklog,
     reclaimDurableCapacity: relayStorePersistence.reclaimDurableCapacity,
@@ -347,6 +351,7 @@ export async function createRelayApp(
     store: relayStore,
     limits: relayLimits,
     auth: authSessionManager,
+    isLiveClientSession,
     guards: relayRequestGuards,
     metrics: relayMetrics,
     fanout: relayFanout,

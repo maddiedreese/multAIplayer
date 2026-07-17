@@ -1,6 +1,6 @@
 import type { WebSocket } from "ws";
 import type { TeamRole } from "@multaiplayer/protocol";
-import type { ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
+import type { AuthSession, ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 import { isActiveRoom, isActiveTeam } from "../relay-domain.js";
 
 interface CreateRelayRoomSocketManagerOptions {
@@ -190,6 +190,17 @@ export function createRelayRoomSocketManager({
     revokeUserPresence(userId);
   }
 
+  function revokeAuthSessionSockets(authSession: AuthSession) {
+    for (const session of Array.from(sessions.values())) {
+      if (session.authSession !== authSession) continue;
+      leaveRoom(session);
+      leaveTeams(session);
+      leaveWorkspace(session);
+      sessions.delete(session.socket);
+      session.socket.close(1008, "Authentication session ended");
+    }
+  }
+
   function approvedInviteForAdmission(
     inviteId: string,
     teamId: string,
@@ -233,6 +244,7 @@ export function createRelayRoomSocketManager({
     leaveWorkspace,
     revokeTeamMemberSessions,
     revokeUserPresence,
-    revokeUserSessions
+    revokeUserSessions,
+    revokeAuthSessionSockets
   };
 }

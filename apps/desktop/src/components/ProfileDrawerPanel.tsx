@@ -7,6 +7,7 @@ import { saveNativeDiagnosticBundle } from "../lib/platform/diagnostics";
 import { InfoRow } from "./common";
 import { CodexAccountPanel } from "./CodexAccountPanel";
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../lib/core/productLinks";
+import { reportExpectedFailure } from "../lib/core/nonFatalReporting";
 import {
   deleteHostedAccount,
   recheckHostedAccountDeletion,
@@ -30,6 +31,8 @@ export function ProfileDrawerPanel({
   relaySessionPersistence,
   codexAccountPanel = <CodexAccountPanel />,
   archivePanel,
+  onHostedAccountDeletionStarted,
+  onHostedAccountDeletionRejected,
   onHostedAccountDeleted,
   onSignIn,
   onSignOut
@@ -45,9 +48,11 @@ export function ProfileDrawerPanel({
   relaySessionPersistence: string;
   codexAccountPanel?: ReactNode;
   archivePanel?: ReactNode;
-  onHostedAccountDeleted: () => void;
+  onHostedAccountDeletionStarted: () => void | Promise<void>;
+  onHostedAccountDeletionRejected: () => void;
+  onHostedAccountDeleted: () => void | Promise<void>;
   onSignIn: () => void;
-  onSignOut: () => void;
+  onSignOut: () => void | Promise<void>;
 }) {
   const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null);
   const [deletionOpen, setDeletionOpen] = useState(false);
@@ -70,22 +75,25 @@ export function ProfileDrawerPanel({
     setDeletionBusy(true);
     setDeletionResult(null);
     try {
+      await onHostedAccountDeletionStarted();
       const result = await deleteHostedAccount(deletionConfirmation);
       setDeletionResult(result);
       if (result.status === "deleted") {
         setDeletionConfirmation("");
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
       } else if (result.status === "pending") {
         setDeletionConfirmation("");
         setDeletionStatus(
           "The relay durably accepted the deletion request and signed this identity out. Primary cleanup is pending and will be retried before the relay next accepts traffic."
         );
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
       } else if (result.status === "indeterminate") {
         setDeletionStatus(
           "The configured relay reports this session as signed out after the deletion response was lost. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
         );
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
+      } else {
+        onHostedAccountDeletionRejected();
       }
     } catch (error) {
       setDeletionStatus(
@@ -104,11 +112,12 @@ export function ProfileDrawerPanel({
         setDeletionStatus(
           "The configured relay still reports this session as signed in, so deletion is not confirmed. Review any blockers and retry the deletion request."
         );
+        onHostedAccountDeletionRejected();
       } else {
         setDeletionStatus(
           "The configured relay reports this session as signed out. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
         );
-        onHostedAccountDeleted();
+        await onHostedAccountDeleted();
       }
     } catch (error) {
       setDeletionStatus(`Account status could not be rechecked: ${String(error)}. Do not assume deletion completed.`);
@@ -147,7 +156,11 @@ export function ProfileDrawerPanel({
         authError={authError}
         deviceFlow={deviceFlow}
         onSignIn={onSignIn}
-        onSignOut={onSignOut}
+        onSignOut={() =>
+          void Promise.resolve(onSignOut()).catch(() => {
+            reportExpectedFailure("GitHub sign-out failure was reflected in authentication state");
+          })
+        }
       />
 
       {currentUser && (

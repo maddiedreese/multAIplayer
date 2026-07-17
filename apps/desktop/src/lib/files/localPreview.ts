@@ -1,8 +1,9 @@
 import { reportExpectedFailure } from "../core/nonFatalReporting";
 
-export const localPreviewPorts = [3000, 3001, 5173, 5174, 8000, 8080, 4200, 5000, 8888] as const;
-
 export const localPreviewHosts = ["localhost", "127.0.0.1"] as const;
+
+export const localPreviewTerminationWarning =
+  "A local preview process could not be confirmed stopped. Quit multAIplayer now to guarantee that public sharing ends.";
 
 export const quickTunnelDisclaimer =
   "Cloudflare is a third-party service. Use of Cloudflare Quick Tunnel is subject to Cloudflare's terms and policies.";
@@ -61,10 +62,6 @@ export function normalizeLocalPreviewUrl(value: string): string {
   return parsed.toString();
 }
 
-export function localPreviewDetectionUrls(): string[] {
-  return localPreviewPorts.flatMap((port) => localPreviewHosts.map((host) => `http://${host}:${port}/`));
-}
-
 export function localPreviewLabel(url: string): string {
   try {
     const parsed = new URL(url);
@@ -72,16 +69,6 @@ export function localPreviewLabel(url: string): string {
   } catch {
     reportExpectedFailure("local preview label parser rejected malformed input");
     return url;
-  }
-}
-
-export function isTryCloudflareUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "https:" && /^[a-zA-Z0-9.-]+\.trycloudflare\.com$/.test(parsed.hostname);
-  } catch {
-    reportExpectedFailure("quick-tunnel URL validation rejected malformed input");
-    return false;
   }
 }
 

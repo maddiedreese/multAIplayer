@@ -44,8 +44,15 @@ function sidebarRoomDisplay(room: ClientRoomRecord | null) {
 }
 
 export interface SidebarSources {
-  githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn" | "clearDeletedHostedAccount">;
-  roomRuntime: Pick<ReturnType<typeof useRoomRuntimeContext>, "signOut" | "chooseProjectPath">;
+  githubAuth: Pick<ReturnType<typeof useGitHubAuth>, "beginGitHubSignIn">;
+  roomRuntime: Pick<
+    ReturnType<typeof useRoomRuntimeContext>,
+    | "signOut"
+    | "prepareHostedAccountDeletion"
+    | "hostedAccountDeletionRejected"
+    | "hostedAccountDeleted"
+    | "chooseProjectPath"
+  >;
   workspaceFlow: Pick<
     ReturnType<typeof useWorkspaceFlowContext>,
     | "addTeam"
@@ -304,7 +311,9 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
             hasSelectedRoom={hasSelectedRoom}
           />
         ),
-        onHostedAccountDeleted: sources.githubAuth.clearDeletedHostedAccount,
+        onHostedAccountDeletionStarted: sources.roomRuntime.prepareHostedAccountDeletion,
+        onHostedAccountDeletionRejected: sources.roomRuntime.hostedAccountDeletionRejected,
+        onHostedAccountDeleted: sources.roomRuntime.hostedAccountDeleted,
         onSignIn: sources.githubAuth.beginGitHubSignIn,
         onSignOut: sources.roomRuntime.signOut
       }}
