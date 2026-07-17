@@ -462,7 +462,8 @@ function TerminalCommandRequest({
       {pending && (
         <div className="terminal-request-warning">
           <InlineSecretWarning
-            risks={["Approving runs this shell command on the host account, not inside a project sandbox."]}
+            risks={["Shell commands"]}
+            detail="They run as your host account with filesystem writes confined to this project; system and toolchain reads, child processes, inherited environment, and network access remain available."
             compact
           />
         </div>

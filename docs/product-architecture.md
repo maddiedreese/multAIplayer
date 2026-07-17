@@ -75,7 +75,7 @@ npm run check
 npm test
 ```
 
-Pull requests run blocking workspace checks and an always-present product-journey aggregate; executable changes run UI, native two-client, and packaged macOS journeys. Scheduled workflows run focused fuzz, relay churn/restore, supply-chain, container, compatibility, and native checks. Releases rerun the full supply-chain workflow against the exact tagged source before verifying signing, notarization, authenticated updater metadata, checksums, and the required asset set. Workflow definitions are the source of truth for the current gates.
+Pull requests run blocking workspace checks and an always-present product-journey aggregate. Relevant executable changes run UI and native two-client journeys; Tauri, packaging, and macOS build changes also run the packaged-app journey. Scheduled workflows run focused fuzz, relay churn/restore, supply-chain, container, compatibility, and native checks. Releases rerun the full supply-chain workflow against the exact tagged source before verifying signing, notarization, authenticated updater metadata, checksums, and the required asset set. Workflow definitions are the source of truth for the current gates.
 
 Tests that support security or release claims must assert behavior that actually executed. A green check is not evidence when it only matches output from an otherwise failing command.
 

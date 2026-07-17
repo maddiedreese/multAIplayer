@@ -5,6 +5,7 @@ import {
   type ClientRoomRecord
 } from "@multaiplayer/protocol";
 import type { GitDiffResult, ProjectFileContent, TerminalSnapshot } from "../platform/localBackend";
+import { isRetainableTerminalLine } from "../terminal/terminalState";
 import { stripTerminalControlSequences } from "../terminal/terminalText";
 
 export interface MarkdownChatAttachment {
@@ -228,7 +229,9 @@ export function buildTerminalMarkdown(
   sensitiveRisks: string[] = []
 ): string {
   const title = terminal ? terminal.name : "Room terminal log";
-  const visibleLines = lines.filter((line) => !(line.stream === "system" && line.text.trim() === "$ exec zsh -f"));
+  const visibleLines = lines.filter(
+    (line) => isRetainableTerminalLine(line) && !(line.stream === "system" && line.text.trim() === "$ exec zsh -f")
+  );
   const output = visibleLines.length
     ? visibleLines
         .map((line) => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { replaceRoomTerminalSnapshots } from "../src/lib/terminal/terminalState";
+import { terminalsForLocalHistory, replaceRoomTerminalSnapshots } from "../src/lib/terminal/terminalState";
 
 const alphaTerminal = { id: "alpha:dev", roomId: "alpha", name: "dev", running: true };
 const betaTerminal = { id: "beta:dev", roomId: "beta", name: "dev", running: true };
@@ -21,4 +21,23 @@ test("replaceRoomTerminalSnapshots clears one room while preserving others", () 
   const next = replaceRoomTerminalSnapshots([alphaTerminal, betaTerminal], "alpha", []);
 
   assert.deepEqual(next, [betaTerminal]);
+});
+
+test("terminal history drops interactive input while retaining process output", () => {
+  const [terminal] = terminalsForLocalHistory([
+    {
+      ...alphaTerminal,
+      lines: [
+        { stream: "stdout", text: "Password: " },
+        { stream: "stdin", text: "ghp_attacker_shaped_secret" },
+        { stream: "system", text: "done" }
+      ]
+    }
+  ]);
+
+  assert.equal(terminal?.running, false);
+  assert.deepEqual(terminal?.lines, [
+    { stream: "stdout", text: "Password: " },
+    { stream: "system", text: "done" }
+  ]);
 });

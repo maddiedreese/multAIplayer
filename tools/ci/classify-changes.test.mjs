@@ -52,18 +52,32 @@ test("desktop frontend changes select UI coverage without native or packaged-app
   }
 });
 
-test("native, protocol, manifest, and lockfile changes retain expensive journey coverage", () => {
+test("native and desktop manifest changes retain packaged-app coverage", () => {
   for (const path of [
     "apps/desktop/src-tauri/src/lib.rs",
     "apps/desktop/src-tauri/tauri.conf.json",
     "apps/desktop/package.json",
-    "apps/desktop/native-command-error-codes.json",
-    "packages/protocol/src/relay-messages.ts",
-    "package-lock.json"
+    "package.json"
   ]) {
     const result = classifyChanges([path]);
     assert.equal(result.native_journey, true, `${path} must select the native-shell journey`);
     assert.equal(result.macos, true, `${path} must select packaged macOS coverage`);
+  }
+});
+
+test("native IPC vocabulary changes exercise the native journey without rebuilding the packaged app", () => {
+  const result = classifyChanges(["apps/desktop/native-command-error-codes.json"]);
+  assert.equal(result.javascript, true);
+  assert.equal(result.native_journey, true);
+  assert.equal(result.macos, false);
+});
+
+test("protocol and lockfile changes use product journeys without rebuilding the packaged app", () => {
+  for (const path of ["packages/protocol/src/relay-messages.ts", "package-lock.json", ".npmrc"]) {
+    const result = classifyChanges([path]);
+    assert.equal(result.ui_journey, true, `${path} must select the UI journey`);
+    assert.equal(result.native_journey, true, `${path} must select the native-shell journey`);
+    assert.equal(result.macos, false, `${path} must not select packaged macOS coverage`);
   }
 });
 

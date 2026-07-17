@@ -4,8 +4,7 @@ A hook earns its own file only when it is reused or owns a real React lifecycle,
 Otherwise, inline it at its call site. New multi-file hook internals belong in a domain directory instead of adding
 more files to this root.
 
-Only put code here when it needs React. Imperative workflows belong in `application/`, pure helpers in `lib/`,
-display projections in `presentation/`, and state ownership in `store/`.
+Follow the repository-wide [code placement guide](../../../../CONTRIBUTING.md#where-changes-belong).
 
 Action factories should read Zustand actions from `useAppStore.getState()` at invocation time instead of accepting
 store setters as parameters. This keeps them usable from relay routing and directly testable without a renderer.

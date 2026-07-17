@@ -38,10 +38,19 @@ export function terminalsForLocalHistory<T extends PersistableTerminalSnapshot>(
   return terminals.map(terminalForLocalHistory).sort((left, right) => left.name.localeCompare(right.name));
 }
 
+export function isRetainableTerminalLine(line: unknown): boolean {
+  return !(
+    typeof line === "object" &&
+    line !== null &&
+    "stream" in line &&
+    (line as { stream?: unknown }).stream === "stdin"
+  );
+}
+
 function terminalForLocalHistory<T extends PersistableTerminalSnapshot>(terminal: T): T {
   return {
     ...terminal,
     running: false,
-    lines: terminal.lines.slice(-1000)
+    lines: terminal.lines.filter(isRetainableTerminalLine).slice(-1000)
   };
 }
