@@ -4,12 +4,14 @@ interface AccountActionsOptions {
   stopOwnedLocalPreviews: (reason: string) => Promise<boolean>;
   signOutGitHub: () => Promise<void>;
   clearDeletedHostedAccount: () => void;
+  reportUnconfirmedPreviewCleanup: () => void;
 }
 
 export function createAccountActions({
   stopOwnedLocalPreviews,
   signOutGitHub,
-  clearDeletedHostedAccount
+  clearDeletedHostedAccount,
+  reportUnconfirmedPreviewCleanup
 }: AccountActionsOptions) {
   async function cleanUpPreviews(reason: string) {
     try {
@@ -22,8 +24,11 @@ export function createAccountActions({
 
   async function signOut() {
     const previewCleanupConfirmed = await cleanUpPreviews("Stopped because the sharing user signed out.");
-    await signOutGitHub();
-    return previewCleanupConfirmed;
+    try {
+      await signOutGitHub();
+    } finally {
+      if (!previewCleanupConfirmed) reportUnconfirmedPreviewCleanup();
+    }
   }
 
   async function hostedAccountDeleted() {
@@ -31,7 +36,7 @@ export function createAccountActions({
       "Stopped because the sharing user's hosted account was deleted."
     );
     clearDeletedHostedAccount();
-    return previewCleanupConfirmed;
+    if (!previewCleanupConfirmed) reportUnconfirmedPreviewCleanup();
   }
 
   return { signOut, hostedAccountDeleted };

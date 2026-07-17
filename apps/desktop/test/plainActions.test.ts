@@ -102,7 +102,8 @@ test("account sign-out actions preserve preview cleanup ordering without React",
     signOutGitHub: async () => {
       calls.push("github");
     },
-    clearDeletedHostedAccount: () => calls.push("deleted")
+    clearDeletedHostedAccount: () => calls.push("deleted"),
+    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
   });
 
   await actions.signOut();
@@ -118,7 +119,8 @@ test("hosted-account deletion stops previews before clearing account state", asy
       return true;
     },
     signOutGitHub: async () => undefined,
-    clearDeletedHostedAccount: () => calls.push("deleted")
+    clearDeletedHostedAccount: () => calls.push("deleted"),
+    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
   });
 
   await actions.hostedAccountDeleted();
@@ -134,13 +136,13 @@ test("hosted-account deletion clears local identity even when native preview cle
       throw new Error("native stop failed");
     },
     signOutGitHub: async () => undefined,
-    clearDeletedHostedAccount: () => calls.push("deleted")
+    clearDeletedHostedAccount: () => calls.push("deleted"),
+    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
   });
 
-  const previewCleanupConfirmed = await actions.hostedAccountDeleted();
+  await actions.hostedAccountDeleted();
 
-  assert.deepEqual(calls, ["preview", "deleted"]);
-  assert.equal(previewCleanupConfirmed, false);
+  assert.deepEqual(calls, ["preview", "deleted", "warning"]);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {

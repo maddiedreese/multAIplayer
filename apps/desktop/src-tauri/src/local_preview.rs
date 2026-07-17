@@ -8,7 +8,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::State;
 
-use crate::process::{terminate_child, trim_command_output};
+use crate::process::{terminate_child, terminate_child_confirmed, trim_command_output};
 use crate::validation::{
     ensure_local_preview_reachable, ensure_preview_id, local_port_reachable,
     local_preview_reachable, validate_local_preview_url, MAX_COMMAND_OUTPUT_CHARS,
@@ -29,11 +29,27 @@ struct LocalPreviewRegistry {
 }
 
 impl LocalPreviewRegistry {
-    fn cancel_all(&mut self) -> usize {
+    fn cancel_all(&mut self) -> Result<usize, String> {
         self.generation = self.generation.wrapping_add(1);
-        let stopped = self.tunnels.len();
-        self.tunnels.clear();
-        stopped
+        let mut stopped_ids = Vec::new();
+        let mut failed_ids = Vec::new();
+        for (id, tunnel) in &mut self.tunnels {
+            match terminate_child_confirmed(&mut tunnel.child) {
+                Ok(()) => stopped_ids.push(id.clone()),
+                Err(_) => failed_ids.push(id.clone()),
+            }
+        }
+        for id in &stopped_ids {
+            self.tunnels.remove(id);
+        }
+        if failed_ids.is_empty() {
+            Ok(stopped_ids.len())
+        } else {
+            Err(format!(
+                "Could not confirm termination for {} local preview tunnel process(es).",
+                failed_ids.len()
+            ))
+        }
     }
 }
 
@@ -239,19 +255,20 @@ pub(crate) fn local_preview_start(
             .registry
             .lock()
             .map_err(|_| "Local preview state lock is poisoned".to_string())?;
+        let mut tunnel = LocalPreviewTunnel {
+            id: request.id.clone(),
+            local_url: local_url.clone(),
+            public_url: public_url.clone(),
+            child,
+        };
         if registry.generation != start_generation {
-            terminate_child(&mut child);
+            if terminate_child_confirmed(&mut tunnel.child).is_err() {
+                registry.tunnels.insert(request.id.clone(), tunnel);
+                return Err("Local preview startup was cancelled, but process termination could not be confirmed.".into());
+            }
             return Err("Local preview startup was cancelled during account cleanup.".into());
         }
-        registry.tunnels.insert(
-            request.id.clone(),
-            LocalPreviewTunnel {
-                id: request.id.clone(),
-                local_url: local_url.clone(),
-                public_url: public_url.clone(),
-                child,
-            },
-        );
+        registry.tunnels.insert(request.id.clone(), tunnel);
     }
 
     Ok(LocalPreviewStartResult {
@@ -272,10 +289,21 @@ pub(crate) fn local_preview_stop(
         .registry
         .lock()
         .map_err(|_| "Local preview state lock is poisoned".to_string())?;
-    let Some(mut tunnel) = registry.tunnels.remove(&id) else {
-        return Err("Local preview tunnel is not running on this device.".into());
+    let Some(tunnel) = registry.tunnels.get_mut(&id) else {
+        return Ok(LocalPreviewStopResult {
+            id,
+            local_url: String::new(),
+            public_url: String::new(),
+            stopped: false,
+        });
     };
-    terminate_child(&mut tunnel.child);
+    terminate_child_confirmed(&mut tunnel.child).map_err(|_| {
+        "Local preview tunnel process termination could not be confirmed.".to_string()
+    })?;
+    let tunnel = registry
+        .tunnels
+        .remove(&id)
+        .ok_or_else(|| "Local preview tunnel disappeared during termination.".to_string())?;
     Ok(LocalPreviewStopResult {
         id: tunnel.id.clone(),
         local_url: tunnel.local_url.clone(),
@@ -292,7 +320,7 @@ pub(crate) fn local_preview_stop_all(
         Ok(registry) => registry,
         Err(poisoned) => poisoned.into_inner(),
     };
-    Ok(registry.cancel_all())
+    registry.cancel_all().map_err(Into::into)
 }
 
 #[typed_tauri_command::command]
@@ -374,7 +402,7 @@ mod tests {
         let mut registry = LocalPreviewRegistry::default();
         let start_generation = registry.generation;
 
-        assert_eq!(registry.cancel_all(), 0);
+        assert_eq!(registry.cancel_all().expect("cancel empty registry"), 0);
 
         assert_ne!(registry.generation, start_generation);
     }
@@ -407,7 +435,7 @@ mod tests {
             },
         );
 
-        assert_eq!(registry.cancel_all(), 1);
+        assert_eq!(registry.cancel_all().expect("cancel registered tunnel"), 1);
         thread::sleep(Duration::from_millis(650));
 
         assert!(

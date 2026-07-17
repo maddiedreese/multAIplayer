@@ -2,6 +2,9 @@ import { reportExpectedFailure } from "../core/nonFatalReporting";
 
 export const localPreviewHosts = ["localhost", "127.0.0.1"] as const;
 
+export const localPreviewTerminationWarning =
+  "A local preview process could not be confirmed stopped. Quit multAIplayer now to guarantee that public sharing ends.";
+
 export const quickTunnelDisclaimer =
   "Cloudflare is a third-party service. Use of Cloudflare Quick Tunnel is subject to Cloudflare's terms and policies.";
 

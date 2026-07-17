@@ -6,7 +6,12 @@ import {
   stopAllLocalPreviewTunnels,
   stopLocalPreviewTunnel
 } from "../../lib/platform/localBackend";
-import { localPreviewLabel, normalizeLocalPreviewUrl, quickTunnelDisclaimer } from "../../lib/files/localPreview";
+import {
+  localPreviewLabel,
+  localPreviewTerminationWarning,
+  normalizeLocalPreviewUrl,
+  quickTunnelDisclaimer
+} from "../../lib/files/localPreview";
 import { roomLockMessage } from "../runtime/appRuntime";
 import { useAppStore } from "../../store/appStore";
 import type { LocalPreviewRecord } from "../../types";
@@ -140,6 +145,7 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
           await stopLocalPreviewTunnel(previewId);
         } catch {
           reportExpectedFailure("cancelled local preview tunnel was already stopped");
+          useAppStore.getState().setAuthError(localPreviewTerminationWarning);
         }
         return;
       }
@@ -156,7 +162,15 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
       useAppStore.getState().closeLocalPreviewDialog();
       useAppStore.getState().setChatMessageForRoom(room.id, `Shared local preview: ${tunnel.publicUrl}`);
     } catch (error) {
-      if (cleanupGeneration !== localPreviewCleanupGeneration) return;
+      if (cleanupGeneration !== localPreviewCleanupGeneration) {
+        try {
+          await stopLocalPreviewTunnel(previewId);
+        } catch {
+          reportExpectedFailure("cancelled local preview tunnel termination could not be confirmed");
+          useAppStore.getState().setAuthError(localPreviewTerminationWarning);
+        }
+        return;
+      }
       const errorPayload: LocalPreviewRecord = {
         ...startingPayload,
         status: "error",

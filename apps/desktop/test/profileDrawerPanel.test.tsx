@@ -68,10 +68,9 @@ test("accepted hosted-account deletion is reported as protected and pending clea
         codexAccountPanel={null}
         onHostedAccountDeleted={() => {
           deleted += 1;
-          return false;
         }}
         onSignIn={() => undefined}
-        onSignOut={() => true}
+        onSignOut={() => undefined}
       />
     );
     assert.equal(view.queryByRole("button", { name: "Reset device identity" }), null);
@@ -99,7 +98,6 @@ test("accepted hosted-account deletion is reported as protected and pending clea
     assert.equal(deletionRequest?.init?.method, "DELETE");
     assert.equal(deletionRequest?.init?.body, JSON.stringify({ confirmation: "delete my account" }));
     assert.match(view.getByText("Account deletion status").parentElement?.textContent ?? "", /durably accepted/i);
-    assert.match(view.getByRole("alert").textContent ?? "", /quit multAIplayer.*public sharing ends/i);
   } finally {
     globalThis.fetch = originalFetch;
   }

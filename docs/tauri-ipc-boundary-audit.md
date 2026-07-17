@@ -163,7 +163,7 @@ of the trusted computing base for every custom command below.
 | `probe_cloudflared`            | local  | No input; fixed `cloudflared --version`, bounded error/version presentation.                                                                                                                                   |
 | `local_preview_start`          | local  | ID grammar, loopback-only URL/port policy and reachability checked; fixed cloudflared argv; emitted public URL must match `trycloudflare.com`; replaces same-ID tunnel. Exposes a local service intentionally. |
 | `local_preview_status`         | local  | ID grammar and existing native tunnel required; reports URLs and liveness. Scoped ID is not caller authentication (IPC-03).                                                                                    |
-| `local_preview_stop`           | local  | ID grammar and existing tunnel required; removes then terminates the exact process. Scoped ID is not caller authentication (IPC-03).                                                                           |
+| `local_preview_stop`           | local  | ID grammar required; idempotently terminates the exact process when registered and reports whether one was stopped. Scoped ID is not caller authentication (IPC-03).                                           |
 | `local_preview_stop_all`       | local  | Account-exit cleanup increments the native start generation and terminates every registered Quick Tunnel; in-flight starts from an earlier generation fail before registration.                                |
 
 ### MLS identity, messages, and history

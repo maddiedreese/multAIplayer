@@ -14,6 +14,7 @@ import { openTrustedAuthenticationUrl } from "../lib/identity/authExternalUrl";
 import { invokeNative } from "../lib/platform/nativeCommandError";
 import { clearDeviceSession } from "../lib/identity/deviceSession";
 import { resumeLocalPreviewSharingAfterAuthentication } from "../application/files/localPreviewActions";
+import { localPreviewTerminationWarning } from "../lib/files/localPreview";
 
 const fallbackAuthConfig: GitHubAuthConfig = {
   provider: "github",
@@ -160,8 +161,12 @@ export function useGitHubAuth(relayHttpUrl: string) {
   }, [deviceFlow, setAuthBusy, setAuthError, setDeviceFlow]);
 
   const signOutGitHub = useCallback(async () => {
+    let logoutError: unknown = null;
     try {
       await logout();
+    } catch (error) {
+      logoutError = error;
+      throw error;
     } finally {
       clearDeviceSession();
       const store = useAppStore.getState();
@@ -171,8 +176,14 @@ export function useGitHubAuth(relayHttpUrl: string) {
       setCurrentUser(null);
       setDeviceFlow(null);
       setAuthBusy(false);
+      if (logoutError)
+        setAuthError("Signed out locally, but the relay or GitHub credential cleanup reported a failure.");
     }
-  }, [setAuthBusy, setCurrentUser, setDeviceFlow]);
+  }, [setAuthBusy, setAuthError, setCurrentUser, setDeviceFlow]);
+
+  const reportUnconfirmedPreviewCleanup = useCallback(() => {
+    setAuthError(localPreviewTerminationWarning);
+  }, [setAuthError]);
 
   const clearDeletedHostedAccount = useCallback(() => {
     clearDeviceSession();
@@ -198,6 +209,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
     beginGitHubSignIn,
     cancelGitHubSignIn,
     signOutGitHub,
-    clearDeletedHostedAccount
+    clearDeletedHostedAccount,
+    reportUnconfirmedPreviewCleanup
   };
 }

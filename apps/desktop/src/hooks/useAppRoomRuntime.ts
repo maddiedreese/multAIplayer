@@ -154,7 +154,8 @@ export function useAppRoomRuntime({
       },
       account: {
         signOutGitHub: githubAuth.signOutGitHub,
-        clearDeletedHostedAccount: githubAuth.clearDeletedHostedAccount
+        clearDeletedHostedAccount: githubAuth.clearDeletedHostedAccount,
+        reportUnconfirmedPreviewCleanup: githubAuth.reportUnconfirmedPreviewCleanup
       },
       githubActions: {
         selectedRoom,
