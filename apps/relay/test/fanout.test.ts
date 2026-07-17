@@ -61,6 +61,37 @@ test("queued publishes fail after room lifecycle changes without restoring durab
   assert.equal(store.acceptedMessageReceipts.size, 0);
 });
 
+test("queued publishes recheck the exact caller authorization after capacity reclamation", async () => {
+  let authorized = true;
+  let writes = 0;
+  const { store, key } = setup(async () => {
+    writes += 1;
+  });
+  const fanout = fanoutFor(
+    store,
+    key,
+    async () => {
+      writes += 1;
+    },
+    async () => {
+      writes += 1;
+    },
+    true,
+    createRelayMetrics(),
+    async () => {
+      authorized = false;
+    }
+  );
+
+  await assert.rejects(
+    fanout.publishMlsMessage(message("after-revocation", "application", 0), () => authorized),
+    (error: unknown) => error instanceof Error && "code" in error && error.code === "not_joined"
+  );
+  assert.equal(writes, 0);
+  assert.equal(store.getMlsBacklog(key), undefined);
+  assert.equal(store.acceptedMessageReceipts.size, 0);
+});
+
 test("workspace updates are sent only to current team members", () => {
   const store = createRelayStore();
   const team = { id: "team-core", name: "Core", members: 1 };
@@ -332,7 +363,7 @@ function fanoutFor(
   metrics = createRelayMetrics(),
   reclaimDurableCapacity?: () => Promise<void>
 ) {
-  return createRelayFanout({
+  const fanout = createRelayFanout({
     store,
     roomSockets: store.roomSockets,
     teamSockets: store.teamSockets,
@@ -348,6 +379,11 @@ function fanoutFor(
     saveMlsCommit,
     teamRecordForUser: (team) => team
   });
+  return {
+    ...fanout,
+    publishMlsMessage: (message: MlsRelayMessage, remainsAuthorized: () => boolean = () => true) =>
+      fanout.publishMlsMessage(message, remainsAuthorized)
+  };
 }
 
 function recordingSocket() {

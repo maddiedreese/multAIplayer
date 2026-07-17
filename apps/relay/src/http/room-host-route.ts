@@ -1,9 +1,9 @@
 import { sendRelayError } from "./errors.js";
 import type { RoomRecord } from "@multaiplayer/protocol";
 import { hasDeviceSession } from "./device-auth.js";
-import type { RegisterRoomRoutesOptions } from "./room-route-types.js";
+import type { RoomHostRouteOptions } from "./room-route-types.js";
 
-export function registerRoomHostRoute(options: RegisterRoomRoutesOptions) {
+export function registerRoomHostRoute(options: RoomHostRouteOptions) {
   const {
     app,
     store,
@@ -90,12 +90,12 @@ function invalidRequestedHost(
 function isInitialHostBootstrap(options: {
   body: unknown;
   room: RoomRecord;
-  session: ReturnType<RegisterRoomRoutesOptions["getAuthSession"]>;
+  session: ReturnType<RoomHostRouteOptions["getAuthSession"]>;
   requestedHost: string | null;
   requestedHostUserId: string | null;
   requestedHostDeviceId: string | null;
   deviceSession: string | undefined;
-  store: RegisterRoomRoutesOptions["store"];
+  store: RoomHostRouteOptions["store"];
 }): boolean {
   const { room, session } = options;
   if (!session || !options.requestedHostDeviceId || !hasExactHostBootstrapBody(options.body)) return false;

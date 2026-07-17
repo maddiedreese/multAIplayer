@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { InviteJoinRequestRecord, InviteRecord, KeyPackageRecord, RoomRecord } from "@multaiplayer/protocol";
 import { consumeKeyPackageForInvite } from "../../src/http/key-package-consumption-transaction.js";
 import { commitValidatedKeyPackages } from "../../src/http/key-package-upload-transaction.js";
-import { createRelayStore } from "../../src/state.js";
+import { createRelayStore, RelayStoreCapacityError, type RelayStore } from "../../src/state.js";
 import { createRelayPersistence } from "../../src/persistence.js";
 import { acquireAccountMutationTurn } from "../../src/auth/account-mutation-transaction.js";
 
@@ -195,6 +195,26 @@ test("a queued consume revalidates live host authority before mutation or persis
   assert.deepEqual(store.getInvite(invite.id), invite);
 });
 
+test("team tombstone capacity rejection restores the live KeyPackage and invite", async () => {
+  const store = createRelayStore(100, 3);
+  const { common, invite, keyPackage } = transactionFixture({}, store);
+  let persistenceCalls = 0;
+  await assert.rejects(
+    () =>
+      consumeKeyPackageForInvite({
+        ...common,
+        persist: async () => {
+          persistenceCalls += 1;
+        }
+      }),
+    (error: unknown) => error instanceof RelayStoreCapacityError && error.teamId === "team-one"
+  );
+  assert.equal(persistenceCalls, 0);
+  assert.equal(store.keyPackages.get(keyPackage.id), keyPackage);
+  assert.equal(store.consumedKeyPackages.has(keyPackage.keyPackageHash), false);
+  assert.equal(store.getInvite(invite.id), invite);
+});
+
 test("an upload waits for consumption and cannot reintroduce the consumed KeyPackage under another id", async () => {
   const { store, room, invite, keyPackage, common } = transactionFixture();
   const save = deferred<void>();
@@ -361,8 +381,7 @@ test("a consumed hash survives restart and rejects alternate-id reuse", async ()
   }
 });
 
-function transactionFixture(inviteOverrides: Partial<InviteRecord> = {}) {
-  const store = createRelayStore();
+function transactionFixture(inviteOverrides: Partial<InviteRecord> = {}, store: RelayStore = createRelayStore()) {
   const room: RoomRecord = {
     id: "room-one",
     teamId: "team-one",

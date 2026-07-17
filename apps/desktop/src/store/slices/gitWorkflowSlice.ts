@@ -137,26 +137,6 @@ export function projectGitHubWorkflowPanelMaps(
   };
 }
 
-export function projectGitWorkflowEventsByRoom(
-  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom
-): Record<string, GitWorkflowEventPlaintextPayload[]> {
-  return Object.fromEntries(
-    Object.entries(gitWorkflowRuntimeByRoom)
-      .filter(([, runtime]) => runtime.workflow?.events)
-      .map(([roomId, runtime]) => [roomId, runtime.workflow?.events ?? []])
-  );
-}
-
-export function projectGitHubActionsEventsByRoom(
-  gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom
-): Record<string, GitHubActionsEventPlaintextPayload[]> {
-  return Object.fromEntries(
-    Object.entries(gitWorkflowRuntimeByRoom)
-      .filter(([, runtime]) => runtime.actions?.events)
-      .map(([roomId, runtime]) => [roomId, runtime.actions?.events ?? []])
-  );
-}
-
 export interface GitWorkflowSlice {
   gitWorkflowRuntimeByRoom: GitWorkflowRuntimeByRoom;
   setActionsMessageForRoom: (roomId: string, message: string | null) => void;

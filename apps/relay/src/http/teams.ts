@@ -3,7 +3,12 @@ import type { Express, Response } from "express";
 import { nanoid } from "nanoid";
 import type { RoomRecord, TeamMemberRecord, TeamRecord, TeamRole } from "@multaiplayer/protocol";
 import { RelayStoreCapacityError, type AuthSession, type RelayStore } from "../state.js";
-import { acquireDurableQuotaTransaction, reserveDurableQuota, rollbackDurableQuota } from "../auth/account-quotas.js";
+import {
+  acquireDurableQuotaTransaction,
+  nextUtcMidnight,
+  reserveDurableQuota,
+  rollbackDurableQuota
+} from "../auth/account-quotas.js";
 import {
   acquireAccountMutationTurn,
   acquireAccountMutationTurns,
@@ -49,10 +54,8 @@ export function registerTeamRoutes(options: RegisterTeamRoutesOptions) {
     isTeamMember,
     teamRoleRank,
     canSetTeamMemberRole,
-    canRemoveTeamMember,
     transferTeamOwnership,
     revokeTeamInvites,
-    revokeTeamMemberSessions,
     broadcastWorkspaceUpdated,
     broadcastRoomUpdated,
     scheduleStoreSave,
@@ -170,39 +173,24 @@ export function registerTeamRoutes(options: RegisterTeamRoutesOptions) {
     }
   });
 
-  app.delete("/teams/:teamId/members/:userId", (req, res) => {
+  app.delete("/teams/:teamId/members/:userId", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
 
     const teamId = String(req.params.teamId ?? "");
     const userId = String(req.params.userId ?? "");
-    if (!store.hasTeam(teamId)) {
-      sendRelayError(res, 404, "team_not_found", "Team not found");
-      return;
+    const releaseAccountMutations = await acquireAccountMutationTurns(
+      store,
+      session ? [session.user.id, userId] : [userId]
+    );
+    try {
+      if (session && !isLiveAccountSession(store, session)) {
+        return void sendRelayError(res, 401, "authentication_required", "Sign in before removing a team member.");
+      }
+      removeTeamMemberWithinAccountTurns(options, session, teamId, userId, res);
+    } finally {
+      releaseAccountMutations();
     }
-    const members = store.getTeamMembers(teamId);
-    const target = store.getTeamMember(teamId, userId);
-    if (!members || !target) {
-      sendRelayError(res, 404, "team_member_not_found", "Team member not found");
-      return;
-    }
-    const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
-    if (!canRemoveTeamMember(requesterRole, target.role)) {
-      sendRelayError(res, 403, "forbidden", "Only team owners can remove admins, and owners cannot be removed.");
-      return;
-    }
-
-    members.delete(userId);
-    const team = store.getTeam(teamId);
-    if (team) {
-      const updatedTeam = { ...team, members: members.size };
-      store.setTeam(updatedTeam);
-      revokeTeamInvites(teamId);
-      revokeTeamMemberSessions(teamId, userId);
-    }
-    scheduleStoreSave();
-    if (team) broadcastWorkspaceUpdated(store.getTeam(teamId)!);
-    res.json({ members: listTeamMembers(teamId, store, teamRoleRank) });
   });
 
   app.patch("/teams/:teamId/lifecycle", (req, res) => {
@@ -272,6 +260,102 @@ export function registerTeamRoutes(options: RegisterTeamRoutesOptions) {
   });
 }
 
+function removeTeamMemberWithinAccountTurns(
+  options: RegisterTeamRoutesOptions,
+  session: AuthSession | null,
+  teamId: string,
+  userId: string,
+  res: Response
+): void {
+  const { store, canRemoveTeamMember, revokeTeamInvites, revokeTeamMemberSessions, scheduleStoreSave } = options;
+  if (!store.hasTeam(teamId)) {
+    sendRelayError(res, 404, "team_not_found", "Team not found");
+    return;
+  }
+  const members = store.getTeamMembers(teamId);
+  const target = store.getTeamMember(teamId, userId);
+  if (!members || !target) {
+    sendRelayError(res, 404, "team_member_not_found", "Team member not found");
+    return;
+  }
+  const requesterRole = session ? store.getTeamMember(teamId, session.user.id)?.role : "owner";
+  if (!canRemoveTeamMember(requesterRole, target.role)) {
+    sendRelayError(res, 403, "forbidden", "Only team owners can remove admins, and owners cannot be removed.");
+    return;
+  }
+  const retainedHostedRoom = store
+    .allRooms()
+    .find((room) => room.teamId === teamId && !room.deletedAt && room.hostUserId === userId);
+  if (retainedHostedRoom) {
+    sendRelayError(res, 409, "conflict", "Reassign room host authority before removing this team member.", {
+      roomId: retainedHostedRoom.id
+    });
+    return;
+  }
+
+  const team = store.getTeam(teamId);
+  if (!team) return void sendRelayError(res, 404, "team_not_found", "Team not found");
+  const previousMembers = new Map(members);
+  const scrubbedRooms = deletedRoomsHostedBy(store, teamId, userId);
+  const inviteArtifacts = snapshotTeamInviteArtifacts(store, teamId);
+  try {
+    scrubDeletedRoomHostIdentity(store, scrubbedRooms);
+    const updatedMembers = new Map(members);
+    updatedMembers.delete(userId);
+    store.setTeamMembers(teamId, updatedMembers);
+    store.setTeam({ ...team, members: updatedMembers.size });
+    revokeTeamInvites(teamId);
+    scheduleStoreSave();
+  } catch {
+    store.setTeamMembers(teamId, previousMembers);
+    store.setTeam(team);
+    for (const room of scrubbedRooms) store.setRoom(room);
+    restoreTeamInviteArtifacts(store, inviteArtifacts);
+    return void sendRelayError(res, 503, "persistence_unavailable", "Could not persist team member removal.");
+  }
+  revokeTeamMemberSessions(teamId, userId);
+  options.broadcastWorkspaceUpdated(store.getTeam(teamId)!);
+  res.json({ members: listTeamMembers(teamId, store, options.teamRoleRank) });
+}
+
+interface TeamInviteArtifactSnapshot {
+  invites: Map<string, RelayStore["invites"] extends Map<string, infer Value> ? Value : never>;
+  requests: Map<string, RelayStore["inviteRequests"] extends Map<string, infer Value> ? Value : never>;
+  responses: Map<string, RelayStore["inviteResponses"] extends Map<string, infer Value> ? Value : never>;
+  receipts: Map<string, RelayStore["inviteAckReceipts"] extends Map<string, infer Value> ? Value : never>;
+}
+
+function snapshotTeamInviteArtifacts(store: RelayStore, teamId: string): TeamInviteArtifactSnapshot {
+  const invites = new Map(Array.from(store.invites).filter(([, invite]) => invite.teamId === teamId));
+  const inviteIds = new Set(invites.keys());
+  return {
+    invites,
+    requests: new Map(Array.from(store.inviteRequests).filter(([, request]) => inviteIds.has(request.inviteId))),
+    responses: new Map(Array.from(store.inviteResponses).filter(([, response]) => inviteIds.has(response.inviteId))),
+    receipts: new Map(Array.from(store.inviteAckReceipts).filter(([, receipt]) => inviteIds.has(receipt.inviteId)))
+  };
+}
+
+function restoreTeamInviteArtifacts(store: RelayStore, snapshot: TeamInviteArtifactSnapshot): void {
+  for (const [id, invite] of snapshot.invites) store.invites.set(id, invite);
+  for (const [id, request] of snapshot.requests) store.inviteRequests.set(id, request);
+  for (const [id, response] of snapshot.responses) store.inviteResponses.set(id, response);
+  for (const [id, receipt] of snapshot.receipts) store.inviteAckReceipts.set(id, receipt);
+}
+
+function deletedRoomsHostedBy(store: RelayStore, teamId: string, userId: string): RoomRecord[] {
+  return store
+    .allRooms()
+    .filter((room) => room.teamId === teamId && Boolean(room.deletedAt) && room.hostUserId === userId);
+}
+
+function scrubDeletedRoomHostIdentity(store: RelayStore, rooms: RoomRecord[]): void {
+  for (const room of rooms) {
+    const { hostUserId: _hostUserId, activeHostDeviceId: _activeHostDeviceId, ...withoutHostIdentity } = room;
+    store.setRoom({ ...withoutHostIdentity, host: "Former member", hostStatus: "offline" });
+  }
+}
+
 interface TeamCreationRequest {
   session: AuthSession | null;
   name: string;
@@ -293,6 +377,12 @@ async function createTeamWithinAccountTurn(
   const teamsPerUser = dailyCreationCaps?.teamsPerUser ?? 25;
   const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
   try {
+    // A restriction, logout, or deletion can revoke this exact session while
+    // this request waits behind an unrelated durable-quota write.
+    if (session && !isLiveAccountSession(store, session)) {
+      sendRelayError(res, 401, "authentication_required", "Sign in before creating a team.");
+      return;
+    }
     const reservation = session
       ? reserveDurableQuota({
           store,
@@ -408,9 +498,4 @@ export function teamRecordForUser(
 
 function parseRequestedTeamRole(value: unknown): TeamRole | null {
   return value === "owner" || value === "admin" || value === "member" ? value : null;
-}
-
-function nextUtcMidnight(now: number): number {
-  const date = new Date(now);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
 }

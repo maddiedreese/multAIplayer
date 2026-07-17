@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import type {
   InviteRecord,
@@ -10,9 +12,115 @@ import type {
   TeamMemberRecord,
   TeamRecord
 } from "@multaiplayer/protocol";
-import { ackInviteResponseAtomically, isExactInviteAckReceipt } from "../../src/http/invite-delivery.js";
+import { ackInviteResponseAtomically } from "../../src/http/invite-ack-transaction.js";
+import { isExactInviteAckReceipt } from "../../src/http/invite-delivery.js";
 import { createRelayPersistence } from "../../src/persistence.js";
 import { InMemoryRelayStore } from "../../src/state.js";
+import {
+  createAuthenticatedTestDevice,
+  defaultWorkspaceFixture,
+  startRelayWithWorkspace,
+  type AuthenticatedTestDevice
+} from "../support/relay.js";
+
+const validatorPath = fileURLToPath(new URL("../fixtures/mock-keypackage-validator.mjs", import.meta.url));
+
+test("expired invite delivery endpoints enforce expiry while response lookup conceals capability state", async () => {
+  const expiresAt = "2099-07-13T12:00:00.000Z";
+  const fixture = defaultWorkspaceFixture();
+  fixture.invites = [
+    inviteFixture("request-post", expiresAt),
+    inviteFixture("request-get", expiresAt),
+    inviteFixture("response-post", expiresAt),
+    inviteFixture("response-read", expiresAt)
+  ];
+  fixture.inviteResponses = [deniedResponseFixture("response-read", expiresAt)];
+  const relay = await startRelayWithWorkspace(
+    {
+      MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+      MULTAIPLAYER_MLS_VALIDATOR_PATH: validatorPath
+    },
+    fixture
+  );
+  try {
+    const host = await createAuthenticatedTestDevice(relay.baseUrl, "github:maddiedreese", "host-device-1");
+    const peer = await createAuthenticatedTestDevice(relay.baseUrl, "github:tester", "peer-device-1");
+    const hostHeaders = authenticatedHeaders(host);
+    const peerHeaders = authenticatedHeaders(peer);
+    const keyPackage = "AA==";
+    const keyPackageHash = `sha256:${createHash("sha256").update(Buffer.from(keyPackage, "base64")).digest("hex")}`;
+    const upload = await fetch(`${relay.baseUrl}/devices/peer-device-1/key-packages`, {
+      method: "POST",
+      headers: peerHeaders,
+      body: JSON.stringify({
+        keyPackages: [{ id: "expired-boundary-kp", keyPackage, keyPackageHash, ciphersuite: 2 }]
+      })
+    });
+    assert.equal(upload.status, 201);
+
+    for (const inviteId of ["request-post", "request-get", "response-post", "response-read"]) {
+      const expired = await fetch(`${relay.baseUrl}/debug/invites/${inviteId}/expire`, { method: "POST" });
+      assert.equal(expired.status, 204);
+    }
+
+    await assertRelayError(
+      await fetch(`${relay.baseUrl}/invites/request-post/requests`, {
+        method: "POST",
+        headers: peerHeaders,
+        body: JSON.stringify({
+          requestId: "expired-boundary-request",
+          requesterDeviceId: "peer-device-1",
+          keyPackageId: "expired-boundary-kp",
+          keyPackageHash,
+          sealedRequest: "expiry must be checked before parsing this payload"
+        })
+      }),
+      410,
+      "invite_expired"
+    );
+    await assertRelayError(
+      await fetch(`${relay.baseUrl}/invites/request-get/requests?hostDeviceId=host-device-1`, {
+        headers: hostHeaders
+      }),
+      410,
+      "invite_expired"
+    );
+    await assertRelayError(
+      await fetch(`${relay.baseUrl}/invites/response-post/response`, {
+        method: "POST",
+        headers: hostHeaders,
+        body: JSON.stringify({
+          hostDeviceId: "host-device-1",
+          requestId: "expired-response-post-request",
+          status: "denied",
+          responseBinding: {},
+          responseMac: "AA=="
+        })
+      }),
+      410,
+      "invite_expired"
+    );
+    await assertRelayError(
+      await fetch(
+        `${relay.baseUrl}/invites/response-read/response/response-read-request?requesterDeviceId=peer-device-1`,
+        { headers: peerHeaders }
+      ),
+      404,
+      "not_found"
+    );
+    await assertRelayError(
+      await fetch(`${relay.baseUrl}/invites/response-read/response/response-read-request/ack`, {
+        method: "POST",
+        headers: peerHeaders,
+        body: JSON.stringify({ requesterDeviceId: "peer-device-1" })
+      }),
+      410,
+      "invite_expired"
+    );
+  } finally {
+    await relay.close();
+  }
+});
 
 test("invite response ACK rolls back on persistence failure and retries atomically after restart", async () => {
   const dir = await mkdtemp(join(tmpdir(), "relay-invite-ack-"));
@@ -147,6 +255,56 @@ test("invite ACK cannot admit after the invite expires", async () => {
   assert.equal(store.inviteResponses.has(response.requestId), true);
   assert.equal(store.getInvite(invite.id)?.id, invite.id);
 });
+
+function inviteFixture(id: string, expiresAt: string): InviteRecord {
+  return {
+    id,
+    teamId: "team-core",
+    roomId: "room-desktop",
+    createdAt: "2026-07-12T12:00:00.000Z",
+    expiresAt
+  };
+}
+
+function deniedResponseFixture(inviteId: string, expiresAt: string): InviteResponseRecord {
+  return {
+    requestId: `${inviteId}-request`,
+    inviteId,
+    requesterUserId: "github:tester",
+    requesterDeviceId: "peer-device-1",
+    keyPackageHash: `sha256:${"a".repeat(64)}`,
+    status: "denied",
+    responseBinding: {
+      version: 3,
+      phase: "response",
+      inviteId,
+      teamId: "team-core",
+      roomId: "room-desktop",
+      keyEpoch: 0,
+      keyPackageHash: `sha256:${"a".repeat(64)}`,
+      requestId: `${inviteId}-request`,
+      requestNonce: "expired-boundary-nonce",
+      requesterUserId: "github:tester",
+      requesterDeviceId: "peer-device-1",
+      hostUserId: "github:maddiedreese",
+      hostDeviceId: "host-device-1",
+      expiresAt,
+      status: "denied",
+      decidedAt: "2026-07-12T12:01:00.000Z"
+    },
+    responseMac: "AA==",
+    createdAt: "2026-07-12T12:01:00.000Z"
+  };
+}
+
+function authenticatedHeaders(device: AuthenticatedTestDevice): Record<string, string> {
+  return { "content-type": "application/json", cookie: device.cookie, "x-device-session": device.token };
+}
+
+async function assertRelayError(response: Response, status: number, code: string): Promise<void> {
+  assert.equal(response.status, status);
+  assert.equal(((await response.json()) as { code?: string }).code, code);
+}
 
 interface PersistedFixture {
   teams: TeamRecord[];

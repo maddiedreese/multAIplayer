@@ -1,12 +1,5 @@
 import { normalizeSafeBranchName } from "@multaiplayer/git";
 
-export interface GitHubUser {
-  id: string;
-  login: string;
-  name?: string;
-  avatarUrl?: string;
-}
-
 export interface PullRequestDraft {
   owner: string;
   repo: string;
@@ -16,11 +9,6 @@ export interface PullRequestDraft {
   base: string;
   draft: boolean;
 }
-
-export const githubScopes = {
-  login: ["read:user"],
-  pullRequest: ["read:user", "repo"]
-} as const;
 
 export interface GitHubRepoRef {
   owner: string;

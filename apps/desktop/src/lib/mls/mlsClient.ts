@@ -138,11 +138,6 @@ export function isMlsRequiresRejoin(error: unknown): boolean {
   return isNativeCommandErrorCode(error, "requires_rejoin");
 }
 
-export async function joinMlsWelcome(roomId: string, welcome: string): Promise<number> {
-  await waitForRoomLocalDataCleanup(roomId);
-  return invokeNative("mls_join_welcome", { request: { roomId, welcome } });
-}
-
 export async function loadMlsRoomConfig(roomId: string): Promise<unknown | null> {
   return invokeNative("mls_room_config_load", { request: { roomId } });
 }
@@ -281,19 +276,6 @@ export async function denyMlsInvite(
   return invokeNative("mls_invite_deny", { request: { capabilityHandle, binding, mac } });
 }
 
-export async function acceptMlsInviteResponse(
-  capabilityUrlValue: string,
-  originalBinding: MlsInviteCapabilityBinding,
-  responseBinding: MlsInviteCapabilityBinding,
-  responseMac: string,
-  welcome?: string
-): Promise<{ status: "approved" | "denied"; epoch?: number }> {
-  await waitForRoomLocalDataCleanup(originalBinding.roomId);
-  return invokeNative("mls_invite_response_accept", {
-    request: { capabilityUrlValue, originalBinding, responseBinding, responseMac, ...(welcome ? { welcome } : {}) }
-  });
-}
-
 export interface PendingMlsInviteRequest {
   inviteId: string;
   teamId: string;
@@ -346,14 +328,6 @@ export async function listMlsJoinAdmissions(): Promise<MlsJoinAdmission[]> {
 
 export async function completeMlsJoinAdmission(roomId: string, requestId: string): Promise<void> {
   return invokeNative("mls_join_admission_complete", { request: { roomId, requestId } });
-}
-
-export async function findMlsOutboxMessage(roomId: string, payload: string, kind?: string): Promise<MlsOutboxItem> {
-  const item = (await listMlsOutbox()).find(
-    (candidate) => candidate.roomId === roomId && candidate.payload === payload && (!kind || candidate.kind === kind)
-  );
-  if (!item) throw new Error("Native MLS outbox does not contain the persisted message.");
-  return item;
 }
 
 export interface MlsHostTransferAuthorization {

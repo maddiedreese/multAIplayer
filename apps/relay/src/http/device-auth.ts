@@ -130,19 +130,3 @@ export function hasDeviceSession(store: RelayStore, token: unknown, userId: stri
   }
   return s.userId === userId && s.deviceId === deviceId;
 }
-
-export function verifyDeviceChallengeSignature(
-  signaturePublicKey: string,
-  userId: string,
-  deviceId: string,
-  challenge: Buffer,
-  signature: string
-): boolean {
-  if (challenge.length !== 32 || !isCanonicalBase64(signature, undefined, 256)) return false;
-  try {
-    const key = createPublicKey({ key: Buffer.from(signaturePublicKey, "base64"), format: "der", type: "spki" });
-    return verify("sha256", deviceAuthPayload(userId, deviceId, challenge), key, Buffer.from(signature, "base64"));
-  } catch {
-    return false;
-  }
-}

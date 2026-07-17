@@ -61,7 +61,7 @@ export interface RelayWebSocketConnectionOptions {
     subscribeWorkspace: (session: ClientSession) => void;
     canPublishMlsMessage: (session: ClientSession, message: MlsRelayMessage) => boolean;
     canAccessRoom: (teamId: string, roomId: string, userId: string) => boolean;
-    publishMlsMessage: (message: MlsRelayMessage) => Promise<void>;
+    publishMlsMessage: (message: MlsRelayMessage, remainsAuthorized: () => boolean) => Promise<void>;
     publishPresence: (session: ClientSession, teamId: string, roomId: string, presence: PresenceRecord) => void;
     leaveRoom: (session: ClientSession) => void;
     leaveTeams: (session: ClientSession) => void;

@@ -63,7 +63,7 @@ export function createRelayFanout(options: Options) {
       });
     }
   }
-  async function publishMlsMessage(message: MlsRelayMessage): Promise<void> {
+  async function publishMlsMessage(message: MlsRelayMessage, remainsAuthorized: () => boolean): Promise<void> {
     const startedAt = performance.now();
     const key = options.roomKey(message.teamId, message.roomId);
     const previous = queues.get(key) ?? Promise.resolve();
@@ -75,7 +75,7 @@ export function createRelayFanout(options: Options) {
     queues.set(key, queued);
     await previous.catch(() => undefined);
     try {
-      if (await publishForRoom(key, message)) {
+      if (await publishForRoom(key, message, remainsAuthorized)) {
         options.metrics.recordPublishToFanoutDuration(performance.now() - startedAt);
       }
     } finally {
@@ -83,8 +83,9 @@ export function createRelayFanout(options: Options) {
       if (queues.get(key) === queued) queues.delete(key);
     }
   }
-  async function publishForRoom(key: RoomKey, message: MlsRelayMessage) {
+  async function publishForRoom(key: RoomKey, message: MlsRelayMessage, remainsAuthorized: () => boolean) {
     await options.reclaimDurableCapacity?.();
+    assertQueuedPublishAuthorized(remainsAuthorized);
     if (!isActiveRoom(options.store, message.teamId, message.roomId)) {
       throw new RelayPublishError("not_joined", "Room is archived, deleted, or unavailable.");
     }
@@ -159,6 +160,12 @@ export function createRelayFanout(options: Options) {
     broadcast(key, { type: "presence", ...verified, status: "online" });
   }
   return { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publishMlsMessage, publishPresence };
+}
+
+function assertQueuedPublishAuthorized(remainsAuthorized: () => boolean): void {
+  if (!remainsAuthorized()) {
+    throw new RelayPublishError("not_joined", "Publishing authorization changed while the message was queued.");
+  }
 }
 
 function isAcceptedReceiptRetry(previousDigest: string, nextDigest: string): boolean {

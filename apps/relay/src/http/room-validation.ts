@@ -1,15 +1,6 @@
 import { sendRelayError } from "./errors.js";
 import type { Response } from "express";
-import { type CodexCatalogSelectionPolicy } from "@multaiplayer/protocol";
 import type { RelayStore } from "../state.js";
-
-export function normalizeCatalogSelectionPolicy(
-  value: unknown,
-  fallback?: CodexCatalogSelectionPolicy
-): CodexCatalogSelectionPolicy | undefined | null {
-  if (value === undefined) return fallback;
-  return value === "auto" || value === "pinned" ? value : null;
-}
 
 export function allowTotalRoomQuota({
   store,
@@ -32,57 +23,4 @@ export function allowTotalRoomQuota({
     quota: { type: quota, limit: cap, used, remaining: 0 }
   });
   return false;
-}
-
-export interface DailyCreationQuotaRecord {
-  count: number;
-  resetAt: number;
-}
-
-export function consumeDailyCreationQuota({
-  cap,
-  counts,
-  quota,
-  userId,
-  res,
-  recordQuotaRejection
-}: {
-  cap: number;
-  counts: Map<string, DailyCreationQuotaRecord>;
-  quota: "daily_user_room_creations";
-  userId: string;
-  res: Response;
-  recordQuotaRejection?: (type: string) => void;
-}): boolean {
-  const now = Date.now();
-  for (const [existingKey, existing] of counts) if (existing.resetAt <= now) counts.delete(existingKey);
-  const resetAt = nextUtcMidnight(now);
-  const key = `${quota}:${userId}`;
-  const current = counts.get(key);
-  const record = current && current.resetAt > now ? current : { count: 0, resetAt };
-  if (record.count >= cap) {
-    sendDailyCreationQuotaExceeded(res, { quota, limit: cap, used: record.count, resetAt: record.resetAt });
-    recordQuotaRejection?.(quota);
-    return false;
-  }
-  counts.set(key, { count: record.count + 1, resetAt: record.resetAt });
-  return true;
-}
-
-function sendDailyCreationQuotaExceeded(
-  res: Response,
-  options: { quota: "daily_user_room_creations"; limit: number; used: number; resetAt: number }
-) {
-  const { quota, limit, used, resetAt } = options;
-  const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
-  res.setHeader("Retry-After", retryAfterSeconds);
-  sendRelayError(res, 429, "quota_exceeded", "Daily room creation quota exceeded.", {
-    retryAfterSeconds,
-    quota: { type: quota, limit, used, remaining: 0, resetsAt: new Date(resetAt).toISOString() }
-  });
-}
-
-function nextUtcMidnight(now: number): number {
-  const date = new Date(now);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
 }

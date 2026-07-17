@@ -163,7 +163,8 @@ export function createRelayStoreCodec(options: RelayStoreCodecOptions): RelaySto
     });
     applyStoredRows(
       stored.consumedKeyPackages,
-      (item) => normalizeConsumedKeyPackage(item, options.maxUserIdChars, options.maxDeviceIdChars),
+      (item) =>
+        normalizeConsumedKeyPackage(item, options.maxTeamIdChars, options.maxUserIdChars, options.maxDeviceIdChars),
       (item) => store.consumedKeyPackages.set(item.keyPackageHash, item),
       "consumed KeyPackage"
     );
@@ -455,32 +456,51 @@ function isStoredTimestamp(value: unknown): value is string {
 
 function normalizeConsumedKeyPackage(
   value: unknown,
+  maxTeamIdChars: number,
   maxUserIdChars: number,
   maxDeviceIdChars: number
 ): ConsumedKeyPackageRecord | null {
   if (!isRecord(value) || Array.isArray(value)) return null;
-  const { keyPackageHash, userId, deviceId, consumedAt } = value;
+  const { keyPackageHash, teamId, userId, deviceId, consumedAt } = value;
+  if (!isConsumedKeyPackageHash(keyPackageHash)) return null;
+  if (!isOptionalBoundedStoredText(teamId, maxTeamIdChars)) return null;
+  if (!isValidConsumedKeyPackageOwner(userId, deviceId, maxUserIdChars, maxDeviceIdChars)) return null;
+  if (!isStoredTimestamp(consumedAt)) return null;
+  return consumedKeyPackageRecord(keyPackageHash, teamId, userId, deviceId, consumedAt);
+}
+
+function isConsumedKeyPackageHash(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
+}
+
+function consumedKeyPackageRecord(
+  keyPackageHash: string,
+  teamId: unknown,
+  userId: unknown,
+  deviceId: unknown,
+  consumedAt: string
+): ConsumedKeyPackageRecord {
   const hasOwner = userId !== undefined || deviceId !== undefined;
-  if (
-    typeof keyPackageHash !== "string" ||
-    !/^sha256:[0-9a-f]{64}$/.test(keyPackageHash) ||
-    (hasOwner &&
-      (typeof userId !== "string" ||
-        userId.length < 1 ||
-        userId.length > maxUserIdChars ||
-        typeof deviceId !== "string" ||
-        deviceId.length < 1 ||
-        deviceId.length > maxDeviceIdChars)) ||
-    typeof consumedAt !== "string" ||
-    !Number.isFinite(Date.parse(consumedAt))
-  ) {
-    return null;
-  }
   return {
     keyPackageHash,
+    ...(teamId !== undefined ? { teamId: teamId as string } : {}),
     consumedAt,
     ...(hasOwner ? { userId: userId as string, deviceId: deviceId as string } : {})
   };
+}
+
+function isOptionalBoundedStoredText(value: unknown, maxChars: number): boolean {
+  return value === undefined || isBoundedStoredText(value, maxChars);
+}
+
+function isValidConsumedKeyPackageOwner(
+  userId: unknown,
+  deviceId: unknown,
+  maxUserIdChars: number,
+  maxDeviceIdChars: number
+): boolean {
+  if (userId === undefined && deviceId === undefined) return true;
+  return isBoundedStoredText(userId, maxUserIdChars) && isBoundedStoredText(deviceId, maxDeviceIdChars);
 }
 
 function storedTeamMembershipKey(value: unknown): string | null {

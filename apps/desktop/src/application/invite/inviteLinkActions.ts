@@ -7,7 +7,6 @@ import { encodeNoSecretRoomInvite } from "../../lib/invite/noSecretRoomInvite";
 import type { UseInviteActionsOptions } from "./inviteActionTypes";
 import { currentLocalIdentity, currentSelectedRoom } from "../workspace/selectedWorkspace";
 import { issueMlsInviteCapability } from "../../lib/mls/mlsClient";
-import { rememberIssuedMlsInvite } from "../../lib/invite/inviteCapabilityMemory";
 import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
 
 type InviteLinkActionOptions = Pick<UseInviteActionsOptions, "selectedRoomIdRef">;
@@ -70,7 +69,6 @@ export function createInviteLinkActions(
         hostHpkePublicKey: deviceIdentity.hpkePublicKey!,
         hostHpkeKeyFingerprint: deviceIdentity.hpkeKeyFingerprint
       };
-      rememberIssuedMlsInvite(invite.id, capability);
       const fragment = encodeNoSecretRoomInvite(capabilityInvite);
       const link = `https://open.multaiplayer.com/invite#invite=${encodeURIComponent(invite.id)}&multaiplayerJoin=${fragment}&approval=request`;
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {

@@ -208,6 +208,7 @@ function removeConsumedKeyPackageOwnerFields(store: RelayStore, userId: string):
     if (consumed.userId !== userId) continue;
     store.consumedKeyPackages.set(keyPackageHash, {
       keyPackageHash,
+      ...(consumed.teamId ? { teamId: consumed.teamId } : {}),
       consumedAt: consumed.consumedAt
     });
     deattributed += 1;

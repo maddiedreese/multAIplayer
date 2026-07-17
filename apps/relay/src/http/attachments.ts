@@ -116,10 +116,7 @@ async function persistAttachmentUpload(
 ) {
   const releaseAccountMutation = session ? await acquireAccountMutationTurn(options.store, session.user.id) : null;
   try {
-    if (session && !isLiveAccountSession(options.store, session)) {
-      return void sendRelayError(res, 401, "authentication_required", "Sign in before uploading an attachment.");
-    }
-    if (!attachmentTargetRemainsAuthorized(options, target, session, res)) return;
+    if (!attachmentUploadRemainsAuthorized(options, target, session, res)) return;
     await persistAttachmentWithinQuotaTransaction(options, session, target, payload, res);
   } finally {
     releaseAccountMutation?.();
@@ -153,6 +150,9 @@ async function persistAttachmentWithinQuotaTransaction(
   let durableCommitCompleted = false;
   const releaseQuotaTransaction = await acquireDurableQuotaTransaction(store);
   try {
+    // Re-authorize after the global quota wait so shared lifecycle and blob-id
+    // changes, plus any future authorization path, fail closed before mutation.
+    if (!attachmentUploadRemainsAuthorized(options, target, session, res)) return;
     reservation = session
       ? reserveAttachmentQuota({
           store,
@@ -220,6 +220,19 @@ type AttachmentPayload = NonNullable<ReturnType<typeof validateAttachmentPayload
 
 function attachmentUploader(session: AuthSession | null): { uploadedByUserId?: string } {
   return session ? { uploadedByUserId: session.user.id } : {};
+}
+
+function attachmentUploadRemainsAuthorized(
+  options: RegisterAttachmentRoutesOptions,
+  target: AttachmentTarget,
+  session: AuthSession | null,
+  res: Response
+): boolean {
+  if (session && !isLiveAccountSession(options.store, session)) {
+    sendRelayError(res, 401, "authentication_required", "Sign in before uploading an attachment.");
+    return false;
+  }
+  return attachmentTargetRemainsAuthorized(options, target, session, res);
 }
 
 function attachmentTargetRemainsAuthorized(

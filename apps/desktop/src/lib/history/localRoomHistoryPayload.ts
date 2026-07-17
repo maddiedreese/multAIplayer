@@ -2,7 +2,6 @@ import {
   isRecord,
   maxCodexActivitiesPerRoom,
   CodexActivityPlaintextPayload as CodexActivityPlaintextPayloadSchema,
-  CodexQueuePlaintextPayload as CodexQueuePlaintextPayloadSchema,
   CodexEventPlaintextPayload as CodexEventPlaintextPayloadSchema,
   GitWorkflowEventPlaintextPayload as GitWorkflowEventPlaintextPayloadSchema,
   GitHubActionsEventPlaintextPayload as GitHubActionsEventPlaintextPayloadSchema,
@@ -14,7 +13,6 @@ import {
   type ChatEditPlaintextPayload,
   type CodexActivityPlaintextPayload,
   type CodexEventPlaintextPayload,
-  type CodexQueuePlaintextPayload,
   type GitHubActionsEventPlaintextPayload,
   type GitWorkflowEventPlaintextPayload,
   type LocalPreviewPlaintextPayload,
@@ -214,10 +212,6 @@ export function isChatEditPlaintextPayload(value: unknown): value is ChatEditPla
 
 export function isChatDeletePlaintextPayload(value: unknown): value is ChatDeletePlaintextPayload {
   return ChatDeletePlaintextPayloadSchema.safeParse(value).success;
-}
-
-export function isCodexQueuePlaintextPayload(value: unknown): value is CodexQueuePlaintextPayload {
-  return CodexQueuePlaintextPayloadSchema.safeParse(value).success;
 }
 
 export function isAttachmentBlobContent(value: unknown): value is {

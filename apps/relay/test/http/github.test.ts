@@ -141,6 +141,63 @@ globalThis.fetch = async (input, init = {}) => {
   }
 });
 
+test("concurrent GitHub verification retains a bounded session set across restart", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-github-session-cap-test-"));
+  const mockPath = join(tempDir, "mock-github-fetch.mjs");
+  await writeFile(
+    mockPath,
+    `
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = async (input, init = {}) =>
+  String(input) === "https://api.github.com/user"
+    ? Response.json({ id: 77, login: "bounded-user" })
+    : nativeFetch(input, init);
+`,
+    "utf8"
+  );
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false",
+    MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER: "2",
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${mockPath}`.trim()
+  });
+  let restarted: Awaited<ReturnType<typeof startRelay>> | null = null;
+  let firstRelayClosed = false;
+  try {
+    const verified = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        fetch(`${relay.baseUrl}/auth/github/verify`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ access_token: "bounded-test-token" })
+        })
+      )
+    );
+    assert.deepEqual(
+      verified.map((response) => response.status),
+      [200, 200, 200]
+    );
+    const cookies = verified.map((response) => response.headers.get("set-cookie")?.split(";")[0]);
+    assert.ok(cookies.every(Boolean));
+    await waitForStoredState(relay.dataPath, (state) => state.authSessions?.length === 2);
+    const liveBeforeRestart = await Promise.all(
+      cookies.map((cookie) => fetch(`${relay.baseUrl}/auth/me`, { headers: { cookie: cookie! } }))
+    );
+    assert.deepEqual(liveBeforeRestart.map((response) => response.status).sort(), [200, 200, 401]);
+
+    await relay.close({ preserveData: true });
+    firstRelayClosed = true;
+    restarted = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" }, undefined, relay.dataPath);
+    const liveAfterRestart = await Promise.all(
+      cookies.map((cookie) => fetch(`${restarted!.baseUrl}/auth/me`, { headers: { cookie: cookie! } }))
+    );
+    assert.deepEqual(liveAfterRestart.map((response) => response.status).sort(), [200, 200, 401]);
+  } finally {
+    if (restarted) await restarted.close();
+    else if (!firstRelayClosed) await relay.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("verify denies an operator-restricted identity with a stable error code", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "multaiplayer-restricted-github-test-"));
   const mockPath = join(tempDir, "mock-github-fetch.mjs");

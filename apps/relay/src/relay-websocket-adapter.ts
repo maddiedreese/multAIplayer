@@ -69,7 +69,7 @@ export function registerRelayWebSocketAdapter(options: RegisterRelayWebSocketAda
       subscribeWorkspace: roomManager.subscribeWorkspace,
       canPublishMlsMessage,
       canAccessRoom: options.roomManager.canAccessRoom,
-      publishMlsMessage: fanout.publishMlsMessage,
+      publishMlsMessage: (message, remainsAuthorized) => fanout.publishMlsMessage(message, remainsAuthorized),
       publishPresence: fanout.publishPresence,
       leaveRoom: roomManager.leaveRoom,
       leaveTeams: roomManager.leaveTeams,

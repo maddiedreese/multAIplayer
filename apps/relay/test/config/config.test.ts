@@ -27,6 +27,37 @@ test("relay validates PORT with the bounded integer parser", () => {
   }
 });
 
+test("relay bounds durable per-account device and retained-session caps", () => {
+  const registeredDeviceName = "MULTAIPLAYER_RELAY_REGISTERED_DEVICE_CAP_USER";
+  const retainedSessionName = "MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER";
+  const previousRegisteredDeviceCap = process.env[registeredDeviceName];
+  const previousRetainedSessionCap = process.env[retainedSessionName];
+  try {
+    delete process.env[registeredDeviceName];
+    delete process.env[retainedSessionName];
+    assert.equal(loadRelayConfig().registeredDeviceCapPerUser, 25);
+    assert.equal(loadRelayConfig().retainedAuthSessionCapPerUser, 20);
+
+    process.env[registeredDeviceName] = "0";
+    process.env[retainedSessionName] = "0";
+    assert.equal(loadRelayConfig().registeredDeviceCapPerUser, 1);
+    assert.equal(loadRelayConfig().retainedAuthSessionCapPerUser, 1);
+
+    process.env[registeredDeviceName] = "10001";
+    process.env[retainedSessionName] = "1001";
+    assert.equal(loadRelayConfig().registeredDeviceCapPerUser, 10_000);
+    assert.equal(loadRelayConfig().retainedAuthSessionCapPerUser, 1_000);
+
+    process.env[registeredDeviceName] = "invalid";
+    process.env[retainedSessionName] = "invalid";
+    assert.equal(loadRelayConfig().registeredDeviceCapPerUser, 25);
+    assert.equal(loadRelayConfig().retainedAuthSessionCapPerUser, 20);
+  } finally {
+    restoreEnv(registeredDeviceName, previousRegisteredDeviceCap);
+    restoreEnv(retainedSessionName, previousRetainedSessionCap);
+  }
+});
+
 test("relay only enables metrics with a strong bearer token", () => {
   const previous = process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN;
   try {

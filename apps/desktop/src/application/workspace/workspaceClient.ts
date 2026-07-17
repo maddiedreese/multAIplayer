@@ -235,14 +235,6 @@ export async function consumeKeyPackage(
   >(response, "Failed to consume MLS KeyPackage");
 }
 
-export async function loadTeamDevices(teamId: string): Promise<DeviceRecord[]> {
-  const response = await fetch(`${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/devices`, {
-    credentials: "include"
-  });
-  const body = await readJsonResponse<{ devices: DeviceRecord[] }>(response, "Failed to load team devices");
-  return body.devices as DeviceRecord[];
-}
-
 export async function createRoom(
   teamId: string,
   name: string,
@@ -403,15 +395,6 @@ export async function lookupInvite(inviteId: string): Promise<InviteLookupResult
   );
   const previous = useAppStore.getState().rooms.find((room) => room.id === body.room.id);
   return { ...body, room: ensureRoomDefaults(body.room, previous) };
-}
-
-export async function revokeRoomInvites(teamId: string, roomId: string): Promise<number> {
-  const response = await fetch(
-    `${getRelayHttpUrl()}/teams/${encodeURIComponent(teamId)}/rooms/${encodeURIComponent(roomId)}/invites`,
-    { method: "DELETE", credentials: "include" }
-  );
-  const body = await readJsonResponse<{ revoked: number }>(response, "Failed to revoke room invites");
-  return body.revoked;
 }
 
 export async function publishDirectedInviteRequest(

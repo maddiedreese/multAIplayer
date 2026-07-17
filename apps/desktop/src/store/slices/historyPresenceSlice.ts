@@ -5,10 +5,6 @@ import type { ChatMessage, RoomPresence } from "../../types";
 import type { AppStoreState } from "../appStore";
 
 export type HistorySearchMessagesByRoom = Record<string, ChatMessage[]>;
-export type HistoryMessagesByRoom = Record<string, string | null>;
-export type TeamHistoryMessagesByTeam = Record<string, string | null>;
-export type InspectorTabByRoom = Record<string, InspectorTab>;
-export type PresenceByRoom = Record<string, Record<string, RoomPresence>>;
 
 export interface HistoryPresenceRoomState {
   searchMessages?: ChatMessage[];
@@ -25,10 +21,6 @@ export interface TeamHistoryState {
 
 export type HistoryPresenceByRoom = Record<string, HistoryPresenceRoomState>;
 export type TeamHistoryByTeam = Record<string, TeamHistoryState>;
-
-function normalizeInspectorTab(tab: InspectorTab | "diff" | undefined): InspectorTab {
-  return tab === "diff" || !tab ? "files" : tab;
-}
 
 function updateHistoryPresenceForRoom(
   current: HistoryPresenceByRoom,
@@ -63,41 +55,6 @@ export function historySearchEntriesToMessagesByRoom(
     entries
       .filter(([, roomMessages]) => roomMessages.length > 0)
       .map(([roomId, roomMessages]) => [roomId, [...roomMessages]])
-  );
-}
-
-export function projectHistoryMessagesByRoom(historyPresenceByRoom: HistoryPresenceByRoom): HistoryMessagesByRoom {
-  return Object.fromEntries(
-    Object.entries(historyPresenceByRoom)
-      .filter(([, roomState]) => roomState.historyMessage)
-      .map(([roomId, roomState]) => [roomId, roomState.historyMessage ?? null])
-  );
-}
-
-export function projectInspectorTabsByRoom(historyPresenceByRoom: HistoryPresenceByRoom): InspectorTabByRoom {
-  return Object.fromEntries(
-    Object.entries(historyPresenceByRoom)
-      .filter(([, roomState]) => roomState.inspectorTab)
-      .map(([roomId, roomState]) => [
-        roomId,
-        normalizeInspectorTab(roomState.inspectorTab as InspectorTab | "diff" | undefined)
-      ])
-  );
-}
-
-export function projectPresenceByRoom(historyPresenceByRoom: HistoryPresenceByRoom): PresenceByRoom {
-  return Object.fromEntries(
-    Object.entries(historyPresenceByRoom)
-      .filter(([, roomState]) => roomState.presence)
-      .map(([roomId, roomState]) => [roomId, roomState.presence ?? {}])
-  );
-}
-
-export function projectTeamHistoryMessagesByTeam(teamHistoryByTeam: TeamHistoryByTeam): TeamHistoryMessagesByTeam {
-  return Object.fromEntries(
-    Object.entries(teamHistoryByTeam)
-      .filter(([, teamState]) => teamState.message)
-      .map(([teamId, teamState]) => [teamId, teamState.message ?? null])
   );
 }
 

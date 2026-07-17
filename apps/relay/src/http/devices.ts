@@ -1,9 +1,10 @@
-import { sendRelayError } from "./errors.js";
+import { sendRelayCapacityError, sendRelayError } from "./errors.js";
 import type { Express, Response } from "express";
 import { ECDH, createHash, createPublicKey, timingSafeEqual } from "node:crypto";
 import { type DeviceRecord } from "@multaiplayer/protocol";
-import type { AuthSession, RelayStore } from "../state.js";
+import { RelayStoreCapacityError, type AuthSession, type RelayStore } from "../state.js";
 import { isCanonicalPaddedBase64 } from "../opaque.js";
+import { acquireAccountMutationTurn, isLiveAccountSession } from "../auth/account-mutation-transaction.js";
 
 interface RegisterDeviceRoutesOptions {
   app: Express;
@@ -12,6 +13,8 @@ interface RegisterDeviceRoutesOptions {
   allowRead: (session: AuthSession | null, res: Response) => boolean;
   allowMutation: (session: AuthSession | null, res: Response) => boolean;
   scheduleStoreSave: () => void;
+  registeredDeviceCapPerUser: number;
+  recordQuotaRejection?: (type: string) => void;
   normalizeMetadataText: (value: unknown, maxChars: number) => string | null;
   normalizeOptionalMetadataText: (value: unknown, maxChars: number) => string | null;
   displayNameForUser: (user: AuthSession["user"]) => string;
@@ -24,7 +27,7 @@ interface RegisterDeviceRoutesOptions {
 
 export function registerDeviceRoutes(options: RegisterDeviceRoutesOptions) {
   const { app, store, getAuthSession, allowRead, allowMutation, scheduleStoreSave } = options;
-  app.post("/devices", (req, res) => {
+  app.post("/devices", async (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowMutation(session, res)) return;
     if (!session) {
@@ -44,31 +47,69 @@ export function registerDeviceRoutes(options: RegisterDeviceRoutesOptions) {
       hpkeKeyFingerprint
     } = identity;
 
-    const now = new Date().toISOString();
-    const existing = store.getDevice(userId, deviceId);
-    if (existing && (existing.signaturePublicKey !== signaturePublicKey || existing.hpkePublicKey !== hpkePublicKey)) {
-      sendRelayError(
-        res,
-        409,
-        "conflict",
-        "This device id is already bound to a different public key. Reset the device explicitly before replacing it."
-      );
-      return;
+    const releaseAccountMutation = await acquireAccountMutationTurn(store, userId);
+    try {
+      if (!isLiveAccountSession(store, session)) {
+        return void sendRelayError(
+          res,
+          401,
+          "authentication_required",
+          "Sign in before registering a device identity."
+        );
+      }
+      const existing = store.getDevice(userId, deviceId);
+      if (
+        existing &&
+        (existing.signaturePublicKey !== signaturePublicKey || existing.hpkePublicKey !== hpkePublicKey)
+      ) {
+        return void sendRelayError(
+          res,
+          409,
+          "conflict",
+          "This device id is already bound to different public keys; register a new device id instead."
+        );
+      }
+      if (!existing && deviceCountForUser(store, userId) >= options.registeredDeviceCapPerUser) {
+        options.recordQuotaRejection?.("registered_devices_per_user");
+        return void sendRelayError(res, 429, "quota_exceeded", "Registered device quota exceeded.", {
+          quota: {
+            type: "registered_devices_per_user",
+            limit: options.registeredDeviceCapPerUser,
+            remaining: 0
+          }
+        });
+      }
+
+      const now = new Date().toISOString();
+      const device: DeviceRecord = {
+        userId,
+        deviceId,
+        displayName,
+        signaturePublicKey,
+        signatureKeyFingerprint,
+        hpkePublicKey,
+        hpkeKeyFingerprint,
+        registeredAt: existing?.registeredAt ?? now,
+        lastSeenAt: now
+      };
+      let stored = false;
+      try {
+        store.setDevice(device);
+        stored = true;
+        scheduleStoreSave();
+      } catch (error) {
+        if (stored) {
+          if (existing) store.setDevice(existing);
+          else store.devices.delete(`${userId}:${deviceId}`);
+        }
+        if (error instanceof RelayStoreCapacityError) sendRelayCapacityError(res, error);
+        else sendRelayError(res, 503, "persistence_unavailable", "Could not persist device identity.");
+        return;
+      }
+      res.status(existing ? 200 : 201).json({ device });
+    } finally {
+      releaseAccountMutation();
     }
-    const device: DeviceRecord = {
-      userId,
-      deviceId,
-      displayName,
-      signaturePublicKey,
-      signatureKeyFingerprint,
-      hpkePublicKey,
-      hpkeKeyFingerprint,
-      registeredAt: existing?.registeredAt ?? now,
-      lastSeenAt: now
-    };
-    store.setDevice(device);
-    scheduleStoreSave();
-    res.status(existing ? 200 : 201).json({ device });
   });
 
   app.get("/teams/:teamId/devices", (req, res) => {
@@ -95,6 +136,12 @@ export function registerDeviceRoutes(options: RegisterDeviceRoutesOptions) {
       .sort((left, right) => left.userId.localeCompare(right.userId) || left.deviceId.localeCompare(right.deviceId));
     res.json({ devices });
   });
+}
+
+function deviceCountForUser(store: RelayStore, userId: string): number {
+  let count = 0;
+  for (const device of store.devices.values()) if (device.userId === userId) count += 1;
+  return count;
 }
 
 export function validP256Spki(value: string, maxChars: number): boolean {
