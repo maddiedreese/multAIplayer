@@ -61,10 +61,15 @@ jobs:
       - name: Build relay image
         run: docker build --tag multaiplayer-relay:scan --file apps/relay/Dockerfile .
       - name: Verify minimal relay runtime contents
-        run: >-
-          docker run --rm --entrypoint node multaiplayer-relay:scan
-          tools/release/relay-runtime-dependency-closure.mjs
-          verify node_modules relay-runtime-dependencies.json
+        run: |
+          docker run --rm --entrypoint node multaiplayer-relay:scan \
+            tools/release/relay-runtime-dependency-closure.mjs \
+            verify node_modules relay-runtime-dependencies.json
+          docker run --rm --entrypoint sh multaiplayer-relay:scan -eu -c '
+            test ! -e /usr/local/lib/node_modules/npm
+            test ! -e /usr/local/bin/npm
+            test ! -e /usr/local/bin/npx
+          '
       - name: Scan relay image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

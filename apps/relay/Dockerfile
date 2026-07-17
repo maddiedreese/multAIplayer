@@ -39,6 +39,12 @@ ENV MULTAIPLAYER_MLS_VALIDATOR_PATH=/app/bin/mls-keypackage-validator
 
 WORKDIR /app
 
+# The production image executes Node directly and does not need npm. Removing
+# the bundled package manager also removes its independent dependency tree from
+# the relay's runtime attack surface.
+RUN rm -rf /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx
+
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/relay-runtime-dependencies.json ./relay-runtime-dependencies.json
 COPY --from=build /app/tools/release/relay-runtime-dependency-closure.mjs ./tools/release/relay-runtime-dependency-closure.mjs
