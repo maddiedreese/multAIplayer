@@ -154,6 +154,18 @@ test("buildDiffSummaryMarkdown and buildTerminalMarkdown include operational con
   assert.match(terminalMarkdown, /```text\n\[system\] \$ npm test\nok\n\[stderr\] warn\n```/);
 });
 
+test("buildTerminalMarkdown never exports interactive input", () => {
+  const terminalMarkdown = buildTerminalMarkdown(room, null, [
+    { stream: "stdout", text: "Password: " },
+    { stream: "stdin", text: "ghp_attacker_shaped_secret" },
+    { stream: "system", text: "done" }
+  ]);
+
+  assert.match(terminalMarkdown, /Password:/);
+  assert.match(terminalMarkdown, /\[system\] done/);
+  assert.doesNotMatch(terminalMarkdown, /ghp_attacker_shaped_secret|\[stdin\]/);
+});
+
 test("project, diff, and terminal exports include sensitive-content warnings", () => {
   const projectMarkdown = buildProjectMarkdown(
     room.name,

@@ -25,7 +25,9 @@ boundary; add or supersede a decision when the boundary itself changes.
 
 ## Operate or review the system
 
-- [Self-hosting](self-hosting.md) is the operator runbook.
+- [Self-hosting](self-hosting.md) is the basic deployment guide.
+- [Relay operations](relay-operations.md) covers monitoring, incidents,
+  restrictions, and backup restores.
 - [Threat model](threat-model.md) is the authoritative security-claims and
   residual-risk document.
 - [Tauri IPC boundary notes](tauri-ipc-boundary.md) record the native trust
@@ -43,7 +45,8 @@ To keep the documentation graph manageable:
 
 - security claims and residual risks belong in the threat model;
 - durable architecture constraints belong in ADRs;
-- deployment commands and operator checks belong in self-hosting;
+- basic deployment commands belong in self-hosting;
+- incident, monitoring, restriction, and restore procedures belong in relay operations;
 - contributor setup and merge expectations belong in CONTRIBUTING;
 - user-facing behavior belongs in Using the app;
 - other pages should link to those sources instead of copying their policy.

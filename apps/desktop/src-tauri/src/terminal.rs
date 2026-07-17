@@ -228,13 +228,6 @@ pub(crate) fn terminal_write(
         .writer
         .flush()
         .map_err(|error| format!("Failed to flush terminal input: {error}"))?;
-    push_terminal_line(
-        &session.output,
-        TerminalLine {
-            stream: "stdin".to_string(),
-            text: request.input.trim_end_matches('\n').to_string(),
-        },
-    );
     Ok(snapshot_terminal(&request.id, session)?)
 }
 
@@ -397,6 +390,11 @@ impl TerminalStreamRedactor {
 }
 
 pub(crate) fn push_terminal_line(output: &Arc<Mutex<Vec<TerminalLine>>>, line: TerminalLine) {
+    // Interactive input may contain passwords or tokens that the PTY intentionally
+    // does not echo. Only process output belongs in snapshots and local history.
+    if line.stream == "stdin" {
+        return;
+    }
     if let Ok(mut lines) = output.lock() {
         lines.push(line);
         if lines.len() > 1_000 {

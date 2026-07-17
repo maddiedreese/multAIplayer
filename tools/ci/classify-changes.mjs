@@ -86,12 +86,10 @@ export function classifyChanges(paths) {
   const macos = executableFiles.some((path) =>
     matches(path, [
       /^apps\/desktop\/src-tauri\//,
-      /^apps\/desktop\/(?:package\.json|native-command-error-codes\.json|vite\.config\.ts)$/,
-      /^packages\//,
+      /^apps\/desktop\/(?:package\.json|vite\.config\.ts)$/,
       /^e2e\/native-macos\//,
       /^scripts\/verify-macos-/,
-      /^package(?:-lock)?\.json$/,
-      /^\.npmrc$/,
+      /^package\.json$/,
       /^rust-toolchain\.toml$/,
       /^\.github\/workflows\/journeys\.yml$/,
       /^\.github\/actions\/setup-(?:node-npm|rust)\//

@@ -19,13 +19,13 @@ Encrypted room archives are a data-exit path, not a room backup or membership mi
 
 ## Continue with a self-hosted deployment
 
-Fork or archive a known-good repository revision, including its lockfile and release artifacts. Follow [Self-hosting](self-hosting.md) to build the relay and desktop, configure durable storage, HTTPS/WSS, exact origins, auth, quotas, and backups. A custom relay origin requires a self-built desktop whose Tauri CSP permits that HTTPS/WSS origin.
+Fork or archive a known-good repository revision, including its lockfile and release artifacts. Follow [Self-hosting](self-hosting.md) to build the relay and desktop, configure durable storage, HTTPS/WSS, exact origins, and auth. Use [Relay operations](relay-operations.md) for backups and restore-safe deletion. A custom relay origin requires a self-built desktop whose Tauri CSP permits that HTTPS/WSS origin.
 
 Use the [hosted-to-self-hosted migration procedure](self-hosting.md#migrating-from-the-hosted-relay) while the old relay is reachable. Migration recreates teams, rooms, membership, sessions, and invites; it does not transfer live-room history, MLS private state, group secrets, or exporter-derived history secrets. Encrypted room archives can carry inert display history separately, but cannot restore membership or cryptographic continuity. Keep the original devices intact until the replacement rooms and archives have been verified.
 
 Pin and mirror all dependencies needed for rebuilding. Maintain your own GitHub OAuth app and Apple signing/notarization setup if distributing macOS builds. If upstream GitHub, Codex, Tauri, WebKit, Node, or Rust behavior changes, a frozen build may eventually require maintenance even when the relay continues to run.
 
-For a private, trusted network, the documented unauthenticated mode remains available only when explicitly configured. Internet-facing deployments should keep authentication, rate limits, persistent storage, backups, and the production relay doctor enabled. Continue monitoring published dependency vulnerabilities. A frozen deployment may need code and dependency maintenance as its operating system and upstream services change.
+For a private, trusted network, the documented unauthenticated mode remains available only when explicitly configured. Internet-facing deployments should keep authentication, rate limits, persistent storage, backups, and the relay's production pre-deploy check enabled. Continue monitoring published dependency vulnerabilities. A frozen deployment may need code and dependency maintenance as its operating system and upstream services change.
 
 ## Hosted relay shutdown
 

@@ -802,6 +802,26 @@ fn terminal_output_buffer_keeps_latest_lines() {
 }
 
 #[test]
+fn terminal_output_buffer_never_retains_interactive_input() {
+    let output = Arc::new(Mutex::new(vec![TerminalLine {
+        stream: "stdout".to_string(),
+        text: "Password: ".to_string(),
+    }]));
+
+    push_terminal_line(
+        &output,
+        TerminalLine {
+            stream: "stdin".to_string(),
+            text: "ghp_attacker_shaped_secret".to_string(),
+        },
+    );
+
+    let lines = output.lock().expect("terminal output lock");
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0].text, "Password: ");
+}
+
+#[test]
 fn terminal_secret_redaction_covers_tokens_env_and_private_keys() {
     let raw = "ghp_abcdefghijklmnopqrstuvwxyz\nOPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz\n-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----";
     let redacted = redact_known_secrets(raw);

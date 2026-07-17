@@ -78,7 +78,7 @@ The optional staged-file hook runs Prettier and ESLint. Enable it per clone with
   maintenance and release utilities belong under `tools`.
 - A React hook earns a separate file when reused or when it owns a real lifecycle
   such as a subscription, effect, or ref. See the
-  [hook index](apps/desktop/src/hooks/README.md).
+  [hook-specific guidance](apps/desktop/src/hooks/README.md).
 
 ## Repository contracts
 
@@ -115,11 +115,12 @@ together.
 
 Ordinary contributions do not require release or hosted-relay operations:
 
-- [Self-hosting](docs/self-hosting.md) covers relay deployment, quotas, backups,
-  restore drills, account restriction, and migration.
+- [Self-hosting](docs/self-hosting.md) covers basic relay deployment and migration;
+  [Relay operations](docs/relay-operations.md) covers monitoring, incidents,
+  restrictions, and restore-safe deletion.
 - [Verifying releases](docs/reproducible-builds.md) covers exact-tag artifacts,
   signing, notarization, updater metadata, publication, and failure recovery.
-- [Compatibility inventory](docs/compatibility-inventory.md) records supported
-  legacy readers and their deletion conditions.
+- [Codex hosting](docs/codex-hosting.md) records the exact supported app-server
+  range and the behavior of older and unverified newer versions.
 - Workflow definitions are the source of truth for the current CI schedule and
   path selection.

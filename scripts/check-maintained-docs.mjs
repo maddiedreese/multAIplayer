@@ -23,9 +23,8 @@ if (fingerprintOwners.join(",") !== "docs/reproducible-builds.md") {
 const policy = JSON.parse(
   readFileSync(new URL("../contracts/codex-app-server/support-policy.json", import.meta.url), "utf8")
 );
-const authoritativeCompatibilityDocs = new Set(["docs/codex-hosting.md", "docs/compatibility-inventory.md"]);
 for (const path of markdownFiles) {
-  if (authoritativeCompatibilityDocs.has(path)) continue;
+  if (path === "docs/codex-hosting.md") continue;
   const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   if (source.includes(policy.minimumSupportedVersion) && source.includes(policy.latestContractTestedVersion)) {
     throw new Error(`Codex version bounds are duplicated in ${path}; link to docs/codex-hosting.md instead`);

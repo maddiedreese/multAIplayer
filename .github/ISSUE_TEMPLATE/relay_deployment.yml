@@ -27,10 +27,10 @@ body:
     validations:
       required: true
   - type: textarea
-    id: production_doctor
+    id: predeploy_check
     attributes:
-      label: Production doctor result
-      description: Paste the redacted output of `NODE_ENV=production node scripts/doctor.mjs --production-relay` if relevant. Remove complete invite links/fragments.
+      label: Pre-deploy check result
+      description: Paste the redacted output of `NODE_ENV=production node apps/relay/dist/predeploy-check.js` if relevant. Remove complete invite links/fragments.
       render: shell
   - type: textarea
     id: config

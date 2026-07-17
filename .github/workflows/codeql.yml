@@ -56,9 +56,10 @@ jobs:
         uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
 
   analyze-actions:
+    # The repository code-scanning ruleset compares every PR with the Actions
+    # configuration on main, so this analysis must be present even when the PR
+    # does not edit workflow files.
     name: actions
-    needs: changes
-    if: needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
