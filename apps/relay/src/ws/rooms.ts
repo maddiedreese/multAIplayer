@@ -190,21 +190,6 @@ export function createRelayRoomSocketManager({
     revokeUserPresence(userId);
   }
 
-  function revokeDeviceSessions(userId: string, deviceId: string) {
-    for (const session of Array.from(sessions.values())) {
-      if (session.userId !== userId || session.deviceId !== deviceId) continue;
-      send(session.socket, {
-        type: "error",
-        message: "This device identity was retired. Create a new device identity before rejoining."
-      });
-      leaveRoom(session);
-      leaveTeams(session);
-      leaveWorkspace(session);
-      sessions.delete(session.socket);
-      session.socket.close(1008, "Device identity retired");
-    }
-  }
-
   function approvedInviteForAdmission(
     inviteId: string,
     teamId: string,
@@ -247,7 +232,6 @@ export function createRelayRoomSocketManager({
     leaveTeams,
     leaveWorkspace,
     revokeTeamMemberSessions,
-    revokeDeviceSessions,
     revokeUserPresence,
     revokeUserSessions
   };
