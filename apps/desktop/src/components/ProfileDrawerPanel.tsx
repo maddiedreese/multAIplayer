@@ -31,6 +31,8 @@ export function ProfileDrawerPanel({
   relaySessionPersistence,
   codexAccountPanel = <CodexAccountPanel />,
   archivePanel,
+  onHostedAccountDeletionStarted,
+  onHostedAccountDeletionRejected,
   onHostedAccountDeleted,
   onSignIn,
   onSignOut
@@ -46,6 +48,8 @@ export function ProfileDrawerPanel({
   relaySessionPersistence: string;
   codexAccountPanel?: ReactNode;
   archivePanel?: ReactNode;
+  onHostedAccountDeletionStarted: () => void | Promise<void>;
+  onHostedAccountDeletionRejected: () => void;
   onHostedAccountDeleted: () => void | Promise<void>;
   onSignIn: () => void;
   onSignOut: () => void | Promise<void>;
@@ -71,6 +75,7 @@ export function ProfileDrawerPanel({
     setDeletionBusy(true);
     setDeletionResult(null);
     try {
+      await onHostedAccountDeletionStarted();
       const result = await deleteHostedAccount(deletionConfirmation);
       setDeletionResult(result);
       if (result.status === "deleted") {
@@ -87,6 +92,8 @@ export function ProfileDrawerPanel({
           "The configured relay reports this session as signed out after the deletion response was lost. Deletion may have completed, but an expired session can look the same; sign in again to inspect or delete any remaining hosted data."
         );
         await onHostedAccountDeleted();
+      } else {
+        onHostedAccountDeletionRejected();
       }
     } catch (error) {
       setDeletionStatus(

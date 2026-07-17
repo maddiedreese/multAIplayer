@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -26,6 +26,7 @@ pub(crate) struct LocalPreviewState {
 struct LocalPreviewRegistry {
     generation: u64,
     tunnels: HashMap<String, LocalPreviewTunnel>,
+    starting_ids: HashSet<String>,
 }
 
 impl LocalPreviewRegistry {
@@ -51,6 +52,75 @@ impl LocalPreviewRegistry {
             ))
         }
     }
+}
+
+fn terminate_registered_tunnel_with<F>(
+    registry: &mut LocalPreviewRegistry,
+    id: &str,
+    mut terminate: F,
+) -> Result<bool, String>
+where
+    F: FnMut(&mut Child) -> std::io::Result<()>,
+{
+    let Some(tunnel) = registry.tunnels.get_mut(id) else {
+        return Ok(false);
+    };
+    terminate(&mut tunnel.child).map_err(|_| {
+        "Local preview tunnel process termination could not be confirmed.".to_string()
+    })?;
+    registry.tunnels.remove(id);
+    Ok(true)
+}
+
+fn terminate_or_retain_tunnel_with<F>(
+    registry: &mut LocalPreviewRegistry,
+    mut tunnel: LocalPreviewTunnel,
+    mut terminate: F,
+) -> bool
+where
+    F: FnMut(&mut Child) -> std::io::Result<()>,
+{
+    if terminate(&mut tunnel.child).is_ok() {
+        return true;
+    }
+    registry.tunnels.insert(tunnel.id.clone(), tunnel);
+    false
+}
+
+fn release_start_reservation(state: &LocalPreviewState, id: &str) {
+    let mut registry = match state.registry.lock() {
+        Ok(registry) => registry,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    registry.starting_ids.remove(id);
+}
+
+fn fail_spawned_preview_start(
+    state: &LocalPreviewState,
+    id: &str,
+    local_url: &str,
+    public_url: Option<&str>,
+    child: Child,
+    reason: String,
+) -> crate::command_error::CommandResult<LocalPreviewStartResult> {
+    let mut registry = match state.registry.lock() {
+        Ok(registry) => registry,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    registry.starting_ids.remove(id);
+    let tunnel = LocalPreviewTunnel {
+        id: id.to_string(),
+        local_url: local_url.to_string(),
+        public_url: public_url.unwrap_or_default().to_string(),
+        child,
+    };
+    if !terminate_or_retain_tunnel_with(&mut registry, tunnel, terminate_child_confirmed) {
+        return Err(format!(
+            "{reason} Process termination could not be confirmed; the process was retained for another stop attempt."
+        )
+        .into());
+    }
+    Err(reason.into())
 }
 
 struct LocalPreviewTunnel {
@@ -171,26 +241,43 @@ pub(crate) fn local_preview_start(
 ) -> crate::command_error::CommandResult<LocalPreviewStartResult> {
     ensure_preview_id(&request.id)?;
     let start_generation = {
-        let mut registry = state
-            .registry
-            .lock()
-            .map_err(|_| "Local preview state lock is poisoned".to_string())?;
-        if let Some(mut existing) = registry.tunnels.remove(&request.id) {
-            terminate_child(&mut existing.child);
+        let mut registry = match state.registry.lock() {
+            Ok(registry) => registry,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if registry.starting_ids.contains(&request.id) {
+            return Err("A local preview tunnel with this id is already starting.".into());
         }
+        terminate_registered_tunnel_with(&mut registry, &request.id, terminate_child_confirmed)?;
+        registry.starting_ids.insert(request.id.clone());
         registry.generation
     };
-    let local_url = validate_local_preview_url(&request.local_url)?;
-    ensure_local_preview_reachable(&local_url)?;
+    let local_url = match validate_local_preview_url(&request.local_url) {
+        Ok(local_url) => local_url,
+        Err(error) => {
+            release_start_reservation(&state, &request.id);
+            return Err(error.into());
+        }
+    };
+    if let Err(error) = ensure_local_preview_reachable(&local_url) {
+        release_start_reservation(&state, &request.id);
+        return Err(error.into());
+    }
 
-    let mut child = Command::new("cloudflared")
+    let mut child = match Command::new("cloudflared")
         .arg("tunnel")
         .arg("--url")
         .arg(&local_url)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| format!("Failed to start Cloudflare Quick Tunnel: {error}"))?;
+    {
+        Ok(child) => child,
+        Err(error) => {
+            release_start_reservation(&state, &request.id);
+            return Err(format!("Failed to start Cloudflare Quick Tunnel: {error}").into());
+        }
+    };
 
     let stdout = child
         .stdout
@@ -203,8 +290,7 @@ pub(crate) fn local_preview_start(
     let (stdout, stderr) = match (stdout, stderr) {
         (Ok(stdout), Ok(stderr)) => (stdout, stderr),
         (Err(error), _) | (_, Err(error)) => {
-            terminate_child(&mut child);
-            return Err(error.into());
+            return fail_spawned_preview_start(&state, &request.id, &local_url, None, child, error);
         }
     };
 
@@ -216,16 +302,31 @@ pub(crate) fn local_preview_start(
     let mut startup_log = String::new();
     let mut public_url: Option<String> = None;
     while start.elapsed() < Duration::from_secs(20) {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|error| format!("Failed to read cloudflared status: {error}"))?
-        {
-            terminate_child(&mut child);
-            return Err(format!(
-                "cloudflared exited before the tunnel was ready with status {status}. {}",
-                trim_command_output(&startup_log)
-            )
-            .into());
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return fail_spawned_preview_start(
+                    &state,
+                    &request.id,
+                    &local_url,
+                    None,
+                    child,
+                    format!(
+                        "cloudflared exited before the tunnel was ready with status {status}. {}",
+                        trim_command_output(&startup_log)
+                    ),
+                );
+            }
+            Ok(None) => {}
+            Err(error) => {
+                return fail_spawned_preview_start(
+                    &state,
+                    &request.id,
+                    &local_url,
+                    None,
+                    child,
+                    format!("Failed to read cloudflared status: {error}"),
+                );
+            }
         }
 
         match receiver.recv_timeout(Duration::from_millis(250)) {
@@ -242,29 +343,34 @@ pub(crate) fn local_preview_start(
     }
 
     let Some(public_url) = public_url else {
-        terminate_child(&mut child);
-        return Err(format!(
-            "cloudflared started but did not produce a trycloudflare.com URL. {}",
-            trim_command_output(&startup_log)
-        )
-        .into());
+        return fail_spawned_preview_start(
+            &state,
+            &request.id,
+            &local_url,
+            None,
+            child,
+            format!(
+                "cloudflared started but did not produce a trycloudflare.com URL. {}",
+                trim_command_output(&startup_log)
+            ),
+        );
     };
 
     {
-        let mut registry = state
-            .registry
-            .lock()
-            .map_err(|_| "Local preview state lock is poisoned".to_string())?;
-        let mut tunnel = LocalPreviewTunnel {
+        let mut registry = match state.registry.lock() {
+            Ok(registry) => registry,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        registry.starting_ids.remove(&request.id);
+        let tunnel = LocalPreviewTunnel {
             id: request.id.clone(),
             local_url: local_url.clone(),
             public_url: public_url.clone(),
             child,
         };
         if registry.generation != start_generation {
-            if terminate_child_confirmed(&mut tunnel.child).is_err() {
-                registry.tunnels.insert(request.id.clone(), tunnel);
-                return Err("Local preview startup was cancelled, but process termination could not be confirmed.".into());
+            if !terminate_or_retain_tunnel_with(&mut registry, tunnel, terminate_child_confirmed) {
+                return Err("Local preview startup was cancelled, but process termination could not be confirmed; the process was retained for another stop attempt.".into());
             }
             return Err("Local preview startup was cancelled during account cleanup.".into());
         }
@@ -391,7 +497,10 @@ fn append_bounded(output: &mut String, line: &str, max_chars: usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{LocalPreviewRegistry, LocalPreviewTunnel};
+    use super::{
+        terminate_or_retain_tunnel_with, terminate_registered_tunnel_with, LocalPreviewRegistry,
+        LocalPreviewTunnel,
+    };
     use std::fs;
     use std::process::Command;
     use std::thread;
@@ -443,5 +552,56 @@ mod tests {
             "terminated preview child must not reach its delayed side effect"
         );
         let _ = fs::remove_file(marker);
+    }
+
+    #[test]
+    fn same_id_tunnel_is_not_removed_when_termination_is_unconfirmed() {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("sleep 5")
+            .spawn()
+            .expect("spawn retained preview test child");
+        let mut registry = LocalPreviewRegistry::default();
+        registry.tunnels.insert(
+            "preview-same-id".to_string(),
+            LocalPreviewTunnel {
+                id: "preview-same-id".to_string(),
+                local_url: "http://localhost:5173/".to_string(),
+                public_url: "https://example.trycloudflare.com".to_string(),
+                child,
+            },
+        );
+
+        let result = terminate_registered_tunnel_with(&mut registry, "preview-same-id", |_| {
+            Err(std::io::Error::other("simulated termination failure"))
+        });
+
+        assert!(result.is_err());
+        assert!(registry.tunnels.contains_key("preview-same-id"));
+        assert_eq!(registry.cancel_all().expect("cleanup retained child"), 1);
+    }
+
+    #[test]
+    fn failed_start_child_is_retained_when_termination_is_unconfirmed() {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("sleep 5")
+            .spawn()
+            .expect("spawn failed-start preview test child");
+        let mut registry = LocalPreviewRegistry::default();
+        let tunnel = LocalPreviewTunnel {
+            id: "preview-failed-start".to_string(),
+            local_url: "http://localhost:5173/".to_string(),
+            public_url: String::new(),
+            child,
+        };
+
+        let terminated = terminate_or_retain_tunnel_with(&mut registry, tunnel, |_| {
+            Err(std::io::Error::other("simulated termination failure"))
+        });
+
+        assert!(!terminated);
+        assert!(registry.tunnels.contains_key("preview-failed-start"));
+        assert_eq!(registry.cancel_all().expect("cleanup retained child"), 1);
     }
 }

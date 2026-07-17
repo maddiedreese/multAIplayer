@@ -2,6 +2,7 @@ import { reportExpectedFailure } from "../../lib/core/nonFatalReporting";
 
 interface AccountActionsOptions {
   stopOwnedLocalPreviews: (reason: string) => Promise<boolean>;
+  resumeLocalPreviewSharing: () => void;
   signOutGitHub: () => Promise<void>;
   clearDeletedHostedAccount: () => void;
   reportUnconfirmedPreviewCleanup: () => void;
@@ -9,10 +10,13 @@ interface AccountActionsOptions {
 
 export function createAccountActions({
   stopOwnedLocalPreviews,
+  resumeLocalPreviewSharing,
   signOutGitHub,
   clearDeletedHostedAccount,
   reportUnconfirmedPreviewCleanup
 }: AccountActionsOptions) {
+  let hostedAccountPreviewCleanupConfirmed: boolean | null = null;
+
   async function cleanUpPreviews(reason: string) {
     try {
       return await stopOwnedLocalPreviews(reason);
@@ -31,13 +35,26 @@ export function createAccountActions({
     }
   }
 
-  async function hostedAccountDeleted() {
-    const previewCleanupConfirmed = await cleanUpPreviews(
-      "Stopped because the sharing user's hosted account was deleted."
+  async function prepareHostedAccountDeletion() {
+    hostedAccountPreviewCleanupConfirmed = await cleanUpPreviews(
+      "Stopped because the sharing user requested hosted account deletion."
     );
+    if (!hostedAccountPreviewCleanupConfirmed) reportUnconfirmedPreviewCleanup();
+  }
+
+  async function hostedAccountDeleted() {
+    const previewCleanupConfirmed =
+      hostedAccountPreviewCleanupConfirmed ??
+      (await cleanUpPreviews("Stopped because the sharing user's hosted account was deleted."));
+    hostedAccountPreviewCleanupConfirmed = null;
     clearDeletedHostedAccount();
     if (!previewCleanupConfirmed) reportUnconfirmedPreviewCleanup();
   }
 
-  return { signOut, hostedAccountDeleted };
+  function hostedAccountDeletionRejected() {
+    hostedAccountPreviewCleanupConfirmed = null;
+    resumeLocalPreviewSharing();
+  }
+
+  return { signOut, prepareHostedAccountDeletion, hostedAccountDeleted, hostedAccountDeletionRejected };
 }

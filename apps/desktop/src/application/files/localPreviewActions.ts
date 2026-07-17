@@ -295,6 +295,7 @@ export function createLocalPreviewActions({ publishLocalPreviewEvent }: LocalPre
     prepareLocalPreviewConfirmation,
     confirmLocalPreviewShare,
     stopLocalPreview,
-    stopOwnedLocalPreviews
+    stopOwnedLocalPreviews,
+    resumeLocalPreviewSharingAfterAuthentication
   };
 }

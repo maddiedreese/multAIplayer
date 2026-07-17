@@ -99,6 +99,7 @@ test("account sign-out actions preserve preview cleanup ordering without React",
       calls.push(`preview:${reason}`);
       return true;
     },
+    resumeLocalPreviewSharing: () => calls.push("resumed"),
     signOutGitHub: async () => {
       calls.push("github");
     },
@@ -118,14 +119,16 @@ test("hosted-account deletion stops previews before clearing account state", asy
       calls.push(`preview:${reason}`);
       return true;
     },
+    resumeLocalPreviewSharing: () => calls.push("resumed"),
     signOutGitHub: async () => undefined,
     clearDeletedHostedAccount: () => calls.push("deleted"),
     reportUnconfirmedPreviewCleanup: () => calls.push("warning")
   });
 
+  await actions.prepareHostedAccountDeletion();
   await actions.hostedAccountDeleted();
 
-  assert.deepEqual(calls, ["preview:Stopped because the sharing user's hosted account was deleted.", "deleted"]);
+  assert.deepEqual(calls, ["preview:Stopped because the sharing user requested hosted account deletion.", "deleted"]);
 });
 
 test("hosted-account deletion clears local identity even when native preview cleanup fails", async () => {
@@ -135,14 +138,35 @@ test("hosted-account deletion clears local identity even when native preview cle
       calls.push("preview");
       throw new Error("native stop failed");
     },
+    resumeLocalPreviewSharing: () => calls.push("resumed"),
     signOutGitHub: async () => undefined,
     clearDeletedHostedAccount: () => calls.push("deleted"),
     reportUnconfirmedPreviewCleanup: () => calls.push("warning")
   });
 
+  await actions.prepareHostedAccountDeletion();
   await actions.hostedAccountDeleted();
 
-  assert.deepEqual(calls, ["preview", "deleted", "warning"]);
+  assert.deepEqual(calls, ["preview", "warning", "deleted", "warning"]);
+});
+
+test("a rejected hosted-account deletion re-enables preview sharing", async () => {
+  const calls: string[] = [];
+  const actions = createAccountActions({
+    stopOwnedLocalPreviews: async () => {
+      calls.push("preview");
+      return true;
+    },
+    resumeLocalPreviewSharing: () => calls.push("resumed"),
+    signOutGitHub: async () => undefined,
+    clearDeletedHostedAccount: () => calls.push("deleted"),
+    reportUnconfirmedPreviewCleanup: () => calls.push("warning")
+  });
+
+  await actions.prepareHostedAccountDeletion();
+  actions.hostedAccountDeletionRejected();
+
+  assert.deepEqual(calls, ["preview", "resumed"]);
 });
 
 test("visibility warning actions update persistence and the current Zustand store", () => {

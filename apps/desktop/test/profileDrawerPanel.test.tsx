@@ -32,6 +32,7 @@ afterEach(() => cleanup());
 test("accepted hosted-account deletion is reported as protected and pending cleanup", async () => {
   const originalFetch = globalThis.fetch;
   let deleted = 0;
+  const lifecycle: string[] = [];
   const deletionRequests: Array<{ input: string; init?: RequestInit }> = [];
   globalThis.fetch = async (input, init) => {
     deletionRequests.push({ input: String(input), ...(init === undefined ? {} : { init }) });
@@ -66,7 +67,14 @@ test("accepted hosted-account deletion is reported as protected and pending clea
         deviceIdentityMessage={null}
         relaySessionPersistence="Encrypted"
         codexAccountPanel={null}
+        onHostedAccountDeletionStarted={() => {
+          lifecycle.push("preview-cleanup");
+        }}
+        onHostedAccountDeletionRejected={() => {
+          lifecycle.push("deletion-rejected");
+        }}
         onHostedAccountDeleted={() => {
+          lifecycle.push("account-cleared");
           deleted += 1;
         }}
         onSignIn={() => undefined}
@@ -93,11 +101,71 @@ test("accepted hosted-account deletion is reported as protected and pending clea
       assert.ok(view.getByText(/Deletion request protected and pending primary cleanup/i));
     });
     assert.equal(deleted, 1);
+    assert.deepEqual(lifecycle, ["preview-cleanup", "account-cleared"]);
     const deletionRequest = deletionRequests.at(-1);
     assert.equal(deletionRequest?.input, "https://relay.example/auth/account");
     assert.equal(deletionRequest?.init?.method, "DELETE");
     assert.equal(deletionRequest?.init?.body, JSON.stringify({ confirmation: "delete my account" }));
     assert.match(view.getByText("Account deletion status").parentElement?.textContent ?? "", /durably accepted/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hosted-account deletion cleans up previews before an unrecoverable response loss", async () => {
+  const originalFetch = globalThis.fetch;
+  const lifecycle: string[] = [];
+  globalThis.fetch = async () => {
+    lifecycle.push("request");
+    throw new TypeError("relay unavailable");
+  };
+
+  try {
+    const view = render(
+      <ProfileDrawerPanel
+        currentUser={{ id: "github:123", login: "octocat", name: "Octo Cat" }}
+        authConfig={{
+          provider: "github",
+          configured: true,
+          scopes: ["read:user"],
+          mutationsRequireAuth: true,
+          allowedOrigins: ["tauri://localhost"],
+          sessionPersistence: "identity_only"
+        }}
+        authBusy={false}
+        authError={null}
+        deviceFlow={null}
+        deviceId="device-test"
+        deviceIdentity={null}
+        deviceIdentityMessage={null}
+        relaySessionPersistence="Encrypted"
+        codexAccountPanel={null}
+        onHostedAccountDeletionStarted={() => {
+          lifecycle.push("preview-cleanup");
+        }}
+        onHostedAccountDeletionRejected={() => {
+          lifecycle.push("deletion-rejected");
+        }}
+        onHostedAccountDeleted={() => {
+          lifecycle.push("account-cleared");
+        }}
+        onSignIn={() => undefined}
+        onSignOut={() => undefined}
+      />
+    );
+
+    fireEvent.click(view.getByRole("button", { name: "Delete hosted account data" }));
+    fireEvent.change(view.getByLabelText(/Type delete my account to confirm/), {
+      target: { value: "delete my account" }
+    });
+    fireEvent.click(view.getByRole("button", { name: "Permanently delete hosted account data" }));
+
+    await waitFor(() => {
+      assert.match(view.getByText("Account deletion status").parentElement?.textContent ?? "", /could not be confirmed/i);
+    });
+    assert.equal(lifecycle[0], "preview-cleanup");
+    assert.ok(lifecycle.slice(1).every((entry) => entry === "request"));
+    assert.equal(lifecycle.includes("account-cleared"), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
