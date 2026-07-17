@@ -1,5 +1,3 @@
-import { reportExpectedFailure } from "../core/nonFatalReporting";
-
 const secretTextLimit = 120_000;
 
 export function detectSecretRisks(text: string, path = ""): string[] {
