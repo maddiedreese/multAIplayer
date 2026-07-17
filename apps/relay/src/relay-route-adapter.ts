@@ -225,8 +225,6 @@ export function registerRelayRouteAdapter(options: RegisterRelayRouteAdapterOpti
       allowRead: auth.allowRead,
       allowMutation: auth.allowMutation,
       scheduleStoreSave,
-      saveRelayStore,
-      revokeDeviceSessions: roomManager.revokeDeviceSessions,
       registeredDeviceCapPerUser: config.registeredDeviceCapPerUser,
       recordQuotaRejection: metrics.recordQuotaRejection,
       normalizeMetadataText,
