@@ -4,8 +4,8 @@ use super::invites::{
 };
 use super::{
     decode_stored_signing_secret, delete_all_history_native, delete_room_local_data_native,
-    engine_error, fingerprint, group_state_command_error, is_corruption_error_message,
-    quarantine_store, validate_room_config_payload, BasicAppCredential, CapabilityBinding,
+    engine_error, fingerprint, group_state_command_error, quarantine_store,
+    should_quarantine_store, validate_room_config_payload, BasicAppCredential, CapabilityBinding,
     EncryptRequest, EncryptedStore, MlsEngine, PendingInviteRequestPublic,
     PendingJoinAdmissionPublic, SigningSecretLoadError, StoredMlsIdentity,
 };
@@ -235,13 +235,19 @@ fn quarantine_moves_database_and_sidecars_together() {
 }
 
 #[test]
-fn quarantine_classification_rejects_transient_database_errors() {
-    assert!(is_corruption_error_message("file is not a database"));
-    assert!(is_corruption_error_message(
-        "database disk image is malformed"
-    ));
-    assert!(!is_corruption_error_message("database is locked"));
-    assert!(!is_corruption_error_message("disk I/O error"));
+fn quarantine_classification_uses_typed_store_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let corrupt = dir.path().join("corrupt.db");
+    std::fs::write(&corrupt, b"not a sqlite database").unwrap();
+    assert!(should_quarantine_store(&corrupt, [17; 32]));
+
+    let healthy = dir.path().join("healthy.db");
+    EncryptedStore::open(&healthy, [18; 32]).unwrap();
+    assert!(!should_quarantine_store(&healthy, [18; 32]));
+}
+
+#[test]
+fn engine_errors_are_sanitized_for_ipc() {
     assert_eq!(
         engine_error(mls_core::EngineError::requires_rejoin(
             "load_group",

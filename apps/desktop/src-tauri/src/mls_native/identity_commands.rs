@@ -25,7 +25,7 @@ pub(crate) fn mls_identity_initialize(
     validate_credential(
         &serde_json::to_vec(&identity).map_err(|_| "MLS identity is invalid".to_string())?,
     )
-    .map_err(safe_error)?;
+    .map_err(display_error)?;
     let secret = load_or_create_signing_secret(&request.github_user_id, &request.device_id)
         .map_err(identity_initialization_error)?;
     let wrapping_key = load_or_create_store_wrapping_key()?;
@@ -55,19 +55,20 @@ pub(crate) fn mls_identity_initialize(
                     &database_path,
                     wrapping_key,
                 )
-                .map_err(|_| safe_error(error))?
+                .map_err(|_| display_error(error))?
             }
-            Err(error) => return Err(safe_error(error).into()),
+            Err(error) => return Err(display_error(error).into()),
         };
-    let store = EncryptedStore::open(&database_path, wrapping_key).map_err(safe_error)?;
+    let store = EncryptedStore::open(&database_path, wrapping_key).map_err(display_error)?;
     secure_store_permissions(&database_path)?;
     let signer = DeviceAuthSigner::from_secret(
         secret,
         request.github_user_id.clone(),
         request.device_id.clone(),
     )
-    .map_err(safe_error)?;
-    let signature_public_key = STANDARD.encode(signer.public_key_spki_der().map_err(safe_error)?);
+    .map_err(display_error)?;
+    let signature_public_key =
+        STANDARD.encode(signer.public_key_spki_der().map_err(display_error)?);
     let hpke = load_or_create_hpke_key_pair()?;
     let hpke_public_key = STANDARD.encode(hpke.public_key_bytes());
     let signature_key_fingerprint = fingerprint(

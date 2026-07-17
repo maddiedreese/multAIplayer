@@ -222,12 +222,13 @@ fn native_bundle_normalizes_context_and_never_exposes_unredacted_entries() {
     assert_eq!(bundle["app"]["language"], "en-US");
     assert_eq!(bundle["relay"]["httpOrigin"], "https://relay.example.com");
     assert_eq!(bundle["relay"]["wsOrigin"], "wss://relay.example.com");
+    assert!(bundle["entries"][0].get("detail").is_none());
     let serialized = String::from_utf8(encoded).expect("utf8 bundle");
     assert!(!serialized.contains("password"));
     assert!(!serialized.contains("secret=leaked"));
     assert!(!serialized.contains("abcdefghijklmnopqrstuvwxyz1234567890"));
     assert!(!serialized.contains("ghp_GITHUB_TOKEN"));
-    assert!(serialized.contains("[redacted-token]"));
+    assert!(serialized.contains("event-1"));
     let _ = fs::remove_dir_all(path.parent().expect("parent"));
 }
 

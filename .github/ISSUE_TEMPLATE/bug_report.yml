@@ -26,10 +26,21 @@ body:
     validations:
       required: true
   - type: input
-    id: version
+    id: desktop_version
     attributes:
-      label: Version or commit
-      placeholder: Version shown in the app, release tag, or commit SHA
+      label: Desktop version or commit
+      description: Use the version shown by the installed app, a release tag, or an exact commit SHA.
+      placeholder: 0.1.0-alpha.0 or 5cb636467ca4c4508c1e06b01152f7091e28cff7
+    validations:
+      required: true
+  - type: input
+    id: relay_version
+    attributes:
+      label: Relay version or commit
+      description: Ask the relay operator for its release tag or exact commit SHA. Enter "unknown" if unavailable.
+      placeholder: 0.1.0-alpha.0, exact commit SHA, or unknown
+    validations:
+      required: true
   - type: dropdown
     id: surface
     attributes:
@@ -50,4 +61,11 @@ body:
     id: logs
     attributes:
       label: Logs or screenshots
-      description: Redact secrets, complete invite links/fragments, and private repo content before attaching anything.
+      description: Attach diagnostics only after explicitly saving and reviewing them. Redact secrets, complete invite links/fragments, private repo content, and all room content before attaching anything else.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I reviewed every attachment and removed room content, private code, credentials, tokens, and complete invite links or fragments.
+          required: true

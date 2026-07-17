@@ -235,6 +235,23 @@ test("transient denial ACK failure retries without clearing native recovery earl
 });
 
 test("structured relay status controls retry regardless of message wording", async (t) => {
+  await t.test("untyped terminal-looking text remains retryable", async () => {
+    let loads = 0;
+    const result = await runPendingInviteRecoveryLoop(
+      pending,
+      dependencies({
+        loadResponse: async () => {
+          loads += 1;
+          if (loads === 1) throw new Error("Unrelated dependency was not found");
+          return response;
+        }
+      }),
+      { maxAttempts: 2, sleep: async () => undefined }
+    );
+    assert.equal(result, "approved");
+    assert.equal(loads, 2);
+  });
+
   await t.test("structured 5xx containing terminal-looking text still retries", async () => {
     let loads = 0;
     const result = await runPendingInviteRecoveryLoop(
@@ -327,7 +344,16 @@ test("missing relay invite clears the exact durable record while transient looku
     cleared.push([requestId, roomId]);
   };
 
-  assert.equal(await clearPendingInviteIfMissing(new Error("Invite not found"), pending, clear), true);
+  assert.equal(
+    await clearPendingInviteIfMissing(new RelayHttpError("Invite not found", 404, "invite_not_found"), pending, clear),
+    true
+  );
+  assert.deepEqual(cleared, [[pending.requestId, pending.roomId]]);
+
+  assert.equal(
+    await clearPendingInviteIfMissing(new Error("Unrelated dependency was not found"), pending, clear),
+    false
+  );
   assert.deepEqual(cleared, [[pending.requestId, pending.roomId]]);
 
   assert.equal(await clearPendingInviteIfMissing(new Error("Relay unavailable"), pending, clear), false);

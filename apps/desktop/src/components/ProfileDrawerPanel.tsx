@@ -134,6 +134,10 @@ export function ProfileDrawerPanel({
         <ClipboardList size={15} />
         Save diagnostics
       </button>
+      <small>
+        Saves metadata-only warning and error events on this Mac. Nothing is uploaded, and room content is never
+        included. Review the file before choosing whether to attach it to a report.
+      </small>
       {diagnosticsMessage && <div className="workflow-message">{diagnosticsMessage}</div>}
 
       {codexAccountPanel}

@@ -228,10 +228,10 @@ pub(super) fn delete_all_history_native(
     // The engine transaction removes both retained epoch secrets and ciphertext rows from the
     // shared SQLCipher KVS. The store deletion is an idempotent defense-in-depth pass for the
     // application-storage abstraction; running it second cannot orphan readable ciphertext.
-    engine.forget_history(room_id).map_err(safe_error)?;
+    engine.forget_history(room_id).map_err(display_error)?;
     store
         .delete_all_history_ciphertexts(room_id)
-        .map_err(safe_error)
+        .map_err(display_error)
 }
 
 pub(super) fn delete_room_local_data_native(
@@ -240,5 +240,5 @@ pub(super) fn delete_room_local_data_native(
     room_id: &str,
 ) -> Result<(), String> {
     delete_all_history_native(engine, store, room_id)?;
-    store.delete_room_config(room_id).map_err(safe_error)
+    store.delete_room_config(room_id).map_err(display_error)
 }

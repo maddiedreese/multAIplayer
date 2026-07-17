@@ -14,7 +14,7 @@ pub(crate) fn mls_device_auth_sign(
         .as_ref()
         .ok_or_else(|| "MLS identity is not initialized".to_string())?
         .sign(&challenge)
-        .map_err(safe_error)?;
+        .map_err(display_error)?;
     Ok(DeviceAuthResponse {
         signature_der: STANDARD.encode(output.signature_der),
         public_key_spki_der: STANDARD.encode(output.public_key_spki_der),
@@ -34,7 +34,7 @@ pub(crate) fn mls_generate_key_package(
     })?;
     let bytes = engine
         .generate_key_package()
-        .map_err(|error| crate::command_error::CommandError::crypto(safe_error(error)))?;
+        .map_err(|error| crate::command_error::CommandError::crypto(display_error(error)))?;
     let id = uuid::Uuid::new_v4().to_string();
     let key_package_hash = format!("sha256:{:x}", Sha256::digest(&bytes));
     Ok(KeyPackagePublish {

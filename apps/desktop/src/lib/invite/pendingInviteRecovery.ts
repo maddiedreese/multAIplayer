@@ -52,22 +52,20 @@ class InviteRecoveryTransportError extends Error {
 }
 
 function isTerminalRelayError(error: unknown): boolean {
-  if (error instanceof RelayHttpError) {
-    if (error.status >= 500 || [408, 429].includes(error.status)) return false;
-    if (
-      error.code &&
-      [
-        "persistence_unavailable",
-        "upstream_unavailable",
-        "relay_shutting_down",
-        "internal_error",
-        "rate_limited"
-      ].includes(error.code)
-    )
-      return false;
-    return error.status >= 400 && error.status < 500;
-  }
-  return /not found|conflict|invalid|forbidden|unauthorized|\b(?:400|401|403|404|409)\b/i.test(String(error));
+  if (!(error instanceof RelayHttpError)) return false;
+  if (error.status >= 500 || [408, 429].includes(error.status)) return false;
+  if (
+    error.code &&
+    [
+      "persistence_unavailable",
+      "upstream_unavailable",
+      "relay_shutting_down",
+      "internal_error",
+      "rate_limited"
+    ].includes(error.code)
+  )
+    return false;
+  return error.status >= 400 && error.status < 500;
 }
 
 export async function clearPendingInviteIfMissing(
@@ -76,9 +74,8 @@ export async function clearPendingInviteIfMissing(
   clear: (requestId: string, roomId: string) => Promise<void>
 ): Promise<boolean> {
   const missing =
-    error instanceof RelayHttpError
-      ? error.status === 404 || error.code === "invite_not_found" || error.code === "not_found"
-      : /not found|404/i.test(String(error));
+    error instanceof RelayHttpError &&
+    (error.status === 404 || error.code === "invite_not_found" || error.code === "not_found");
   if (!missing) return false;
   await clear(pending.requestId, pending.roomId);
   return true;

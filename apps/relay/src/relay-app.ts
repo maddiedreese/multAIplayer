@@ -36,8 +36,7 @@ import {
   createContentLengthGuard,
   relayInternalErrorMiddleware,
   relayJsonBodyErrorMiddleware,
-  relayNotFoundMiddleware,
-  typedRelayErrorMiddleware
+  relayNotFoundMiddleware
 } from "./http/errors.js";
 import { createRelayOriginPolicy } from "./http/origin-policy.js";
 import { teamRecordForUser } from "./http/teams.js";
@@ -122,8 +121,6 @@ export async function createRelayApp(
   app.use(cookieParser());
   app.use(originPolicy.enforceCookieMutationCsrf);
   app.use(requestLoggingMiddleware(structuredLogsEnabled));
-  app.use(typedRelayErrorMiddleware);
-
   const server = createServer(app);
   const wss = new WebSocketServer({
     server,

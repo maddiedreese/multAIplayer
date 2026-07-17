@@ -91,7 +91,7 @@ test("web-preview diagnostics remain memory-only", () => {
   assert.equal(loadDiagnosticEntries().length, 1);
 });
 
-test("Tauri diagnostics persist exactly one redacted entry", async () => {
+test("Tauri diagnostics persist exactly one metadata-only entry", async () => {
   const calls: Array<{ command: string; payload: unknown }> = [];
   mockIPC((command, payload) => {
     calls.push({ command, payload });
@@ -106,8 +106,21 @@ test("Tauri diagnostics persist exactly one redacted entry", async () => {
   assert.equal(call.command, "record_diagnostic");
   const entry = (call.payload as Record<string, unknown>).entry as Record<string, unknown>;
   assert.equal(entry.level, "warn");
-  assert.match(String(entry.detail), /"secret":"\[omitted\]"/);
-  assert.match(String(entry.detail), /"safe":"visible"/);
+  assert.equal(entry.message, "Persistence test");
+  assert.equal(entry.detail, undefined);
+});
+
+test("persisted reports never include room content from error detail", async () => {
+  const calls: Array<{ command: string; payload: unknown }> = [];
+  mockIPC((command, payload) => {
+    calls.push({ command, payload });
+  });
+
+  recordDiagnosticEvent("error", "React render failure", "private room transcript text");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.match(loadDiagnosticEntries()[0]?.detail ?? "", /private room transcript text/);
+  assert.doesNotMatch(JSON.stringify(calls), /private room transcript text/);
 });
 
 test("failed Tauri persistence is swallowed without changing the memory ring", async () => {
