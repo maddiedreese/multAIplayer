@@ -5,8 +5,9 @@ import { type DeviceRecord } from "@multaiplayer/protocol";
 import { RelayStoreCapacityError, type AuthSession, type RelayStore } from "../state.js";
 import { isCanonicalPaddedBase64 } from "../opaque.js";
 import { acquireAccountMutationTurn, isLiveAccountSession } from "../auth/account-mutation-transaction.js";
+import { registerDeviceRetirementRoute, type DeviceRetirementRouteOptions } from "./device-retirement.js";
 
-interface RegisterDeviceRoutesOptions {
+interface RegisterDeviceRoutesOptions extends DeviceRetirementRouteOptions {
   app: Express;
   store: RelayStore;
   getAuthSession: (sessionId: unknown) => AuthSession | null;
@@ -112,6 +113,21 @@ export function registerDeviceRoutes(options: RegisterDeviceRoutesOptions) {
     }
   });
 
+  app.get("/devices", (req, res) => {
+    const session = getAuthSession(req.cookies?.multaiplayer_session);
+    if (!allowRead(session, res)) return;
+    if (!session) {
+      sendRelayError(res, 401, "authentication_required", "Sign in before listing registered devices.");
+      return;
+    }
+    const devices = Array.from(store.devices.values())
+      .filter((device) => device.userId === session.user.id)
+      .sort(
+        (left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt) || left.deviceId.localeCompare(right.deviceId)
+      );
+    res.json({ devices });
+  });
+
   app.get("/teams/:teamId/devices", (req, res) => {
     const session = getAuthSession(req.cookies?.multaiplayer_session);
     if (!allowRead(session, res)) return;
@@ -136,6 +152,7 @@ export function registerDeviceRoutes(options: RegisterDeviceRoutesOptions) {
       .sort((left, right) => left.userId.localeCompare(right.userId) || left.deviceId.localeCompare(right.deviceId));
     res.json({ devices });
   });
+  registerDeviceRetirementRoute(options);
 }
 
 function deviceCountForUser(store: RelayStore, userId: string): number {
