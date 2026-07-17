@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import type { CodexEventPlaintextPayload, ClientRoomRecord } from "@multaiplayer/protocol";
@@ -30,6 +31,7 @@ Object.defineProperty(globalThis, "localStorage", { configurable: true, value: l
 Object.defineProperty(globalThis, "window", { configurable: true, value: { __TAURI_INTERNALS__: tauriInternals } });
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-steering",
   teamId: "team-steering",
   name: "Steering",

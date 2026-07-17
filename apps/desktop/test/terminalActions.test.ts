@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -17,6 +18,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
 });
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-terminal-actions",
   teamId: "team-terminal-actions",
   name: "Terminal Actions",
@@ -72,7 +74,7 @@ test.beforeEach(() => {
 });
 
 test("terminal actions report host gating through the current store without React", async () => {
-  const actions = createTerminalActions(createOptions({ isActiveHost: false }));
+  const actions = createTerminalActions(createOptions());
   useAppStore.getState().replaceCurrentUser(null);
 
   await actions.openInteractiveTerminal();
@@ -277,6 +279,7 @@ test("terminal input crosses the native authorization boundary exactly once and 
 
 test("late terminal input completion cannot overwrite state after a room switch", async () => {
   const otherRoom: ClientRoomRecord = {
+    ...defaultTestRoom,
     ...room,
     id: "room-terminal-other",
     name: "Other terminal room",
@@ -327,8 +330,8 @@ test("approved remote commands use the room cwd and retain only native-redacted 
     status: "pending"
   };
   const calls: Array<{ command: string; args: unknown }> = [];
-  let publishedResult: Parameters<Parameters<typeof createTerminalActions>[0]["publishTerminalResult"]>[1] | null =
-    null;
+  const publishedResults: Array<Parameters<Parameters<typeof createTerminalActions>[0]["publishTerminalResult"]>[1]> =
+    [];
   nativeInvoke = async (command, args) => {
     calls.push({ command, args });
     if (command === "authorize_shell_execution") return "shell-token";
@@ -348,7 +351,7 @@ test("approved remote commands use the room cwd and retain only native-redacted 
   const actions = createTerminalActions(
     createOptions({
       publishTerminalResult: async (_approved, result) => {
-        publishedResult = result;
+        publishedResults.push(result);
       }
     })
   );
@@ -380,6 +383,6 @@ test("approved remote commands use the room cwd and retain only native-redacted 
   });
   assert.equal(JSON.stringify(useAppStore.getState().terminalRuntimeByRoom[room.id]).includes("ghp_fake_secret"), true);
   assert.match(JSON.stringify(useAppStore.getState().terminalRuntimeByRoom[room.id]), /GH_TOKEN=\[REDACTED\]/);
-  assert.equal(publishedResult?.stdout, "GH_TOKEN=[REDACTED]");
+  assert.equal(publishedResults.at(-1)?.stdout, "GH_TOKEN=[REDACTED]");
   assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.busy ?? false, false);
 });

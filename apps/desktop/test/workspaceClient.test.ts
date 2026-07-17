@@ -1,6 +1,8 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
+import type { MlsInviteCapabilityBinding } from "../src/lib/mls/mlsClient";
 import { readJsonResponse, RelayHttpError } from "../src/lib/core/httpResponse";
 import {
   createRoom,
@@ -78,9 +80,27 @@ test("readJsonResponse returns typed JSON bodies", async () => {
 });
 
 test("directed invite responses omit an absent Welcome after HTTP decoding", () => {
+  const responseBinding = {
+    version: 3,
+    phase: "response",
+    inviteId: "invite-response",
+    teamId: "team-response",
+    roomId: "room-response",
+    keyEpoch: 1,
+    keyPackageHash: "sha256:key-package",
+    requestId: "request-response",
+    requestNonce: "nonce-response",
+    requesterUserId: "github:guest",
+    requesterDeviceId: "device-guest",
+    hostUserId: "github:host",
+    hostDeviceId: "device-host",
+    expiresAt: "2030-01-01T00:00:00.000Z",
+    status: "denied",
+    decidedAt: "2029-12-01T00:00:00.000Z"
+  } satisfies MlsInviteCapabilityBinding;
   const directed = normalizeDirectedInviteResponse({
     status: "denied",
-    responseBinding: { version: 3 },
+    responseBinding,
     responseMac: "response-mac",
     welcome: undefined
   });
@@ -89,6 +109,7 @@ test("directed invite responses omit an absent Welcome after HTTP decoding", () 
 });
 
 const workspaceRoom: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-workspace-client",
   teamId: "team-workspace-client",
   name: "Workspace client",
@@ -127,7 +148,7 @@ test("room creation keeps local workspace and Codex execution settings off the r
   try {
     const created = await createRoom(workspaceRoom.teamId, "Injected\nroom name", workspaceRoom.projectPath, {
       codexModel: "gpt-5.4",
-      codexSandboxLevel: "workspace-write"
+      codexSandboxLevel: "workspace_write"
     });
 
     assert.match(requestUrl, /\/rooms$/);
@@ -138,7 +159,7 @@ test("room creation keeps local workspace and Codex execution settings off the r
     assert.equal(JSON.stringify(requestBody).includes(workspaceRoom.projectPath), false);
     assert.equal(created.projectPath, workspaceRoom.projectPath);
     assert.equal(created.codexModel, "gpt-5.4");
-    assert.equal(created.codexSandboxLevel, "workspace-write");
+    assert.equal(created.codexSandboxLevel, "workspace_write");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -191,13 +212,13 @@ test("local-only room settings never perform a relay mutation", async () => {
   try {
     const updated = await updateRoomSettings(workspaceRoom.id, {
       projectPath: "/private/new-local-path",
-      codexSandboxLevel: "read-only",
+      codexSandboxLevel: "read_only",
       codexRawReasoningEnabled: true
     });
 
     assert.equal(fetchCalls, 0);
     assert.equal(updated.projectPath, "/private/new-local-path");
-    assert.equal(updated.codexSandboxLevel, "read-only");
+    assert.equal(updated.codexSandboxLevel, "read_only");
     assert.equal(updated.codexRawReasoningEnabled, true);
     assert.equal(updated.configRevision, workspaceRoom.configRevision + 1);
     assert.equal(updated.configEpoch, workspaceRoom.configEpoch);

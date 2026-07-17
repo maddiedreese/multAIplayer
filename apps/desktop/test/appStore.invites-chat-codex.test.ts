@@ -12,13 +12,13 @@ test("desktop store keeps invite panel state room scoped", () => {
 
   store.setInviteRequestsForRoom("room-a", [
     {
-      eventType: "invite.request",
       id: "invite-request-1",
       inviteId: "invite-1",
       requester: "Jordan",
       requesterUserId: "github:jordan",
       requesterDeviceId: "device-jordan",
-      requesterPublicKeyFingerprint: "1234567890abcdef",
+      keyPackageId: "key-package-1",
+      keyPackageHash: "sha256:key-package-1",
       requestedAt: "2026-07-06T00:06:00.000Z",
       note: "Joining from laptop",
       status: "pending"
@@ -221,7 +221,7 @@ test("desktop store keeps Codex room state room scoped", () => {
   store.setRoomGoalForRoom("room-a", {
     id: "goal-a",
     text: "Finish the room",
-    status: "running",
+    status: "active",
     startedAt: "2026-07-06T00:08:00.000Z",
     updatedAt: "2026-07-06T00:08:00.000Z",
     elapsedMs: 0
@@ -284,7 +284,7 @@ test("desktop store exposes room Codex approval actions", () => {
   store.setRoomGoalForRoom("room-a", {
     id: "goal-a",
     text: "Refactor the UI",
-    status: "running",
+    status: "active",
     startedAt: "2026-07-06T00:08:00.000Z",
     updatedAt: "2026-07-06T00:08:00.000Z",
     elapsedMs: 0

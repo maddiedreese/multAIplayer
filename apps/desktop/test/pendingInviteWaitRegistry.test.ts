@@ -95,20 +95,21 @@ test("successful recovery can transfer ownership into response polling", async (
   const observer = scan.observe(["request-1"]).get("request-1");
   assert.ok(observer);
   scan.release();
-  let transferredOwnership: PendingInviteWaitOwnership | null = null;
+  const transferredOwnership: PendingInviteWaitOwnership[] = [];
   await runOwnedPendingInviteRecovery({
     observer,
     load: async () => "metadata",
     recover: (_value, ownership) => {
-      transferredOwnership = ownership;
+      transferredOwnership.push(ownership);
       return "transfer";
     },
     onError: async () => assert.fail("successful lookup must not fail")
   });
 
   assert.equal(registry.claim("request-1"), null);
-  assert.ok(transferredOwnership);
-  transferredOwnership.settle();
-  transferredOwnership.release();
+  const ownership = transferredOwnership.at(-1);
+  assert.ok(ownership);
+  ownership.settle();
+  ownership.release();
   assert.equal(registry.trackedCount(), 0);
 });

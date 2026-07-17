@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -9,6 +10,7 @@ import {
 } from "../src/lib/access/roomHost";
 
 const activeRoom: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-alpha",
   teamId: "team-alpha",
   name: "Alpha",

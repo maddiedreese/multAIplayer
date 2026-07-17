@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -12,6 +13,7 @@ import {
 import { ensureRoomDefaults } from "../src/lib/room/roomDefaults";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-a",
   teamId: "team-a",
   name: "Alpha",
@@ -27,16 +29,25 @@ const room: ClientRoomRecord = {
 test("markRoomRead clears only the selected room unread count", () => {
   const rooms = markRoomRead([room, { ...room, id: "room-b", unread: 3 }], "room-a");
 
-  assert.equal(rooms[0].unread, 0);
-  assert.equal(rooms[1].unread, 3);
+  assert.equal(rooms.at(0)?.unread, 0);
+  assert.equal(rooms.at(1)?.unread, 3);
 });
 
 test("markRoomUnreadForIncomingChat increments inactive rooms only", () => {
   const rooms = [{ ...room, unread: 0 }];
 
-  assert.equal(markRoomUnreadForIncomingChat(rooms, "room-a", "room-b", "remote-device", "local-device")[0].unread, 1);
-  assert.equal(markRoomUnreadForIncomingChat(rooms, "room-a", "room-a", "remote-device", "local-device")[0].unread, 0);
-  assert.equal(markRoomUnreadForIncomingChat(rooms, "room-a", "room-b", "local-device", "local-device")[0].unread, 0);
+  assert.equal(
+    markRoomUnreadForIncomingChat(rooms, "room-a", "room-b", "remote-device", "local-device").at(0)?.unread,
+    1
+  );
+  assert.equal(
+    markRoomUnreadForIncomingChat(rooms, "room-a", "room-a", "remote-device", "local-device").at(0)?.unread,
+    0
+  );
+  assert.equal(
+    markRoomUnreadForIncomingChat(rooms, "room-a", "room-b", "local-device", "local-device").at(0)?.unread,
+    0
+  );
 });
 
 test("relay room projection initializes and preserves device-local unread state", () => {
@@ -51,7 +62,7 @@ test("applyLocalRoomReadState restores encrypted local unread state", () => {
     unread: 4
   });
 
-  assert.equal(updated[0].unread, 4);
+  assert.equal(updated.at(0)?.unread, 4);
 });
 
 test("hideUnreadForLockedRooms suppresses forgotten and revoked room badges", () => {

@@ -15,7 +15,7 @@ All notable user-visible and security-relevant changes are curated here. Release
 ### Security
 
 - The relay transports only opaque MLS, Welcome, HPKE, and exporter-sealed payloads. Codex credentials and live local processes remain host-local; selected project/file, transcript, terminal, and browser context reaches room members only through authenticated encrypted room payloads.
-- Device removal revokes relay access and invites before an MLS Remove commit excludes future traffic.
+- Member removal revokes relay access before an MLS Remove commit excludes that member from future traffic.
 
 ### Fixed
 

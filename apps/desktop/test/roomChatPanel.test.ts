@@ -12,6 +12,7 @@ function renderChat(messages: RoomChatMessageDisplay[], codexActivities: CodexAc
     createElement(RoomChatPanel, {
       messages,
       codexActivities,
+      markdownSelectionMode: false,
       approvalVisible: false,
       approvalSummary: {
         messages: "0 since last Codex response",
@@ -214,6 +215,7 @@ test("RoomChatPanel renders Codex approval risk warnings", () => {
   const html = renderToStaticMarkup(
     createElement(RoomChatPanel, {
       messages: [],
+      markdownSelectionMode: false,
       approvalVisible: true,
       approvalSummary: {
         messages: "Maddie: inspect this output",
@@ -279,6 +281,7 @@ test("RoomChatPanel distinguishes high-privilege Codex approvals", () => {
   const html = renderToStaticMarkup(
     createElement(RoomChatPanel, {
       messages: [],
+      markdownSelectionMode: false,
       approvalVisible: true,
       approvalSummary: {
         messages: "Maddie: run the deployment check",

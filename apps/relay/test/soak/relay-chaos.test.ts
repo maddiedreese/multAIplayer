@@ -12,6 +12,7 @@ import {
   startRelayWithWorkspace,
   waitForJoined
 } from "../support/relay.js";
+import type { RelayHarness } from "../support/relay.js";
 
 const env = {
   MULTAIPLAYER_RELAY_BACKLOG_LIMIT: "1000",
@@ -57,7 +58,7 @@ test("deterministic relay chaos preserves SQLite and MLS ordering", { timeout: d
     publisher = null;
 
     for (let cycle = 0; cycle < restartCycles; cycle += 1) {
-      const active = current!;
+      const active: RelayHarness = current!;
       const phaseDeadline = Date.now() + Math.max(250, Math.floor(durationMs / restartCycles));
       publisher = await joinedSocket(active.wsUrl, deviceId);
       const churn = churnUntil(active.wsUrl, phaseDeadline, concurrentClients, reconnectLatencies, errors).then(

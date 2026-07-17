@@ -37,12 +37,14 @@ test("buildRoomChatMessageRows hides edit and delete once a started Codex event 
   };
 
   const [row] = rows([ownMessage], [started]);
+  assert.ok(row);
   assert.equal(row.canEdit, false);
   assert.equal(row.canDelete, false);
 });
 
 test("buildRoomChatMessageRows keeps queued-but-not-started messages editable", () => {
   const [row] = rows([ownMessage]);
+  assert.ok(row);
   assert.equal(row.canEdit, true);
   assert.equal(row.canDelete, true);
 });
@@ -57,6 +59,7 @@ test("buildRoomChatMessageRows shows deleter attribution on tombstones", () => {
       deletedByUserId: "github:maddie"
     }
   ]);
+  assert.ok(row);
 
   assert.equal(row.body, "Message deleted by Maddie");
   assert.equal(row.deleted, true);
@@ -80,6 +83,7 @@ test("buildRoomChatMessageRows exposes only allowlisted embedded raster images",
       ]
     }
   ]);
+  assert.ok(row);
 
   assert.deepEqual(row.attachments[0]?.image, { src: png, alt: "result.png" });
   assert.equal(row.attachments[1]?.image, undefined);

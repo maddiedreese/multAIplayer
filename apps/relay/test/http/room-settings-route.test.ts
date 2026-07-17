@@ -4,7 +4,6 @@ import { test } from "node:test";
 import express from "express";
 import type { RoomRecord, TeamRecord } from "@multaiplayer/protocol";
 import { registerRoomSettingsRoute } from "../../src/http/room-settings-route.js";
-import type { RegisterRoomRoutesOptions } from "../../src/http/room-route-types.js";
 import { createRelayStore } from "../../src/state.js";
 
 const team: TeamRecord = { id: "team-settings", name: "Settings team", members: 2 };
@@ -129,14 +128,14 @@ test("room settings normalize and persist every public setting while preserving 
   try {
     const response = await harness.patch({
       name: "  Renamed room  ",
-      approvalPolicy: "never"
+      approvalPolicy: "never_host"
     });
     assert.equal(response.status, 200);
     const updated = ((await response.json()) as { room: RoomRecord }).room;
     assert.deepEqual(updated, {
       ...room,
       name: "Renamed room",
-      approvalPolicy: "never"
+      approvalPolicy: "never_host"
     });
     assert.deepEqual(harness.store.getRoom(room.id), updated);
     assert.equal(harness.saves(), 1);
@@ -170,7 +169,7 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
   let sessionEnabled = true;
   const session = {
     sessionIdHash: "c".repeat(64),
-    user: { id: room.hostUserId, login: "maddie" },
+    user: { id: room.hostUserId!, login: "maddie" },
     expiresAt: Date.now() + 60_000
   };
   const reset = (value: RoomRecord = room) => {
@@ -194,19 +193,19 @@ async function startSettingsRouteHarness({ attachCookies = true } = {}) {
       return false;
     },
     canAccessRoom: () => canAccess,
-    requesterFromRequest: () => ({ id: room.hostUserId, name: "Maddie" }),
+    requesterFromRequest: () => ({ id: room.hostUserId!, name: "Maddie" }),
     isRoomHost: () => isHost,
     normalizeMetadataText: (value, maxChars) => {
       if (typeof value !== "string") return null;
       const normalized = value.trim();
       return normalized && normalized.length <= maxChars ? normalized : null;
     },
-    isApprovalPolicy: (value) => ["ask_every_turn", "never"].includes(value),
+    isApprovalPolicy: (value): value is RoomRecord["approvalPolicy"] =>
+      value === "ask_every_turn" || value === "never_host",
     scheduleStoreSave: () => saves++,
     broadcastRoomUpdated: () => broadcasts++,
-    maxRoomNameChars: 160,
-    maxUserIdChars: 160
-  } as RegisterRoomRoutesOptions);
+    maxRoomNameChars: 160
+  });
   const server = app.listen(0);
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);

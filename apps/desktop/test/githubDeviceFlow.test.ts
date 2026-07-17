@@ -108,10 +108,10 @@ test("sign-out reports both relay and credential-store failures", async () => {
 
 test("hosted account deletion sends exact confirmation and preserves typed blockers", async () => {
   const originalFetch = globalThis.fetch;
-  let request: { input: string; init?: RequestInit } | null = null;
+  const requests: Array<{ input: string; init?: RequestInit }> = [];
   try {
     globalThis.fetch = async (input, init) => {
-      request = { input: String(input), init };
+      requests.push(init === undefined ? { input: String(input) } : { input: String(input), init });
       return new Response(
         JSON.stringify({
           error: "Transfer ownership first.",
@@ -131,10 +131,12 @@ test("hosted account deletion sends exact confirmation and preserves typed block
         hostedRooms: [{ id: "room-one", name: "One", teamId: "team-one" }]
       }
     });
-    assert.equal(request?.input, "https://relay.example/auth/account");
-    assert.equal(request?.init?.method, "DELETE");
-    assert.equal(request?.init?.credentials, "include");
-    assert.equal(request?.init?.body, JSON.stringify({ confirmation: "delete my account" }));
+    const request = requests[0];
+    assert.ok(request);
+    assert.equal(request.input, "https://relay.example/auth/account");
+    assert.equal(request.init?.method, "DELETE");
+    assert.equal(request.init?.credentials, "include");
+    assert.equal(request.init?.body, JSON.stringify({ confirmation: "delete my account" }));
   } finally {
     globalThis.fetch = originalFetch;
   }

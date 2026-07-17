@@ -42,27 +42,32 @@ test("recordDiagnosticEvent stores bounded redacted diagnostics", () => {
   );
   const entries = loadDiagnosticEntries();
   assert.equal(entries.length, 1);
-  assert.equal(entries[0].level, "error");
-  const redactedUrl = new URL(entries[0].detail ?? "");
+  const [entry] = entries;
+  assert.ok(entry);
+  assert.equal(entry.level, "error");
+  const redactedUrl = new URL(entry.detail ?? "");
   assert.equal(redactedUrl.origin, "https://relay.example.com");
   assert.equal(redactedUrl.pathname, "/invites%20[redacted-token]");
   assert.equal(redactedUrl.search, "");
-  assert.doesNotMatch(entries[0].detail ?? "", /token=abc/);
-  assert.doesNotMatch(entries[0].detail ?? "", /gho_/);
+  assert.doesNotMatch(entry.detail ?? "", /token=abc/);
+  assert.doesNotMatch(entry.detail ?? "", /gho_/);
 });
 
 test("recoverable failures are countable without including rejected input", () => {
   reportNonFatal("discard corrupt security settings");
   const entries = loadDiagnosticEntries();
   assert.equal(entries.length, 1);
-  assert.equal(entries[0].message, "Non-fatal failure: discard corrupt security settings");
-  assert.equal(entries[0].detail, undefined);
+  const [entry] = entries;
+  assert.ok(entry);
+  assert.equal(entry.message, "Non-fatal failure: discard corrupt security settings");
+  assert.equal(entry.detail, undefined);
 });
 
 test("recoverable failures preserve redacted error context", () => {
   reportNonFatal("publish workflow event", new Error("request failed for token_abcdefghijklmnopqrstuvwxyz123456"));
 
   const [entry] = loadDiagnosticEntries();
+  assert.ok(entry);
   assert.equal(entry.message, "Non-fatal failure: publish workflow event");
   assert.match(entry.detail ?? "", /^Error: request failed for /);
   assert.doesNotMatch(entry.detail ?? "", /token_abcdefghijklmnopqrstuvwxyz123456/);
@@ -87,7 +92,7 @@ test("web-preview diagnostics remain memory-only", () => {
 });
 
 test("Tauri diagnostics persist exactly one redacted entry", async () => {
-  const calls: Array<{ command: string; payload: Record<string, unknown> | undefined }> = [];
+  const calls: Array<{ command: string; payload: unknown }> = [];
   mockIPC((command, payload) => {
     calls.push({ command, payload });
   });
@@ -96,8 +101,10 @@ test("Tauri diagnostics persist exactly one redacted entry", async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].command, "record_diagnostic");
-  const entry = calls[0].payload?.entry as Record<string, unknown>;
+  const [call] = calls;
+  assert.ok(call);
+  assert.equal(call.command, "record_diagnostic");
+  const entry = (call.payload as Record<string, unknown>).entry as Record<string, unknown>;
   assert.equal(entry.level, "warn");
   assert.match(String(entry.detail), /"secret":"\[omitted\]"/);
   assert.match(String(entry.detail), /"safe":"visible"/);
@@ -176,7 +183,9 @@ test("object diagnostics deeply omit sensitive keys without executing object hoo
 
   recordDiagnosticEvent("error", "Serialization safety", circular);
 
-  const detail = loadDiagnosticEntries()[0].detail ?? "";
+  const [entry] = loadDiagnosticEntries();
+  assert.ok(entry);
+  const detail = entry.detail ?? "";
   assert.equal(getterCalls, 0);
   assert.equal(toJsonCalls, 0);
   assert.equal(toStringCalls, 0);
@@ -209,7 +218,9 @@ test("object diagnostics omit compound sensitive keys while retaining benign nea
     plaintextFormat: "retained-format"
   });
 
-  const detail = loadDiagnosticEntries()[0].detail;
+  const [entry] = loadDiagnosticEntries();
+  assert.ok(entry);
+  const detail = entry.detail;
   assert.ok(detail);
   const sanitized = JSON.parse(detail) as Record<string, unknown>;
   for (const key of [
@@ -256,7 +267,9 @@ test("object diagnostics bound depth, arrays, keys, and final detail length", ()
     large: "x".repeat(1_000)
   });
 
-  const detail = loadDiagnosticEntries()[0].detail ?? "";
+  const [entry] = loadDiagnosticEntries();
+  assert.ok(entry);
+  const detail = entry.detail ?? "";
   assert.ok(detail.length <= 800);
   assert.match(detail, /\[max-depth\]/);
   assert.match(detail, /\[truncated\]/);
@@ -277,15 +290,17 @@ test("Error diagnostics use only data name and message fields", () => {
   recordDiagnosticEvent("error", "Error formatting", error);
 
   assert.equal(getterCalls, 0);
-  assert.equal(loadDiagnosticEntries()[0].detail, "Error: safe failure");
+  const [entry] = loadDiagnosticEntries();
+  assert.ok(entry);
+  assert.equal(entry.detail, "Error: safe failure");
 });
 
 test("diagnostic memory ring retains only the newest 80 entries", () => {
   for (let index = 0; index < 85; index += 1) recordDiagnosticEvent("warn", `Event ${index}`);
   const entries = loadDiagnosticEntries();
   assert.equal(entries.length, 80);
-  assert.equal(entries[0].message, "Event 5");
-  assert.equal(entries[79].message, "Event 84");
+  assert.equal(entries.at(0)?.message, "Event 5");
+  assert.equal(entries.at(79)?.message, "Event 84");
 });
 
 test("native bundle save sends bounded context but never reads persisted entries into JavaScript", async () => {
@@ -296,7 +311,7 @@ test("native bundle save sends bounded context but never reads persisted entries
       relayWsUrl: "wss://relay.example.com/rooms?secret=leaked"
     })
   );
-  const calls: Array<{ command: string; payload: Record<string, unknown> | undefined }> = [];
+  const calls: Array<{ command: string; payload: unknown }> = [];
   mockIPC((command, payload) => {
     calls.push({ command, payload });
     if (command === "save_diagnostic_bundle") return "saved";
@@ -312,7 +327,7 @@ test("native bundle save sends bounded context but never reads persisted entries
     calls.some(({ command }) => command === "export_diagnostic_entries"),
     false
   );
-  const context = calls[1].payload?.context as Record<string, unknown>;
+  const context = (calls[1]?.payload as Record<string, unknown>).context as Record<string, unknown>;
   assert.equal(context.relayHttpOrigin, "https://relay.example.com");
   assert.equal(context.relayWsOrigin, "wss://relay.example.com");
   assert.equal("entries" in context, false);

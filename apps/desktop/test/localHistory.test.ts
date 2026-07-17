@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test, { beforeEach } from "node:test";
+import { defaultTestRoom } from "./support/workspaceFixtures";
 
 const calls: Array<{ command: string; args: unknown }> = [];
 let latest: string | null = null;
@@ -180,6 +181,7 @@ test("history retention failure does not publish a false local setting", async (
 
 test("close snapshot construction includes current state from every hydrated eligible room", () => {
   const room = (id: string) => ({
+    ...defaultTestRoom,
     id,
     teamId: "team-a",
     name: id,

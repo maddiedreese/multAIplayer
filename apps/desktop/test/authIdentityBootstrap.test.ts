@@ -180,3 +180,73 @@ test("device identity lifecycle never invokes native MLS before identity resolut
     args: { request: { githubUserId: "github:native-host", deviceId: "device-native-host" } }
   });
 });
+
+test("an old identity registration cannot restore its device session after identity is unresolved", async () => {
+  let releaseSession!: (response: Response) => void;
+  const deferredSession = new Promise<Response>((resolve) => {
+    releaseSession = resolve;
+  });
+  let sessionRequested = false;
+  const statuses: Array<string | null> = [];
+  const identity = {
+    githubUserId: "github:old",
+    deviceId: "device-shared",
+    ciphersuite: 2 as const,
+    signaturePublicKey: "signature-key",
+    signatureKeyFingerprint: "sha256:signature",
+    publicKeyFingerprint: "sha256:signature",
+    hpkePublicKey: "hpke-key",
+    hpkeKeyFingerprint: "sha256:hpke",
+    requiresRejoin: false
+  };
+  (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {
+    invoke: async (command: string) => {
+      if (command === "mls_identity_initialize") return identity;
+      if (command === "mls_device_auth_sign") {
+        return { signatureDer: "c2lnbmF0dXJl", publicKeySpkiDer: "a2V5" };
+      }
+      throw new Error(`Unexpected native command: ${command}`);
+    }
+  };
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/devices") && init?.method === "POST") {
+      return Response.json({ device: { deviceId: identity.deviceId } });
+    }
+    if (url.endsWith("/challenge")) {
+      return Response.json({ challenge: "Y2hhbGxlbmdl", expiresAt: "2030-01-01T00:00:00.000Z" });
+    }
+    if (url.endsWith("/session")) {
+      sessionRequested = true;
+      return deferredSession;
+    }
+    throw new Error(`Unexpected device lifecycle request: ${url}`);
+  };
+
+  const lifecycle = renderHook(
+    ({ identityResolved }: { identityResolved: boolean }) =>
+      useDeviceIdentityLifecycle({
+        relayHttpUrl: "http://127.0.0.1:4322",
+        identityResolved,
+        deviceId: identity.deviceId,
+        userId: identity.githubUserId,
+        displayName: "Old account",
+        deviceIdentity: identity,
+        replaceDeviceIdentity: () => undefined,
+        setDeviceIdentityStatusMessage: (message) => statuses.push(message)
+      }),
+    { initialProps: { identityResolved: true } }
+  );
+
+  await waitFor(() => assert.equal(sessionRequested, true));
+  lifecycle.rerender({ identityResolved: false });
+  releaseSession(Response.json({ deviceSessionToken: "stale-old-token", expiresAt: "2030-01-01T00:15:00.000Z" }));
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+  assert.equal(useAppStore.getState().deviceSessionToken, null);
+  assert.equal(statuses.includes("Device identity registered and authenticated with relay."), false);
+  assert.equal(
+    statuses.some((message) => message?.includes("stale-old-token")),
+    false
+  );
+});

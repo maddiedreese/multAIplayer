@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { loadOrCreateDeviceIdentity, type DeviceIdentity } from "../lib/identity/deviceIdentity";
 import { keyPackageCount, publishKeyPackages, registerDevice } from "../application/workspace/workspaceClient";
-import { establishDeviceSession } from "../lib/identity/deviceSession";
+import { clearDeviceSession, establishDeviceSession } from "../lib/identity/deviceSession";
 import { useAppStore } from "../store/appStore";
 import { generateMlsKeyPackage } from "../lib/mls/mlsClient";
 
@@ -27,9 +27,17 @@ export function useDeviceIdentityLifecycle({
   setDeviceIdentityStatusMessage
 }: UseDeviceIdentityLifecycleOptions) {
   useEffect(() => {
-    if (!identityResolved) return;
+    if (!identityResolved) {
+      replaceDeviceIdentity(null);
+      useAppStore.getState().replaceDeviceSessionToken(null);
+      clearDeviceSession();
+      return;
+    }
+    let cancelled = false;
+    replaceDeviceIdentity(null);
     loadOrCreateDeviceIdentity(userId, deviceId)
       .then((identity) => {
+        if (cancelled) return;
         replaceDeviceIdentity(identity);
         if (identity.requiresRejoin) {
           const store = useAppStore.getState();
@@ -42,31 +50,56 @@ export function useDeviceIdentityLifecycle({
         }
       })
       .catch((error) => {
-        setDeviceIdentityStatusMessage(`Device identity unavailable: ${String(error)}`);
+        if (!cancelled)
+          setDeviceIdentityStatusMessage(
+            `Device identity unavailable: ${String(error)}. This alpha binds one GitHub identity to an installation; sign back into the original account. Account switching on an existing installation is not supported.`
+          );
       });
+    return () => {
+      cancelled = true;
+    };
   }, [deviceId, identityResolved, replaceDeviceIdentity, setDeviceIdentityStatusMessage, userId]);
 
   useEffect(() => {
-    if (!identityResolved || !deviceIdentity) return;
-    registerDevice({
-      userId,
-      deviceId,
-      displayName,
-      signaturePublicKey: deviceIdentity.signaturePublicKey,
-      signatureKeyFingerprint: deviceIdentity.signatureKeyFingerprint!,
-      hpkePublicKey: deviceIdentity.hpkePublicKey!,
-      hpkeKeyFingerprint: deviceIdentity.hpkeKeyFingerprint!
-    })
-      .then(() => establishDeviceSession(relayHttpUrl, deviceId))
-      .then((session) => {
+    if (
+      !identityResolved ||
+      !deviceIdentity ||
+      deviceIdentity.githubUserId !== userId ||
+      deviceIdentity.deviceId !== deviceId
+    )
+      return;
+    let cancelled = false;
+    const store = useAppStore.getState();
+    store.replaceDeviceSessionToken(null);
+    clearDeviceSession();
+    void (async () => {
+      try {
+        await registerDevice({
+          userId,
+          deviceId,
+          displayName,
+          signaturePublicKey: deviceIdentity.signaturePublicKey,
+          signatureKeyFingerprint: deviceIdentity.signatureKeyFingerprint!,
+          hpkePublicKey: deviceIdentity.hpkePublicKey!,
+          hpkeKeyFingerprint: deviceIdentity.hpkeKeyFingerprint!
+        });
+        if (cancelled) return;
+        const session = await establishDeviceSession(relayHttpUrl, deviceId);
+        if (cancelled) return;
         useAppStore.getState().replaceDeviceSessionToken(session.token);
-        return replenishKeyPackages(deviceId);
-      })
-      .then(() => {
-        if (!deviceIdentity.requiresRejoin)
+        await replenishKeyPackages(deviceId);
+        if (!cancelled && !deviceIdentity.requiresRejoin) {
           setDeviceIdentityStatusMessage("Device identity registered and authenticated with relay.");
-      })
-      .catch((error) => setDeviceIdentityStatusMessage(`Device identity registration pending: ${String(error)}`));
+        }
+      } catch (error) {
+        if (!cancelled) setDeviceIdentityStatusMessage(`Device identity registration pending: ${String(error)}`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      useAppStore.getState().replaceDeviceSessionToken(null);
+      clearDeviceSession();
+    };
   }, [relayHttpUrl, deviceId, deviceIdentity, displayName, identityResolved, setDeviceIdentityStatusMessage, userId]);
 
   useEffect(() => {

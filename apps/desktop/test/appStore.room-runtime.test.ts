@@ -1,3 +1,4 @@
+import { defaultTestHandoff } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { useAppStore } from "../src/store/appStore";
@@ -26,6 +27,7 @@ test("desktop store keeps room runtime state room scoped", () => {
   });
   store.clearPresenceForRoom("room-a");
   store.appendHostHandoff("room-a", {
+    ...defaultTestHandoff,
     id: "handoff-1",
     fromHost: "Maddie",
     fromUserId: "github:maddie",
@@ -40,6 +42,7 @@ test("desktop store keeps room runtime state room scoped", () => {
     status: "available"
   });
   store.setCodexContinuationForRoom("room-b", {
+    ...defaultTestHandoff,
     id: "handoff-2",
     fromHost: "Avery",
     fromUserId: "github:avery",
@@ -168,6 +171,7 @@ test("desktop store exposes room event append actions", () => {
     updatedAt: "2026-07-06T00:15:00.000Z"
   };
   const handoff = {
+    ...defaultTestHandoff,
     id: "handoff-1",
     fromHost: "Maddie",
     fromUserId: "github:maddie",
@@ -182,11 +186,13 @@ test("desktop store exposes room event append actions", () => {
     status: "available" as const
   };
   const inviteRequest = {
-    eventType: "invite.request" as const,
     id: "invite-request-1",
+    inviteId: "invite-1",
     requester: "Jordan",
     requesterUserId: "github:jordan",
     requesterDeviceId: "device-jordan",
+    keyPackageId: "key-package-1",
+    keyPackageHash: "sha256:key-package-1",
     requestedAt: "2026-07-06T00:17:00.000Z",
     status: "pending" as const
   };
@@ -227,6 +233,7 @@ test("desktop store exposes room event append actions", () => {
 test("desktop store exposes host handoff actions", () => {
   const store = useAppStore.getState();
   const olderHandoff = {
+    ...defaultTestHandoff,
     id: "handoff-older",
     fromHost: "Maddie",
     fromUserId: "github:maddie",
@@ -269,6 +276,7 @@ test("desktop store exposes host handoff actions", () => {
 test("desktop store preserves accepted host handoffs that arrive before available handoffs", () => {
   const store = useAppStore.getState();
   const acceptedHandoff = {
+    ...defaultTestHandoff,
     id: "handoff-accepted-first",
     fromHost: "Maddie",
     fromUserId: "github:maddie",
@@ -424,12 +432,20 @@ test("desktop store clears local room-scoped state", () => {
     eventType: "codex.turn",
     turnId: "turn-a",
     status: "started",
+    message: "Started",
+    model: "gpt-5.4",
+    host: "Avery",
+    hostUserId: "github:avery",
     createdAt: "2026-07-06T00:23:00.000Z"
   });
   store.appendCodexEvent("room-b", {
     eventType: "codex.turn",
     turnId: "turn-b",
     status: "started",
+    message: "Started",
+    model: "gpt-5.4",
+    host: "Jordan",
+    hostUserId: "github:jordan",
     createdAt: "2026-07-06T00:24:00.000Z"
   });
   store.appendGitWorkflowEvent("room-b", {
@@ -455,6 +471,7 @@ test("desktop store clears local room-scoped state", () => {
     runs: []
   });
   store.appendHostHandoff("room-b", {
+    ...defaultTestHandoff,
     id: "handoff-keep",
     fromHost: "Maddie",
     fromUserId: "github:maddie",
@@ -512,20 +529,19 @@ test("desktop store clears local room-scoped state", () => {
   store.setInspectorTabForRoom("room-a", "browser");
   store.setInspectorTabForRoom("room-b", "terminal");
   store.setRoomPresenceForDevice("room-a", "device-a", {
-    roomId: "room-a",
     deviceId: "device-a",
     displayName: "Avery",
     userId: "github:avery",
-    lastSeenAt: "2026-07-06T00:28:00.000Z"
+    status: "online"
   });
   store.setRoomPresenceForDevice("room-b", "device-b", {
-    roomId: "room-b",
     deviceId: "device-b",
     displayName: "Jordan",
     userId: "github:jordan",
-    lastSeenAt: "2026-07-06T00:29:00.000Z"
+    status: "online"
   });
   store.setCodexContinuationForRoom("room-a", {
+    ...defaultTestHandoff,
     id: "handoff-clear",
     fromHost: "Avery",
     fromUserId: "github:avery",
@@ -542,6 +558,7 @@ test("desktop store clears local room-scoped state", () => {
     acceptedAt: "2026-07-06T00:31:00.000Z"
   });
   store.setCodexContinuationForRoom("room-b", {
+    ...defaultTestHandoff,
     id: "handoff-continue",
     fromHost: "Maddie",
     fromUserId: "github:maddie",
@@ -570,8 +587,10 @@ test("desktop store clears local room-scoped state", () => {
       name: "shell",
       cwd: "/tmp/a",
       command: "zsh -l",
-      status: "running",
-      output: []
+      running: true,
+      exitStatus: null,
+      startedAt: "2026-07-06T00:28:00.000Z",
+      lines: []
     }
   ]);
   store.syncTerminalSnapshotsForRoom("room-b", [
@@ -581,8 +600,10 @@ test("desktop store clears local room-scoped state", () => {
       name: "shell",
       cwd: "/tmp/b",
       command: "zsh -l",
-      status: "running",
-      output: []
+      running: true,
+      exitStatus: null,
+      startedAt: "2026-07-06T00:29:00.000Z",
+      lines: []
     }
   ]);
   store.setBrowserUrlForRoom("room-a", "https://github.com", "http://localhost:3000");
@@ -605,27 +626,22 @@ test("desktop store clears local room-scoped state", () => {
   assert.equal(state.codexRuntimeByRoom["room-a"], undefined);
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"], undefined);
   assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"], undefined);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.threadGraph, undefined);
   assert.equal(projectGitHubActionsByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.runs, undefined);
   assert.equal(projectGitWorkflowByRoom(state.gitWorkflowRuntimeByRoom)["room-a"]?.busy, undefined);
   assert.equal(state.roomSettingsByRoom["room-a"], undefined);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.secretWarningVisible, undefined);
   assert.equal(state.historyPresenceByRoom["room-a"]?.searchMessages, undefined);
   assert.equal(state.historyPresenceByRoom["room-a"]?.inspectorTab, undefined);
   assert.equal(state.historyPresenceByRoom["room-a"]?.presence, undefined);
-  assert.equal(state.codexRuntimeByRoom["room-a"]?.continuation, undefined);
   assert.equal(state.roomChatByRoom["room-a"], undefined);
   assert.equal(state.sensitiveAttachmentReviewKey, null);
   assert.equal(state.filePanelByRoom["room-a"], undefined);
   assert.equal(state.localPreviewByRoom["room-a"], undefined);
   assert.equal(state.localPreviewDialog.open, false);
   assert.equal(state.localPreviewDialog.manualUrl, "");
-  assert.equal(state.terminalRuntimeByRoom["room-a"]?.selectedTerminalId, undefined);
   assert.equal(
     state.terminals.some((terminal) => terminal.roomId === "room-a"),
     false
   );
-  assert.equal(state.browserByRoom["room-a"]?.url, undefined);
   assert.equal(state.messagesByRoom["room-b"]?.[0]?.body, "keep");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.events?.[0]?.turnId, "turn-b");
   assert.equal(state.codexRuntimeByRoom["room-b"]?.threadGraph?.activeThreadId, "thread-b");

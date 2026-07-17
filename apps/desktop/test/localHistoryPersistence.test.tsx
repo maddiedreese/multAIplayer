@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { JSDOM } from "jsdom";
@@ -33,6 +34,7 @@ const { flushEncryptedHistorySaves } = await import("../src/lib/history/localHis
 const { useLocalHistoryPersistence } = await import("../src/hooks/useLocalHistoryPersistence");
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-a",
   teamId: "team-a",
   name: "Room A",

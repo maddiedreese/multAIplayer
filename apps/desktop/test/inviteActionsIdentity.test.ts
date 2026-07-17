@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
@@ -37,6 +38,7 @@ function StrictModeWrapper({ children }: { children: ReactNode }) {
 }
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-invite",
   teamId: "team-alpha",
   name: "Invite",
@@ -51,23 +53,9 @@ const room: ClientRoomRecord = {
 
 const noop = () => undefined;
 const inviteOptions: UseInviteActionsOptions = {
-  hasSelectedRoom: true,
-  selectedRoom: room,
   selectedRoomIdRef: { current: room.id },
-  isSelectedRoomLocked: false,
-  isSelectedRoomRevoked: false,
-  isActiveHost: true,
-  hostGateMessage: "Only the host can decide.",
-  inviteApprovalGate: true,
-  inviteRequests: [],
-  inviteSecretInput: "",
-  localUser: { id: "github:maddie", name: "Maddie" },
-  deviceId: "device-local",
-  deviceIdentity: null,
-  relayStatus: "open",
   relayRef: { current: null },
   seenEnvelopeIds: { current: new Set<string>() },
-  historyLoadedRoomIds: { current: new Set<string>() },
   reportMembershipCommitInFlight: () => false,
   upsertTeam: noop,
   upsertRoom: noop,
@@ -91,7 +79,7 @@ test("invite action identities survive wrapper-object rerenders", () => {
   assert.equal(result.current.joinInviteSecret, first.joinInviteSecret);
   assert.equal(result.current.copyInviteLink, first.copyInviteLink);
   assert.equal(result.current.decideInviteJoinRequest, first.decideInviteJoinRequest);
-  assert.equal(result.current.rotateSelectedRoomKey, first.rotateSelectedRoomKey);
+  assert.equal(result.current.removeMembersFromMlsGroup, first.removeMembersFromMlsGroup);
 });
 
 test("stable invite actions call the latest implementation after inputs change", async () => {
@@ -104,7 +92,7 @@ test("stable invite actions call the latest implementation after inputs change",
   rerender({
     options: {
       ...inviteOptions,
-      hasSelectedRoom: false
+      selectedRoomIdRef: { current: "room-latest" }
     }
   });
   await result.current.copyInviteLink();
@@ -113,9 +101,9 @@ test("stable invite actions call the latest implementation after inputs change",
   assert.equal(result.current.joinInviteSecret, first.joinInviteSecret);
   assert.equal(result.current.copyInviteLink, first.copyInviteLink);
   assert.equal(result.current.decideInviteJoinRequest, first.decideInviteJoinRequest);
-  assert.equal(result.current.rotateSelectedRoomKey, first.rotateSelectedRoomKey);
+  assert.equal(result.current.removeMembersFromMlsGroup, first.removeMembersFromMlsGroup);
   assert.equal(
-    useAppStore.getState().inviteByRoom[room.id]?.message,
+    useAppStore.getState().inviteByRoom["room-latest"]?.message,
     "Create or join a room before copying an invite."
   );
 });

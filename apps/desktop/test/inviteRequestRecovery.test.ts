@@ -207,7 +207,9 @@ test("a pending-list scan retains a terminal result across a deferred snapshot a
   }
   resolvePending([pending]);
 
-  const [{ observer }] = await loading;
+  const recovered = (await loading).at(0);
+  assert.ok(recovered);
+  const { observer } = recovered;
   assert.equal(observer.claim(), null);
   assert.equal(registry.trackedCount(), 0);
 });

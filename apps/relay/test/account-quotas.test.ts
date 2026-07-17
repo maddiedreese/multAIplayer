@@ -173,7 +173,7 @@ test("quota transactions wait for failed persistence rollback before taking the 
       await successfulTransaction;
 
       assert.equal(snapshots.length, 2);
-      const persistedQuotas = snapshots[1].accountQuotaRecords as Array<{ quota: DurableQuota; used: number }>;
+      const persistedQuotas = snapshots[1]!.accountQuotaRecords as Array<{ quota: DurableQuota; used: number }>;
       assert.deepEqual(
         persistedQuotas.map(({ quota: type, used }) => ({ type, used })),
         [{ type: quota, used: amount }]
@@ -214,7 +214,7 @@ test("daily team and room quotas survive a SQLite relay restart", async () => {
       ["/teams", { name: "Blocked" }],
       ["/rooms", { teamId: "team-core", name: "Blocked" }]
     ] as const) {
-      const response = await fetch(`${restarted.baseUrl}${path}`, {
+      const response: Response = await fetch(`${restarted.baseUrl}${path}`, {
         method: "POST",
         headers,
         body: JSON.stringify(body)

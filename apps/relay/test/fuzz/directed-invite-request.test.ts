@@ -101,7 +101,10 @@ test("arbitrary and mutated directed invite input cannot crash the parser", () =
               ? Buffer.from(input).toString("utf8")
               : JSON.stringify(input);
         const bytes = Buffer.from(original);
-        if (bytes.length > 0) bytes[offset % bytes.length] ^= 1 << bit;
+        if (bytes.length > 0) {
+          const position = offset % bytes.length;
+          bytes[position] = bytes[position]! ^ (1 << bit);
+        }
         assert.doesNotThrow(() => parseStrictDirectedInviteRequestJson(original, 1_400_000));
         assert.doesNotThrow(() => parseStrictDirectedInviteRequestJson(bytes.toString("utf8"), 1_400_000));
         assert.doesNotThrow(() =>

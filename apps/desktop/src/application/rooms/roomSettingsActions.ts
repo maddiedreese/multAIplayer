@@ -28,7 +28,7 @@ import { defaultCodexReasoningEffort, defaultCodexSandboxLevel, defaultCodexSpee
 type CurrentRef<T> = { current: T };
 type BusyMap = Record<string, boolean>;
 
-export interface CreateRoomSettingsActionsOptions {
+interface CreateRoomSettingsActionsOptions {
   selectedRoomIdRef: CurrentRef<string | null>;
   settingsBusyRef: CurrentRef<BusyMap>;
   approvalPolicyLabels: Record<string, string>;

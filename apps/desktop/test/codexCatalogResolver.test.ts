@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -10,6 +11,7 @@ import {
 import type { CodexProbe } from "../src/lib/platform/localBackend";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-catalog",
   teamId: "team-core",
   name: "Catalog",

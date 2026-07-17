@@ -22,8 +22,8 @@ test("mergeSearchableMessages prefers live room messages over local history cach
     historyMessages
   );
 
-  assert.equal(merged["room-alpha"][0].id, "live-alpha");
-  assert.equal(merged["room-beta"][0].id, "old-beta");
+  assert.equal(merged["room-alpha"]?.at(0)?.id, "live-alpha");
+  assert.equal(merged["room-beta"]?.at(0)?.id, "old-beta");
   assert.equal(merged["room-empty"], undefined);
 });
 

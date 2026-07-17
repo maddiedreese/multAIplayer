@@ -1,9 +1,11 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { canStageRoomChatAttachment, canUseRoomChat, roomChatGateMessage } from "../src/lib/chat/chatPolicy";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-chat",
   teamId: "team-alpha",
   name: "Chat",

@@ -1,3 +1,4 @@
+import { defaultTestHandoff } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { MlsRelayMessage } from "@multaiplayer/protocol";
@@ -14,6 +15,7 @@ const candidates = {
 } satisfies Record<"candidate-a" | "candidate-b", HostCandidateBinding>;
 
 const availableOffer: HostHandoffRecord = {
+  ...defaultTestHandoff,
   id: "offer-model",
   fromHost: "Outgoing host",
   fromUserId: "user-host",
@@ -53,6 +55,7 @@ test("production record transitions reject candidate or patch changes outside th
 
 test("commit correlation requires the native authenticated transfer id and exact candidate binding", () => {
   const offer: HostHandoffRecord = {
+    ...defaultTestHandoff,
     id: "offer-1",
     fromHost: "Host",
     fromUserId: "user-host",

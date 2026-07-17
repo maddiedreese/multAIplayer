@@ -58,7 +58,14 @@ test("room archive projection strips authority and pending actions but retains r
           requestedByUserId: "u",
           queuedAt: "now",
           messages: [],
-          summary: { text: "pending", files: [], commands: [] }
+          summary: {
+            messagesSinceLastCodex: 0,
+            attachments: [],
+            workspacePath: null,
+            git: null,
+            browserAccess: [],
+            terminals: []
+          }
         }
       }
     }

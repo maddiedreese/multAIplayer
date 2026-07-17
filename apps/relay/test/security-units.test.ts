@@ -17,6 +17,7 @@ import {
 import { createRelayAuthz } from "../src/authz.js";
 import { createRelayStore } from "../src/state.js";
 import { canPublishMlsMessage } from "../src/relay-domain.js";
+import type { TeamMemberRecord } from "@multaiplayer/protocol";
 const message = {
   id: "m",
   teamId: "team",
@@ -118,7 +119,7 @@ test("authorization exhaustively covers roles and transfers", () => {
     roles.map((x) => authz.teamRoleRank(x)),
     [0, 1, 2]
   );
-  const records = new Map(
+  const records = new Map<string, TeamMemberRecord>(
     roles.map((role) => [role, { teamId: "team", userId: role, role, joinedAt: new Date().toISOString() }])
   );
   records.set("observer", {

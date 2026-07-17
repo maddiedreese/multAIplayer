@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
@@ -8,6 +9,7 @@ import { createWorkspaceFilesPanelActions } from "../src/application/files/works
 import { useAppStore } from "../src/store/appStore";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-preview",
   teamId: "team-alpha",
   name: "Preview",
@@ -84,10 +86,6 @@ test("room header actions mutate the store without a React subscription", () => 
   useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   let browserOpenCount = 0;
   const actions = createRoomHeaderActions({
-    selectedRoomId: "room-fallback",
-    selectedRoomIdForTabs: room.id,
-    activeBrowserUrl: null,
-    selectTeamRoom: noop,
     openRoomBrowserNow: () => {
       browserOpenCount += 1;
     }
@@ -106,28 +104,16 @@ test("terminal panel actions resolve request ids before approval", () => {
   useAppStore.setState({ rooms: [room], selectedRoomId: room.id });
   store.appendTerminalRequest(room.id, {
     id: "request-1",
-    roomId: room.id,
-    requestedBy: "Avery",
-    requestedByUserId: "github:avery",
+    requester: "Avery",
+    requesterUserId: "github:avery",
     command: "npm test",
+    cwd: room.projectPath,
     status: "pending",
-    createdAt: "2026-07-09T12:00:00.000Z"
+    requestedAt: "2026-07-09T12:00:00.000Z"
   });
   const approved: string[] = [];
   let revokeCount = 0;
   const actions = createTerminalPanelActions({
-    selectedRoomId: room.id,
-    terminalRequests: [
-      {
-        id: "request-1",
-        roomId: room.id,
-        requestedBy: "Avery",
-        requestedByUserId: "github:avery",
-        command: "npm test",
-        status: "pending",
-        createdAt: "2026-07-09T12:00:00.000Z"
-      }
-    ],
     copyTerminalMarkdown: noop,
     openInteractiveTerminal: noop,
     approveTerminalRequest: (request) => approved.push(request.id),
@@ -154,18 +140,16 @@ test("workspace file panel close clears all viewer state", () => {
   useAppStore.getState().setSelectedFileForRoom(room.id, {
     path: "src/main.ts",
     content: "export {};",
+    size: 10,
     truncated: false
   });
   useAppStore.getState().setSelectedDiffForRoom(room.id, {
     path: "src/main.ts",
-    diff: "diff --git a/src/main.ts b/src/main.ts",
-    truncated: false
+    diff: "diff --git a/src/main.ts b/src/main.ts"
   });
   useAppStore.getState().setSensitiveAttachmentReviewKey("review-key");
   const actions = createWorkspaceFilesPanelActions({
-    selectedRoomId: room.id,
     copyProjectMarkdown: noop,
-    setFileQueryForRoom: noop,
     openProjectFile: noop,
     copyDiffSummaryMarkdown: noop,
     attachSelectedFileToMessage: noop,

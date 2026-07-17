@@ -30,7 +30,7 @@ const validProductionEnvironment: NodeJS.ProcessEnv = {
 };
 
 function runDoctor(extraEnv: NodeJS.ProcessEnv): { status: number | null; output: string } {
-  const env = { ...process.env, NODE_ENV: "production", ...validProductionEnvironment, ...extraEnv };
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "production", ...validProductionEnvironment, ...extraEnv };
   for (const name of ledgerEnvironmentNames) {
     if (!(name in extraEnv)) delete env[name];
   }

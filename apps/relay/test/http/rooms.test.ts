@@ -6,7 +6,6 @@ import { acquireAccountMutationTurn } from "../../src/auth/account-mutation-tran
 import { registerRoomCreateRoute } from "../../src/http/room-create-route.js";
 import { registerRoomHostRoute } from "../../src/http/room-host-route.js";
 import { registerRoomLifecycleRoute } from "../../src/http/room-lifecycle-route.js";
-import type { RegisterRoomRoutesOptions } from "../../src/http/room-route-types.js";
 import { createRelayStore } from "../../src/state.js";
 import {
   assert,
@@ -252,7 +251,7 @@ test("concurrent room creation enforces the exact total-room boundary", async ()
     expiresAt: Date.now() + 60_000
   };
   store.authSessions.set(session.sessionIdHash, session);
-  store.setTeam({ id: "team-boundary", name: "Boundary team", ownerUserId: userId });
+  store.setTeam({ id: "team-boundary", name: "Boundary team", members: 1 });
   for (let index = 0; index < 499; index += 1) {
     store.setRoom({
       id: `room-boundary-${index}`,
@@ -294,7 +293,7 @@ test("concurrent room creation enforces the exact total-room boundary", async ()
     maxRoomNameChars: 120,
     dailyCreationCaps: { roomsPerUser: 100 },
     totalRoomCapPerUser: 500
-  } as RegisterRoomRoutesOptions);
+  });
   const server = app.listen(0);
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);
@@ -630,7 +629,7 @@ test("host bootstrap requires exact identity, device proof, and pristine host st
     harness.reset();
     harness.store.deviceSessions.set("device-token", {
       token: "device-token",
-      userId: room.hostUserId,
+      userId: room.hostUserId!,
       deviceId: "other-device",
       expiresAt: Date.now() + 60_000
     });
@@ -638,7 +637,7 @@ test("host bootstrap requires exact identity, device proof, and pristine host st
     harness.reset();
     harness.store.deviceSessions.set("device-token", {
       token: "device-token",
-      userId: room.hostUserId,
+      userId: room.hostUserId!,
       deviceId: "host-device-1",
       expiresAt: Date.now() - 1
     });
@@ -728,7 +727,7 @@ async function startHostRouteHarness(initialRoom: RoomRecord) {
   let canAccess = true;
   const session = {
     sessionIdHash: "a".repeat(64),
-    user: { id: initialRoom.hostUserId, login: "maddie" },
+    user: { id: initialRoom.hostUserId!, login: "maddie" },
     expiresAt: Date.now() + 60_000
   };
   const reset = (room = initialRoom) => {
@@ -739,7 +738,7 @@ async function startHostRouteHarness(initialRoom: RoomRecord) {
     store.setRoom({ ...room });
     store.deviceSessions.set("device-token", {
       token: "device-token",
-      userId: initialRoom.hostUserId,
+      userId: initialRoom.hostUserId!,
       deviceId: "host-device-1",
       expiresAt: Date.now() + 60_000
     });
@@ -764,7 +763,7 @@ async function startHostRouteHarness(initialRoom: RoomRecord) {
     maxHostNameChars: 120,
     maxUserIdChars: 160,
     maxDeviceIdChars: 160
-  } as RegisterRoomRoutesOptions);
+  });
   const server = app.listen(0);
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);
@@ -887,7 +886,7 @@ async function startLifecycleRouteHarness(initialRoom: RoomRecord) {
   let isHost = true;
   const session = {
     sessionIdHash: "b".repeat(64),
-    user: { id: initialRoom.hostUserId, login: "maddie" },
+    user: { id: initialRoom.hostUserId!, login: "maddie" },
     expiresAt: Date.now() + 60_000
   };
   const reset = (room = initialRoom) => {
@@ -923,13 +922,12 @@ async function startLifecycleRouteHarness(initialRoom: RoomRecord) {
       res.status(401).json({ code: "authentication_required" });
       return false;
     },
-    canAccessRoom: () => canAccess,
     isTeamMember: () => canAccess,
     requesterFromRequest: () => ({ id: session.user.id, name: "Maddie" }),
     isRoomHost: () => isHost,
     scheduleStoreSave: () => saves++,
     broadcastRoomUpdated: () => broadcasts++
-  } as RegisterRoomRoutesOptions);
+  });
   const server = app.listen(0);
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);

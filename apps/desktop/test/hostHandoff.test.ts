@@ -70,7 +70,14 @@ test("createHandoffSettingsPatch rejects unsupported handoff room metadata", () 
     () => createHandoffSettingsPatch({ ...baseHandoff, codexModel: "bad model with spaces" }),
     /Codex model/
   );
-  assert.throws(() => createHandoffSettingsPatch({ ...baseHandoff, codexSandboxLevel: "nope" }), /sandbox/);
+  assert.throws(
+    () =>
+      createHandoffSettingsPatch({
+        ...baseHandoff,
+        codexSandboxLevel: "nope" as unknown as HostHandoffPlaintextPayload["codexSandboxLevel"]
+      }),
+    /sandbox/
+  );
 });
 
 test("host handoff acceptance requires an available handoff from the current room list", () => {

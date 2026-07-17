@@ -177,9 +177,11 @@ test("Codex account view renders native capabilities and dispatches account acti
       },
       requiresOpenaiAuth: true,
       account: null,
-      apps: [{ id: "drive", name: "Drive", enabled: true, accessible: false }],
+      apps: [{ id: "drive", name: "Drive", description: "Drive integration", enabled: true, accessible: false }],
       appsError: null,
-      mcpServers: [{ name: "docs", authStatus: "notLoggedIn", toolCount: 3 }],
+      mcpServers: [
+        { name: "docs", authStatus: "notLoggedIn", toolCount: 3, resourceCount: 0, resourceTemplateCount: 0 }
+      ],
       mcpError: null
     },
     login: null,
@@ -285,7 +287,7 @@ test("workspace files switch between project lists and a diff-only viewer withou
 
 test("Monaco editor synchronizes external values, read-only state, edits, and disposal", async () => {
   let modelValue = "const first = 1;";
-  let changeListener = () => undefined;
+  let changeListener: () => void = () => undefined;
   let editorDisposed = 0;
   let modelDisposed = 0;
   const optionUpdates: boolean[] = [];

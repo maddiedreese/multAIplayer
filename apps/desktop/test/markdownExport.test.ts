@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -15,6 +16,7 @@ import {
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-test",
   teamId: "team-test",
   name: "Docs & Diff Room",
@@ -36,7 +38,6 @@ test("buildMessageMarkdown includes escaped author, attachments, and reactions",
     time: "10:30",
     attachments: [
       {
-        id: "attachment-1",
         name: "src/app`main`.tsx",
         type: "code",
         size: 2048,
@@ -89,7 +90,9 @@ test("buildCodexOutputMarkdown captures messages since the previous Codex turn",
     { id: "c2", author: "Codex", role: "codex" as const, body: "new output", time: "10:04" }
   ];
 
-  const markdown = buildCodexOutputMarkdown(room, messages[4], messages);
+  const codexMessage = messages.at(4);
+  assert.ok(codexMessage);
+  const markdown = buildCodexOutputMarkdown(room, codexMessage, messages);
   assert.doesNotMatch(markdown, /before old codex/);
   assert.match(markdown, /\*\*Priya\*\*: fix the tests/);
   assert.match(markdown, /\*\*Maddie\*\*: and update docs/);

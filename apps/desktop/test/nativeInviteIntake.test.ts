@@ -30,12 +30,14 @@ test("native invite intake subscribes before consuming a cold-start invite and c
           stopped = true;
         };
       },
-      invoke: async () => {
+      invoke: async <T>() => {
         order.push("consume");
-        return pending.shift() ?? null;
+        return (pending.shift() ?? null) as T;
       }
     },
-    (invite) => received.push(invite)
+    (invite) => {
+      received.push(invite);
+    }
   );
 
   assert.deepEqual(order, ["listen:native-invite://available", "consume"]);
@@ -55,13 +57,15 @@ test("warm availability events carry no capability and drain the replacing nativ
         notify = handler;
         return () => undefined;
       },
-      invoke: async () => {
+      invoke: async <T>() => {
         const current = pending;
         pending = null;
-        return current;
+        return current as T;
       }
     },
-    (invite) => received.push(invite)
+    (invite) => {
+      received.push(invite);
+    }
   );
 
   pending = { inviteId: "invite_warm", encodedInvite: "capability_warm" };
@@ -88,9 +92,9 @@ test("StrictMode abandons a deferred installer without draining the one-shot nat
           new Promise((resolve) => {
             listenerInstalls.push({ resolve, handler });
           }),
-        invoke: async () => {
+        invoke: async <T>() => {
           drains += 1;
-          return pending.shift() ?? null;
+          return (pending.shift() ?? null) as T;
         }
       },
       onInvite,
@@ -123,9 +127,9 @@ test("a quick hook unmount cancels deferred native intake before its destructive
           new Promise((resolve) => {
             resolveListener = resolve;
           }),
-        invoke: async () => {
+        invoke: async <T>() => {
           drains += 1;
-          return { inviteId: "invite_unmount", encodedInvite: "capability_unmount" };
+          return { inviteId: "invite_unmount", encodedInvite: "capability_unmount" } as T;
         }
       },
       onInvite,

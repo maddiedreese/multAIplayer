@@ -1,3 +1,4 @@
+import { defaultTestHandoff, defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { JSDOM } from "jsdom";
@@ -96,6 +97,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", { configurable: true, v
 Object.defineProperty(dom.window, "__TAURI_INTERNALS__", { configurable: true, value: tauriInternals });
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-handoff",
   teamId: "team-handoff",
   name: "Handoff",
@@ -110,6 +112,7 @@ const room: ClientRoomRecord = {
 };
 
 const offer: HostHandoffRecord = {
+  ...defaultTestHandoff,
   id: "offer-1",
   fromHost: "Host",
   fromUserId: "github:host",
@@ -132,7 +135,6 @@ const noop = () => undefined;
 
 function options(publish: () => Promise<void>, seen = new Set<string>()): UseHostHandoffActionsOptions {
   return {
-    hasSelectedRoom: true,
     selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
     isSelectedRoomLocked: false,
@@ -149,6 +151,7 @@ function options(publish: () => Promise<void>, seen = new Set<string>()): UseHos
         publish: noop,
         publishAndWaitForAck: async () => publish(),
         joinAndWaitForAck: async () => undefined,
+        rejoinForBacklog: async () => undefined,
         close: noop
       }
     },
@@ -374,7 +377,7 @@ test("accepted patch is applied only while the fresh room snapshot retains host 
 });
 
 test("handoff publication records the package and encrypted relay message", async () => {
-  let appended: HostHandoffRecord | null = null;
+  const appendedHandoffs: HostHandoffRecord[] = [];
   let publishes = 0;
   const input = {
     ...options(async () => {
@@ -382,33 +385,33 @@ test("handoff publication records the package and encrypted relay message", asyn
     }),
     isActiveHost: true,
     appendHostHandoff: (_roomId: string, handoff: HostHandoffRecord) => {
-      appended = handoff;
+      appendedHandoffs.push(handoff);
     },
     getHostHandoffSnapshot: () => ({
       selectedRoomId: room.id,
       room,
       isActiveHost: true,
-      hostHandoffs: appended ? [appended] : []
+      hostHandoffs: appendedHandoffs
     })
   };
   const { result } = renderHook(() => useHostHandoffActions(input));
 
   await act(() => result.current.publishHostHandoff(room));
 
-  assert.equal(appended?.status, "available");
+  assert.equal(appendedHandoffs.at(-1)?.status, "available");
   assert.equal(nativeCommands.includes("mls_encrypt_application"), true);
   assert.equal(publishes, 1);
 });
 
 test("offline handoff publication preserves the package without attempting encryption", async () => {
-  let appended: HostHandoffRecord | null = null;
+  const appendedHandoffs: HostHandoffRecord[] = [];
   let hostMessage = "";
   const input = {
     ...options(async () => undefined),
     relayStatus: "closed" as const,
     relayRef: { current: null },
     appendHostHandoff: (_roomId: string, handoff: HostHandoffRecord) => {
-      appended = handoff;
+      appendedHandoffs.push(handoff);
     },
     setHostMessageForRoom: (_roomId: string, message: string | null) => {
       hostMessage = message ?? "";
@@ -418,7 +421,7 @@ test("offline handoff publication preserves the package without attempting encry
 
   await act(() => result.current.publishHostHandoff(room));
 
-  assert.equal(appended?.status, "available");
+  assert.equal(appendedHandoffs.at(-1)?.status, "available");
   assert.match(hostMessage, /saved locally/);
   assert.equal(nativeCommands.includes("mls_encrypt_application"), false);
 });

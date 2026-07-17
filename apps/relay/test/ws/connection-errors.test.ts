@@ -55,8 +55,7 @@ test("presence publication stops when the joined room becomes inactive", async (
     roomId: "room-desktop",
     userId: "github:member",
     deviceId: "device-member",
-    displayName: "Member",
-    status: "online"
+    displayName: "Member"
   });
 
   assert.equal(published, false);
@@ -286,8 +285,7 @@ test("a presence message queued before close cannot run after its socket is unre
     roomId: "room-desktop",
     userId: "github:member",
     deviceId: "device-member",
-    displayName: "Member",
-    status: "online"
+    displayName: "Member"
   });
   assert.equal(published, false);
 });
@@ -311,7 +309,7 @@ test("queued actions close and unregister logged-out or expired authentication s
       const socket = Object.assign(new EventEmitter(), {
         OPEN: 1,
         readyState: 1,
-        close(code: number, reason: string) {
+        close(this: EventEmitter & { readyState: number }, code: number, reason: string) {
           closed.push([code, reason]);
           this.readyState = 2;
           this.emit("close");
@@ -362,8 +360,7 @@ test("queued actions close and unregister logged-out or expired authentication s
         roomId: "room-desktop",
         userId: "github:member",
         deviceId: "device-member",
-        displayName: "Member",
-        status: "online"
+        displayName: "Member"
       });
       await dispatchRelayClientMessage(options, session as never, {
         type: "join",

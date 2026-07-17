@@ -37,6 +37,8 @@ test("Prometheus metrics are stable, typed, and escape labels", () => {
     capacityRejectionsByReason: { team_attachment_blobs: 2 },
     rateLimitRejectionsTotal: 6,
     rateLimitRejectionsByBucket: { mutation: 6 },
+    rateLimitAllowedTotal: 8,
+    rateLimitAllowedByBucket: { mutation: 8 },
     webSocketConnectionAttemptsTotal: 7,
     webSocketConnectionsAcceptedTotal: 2,
     webSocketConnectionRejectionsByReason: { quota: 5 },

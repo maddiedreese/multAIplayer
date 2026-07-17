@@ -196,7 +196,11 @@ test("attachment upload rechecks authorization, lifecycle, and blob identity aft
   }
 });
 
-function teamRouteOptions(app: express.Express, store: RelayStore, session: AuthSession) {
+function teamRouteOptions(
+  app: express.Express,
+  store: RelayStore,
+  session: AuthSession
+): Parameters<typeof registerTeamRoutes>[0] {
   return {
     app,
     store,
@@ -208,7 +212,7 @@ function teamRouteOptions(app: express.Express, store: RelayStore, session: Auth
     teamRoleRank: () => 0,
     canSetTeamMemberRole: () => false,
     canRemoveTeamMember: () => false,
-    transferTeamOwnership: (members: Map<string, never>) => members,
+    transferTeamOwnership: (members) => members,
     revokeTeamInvites: () => undefined,
     revokeTeamMemberSessions: () => undefined,
     broadcastWorkspaceUpdated: () => undefined,
@@ -239,21 +243,14 @@ function roomRouteOptions(
           .map((team) => team.id)
       ),
     isTeamMember: (teamId: string, userId: string) => Boolean(store.getTeamMember(teamId, userId)),
-    canAccessRoom: () => true,
     scheduleStoreSave: () => undefined,
     saveRelayStore: async () => undefined,
     broadcastRoomUpdated: () => undefined,
-    requesterFromRequest: () => ({ id: session?.user.id ?? "", name: session?.user.login ?? "" }),
-    isRoomHost: () => false,
     isApprovalPolicy: (value: string): value is "ask_every_turn" => value === "ask_every_turn",
     normalizeMetadataText: boundedText,
-    normalizeOptionalMetadataText: boundedText,
     displayNameForUser: (user: AuthSession["user"]) => user.login,
-    maxDeviceIdChars: 160,
     maxHostNameChars: 120,
     maxRoomNameChars: 120,
-    maxUserIdChars: 160,
-    deviceAuthRequired: false,
     ...overrides
   };
 }

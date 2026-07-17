@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import { WebSocket, assert, startRelay } from "../support/relay.js";
+import type { ClientOptions } from "ws";
 
-async function openSocket(url: string, options?: ConstructorParameters<typeof WebSocket>[1]): Promise<WebSocket> {
+async function openSocket(url: string, options?: ClientOptions): Promise<WebSocket> {
   return await new Promise((resolve, reject) => {
     const socket = new WebSocket(url, options);
     socket.once("open", () => resolve(socket));
@@ -9,10 +10,7 @@ async function openSocket(url: string, options?: ConstructorParameters<typeof We
   });
 }
 
-async function rejectedSocketStatus(
-  url: string,
-  options?: ConstructorParameters<typeof WebSocket>[1]
-): Promise<number> {
+async function rejectedSocketStatus(url: string, options?: ClientOptions): Promise<number> {
   return await new Promise((resolve, reject) => {
     const socket = new WebSocket(url, options);
     socket.once("unexpected-response", (_request, response) => {

@@ -46,9 +46,13 @@ test("reconciliation deletes resurrected identity data even when an applied mark
   store.devices.set(`${userId}:device`, {
     userId,
     deviceId: "device",
-    publicKeyFingerprint: "fingerprint",
-    publicKeyJwk: "{}",
-    registeredAt: "2026-07-01T00:00:00.000Z"
+    displayName: "Restored",
+    signaturePublicKey: "signature-public-key",
+    signatureKeyFingerprint: "signature-fingerprint",
+    hpkePublicKey: "hpke-public-key",
+    hpkeKeyFingerprint: "hpke-fingerprint",
+    registeredAt: "2026-07-01T00:00:00.000Z",
+    lastSeenAt: "2026-07-01T00:00:00.000Z"
   });
   store.appliedDeletionLedgerEntries.set(entry!.id, {
     entryId: entry!.id,
@@ -65,8 +69,11 @@ test("reconciliation deletes resurrected identity data even when an applied mark
 test("reconciliation fails closed when an older restore resurrects active ownership", async () => {
   const store = createRelayStore();
   const userId = "github:owner";
-  store.teams.set("team", { id: "team", name: "Team", members: 1, createdAt: "2026-01-01T00:00:00.000Z" });
-  store.teamMembers.set("team", new Map([[userId, { userId, role: "owner", joinedAt: "2026-01-01T00:00:00.000Z" }]]));
+  store.teams.set("team", { id: "team", name: "Team", members: 1 });
+  store.teamMembers.set(
+    "team",
+    new Map([[userId, { teamId: "team", userId, role: "owner", joinedAt: "2026-01-01T00:00:00.000Z" }]])
+  );
   const subject = ledgerFor(userId).subjectFor(userId);
   await assert.rejects(
     () => reconcileDeletionLedger({ ledger: ledgerFor(userId), store, persist: async () => undefined }),

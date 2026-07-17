@@ -592,6 +592,7 @@ test("expiry and pruning use the injected clock", () => {
     name: "Archived",
     host: "No host",
     hostStatus: "offline",
+    approvalPolicy: "ask_every_turn",
     archivedAt: new Date(fixedNow - 1).toISOString()
   });
   store.setMlsBacklog("team-core:room-archived", [

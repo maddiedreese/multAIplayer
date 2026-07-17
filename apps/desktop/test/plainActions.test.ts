@@ -1,3 +1,4 @@
+import { defaultTestRoom } from "./support/workspaceFixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { maxEmbeddedAttachmentBytes, type ClientRoomRecord } from "@multaiplayer/protocol";
@@ -6,8 +7,6 @@ import { createChatActions } from "../src/application/chat/chatActions";
 import { createCodexInvokeActions } from "../src/application/codex/codexInvokeActions";
 import { createFileActions } from "../src/application/files/fileActions";
 import { createGitWorkflowActions } from "../src/application/git/gitWorkflowActions";
-import { buildGitWorkflowApprovalPreview, defaultGitWorkflowDraft } from "../src/lib/git/gitWorkflowDraft";
-import { checkGitHubWorkflowReadiness } from "../src/lib/git/githubWorkflowReadiness";
 import { createMarkdownCopyActions } from "../src/application/markdown/markdownCopyActions";
 import { createMemberActions } from "../src/application/members/memberActions";
 import { createLocalPreviewActions } from "../src/application/files/localPreviewActions";
@@ -56,6 +55,7 @@ Object.defineProperty(globalThis, "__TAURI_INTERNALS__", {
 });
 
 const room: ClientRoomRecord = {
+  ...defaultTestRoom,
   id: "room-actions",
   teamId: "team-actions",
   name: "Actions",
@@ -117,33 +117,11 @@ test("visibility warning actions update persistence and the current Zustand stor
 test("local history actions resolve Zustand mutations when invoked without React", async () => {
   const replacedSettings: Array<{ enabled: boolean; retentionDays: number }> = [];
   const actions = createLocalHistoryActions({
-    hasSelectedRoom: true,
-    selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
-    isSelectedRoomLocked: false,
-    isSelectedRoomRevoked: false,
-    isActiveHost: true,
-    messages: [],
-    terminalRequests: [],
-    fileSaveRequests: [],
-    browserRequests: [],
-    inviteRequests: [],
-    codexEvents: [],
-    codexActivities: [],
-    gitWorkflowEvents: [],
-    githubActionsEvents: [],
-    localPreviews: [],
-    terminals: [],
-    hostHandoffs: [],
-    roomGoal: null,
-    selectedCodexThreadId: null,
-    codexThreadGraph: { activeThreadId: null, nodesById: {} },
     settingsBusyRef: { current: {} },
     reportRoomSettingsMutationInFlight: () => false,
-    roomSettingsActor: () => ({ requesterName: "Maddie", requesterUserId: "github:maddie" }),
     replaceHistorySettings: (settings) => replacedSettings.push(settings),
-    replaceRoom: () => undefined,
-    historyLoadedRoomIds: { current: new Set() }
+    replaceRoom: () => undefined
   });
   const messages: Array<[string, string | null]> = [];
   useAppStore.setState({
@@ -237,17 +215,12 @@ test("member actions update the current Zustand roster without React", async () 
     );
   try {
     const actions = createMemberActions({
-      selectedTeam: room.teamId,
-      selectedTeamName: "Actions Team",
-      selectedRoom: room,
-      localUser: { id: "github:maddie", name: "Maddie" },
-      currentUser: null,
       setDeviceIdentityMessage: () => undefined,
       recordDeviceFingerprintComparisonForRoom: () => undefined,
       removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
-      rotateRoomKeyForDevices: async () => undefined,
+      removeMembersFromMlsGroup: async () => undefined,
       copyMarkdownWithFallback: async () => undefined
     });
 
@@ -285,7 +258,7 @@ test("member removal aborts before relay revocation unless every active room is 
       removeDeviceFingerprintComparisonForRoom: () => undefined,
       updateTeamRoleForTeam: () => undefined,
       updateTeamMemberCountForTeam: () => undefined,
-      rotateRoomKeyForDevices: async () => undefined,
+      removeMembersFromMlsGroup: async () => undefined,
       copyMarkdownWithFallback: async () => undefined
     });
     await actions.removeMemberFromTeam({
@@ -403,11 +376,6 @@ test("chat actions append through the latest store when the relay is offline", a
     createdAt: "2026-07-09T12:00:00.000Z"
   };
   const actions = createChatActions({
-    hasSelectedRoom: true,
-    selectedRoomId: room.id,
-    selectedRoom: room,
-    localUser: { id: "github:maddie", name: "Maddie" },
-    deviceId: "device-1",
     relayRef: { current: null },
     seenEnvelopeIds: { current: new Set() }
   });
@@ -430,11 +398,6 @@ test("chat actions observe relay and access changes made after creation", async 
   const published: unknown[] = [];
   useAppStore.getState().replaceRelayStatus("open");
   const actions = createChatActions({
-    hasSelectedRoom: true,
-    selectedRoomId: room.id,
-    selectedRoom: room,
-    localUser: { id: "github:maddie", name: "Maddie" },
-    deviceId: "device-1",
     relayRef: { current: { publish: (payload: unknown) => published.push(payload) } as never },
     seenEnvelopeIds: { current: new Set() }
   });
@@ -513,11 +476,6 @@ test("chat edits observe Codex watermark changes made after creation", async () 
     createdAt: "2026-07-09T12:00:00.000Z"
   };
   const actions = createChatActions({
-    hasSelectedRoom: true,
-    selectedRoomId: room.id,
-    selectedRoom: room,
-    localUser: { id: "github:maddie", name: "Maddie" },
-    deviceId: "device-1",
     relayRef: { current: null },
     seenEnvelopeIds: { current: new Set() }
   });
@@ -542,8 +500,6 @@ test("chat edits observe Codex watermark changes made after creation", async () 
 test("chat actions resolve the selected room when invoked, not when created", async () => {
   const nextRoom = { ...room, id: "room-actions-next", name: "Next Actions" };
   const actions = createChatActions({
-    localUser: { id: "github:maddie", name: "Maddie" },
-    deviceId: "device-1",
     relayRef: { current: null },
     seenEnvelopeIds: { current: new Set() }
   });
@@ -566,13 +522,7 @@ test("chat actions resolve the selected room when invoked, not when created", as
 
 test("Codex invoke actions report room locks through Zustand without React", () => {
   const actions = createCodexInvokeActions({
-    hasSelectedRoom: true,
-    selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
-    isActiveHost: true,
-    canReadLocalWorkspace: true,
-    hostGateMessage: "Only the active host can approve this turn.",
-    localUser: { id: "github:maddie", name: "Maddie" },
     publishChatMessage: async () => undefined,
     handleCodexBrowserOpenCommand: () => false,
     publishCodexQueueEvent: async () => undefined,
@@ -588,10 +538,6 @@ test("Codex invoke actions report room locks through Zustand without React", () 
 
 test("local preview actions report a room lock through the current store without React", async () => {
   const actions = createLocalPreviewActions({
-    hasSelectedRoom: true,
-    selectedRoom: room,
-    rooms: [room],
-    localUser: { id: "github:maddie", name: "Maddie" },
     publishLocalPreviewEvent: async () => undefined
   });
 
@@ -604,10 +550,6 @@ test("local preview actions report a room lock through the current store without
 
 test("local preview confirmation validation writes through the current store", async () => {
   const actions = createLocalPreviewActions({
-    hasSelectedRoom: true,
-    selectedRoom: room,
-    rooms: [room],
-    localUser: { id: "github:maddie", name: "Maddie" },
     publishLocalPreviewEvent: async () => undefined
   });
 
@@ -626,25 +568,16 @@ test("local preview confirmation validation writes through the current store", a
 test("room settings actions report room locks through the current store without React", async () => {
   const settingsBusyRef = { current: {} as Record<string, boolean> };
   const actions = createRoomSettingsActions({
-    hasSelectedRoom: true,
-    isActiveHost: true,
-    selectedRoom: room,
     selectedRoomIdRef: { current: room.id },
     settingsBusyRef,
-    selectedCodexModel: room.codexModel,
-    selectedCodexReasoningEffort: "high",
-    selectedCodexSpeed: "standard",
-    selectedCodexSandboxLevel: "workspace-write",
     approvalPolicyLabels: { auto: "Auto", ask_every_turn: "Ask every turn" },
-    roomSettingsGateMessage: "Only the active host can change room settings.",
-    roomSettingsActor: () => ({ requesterName: "Maddie", requesterUserId: "github:maddie" }),
     reportRoomSettingsMutationInFlight: () => false,
     replaceRoom: () => undefined,
     publishRoomSettingsEvent: async () => undefined
   });
 
   useAppStore.getState().rememberForgottenRoom(room.id);
-  await actions.setApprovalPolicy("auto");
+  await actions.setApprovalPolicy("never_host");
 
   assert.match(useAppStore.getState().roomSettingsByRoom[room.id]?.settingsMessage ?? "", /forgotten|locked/i);
   assert.deepEqual(settingsBusyRef.current, {});
@@ -653,9 +586,9 @@ test("room settings actions report room locks through the current store without 
 test("room settings actions publish the host-controlled raw reasoning sharing decision", async () => {
   const originalFetch = globalThis.fetch;
   const events: Array<{ setting: string; previousValue: string; nextValue: string }> = [];
-  let requestBody: Record<string, unknown> | null = null;
+  const requestBodies: Array<Record<string, unknown>> = [];
   globalThis.fetch = async (_input, init) => {
-    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
     return new Response(JSON.stringify({ room: { ...room, codexRawReasoningEnabled: true } }), {
       status: 200,
       headers: { "content-type": "application/json" }
@@ -668,16 +601,18 @@ test("room settings actions publish the host-controlled raw reasoning sharing de
       approvalPolicyLabels: { ask_every_turn: "Ask every turn" },
       reportRoomSettingsMutationInFlight: () => false,
       replaceRoom: () => undefined,
-      publishRoomSettingsEvent: async (_updatedRoom, event) =>
+      publishRoomSettingsEvent: async (_updatedRoom, event) => {
         events.push({
           setting: event.setting,
           previousValue: event.previousValue,
           nextValue: event.nextValue
-        })
+        });
+      }
     });
 
     await actions.setCodexRawReasoningEnabled(true);
 
+    const requestBody = requestBodies.at(-1);
     assert.equal(requestBody?.codexRawReasoningEnabled, undefined);
     assert.equal(requestBody?.requesterUserId, "github:maddie");
     assert.deepEqual(events, [{ setting: "codexRawReasoningEnabled", previousValue: "false", nextValue: "true" }]);
@@ -711,22 +646,7 @@ test("team default actions report missing selection without touching storage", (
 });
 
 test("Markdown copy actions report validation failures through Zustand without React", async () => {
-  const actions = createMarkdownCopyActions({
-    hasSelectedRoom: true,
-    canReadLocalWorkspace: true,
-    localWorkspaceMessage: "Workspace unavailable.",
-    selectedRoom: room,
-    teams: [],
-    messages: [],
-    selectedMessages: [],
-    gitStatus: null,
-    selectedFile: null,
-    selectedDiff: null,
-    selectedFileRisks: [],
-    selectedTerminal: null,
-    terminalLines: [],
-    terminalRisks: []
-  });
+  const actions = createMarkdownCopyActions();
 
   await actions.copySelectedMessagesMarkdown();
 
@@ -736,18 +656,7 @@ test("Markdown copy actions report validation failures through Zustand without R
 test("file actions resolve current Zustand file state when invoked without React", async () => {
   const selectedRoomIdRef = { current: room.id };
   const actions = createFileActions({
-    hasSelectedRoom: true,
-    canReadLocalWorkspace: true,
-    localWorkspaceMessage: "Workspace unavailable.",
-    isActiveHost: true,
-    hostGateMessage: "Only the active host can edit files.",
-    selectedRoom: room,
     selectedRoomIdRef,
-    isSelectedRoomLocked: false,
-    isSelectedRoomRevoked: false,
-    localUser: { id: "github:maddie", name: "Maddie" },
-    deviceId: "device-1",
-    relayStatus: "closed",
     relayRef: { current: null },
     seenEnvelopeIds: { current: new Set() },
     reportRoomFileActionInFlight: () => false
@@ -807,6 +716,7 @@ test("file actions preserve a validated inline project image for chat rendering"
 
 test("file saves forward compare-and-swap content and do not cross room switches", async () => {
   const otherRoom: ClientRoomRecord = {
+    ...defaultTestRoom,
     ...room,
     id: "room-actions-other",
     name: "Other actions",
@@ -937,6 +847,7 @@ test("stale and symlink-rejected file saves preserve the editor buffer and pendi
 
 test("late file-open completion cannot populate either side of a room switch", async () => {
   const otherRoom: ClientRoomRecord = {
+    ...defaultTestRoom,
     ...room,
     id: "room-actions-open-other",
     projectPath: "/tmp/actions-open-other"
@@ -973,26 +884,7 @@ test("late file-open completion cannot populate either side of a room switch", a
 
 test("git workflow actions report host gating through Zustand without React", async () => {
   const actions = createGitWorkflowActions({
-    hasSelectedRoom: true,
-    isActiveHost: false,
-    canReadLocalWorkspace: true,
-    hostGateMessage: "Only the active host can approve this workflow.",
-    localWorkspaceMessage: "Workspace unavailable.",
-    selectedRoom: room,
     gitWorkflowBusyRef: { current: {} },
-    gitWorkflowDraft: defaultGitWorkflowDraft,
-    gitApprovalPreview: buildGitWorkflowApprovalPreview(room.projectPath, defaultGitWorkflowDraft),
-    githubWorkflowReadiness: checkGitHubWorkflowReadiness({
-      pushEnabled: false,
-      authConfig: null,
-      currentUser: null,
-      owner: defaultGitWorkflowDraft.prOwner,
-      repo: defaultGitWorkflowDraft.prRepo,
-      head: defaultGitWorkflowDraft.branchName,
-      base: defaultGitWorkflowDraft.prBase
-    }),
-    messages: [],
-    gitStatus: null,
     maxTerminalActivityLines: 100,
     publishGitWorkflowEvent: async () => undefined,
     refreshGitHubActions: async () => undefined
