@@ -13,8 +13,11 @@ import {
   postJsonStatus,
   startRelay,
   tmpdir,
+  waitForClose,
   waitForError,
   waitForStoredState,
+  waitForTeamUpdated,
+  waitForWorkspaceSubscribed,
   type RelayHarness
 } from "../support/relay.js";
 
@@ -213,6 +216,57 @@ test("relay logout clears the session cookie with matching attributes", async ()
     });
     assert.equal(me.status, 401);
   } finally {
+    await relay.close();
+  }
+});
+
+test("relay logout revokes only WebSockets using that exact auth session", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
+  let revokedSocket: WebSocket | null = null;
+  let liveSocket: WebSocket | null = null;
+  try {
+    const revokedCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const liveCookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    revokedSocket = new WebSocket(relay.wsUrl, { headers: { cookie: revokedCookie } });
+    liveSocket = new WebSocket(relay.wsUrl, { headers: { cookie: liveCookie } });
+
+    await Promise.all([onceOpen(revokedSocket), onceOpen(liveSocket)]);
+    const revokedSubscribed = waitForWorkspaceSubscribed(revokedSocket);
+    const liveSubscribed = waitForWorkspaceSubscribed(liveSocket);
+    const subscription = JSON.stringify({
+      type: "subscribe.workspace",
+      userId: "github:maddiedreese",
+      deviceId: "device-session-revocation"
+    });
+    revokedSocket.send(subscription);
+    liveSocket.send(subscription);
+    await Promise.all([revokedSubscribed, liveSubscribed]);
+
+    const revokedMessages: Array<{ type?: string }> = [];
+    revokedSocket.on("message", (raw) => {
+      revokedMessages.push(JSON.parse(raw.toString()) as { type?: string });
+    });
+    const revokedClose = waitForClose(revokedSocket);
+    const logout = await fetch(`${relay.baseUrl}/auth/logout`, {
+      method: "POST",
+      headers: { cookie: revokedCookie }
+    });
+    assert.equal(logout.status, 200);
+    assert.deepEqual(await revokedClose, { code: 1008, reason: "Authentication session logged out" });
+    assert.equal(liveSocket.readyState, WebSocket.OPEN);
+
+    const liveUpdate = waitForTeamUpdated(liveSocket);
+    const created = await fetch(`${relay.baseUrl}/teams`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: liveCookie },
+      body: JSON.stringify({ name: "Still connected" })
+    });
+    assert.equal(created.status, 201);
+    assert.equal((await liveUpdate).name, "Still connected");
+    assert.ok(!revokedMessages.some((message) => message.type === "team.updated"));
+  } finally {
+    revokedSocket?.close();
+    liveSocket?.close();
     await relay.close();
   }
 });

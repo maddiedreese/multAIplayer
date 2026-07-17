@@ -108,14 +108,16 @@ test("workspace updates are sent only to current team members", () => {
     [member.socket, "github:member"],
     [unrelated.socket, "github:unrelated"]
   ] as const) {
+    const authSession = {
+      sessionIdHash: userId.padEnd(64, "0").slice(0, 64),
+      user: { id: userId, login: userId },
+      expiresAt: Date.now() + 60_000
+    };
+    store.authSessions.set(authSession.sessionIdHash, authSession);
     store.workspaceSockets.add(socket);
     store.sessions.set(socket, {
       socket,
-      authSession: {
-        sessionIdHash: "a".repeat(64),
-        user: { id: userId, login: userId },
-        expiresAt: Date.now() + 60_000
-      },
+      authSession,
       rateClientId: userId,
       subscribedTeamIds: new Set(),
       workspaceSubscribed: true
@@ -132,6 +134,36 @@ test("workspace updates are sent only to current team members", () => {
   store.workspaceSockets.add(authDisabled.socket);
   fanoutFor(store, "team-core:room-desktop", async () => undefined, undefined, false).broadcastWorkspaceUpdated(team);
   assert.equal(authDisabled.sent.length, 1);
+});
+
+test("direct product delivery excludes an invalidated auth session without affecting another session", () => {
+  const store = createRelayStore();
+  const revoked = recordingSocket();
+  const live = recordingSocket();
+  for (const [index, socket] of [revoked.socket, live.socket].entries()) {
+    const authSession = {
+      sessionIdHash: String(index).repeat(64),
+      user: { id: "github:member", login: "member" },
+      expiresAt: Date.now() + 60_000
+    };
+    store.authSessions.set(authSession.sessionIdHash, authSession);
+    store.workspaceSockets.add(socket);
+    store.sessions.set(socket, {
+      socket,
+      authSession,
+      rateClientId: `member-${index}`,
+      subscribedTeamIds: new Set(),
+      workspaceSubscribed: true
+    });
+  }
+  store.authSessions.delete(store.sessions.get(revoked.socket)!.authSession!.sessionIdHash);
+
+  const fanout = fanoutFor(store, "team-core:room-desktop", async () => undefined);
+  fanout.send(revoked.socket, { type: "workspace.subscribed" });
+  fanout.send(live.socket, { type: "workspace.subscribed" });
+
+  assert.equal(revoked.sent.length, 0);
+  assert.equal(live.sent.length, 1);
 });
 
 test("identical retries acknowledge without rebroadcast while conflicting ids fail", async () => {
@@ -212,6 +244,19 @@ test("successful publishes record queue-to-fanout and WebSocket send latency", a
       callback();
     }
   } as unknown as WebSocket;
+  const authSession = {
+    sessionIdHash: "a".repeat(64),
+    user: { id: "github:host", login: "host" },
+    expiresAt: Date.now() + 60_000
+  };
+  store.authSessions.set(authSession.sessionIdHash, authSession);
+  store.sessions.set(socket, {
+    socket,
+    authSession,
+    rateClientId: "github:host",
+    subscribedTeamIds: new Set(),
+    workspaceSubscribed: false
+  });
   store.roomSockets.set(key, new Set([socket]));
   const fanout = fanoutFor(
     store,

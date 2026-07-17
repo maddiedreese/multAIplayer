@@ -20,7 +20,7 @@ Good reports include:
 - expected vs actual behavior;
 - whether the issue affects the relay, native desktop app, browser install notice, or documentation.
 
-Expect an initial acknowledgement within 3 business days and a status update at least every 7 days while a report remains open. We coordinate fixes and release timing privately, aim to publish a patched release before technical disclosure, and credit reporters who want attribution. Please allow 90 days for coordinated disclosure unless active exploitation or another urgent risk requires a shorter timeline.
+We aim to acknowledge reports within 3 business days and provide a status update about every 7 days while a report remains open. These are best-effort response targets for a volunteer-maintained project, not a support SLA. We coordinate fixes and release timing privately, aim to publish a patched release before technical disclosure, and credit reporters who want attribution. Please allow up to 90 days for coordinated disclosure unless active exploitation or another urgent risk requires a shorter timeline.
 
 ## Local Verification
 

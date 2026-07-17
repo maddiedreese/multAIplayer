@@ -32,8 +32,10 @@ afterEach(() => cleanup());
 test("accepted hosted-account deletion is reported as protected and pending cleanup", async () => {
   const originalFetch = globalThis.fetch;
   let deleted = 0;
+  let previewsStopped = 0;
   const deletionRequests: Array<{ input: string; init?: RequestInit }> = [];
   globalThis.fetch = async (input, init) => {
+    assert.equal(previewsStopped, 1);
     deletionRequests.push({ input: String(input), ...(init === undefined ? {} : { init }) });
     return new Response(
       JSON.stringify({
@@ -66,6 +68,9 @@ test("accepted hosted-account deletion is reported as protected and pending clea
         deviceIdentityMessage={null}
         relaySessionPersistence="Encrypted"
         codexAccountPanel={null}
+        onBeforeHostedAccountDeletion={async () => {
+          previewsStopped += 1;
+        }}
         onHostedAccountDeleted={() => {
           deleted += 1;
         }}

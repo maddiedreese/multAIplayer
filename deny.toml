@@ -7,12 +7,14 @@ version = 2
 yanked = "deny"
 # Owner: repository maintainers. Cargo-deny has no per-ignore expiry field, so
 # the repository check fails on this date until every exception is reviewed,
-# removed, or deliberately renewed with current reachability evidence.
-# exceptions-expire-at: 2026-08-01
+# removed, or deliberately renewed with current reachability evidence. Issue
+# #285 owns the next upgrade/remove/renew dispositions.
+# exceptions-expire-at: 2026-10-01
 ignore = [
   # GTK3 bindings are Linux-only transitive Tauri/Wry dependencies. Linux is
   # compatibility-only; macOS is the supported release. No safe Tauri upgrade
-  # removes them. Review by 2026-08-01 and on every Tauri/Wry update.
+  # removes them. Reviewed 2026-07-16; review again by 2026-10-01 and on every
+  # Tauri/Wry update.
   "RUSTSEC-2024-0411",
   "RUSTSEC-2024-0412",
   "RUSTSEC-2024-0413",
@@ -26,7 +28,7 @@ ignore = [
   # Unmaintained build/transitive crates from Tauri's macro and URL-pattern
   # graph; no safe compatible replacement is selectable by this application.
   # These are maintenance signals, not known vulnerabilities. Review by
-  # 2026-08-01 and remove when Tauri updates its graph.
+  # 2026-10-01 and remove when Tauri updates its graph.
   "RUSTSEC-2024-0370",
   "RUSTSEC-2025-0075",
   "RUSTSEC-2025-0080",
@@ -36,12 +38,13 @@ ignore = [
   # age 0.12.1 unconditionally selects i18n-embed-fl 0.10.0, whose
   # proc-macro-error2 build dependency is now unmaintained. age and
   # i18n-embed-fl are current and no maintained compatible replacement is
-  # selectable. Review by 2026-08-01 and remove when age migrates its macro.
+  # selectable. Reviewed 2026-07-16; review again by 2026-10-01 and remove when
+  # age migrates its macro.
   { id = "RUSTSEC-2026-0173", reason = "Build-only age localization macro dependency; current upstream has no compatible maintained replacement" },
   # mls-rs 0.55.2 (the current release) requires spin ^0.10, for which 0.10.0
   # is the only published match and is yanked. This is a registry lifecycle
-  # signal, not a vulnerability advisory. Review by 2026-08-01 and remove as
-  # soon as mls-rs publishes support for a non-yanked spin release.
+  # signal, not a vulnerability advisory. Reviewed 2026-07-16; review again by
+  # 2026-10-01 and remove as soon as mls-rs supports a non-yanked spin release.
   { crate = "spin@0.10.0", reason = "Only version satisfying current mls-rs; upstream release and main still require spin ^0.10" },
 ]
 

@@ -10,6 +10,10 @@ export interface RelayWebSocketConnectionOptions {
   transport: {
     wss: WebSocketServer;
     send: (socket: ClientSession["socket"], message: RelayServerMessage) => void;
+    sendConnectionError: (
+      socket: ClientSession["socket"],
+      message: Extract<RelayServerMessage, { type: "error" }>
+    ) => void;
     isReady?: () => boolean;
   };
   state: {

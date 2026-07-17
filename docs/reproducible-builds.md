@@ -43,6 +43,27 @@ archive signature, and required asset set before publication. It
 may replace assets only while a release remains private and refuses to rebuild or
 modify an already-public release.
 
+## Approve the exact release artifact
+
+The `public-alpha-release` environment pauses publication after the signed and
+notarized assets have been uploaded. Before approving that deployment, the
+maintainer downloads the `release-assets-<tag>` artifact from the same workflow
+run and checks the exact candidate rather than a local or ad-hoc build:
+
+1. Mount the DMG, copy the app to Applications, and confirm Gatekeeper accepts
+   and launches it.
+2. With the app closed, open a fresh invitation link and confirm macOS launches
+   the app with the invitation available.
+3. With the app already running, open a second fresh invitation link and confirm
+   the existing window focuses and receives it.
+4. Complete GitHub sign-in, connect to the official relay, and exercise one
+   native approval so the packaged app, OAuth callback, relay, and IPC boundary
+   are all represented.
+
+Any failure blocks environment approval. GitHub records who approved the
+deployment and when; the approval means the reviewer performed this checklist,
+but it is not cryptographic proof that the manual observations occurred.
+
 ## Release and updater failure handling
 
 If only updater-channel advancement fails after publication, use **Re-run failed

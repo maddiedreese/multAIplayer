@@ -16,7 +16,7 @@ import { createRoomSettingsActions } from "../src/application/rooms/roomSettings
 import { createTeamDefaultActions } from "../src/application/teams/teamDefaultActions";
 import { createWorkspaceCreationActions } from "../src/application/workspace/workspaceCreationActions";
 import { useAppStore } from "../src/store/appStore";
-import type { ChatMessage } from "../src/types";
+import type { ChatMessage, LocalPreviewRecord } from "../src/types";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -67,6 +67,21 @@ const room: ClientRoomRecord = {
   codexModel: "gpt-5.4",
   unread: 0
 };
+
+function ownedPreview(status: "live" | "starting"): LocalPreviewRecord {
+  return {
+    eventType: "local.preview",
+    id: "preview-owned",
+    sharedBy: "Maddie",
+    sharedByUserId: "github:maddie",
+    sourceUrl: "http://localhost:5173/",
+    ...(status === "live" ? { publicUrl: "https://preview.trycloudflare.com" } : {}),
+    status,
+    message: status === "live" ? "Live" : "Starting",
+    createdAt: "2026-07-16T00:00:00.000Z",
+    updatedAt: "2026-07-16T00:00:00.000Z"
+  };
+}
 
 test.beforeEach(() => {
   nativeInvoke = async (command) => {
@@ -563,6 +578,156 @@ test("local preview confirmation validation writes through the current store", a
   await actions.prepareLocalPreviewConfirmation();
 
   assert.match(useAppStore.getState().localPreviewDialog.error ?? "", /valid.*URL/i);
+});
+
+test("local preview cleanup confirms every native tunnel stopped before publishing stopped", async () => {
+  const calls: string[] = [];
+  nativeInvoke = async (command) => {
+    calls.push(`native:${command}`);
+    if (command === "local_preview_stop_all") return 1;
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  useAppStore.setState({
+    localPreviewByRoom: {
+      [room.id]: {
+        previews: [ownedPreview("live")]
+      }
+    }
+  });
+  const actions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async (preview) => {
+      calls.push(`publish:${preview.status}`);
+    }
+  });
+
+  await actions.stopOwnedLocalPreviews("Signed out");
+
+  assert.deepEqual(calls, ["native:local_preview_stop_all", "publish:stopped"]);
+});
+
+test("local preview cleanup never reports stopped when native termination is unconfirmed", async () => {
+  nativeInvoke = async (command) => {
+    if (command === "local_preview_stop_all") throw new Error("kill was not confirmed");
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  useAppStore.setState({
+    localPreviewByRoom: {
+      [room.id]: {
+        previews: [ownedPreview("starting")]
+      }
+    }
+  });
+  const statuses: string[] = [];
+  const actions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async (preview) => {
+      statuses.push(preview.status);
+    }
+  });
+
+  await assert.rejects(actions.stopOwnedLocalPreviews());
+
+  assert.deepEqual(statuses, ["error"]);
+});
+
+test("local preview publication failure stops the newly-created public tunnel", async () => {
+  const nativeCommands: string[] = [];
+  nativeInvoke = async (command) => {
+    nativeCommands.push(command);
+    if (command === "local_preview_start") {
+      return {
+        id: "generated",
+        localUrl: "http://localhost:5173/",
+        publicUrl: "https://preview.trycloudflare.com",
+        startupLog: "ready"
+      };
+    }
+    if (command === "local_preview_stop") {
+      return {
+        id: "generated",
+        localUrl: "http://localhost:5173/",
+        publicUrl: "https://preview.trycloudflare.com",
+        stopped: true
+      };
+    }
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  useAppStore.setState({
+    localPreviewDialog: {
+      ...useAppStore.getState().localPreviewDialog,
+      roomId: room.id,
+      selectedUrl: "http://localhost:5173/",
+      phase: "confirm"
+    }
+  });
+  const publishedStatuses: string[] = [];
+  const actions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async (preview) => {
+      publishedStatuses.push(preview.status);
+      if (preview.status === "live") throw new Error("relay publication failed");
+    }
+  });
+
+  await actions.confirmLocalPreviewShare();
+
+  assert.deepEqual(nativeCommands, ["local_preview_start", "local_preview_stop"]);
+  assert.deepEqual(publishedStatuses, ["starting", "live", "error"]);
+});
+
+test("a recreated action factory confirms a late successful start stopped without publishing it live", async () => {
+  let resolveStart: (value: unknown) => void = () => undefined;
+  let startRequested: () => void = () => undefined;
+  const nativeCommands: string[] = [];
+  const startWasRequested = new Promise<void>((resolve) => {
+    startRequested = resolve;
+  });
+  nativeInvoke = async (command) => {
+    nativeCommands.push(command);
+    if (command === "local_preview_start") {
+      startRequested();
+      return new Promise((resolve) => {
+        resolveStart = resolve;
+      });
+    }
+    if (command === "local_preview_stop_all") return 1;
+    throw new Error(`Unexpected native command: ${command}`);
+  };
+  useAppStore.setState({
+    localPreviewDialog: {
+      ...useAppStore.getState().localPreviewDialog,
+      roomId: room.id,
+      selectedUrl: "http://localhost:5173/",
+      phase: "confirm"
+    }
+  });
+  const startStatuses: string[] = [];
+  const startingActions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async (preview) => {
+      startStatuses.push(preview.status);
+      useAppStore.getState().appendLocalPreviewEvent(room.id, preview);
+    }
+  });
+  const confirmation = startingActions.confirmLocalPreviewShare();
+  await startWasRequested;
+
+  const cleanupStatuses: string[] = [];
+  const cleanupActions = createLocalPreviewActions({
+    publishLocalPreviewEvent: async (preview) => {
+      cleanupStatuses.push(preview.status);
+    }
+  });
+  const cleanup = cleanupActions.stopOwnedLocalPreviews();
+  resolveStart({
+    id: "late-preview",
+    localUrl: "http://localhost:5173/",
+    publicUrl: "https://late.trycloudflare.com",
+    startupLog: "ready"
+  });
+  await cleanup;
+  await confirmation;
+
+  assert.deepEqual(nativeCommands, ["local_preview_start", "local_preview_stop_all"]);
+  assert.deepEqual(startStatuses, ["starting"]);
+  assert.deepEqual(cleanupStatuses, ["stopped"]);
 });
 
 test("room settings actions report room locks through the current store without React", async () => {

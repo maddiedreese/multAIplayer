@@ -1,4 +1,5 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { MutableRefObject } from "react";
 import type { ChatMessage } from "../../types";
 import { reportNonFatal } from "../core/nonFatalReporting";
@@ -130,7 +131,6 @@ export function registerRoomNotificationClickFocus({
         const room = roomsRef.current.find((item) => item.id === roomId);
         if (!room) return;
         selectWorkspaceRoom(room.teamId, room.id);
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const currentWindow = getCurrentWindow();
         await currentWindow.show();
         await currentWindow.unminimize();

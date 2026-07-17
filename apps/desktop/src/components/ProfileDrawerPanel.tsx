@@ -30,6 +30,7 @@ export function ProfileDrawerPanel({
   relaySessionPersistence,
   codexAccountPanel = <CodexAccountPanel />,
   archivePanel,
+  onBeforeHostedAccountDeletion,
   onHostedAccountDeleted,
   onSignIn,
   onSignOut
@@ -45,6 +46,7 @@ export function ProfileDrawerPanel({
   relaySessionPersistence: string;
   codexAccountPanel?: ReactNode;
   archivePanel?: ReactNode;
+  onBeforeHostedAccountDeletion: () => Promise<void>;
   onHostedAccountDeleted: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
@@ -69,6 +71,13 @@ export function ProfileDrawerPanel({
   async function deleteAccount() {
     setDeletionBusy(true);
     setDeletionResult(null);
+    try {
+      await onBeforeHostedAccountDeletion();
+    } catch (error) {
+      setDeletionStatus(`Account deletion was not requested because local preview cleanup failed: ${String(error)}`);
+      setDeletionBusy(false);
+      return;
+    }
     try {
       const result = await deleteHostedAccount(deletionConfirmation);
       setDeletionResult(result);

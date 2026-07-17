@@ -3,6 +3,7 @@ import type { MlsRelayMessage, RelayServerMessage, RoomRecord, TeamRecord } from
 import type { RelayMetrics } from "../observability.js";
 import type { ClientSession, PresenceRecord, RelayStore, RoomKey } from "../state.js";
 import { createHash, createPublicKey, verify } from "node:crypto";
+import { isLiveAccountSession } from "../auth/account-mutation-transaction.js";
 import { isActiveRoom } from "../relay-domain.js";
 
 export class RelayPublishError extends Error {
@@ -37,12 +38,22 @@ interface Options {
 
 export function createRelayFanout(options: Options) {
   const queues = new Map<RoomKey, Promise<void>>();
-  const send = (socket: WebSocket, message: RelayServerMessage) => {
+  const sendRaw = (socket: WebSocket, message: RelayServerMessage) => {
     if (socket.readyState !== socket.OPEN) return;
     const startedAt = performance.now();
     socket.send(JSON.stringify(message), () => {
       options.metrics.recordWebSocketSendDuration(performance.now() - startedAt);
     });
+  };
+  const sendConnectionError = (socket: WebSocket, message: Extract<RelayServerMessage, { type: "error" }>) => {
+    sendRaw(socket, message);
+  };
+  const send = (socket: WebSocket, message: RelayServerMessage) => {
+    if (options.mutationsRequireAuth) {
+      const authSession = options.sessions.get(socket)?.authSession;
+      if (!authSession || !isLiveAccountSession(options.store, authSession)) return;
+    }
+    sendRaw(socket, message);
   };
   const broadcast = (key: RoomKey, message: RelayServerMessage) => {
     for (const socket of options.roomSockets.get(key) ?? []) send(socket, message);
@@ -159,7 +170,15 @@ export function createRelayFanout(options: Options) {
     options.roomPresence.set(key, roster);
     broadcast(key, { type: "presence", ...verified, status: "online" });
   }
-  return { send, broadcast, broadcastRoomUpdated, broadcastWorkspaceUpdated, publishMlsMessage, publishPresence };
+  return {
+    send,
+    sendConnectionError,
+    broadcast,
+    broadcastRoomUpdated,
+    broadcastWorkspaceUpdated,
+    publishMlsMessage,
+    publishPresence
+  };
 }
 
 function assertQueuedPublishAuthorized(remainsAuthorized: () => boolean): void {

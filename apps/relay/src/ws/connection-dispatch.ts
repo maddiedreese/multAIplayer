@@ -50,7 +50,7 @@ function hasLiveAuthenticationSession(
   session: ClientSession
 ): boolean {
   if (options.authentication.isLiveClientSession(session)) return true;
-  options.transport.send(session.socket, {
+  options.transport.sendConnectionError(session.socket, {
     type: "error",
     message: "Authentication session expired.",
     code: "not_joined"

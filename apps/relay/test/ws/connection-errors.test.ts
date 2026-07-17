@@ -38,7 +38,10 @@ test("presence publication stops when the joined room becomes inactive", async (
   };
   const options = {
     state: { sessions: new Map([[socket, session]]) },
-    transport: { send: (_socket: unknown, message: unknown) => sent.push(message) },
+    transport: {
+      send: (_socket: unknown, message: unknown) => sent.push(message),
+      sendConnectionError: (_socket: unknown, message: unknown) => sent.push(message)
+    },
     authentication: { isLiveClientSession: () => true },
     rooms: {
       isKnownRoom: () => false,
@@ -101,7 +104,10 @@ test("a queued MLS publish cannot commit after account deletion wins the account
   let published = false;
   const options = {
     state: { store, sessions: new Map([[socket, session]]) },
-    transport: { send: (_socket: unknown, message: unknown) => sent.push(message) },
+    transport: {
+      send: (_socket: unknown, message: unknown) => sent.push(message),
+      sendConnectionError: (_socket: unknown, message: unknown) => sent.push(message)
+    },
     authentication: {
       isLiveClientSession: () => store.authSessions.get(authSession.sessionIdHash) === authSession
     },
@@ -324,7 +330,8 @@ test("queued actions close and unregister logged-out or expired authentication s
               if (event === "connection") acceptConnection = listener;
             }
           },
-          send: (_socket: unknown, message: unknown) => sent.push(message)
+          send: (_socket: unknown, message: unknown) => sent.push(message),
+          sendConnectionError: (_socket: unknown, message: unknown) => sent.push(message)
         },
         authentication: {
           getAuthSessionFromRequest: () => authSession,

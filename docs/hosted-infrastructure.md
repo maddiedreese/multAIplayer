@@ -4,7 +4,7 @@ The open-source repository contains the desktop application, relay service, rele
 
 ## Public application repository
 
-`maddiedreese/multAIplayer` owns the application and relay source, GitHub release workflow, signed updater metadata, updater public key, and the canonical [release asset contract](release-assets.v1.json). GitHub Releases are created as drafts and become public only after the repository’s automated release gates and the protected release-environment deployment complete. GitHub records the deployment, its status, timestamps, and reviewer identity when required reviewers are configured. The maintainer completes the documented manual acceptance checks before approving that deployment; the environment record does not itself prove those checks ran.
+`maddiedreese/multAIplayer` owns the application and relay source, GitHub release workflow, signed updater metadata, updater public key, and the canonical [release asset contract](release-assets.v1.json). GitHub Releases are created as drafts and become public only after the repository’s automated release gates and the protected release-environment deployment complete. GitHub records the deployment, its status, timestamps, and reviewer identity when required reviewers are configured. The maintainer completes the [exact-artifact acceptance checklist](reproducible-builds.md#approve-the-exact-release-artifact) before approving that deployment; the environment record does not itself prove those checks ran.
 
 ## Project website
 

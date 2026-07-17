@@ -1,18 +1,37 @@
 import React, { type ReactNode } from "react";
+import { ActiveRoomInspector, type RoomInspectorSources } from "./ActiveRoomInspector";
+import { ActiveRoomMainColumn, type RoomMainColumnSources } from "./ActiveRoomMainColumn";
 import { AppWorkspaceShell } from "./AppWorkspaceShell";
 import { LocalPreviewDialogContainer, type LocalPreviewDialogActions } from "./LocalPreviewDialogContainer";
-import { RoomInspectorContainer, type RoomInspectorSources } from "./RoomInspectorContainer";
-import { RoomMainColumnContainer, type RoomMainColumnSources } from "./RoomMainColumnContainer";
 import { useUpdateNotice } from "../hooks/useUpdateNotice";
 import { useShellLayout } from "../hooks/useShellLayout";
 import { AppSidebarDrawerContainer, DesktopSidebarContainer, type SidebarSources } from "./SidebarContainers";
 import { SignedUpdateBanner, UpdateVerificationWarning } from "./SignedUpdateBanner";
+import { useAppStore } from "../store/appStore";
 
 interface AppShellViewProps {
   sidebarSources: SidebarSources;
   roomMainColumnSources: RoomMainColumnSources;
   roomInspectorSources: RoomInspectorSources;
   localPreviewDialogActions: LocalPreviewDialogActions;
+}
+
+export function RoomMainColumnContainer({ sources }: { sources: RoomMainColumnSources }) {
+  const selectedRoom = useAppStore((state) => state.rooms.find((room) => room.id === state.selectedRoomId));
+  if (!selectedRoom) {
+    return (
+      <main className="room">
+        <div className="empty-state">Select or create a room to start collaborating.</div>
+      </main>
+    );
+  }
+  return <ActiveRoomMainColumn sources={sources} selectedRoom={selectedRoom} />;
+}
+
+function RoomInspector({ sources }: { sources: RoomInspectorSources }) {
+  const selectedRoom = useAppStore((state) => state.rooms.find((room) => room.id === state.selectedRoomId));
+  if (!selectedRoom) return <aside className="inspector" aria-label="Room inspector" />;
+  return <ActiveRoomInspector sources={sources} selectedRoom={selectedRoom} />;
 }
 
 export function AppShellView({
@@ -47,7 +66,7 @@ export function AppShellView({
       sidebar={<DesktopSidebarContainer sources={sidebarSources} />}
       drawer={<AppSidebarDrawerContainer sources={sidebarSources} />}
       main={<RoomMainColumnContainer sources={roomMainColumnSources} />}
-      inspector={<RoomInspectorContainer sources={roomInspectorSources} />}
+      inspector={<RoomInspector sources={roomInspectorSources} />}
       dialog={dialog}
       shellBanner={updateBanner || verificationWarning ? shellBanner : null}
     />

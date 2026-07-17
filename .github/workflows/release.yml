@@ -451,7 +451,9 @@ jobs:
   publish:
     name: Publish authenticated release
     needs: build
-    environment: public-alpha-release
+    environment:
+      name: public-alpha-release
+      url: ${{ github.server_url }}/${{ github.repository }}/blob/${{ needs.build.outputs.commit }}/docs/reproducible-builds.md#approve-the-exact-release-artifact
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
