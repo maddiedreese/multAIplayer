@@ -53,7 +53,6 @@ test("checkGitHubWorkflowReadiness requires GitHub sign-in and valid repo target
   assert.deepEqual(readiness.messages, [
     "GitHub sign-in is not configured on this relay.",
     "Sign in with GitHub before approving a push and draft PR.",
-    "GitHub permissions need public_repo for public repos or repo for private repos.",
     "Error: GitHub owner must be a valid user or organization name."
   ]);
 });

@@ -93,7 +93,7 @@ The [architecture guide](docs/product-architecture.md) maps flows to code. SQLit
 
 Supported macOS releases are Developer ID-signed, notarized, published with checksums, and use authenticated updater metadata bound to the exact signed bundle. Verification instructions live in [Verifying releases](docs/reproducible-builds.md).
 
-The pre-committed updater public key has minisign key id `5F97AE260BE16B2F`. The SHA-256 fingerprint of the exact committed `apps/desktop/src-tauri/updater-public.key` file is `626f3a15f71fc8c5794c9ce00392a12f782cd05ec47a88ce27858b43ce774673`. Compare that hash with the independently published fingerprint on [multaiplayer.com](https://multaiplayer.com/security/updater-key) before trusting a first install or a compromise-recovery key.
+Before trusting a first install or compromise-recovery key, follow the maintained [release-verification procedure](docs/reproducible-builds.md) to compare the committed updater key with the independently published fingerprint.
 
 The official alpha relay is a deliberately single-node Node/SQLite service with no uptime or recovery guarantee. Keep ordinary Git/project backups. Operators should follow [Self-hosting](docs/self-hosting.md) and the [single-node relay ADR](docs/decisions/single-node-relay.md).
 

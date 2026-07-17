@@ -28,8 +28,8 @@ boundary; add or supersede a decision when the boundary itself changes.
 - [Self-hosting](self-hosting.md) is the operator runbook.
 - [Threat model](threat-model.md) is the authoritative security-claims and
   residual-risk document.
-- [Tauri IPC boundary audit](tauri-ipc-boundary-audit.md) is the manually reviewed
-  native-command inventory, with automated registration-drift detection.
+- [Tauri IPC boundary review](tauri-ipc-boundary-audit.md) records the manual
+  review snapshot and a mechanically refreshed native-command inventory.
 - [Verifying releases](reproducible-builds.md) covers artifact and updater
   verification.
 - [Hosted infrastructure and source boundaries](hosted-infrastructure.md) records

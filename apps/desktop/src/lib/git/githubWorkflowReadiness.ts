@@ -67,13 +67,6 @@ export function checkGitHubWorkflowReadiness(input: GitHubWorkflowReadinessInput
   if (!input.currentUser) {
     messages.push("Sign in with GitHub before approving a push and draft PR.");
   }
-  if (input.authConfig?.scopes.length) {
-    const scopes = new Set(input.authConfig.scopes);
-    if (!scopes.has("public_repo") && !scopes.has("repo")) {
-      messages.push("GitHub permissions need public_repo for public repos or repo for private repos.");
-    }
-  }
-
   try {
     const repo = normalizeGitHubRepoRef(input.owner, input.repo);
     const head = normalizeGitHubBranchName(input.head);

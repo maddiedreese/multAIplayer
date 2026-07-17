@@ -10,7 +10,9 @@ use tauri::{webview::Cookie, WebviewWindow};
 use uuid::Uuid;
 
 const KEYCHAIN_SERVICE: &str = "com.multaiplayer.desktop";
-const KEYCHAIN_ACCOUNT: &str = "github-oauth-token:v1";
+const LEGACY_KEYCHAIN_ACCOUNT: &str = "github-oauth-token:v1";
+const IDENTITY_KEYCHAIN_ACCOUNT: &str = "github-identity-token:v2";
+const REPOSITORY_KEYCHAIN_ACCOUNT: &str = "github-repository-token:v2";
 const MAX_TOKEN_CHARS: usize = 8192;
 const MAX_RESPONSE_BYTES: usize = 1_048_576;
 const GITHUB_CLIENT_ID: &str = match option_env!("MULTAIPLAYER_NATIVE_GITHUB_CLIENT_ID") {
@@ -21,7 +23,8 @@ const RELAY_HTTP_ORIGIN: &str = match option_env!("MULTAIPLAYER_NATIVE_RELAY_HTT
     Some(value) => value,
     None => "https://relay.multaiplayer.com",
 };
-const GITHUB_SCOPES: [&str; 2] = ["read:user", "repo"];
+const GITHUB_IDENTITY_SCOPES: [&str; 1] = ["read:user"];
+const GITHUB_REPOSITORY_SCOPES: [&str; 1] = ["repo"];
 
 #[derive(Default)]
 pub struct GitHubState {
@@ -29,11 +32,18 @@ pub struct GitHubState {
 }
 
 struct PendingDeviceFlow {
+    purpose: DeviceFlowPurpose,
     client_id: String,
     device_code: String,
     expires_at: Instant,
     poll_interval: Duration,
     next_poll_at: Instant,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DeviceFlowPurpose {
+    Identity,
+    Repository,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -59,13 +69,19 @@ pub struct DeviceFlowStart {
 #[derive(Deserialize, Serialize)]
 struct TokenResponse {
     access_token: Option<String>,
+    scope: Option<String>,
     error: Option<String>,
+}
+
+struct AccessCredential {
+    token: String,
+    scopes: Vec<String>,
 }
 
 enum TokenPollOutcome {
     Pending,
     SlowDown,
-    Complete(String),
+    Complete(AccessCredential),
     AccessDenied,
     Expired,
     InvalidCredential,
@@ -78,6 +94,20 @@ pub enum DevicePollResult {
     Pending,
     SlowDown { retry_after_seconds: u64 },
     Complete { user: SignedInUser },
+}
+
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum RepositoryDevicePollResult {
+    Pending,
+    SlowDown { retry_after_seconds: u64 },
+    Complete,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryAccessStatus {
+    authorized: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -194,7 +224,7 @@ async fn github_create_pull_request_inner(
     request: PullRequestInput,
 ) -> Result<PullRequestResult, String> {
     let request = validate_pull_request(request)?;
-    let token = load_token()?;
+    let token = load_repository_token()?;
     let url = format!(
         "https://api.github.com/repos/{}/{}/pulls",
         request.owner, request.repo
@@ -213,6 +243,10 @@ async fn github_create_pull_request_inner(
         .send()
         .await
         .map_err(|_| "Failed to create the pull request.".to_owned())?;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        let _ = clear_repository_token();
+        return Err("GitHub repository authorization expired. Authorize access again.".to_owned());
+    }
     if response.status() != StatusCode::CREATED {
         return Err("GitHub did not create the pull request.".to_owned());
     }
@@ -245,7 +279,7 @@ async fn github_list_action_runs_inner(
         .filter(|v| !v.trim().is_empty())
         .map(validate_branch)
         .transpose()?;
-    let token = load_token()?;
+    let token = load_repository_token()?;
     let mut url = Url::parse(&format!(
         "https://api.github.com/repos/{owner}/{repo}/actions/runs"
     ))
@@ -265,6 +299,10 @@ async fn github_list_action_runs_inner(
         .send()
         .await
         .map_err(|_| "Failed to load GitHub Actions.".to_owned())?;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        let _ = clear_repository_token();
+        return Err("GitHub repository authorization expired. Authorize access again.".to_owned());
+    }
     if !response.status().is_success() {
         return Err("GitHub did not return Actions runs.".to_owned());
     }

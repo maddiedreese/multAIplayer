@@ -44,7 +44,7 @@ The host creates a capability-bearing HTTPS link whose secret payload is in the 
 
 ### Privileged host action
 
-A teammate request is projected for host review, then crosses a typed TypeScript adapter and the Rust IPC boundary. Rust validates inputs and current authority before invoking local Codex, terminal, filesystem, browser, Git, or GitHub capabilities. Text risk labels assist review; structured authorization and explicit approval enforce it. The [IPC audit](tauri-ipc-boundary-audit.md) inventories every registered command.
+A teammate request is projected for host review, then crosses a typed TypeScript adapter and the Rust IPC boundary. Rust validates inputs and current authority before invoking local Codex, terminal, filesystem, browser, Git, or GitHub capabilities. Text risk labels assist review; structured authorization and explicit approval enforce it. The [IPC boundary review](tauri-ipc-boundary-audit.md) records the manual review snapshot and generated command inventory.
 
 ### Host handoff
 

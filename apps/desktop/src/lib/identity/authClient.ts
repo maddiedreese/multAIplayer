@@ -27,6 +27,9 @@ export type GitHubDevicePollResult =
   | { status: "slow_down"; retryAfterSeconds: number }
   | { status: "complete"; user: SignedInUser };
 
+export type GitHubRepositoryDevicePollResult =
+  { status: "pending" } | { status: "slow_down"; retryAfterSeconds: number } | { status: "complete" };
+
 export interface SignedInUser {
   id: string;
   login: string;
@@ -48,7 +51,7 @@ export function summarizeGitHubOAuthPurposes(scopes: readonly string[]): GitHubO
       ? "repo — public and private repository workflows"
       : requested.has("public_repo")
         ? "public_repo — public repository workflows only"
-        : "No repository workflow scope"
+        : "Requested separately when a repository workflow is used"
   };
 }
 
@@ -89,6 +92,31 @@ export async function pollGitHubDeviceFlow(flowId: string): Promise<GitHubDevice
   return invokeNative<GitHubDevicePollResult>("github_device_flow_poll", {
     flowId
   });
+}
+
+export async function getGitHubRepositoryAccessStatus(): Promise<boolean> {
+  if (!isTauriRuntime()) return false;
+  const status = await invokeNative<{ authorized: boolean }>("github_repository_access_status");
+  return status.authorized;
+}
+
+export async function startGitHubRepositoryDeviceFlow(): Promise<GitHubDeviceStart> {
+  if (!isTauriRuntime())
+    throw new Error("GitHub repository authorization is available only in the native desktop app.");
+  const flow = await invokeNative<Omit<GitHubDeviceStart, "expiresAt">>("github_repository_device_flow_start");
+  const verificationUri = trustedAuthenticationUrl("github", flow.verification_uri);
+  if (!verificationUri) throw new Error("GitHub returned an unsupported verification address.");
+  return {
+    ...flow,
+    verification_uri: verificationUri,
+    expiresAt: Date.now() + Math.max(0, flow.expires_in) * 1000
+  };
+}
+
+export async function pollGitHubRepositoryDeviceFlow(flowId: string): Promise<GitHubRepositoryDevicePollResult> {
+  if (!isTauriRuntime())
+    throw new Error("GitHub repository authorization is available only in the native desktop app.");
+  return invokeNative<GitHubRepositoryDevicePollResult>("github_repository_device_flow_poll", { flowId });
 }
 
 export function nextGitHubDevicePollIntervalSeconds(currentInterval: number, result: GitHubDevicePollResult): number {

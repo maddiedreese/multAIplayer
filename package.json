@@ -38,11 +38,13 @@
     "docs:screenshots": "node e2e/capture-readme-screens.mjs",
     "test:e2e:native": "node --import tsx e2e/native-shell/journey.ts",
     "test:e2e:native:macos-smoke": "wdio run e2e/native-macos/wdio.conf.mjs",
+    "docs:check": "node scripts/check-maintained-docs.mjs",
+    "docs:sync-ipc-inventory": "node scripts/check-maintained-docs.mjs --write-ipc-inventory",
     "fmt:rust:check": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check",
     "lint:rust": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-targets --all-features -- -D warnings",
     "test:native": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-features",
     "hooks:install": "git config core.hooksPath .githooks",
-    "verify": "npm run lint && npm run format:check && npm run check:security-exceptions && npm run test:release-tools && npm run build:packages && npm run test:workspaces && npm run build:apps && npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native",
+    "verify": "npm run lint && npm run format:check && npm run docs:check && npm run check:security-exceptions && npm run test:release-tools && npm run build:packages && npm run test:workspaces && npm run build:apps && npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native",
     "release:preflight": "node scripts/doctor.mjs && npm run license:check && npm run sqlite:backup-restore-drill && npm run verify",
     "verify:aasa": "node scripts/verify-macos-associated-domains.mjs --live",
     "verify:macos-associated-domains": "node scripts/verify-macos-associated-domains.mjs",
@@ -85,6 +87,8 @@
   },
   "overrides": {
     "@wdio/native-utils": "2.5.0",
+    "encoding-sniffer": "1.0.2",
+    "glob": "13.0.6",
     "serialize-javascript": "7.0.5",
     "monaco-editor": {
       "dompurify": "$dompurify"

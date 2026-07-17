@@ -16,8 +16,44 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changed domains
+    runs-on: ubuntu-latest
+    outputs:
+      documentation: ${{ steps.paths.outputs.documentation }}
+      workflow: ${{ steps.paths.outputs.workflow }}
+      javascript: ${{ steps.paths.outputs.javascript }}
+      native: ${{ steps.paths.outputs.native }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - name: Validate squash-commit title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: node scripts/check-pr-title.mjs "$PR_TITLE"
+      - name: Classify changed paths
+        id: paths
+        uses: ./.github/actions/changed-domains
+
+  documentation:
+    name: Maintained documentation
+    needs: changes
+    if: needs.changes.outputs.documentation == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Check generated and single-source documentation
+        run: node scripts/check-maintained-docs.mjs
+
   workflow-policy:
     name: GitHub Actions syntax and repository policy
+    needs: changes
+    if: needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,6 +75,8 @@ jobs:
 
   web-and-relay:
     name: Web, relay, and packages
+    needs: changes
+    if: needs.changes.outputs.javascript == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -46,11 +84,6 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
-      - name: Validate squash-commit title
-        if: github.event_name == 'pull_request'
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: node scripts/check-pr-title.mjs "$PR_TITLE"
       - name: Install dependencies
         run: npm ci
       - name: Set up repository Rust toolchain
@@ -61,10 +94,12 @@ jobs:
           node tools/release/relay-runtime-dependency-closure.mjs \
             check-tree node_modules "$RUNNER_TEMP/relay-production-tree.json"
       - name: Verify web, relay, and packages
-        run: npm run lint && npm run format:check && npm run check:security-exceptions && npm run test:release-tools && npm run build:packages && npm run test:workspaces && npm run build:apps
+        run: node --test tools/ci/*.test.mjs && npm run lint && npm run format:check && npm run check:security-exceptions && npm run test:release-tools && npm run check:release-versions && npm run build:packages && npm run test:workspaces && npm run build:apps
 
   native-core:
     name: Native formatting, lints, and tests
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -94,18 +129,39 @@ jobs:
   required-core-checks:
     name: Required core checks
     if: always()
-    needs: [workflow-policy, web-and-relay, native-core]
+    needs: [changes, documentation, workflow-policy, web-and-relay, native-core]
     runs-on: ubuntu-latest
     steps:
       - name: Require every core check
         env:
           WORKFLOW_POLICY_RESULT: ${{ needs.workflow-policy.result }}
+          DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
           WEB_RELAY_RESULT: ${{ needs.web-and-relay.result }}
           NATIVE_RESULT: ${{ needs.native-core.result }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          WORKFLOW_CHANGED: ${{ needs.changes.outputs.workflow }}
+          DOCUMENTATION_CHANGED: ${{ needs.changes.outputs.documentation }}
+          JAVASCRIPT_CHANGED: ${{ needs.changes.outputs.javascript }}
+          NATIVE_CHANGED: ${{ needs.changes.outputs.native }}
         run: |
-          for result in "$WORKFLOW_POLICY_RESULT" "$WEB_RELAY_RESULT" "$NATIVE_RESULT"; do
-            if [ "$result" != "success" ]; then
-              echo "A required core check did not succeed: $result" >&2
+          [ "$CHANGES_RESULT" = "success" ] || exit 1
+          require_when_changed() {
+            changed="$1"
+            result="$2"
+            if [ "$changed" != "true" ] && [ "$changed" != "false" ]; then
+              echo "Changed-path detection returned an invalid value: $changed" >&2
               exit 1
             fi
-          done
+            if [ "$changed" = "true" ] && [ "$result" != "success" ]; then
+              echo "A selected core check did not succeed: $result" >&2
+              exit 1
+            fi
+            if [ "$changed" = "false" ] && [ "$result" != "skipped" ]; then
+              echo "An unselected core check unexpectedly ran: $result" >&2
+              exit 1
+            fi
+          }
+          require_when_changed "$DOCUMENTATION_CHANGED" "$DOCUMENTATION_RESULT"
+          require_when_changed "$WORKFLOW_CHANGED" "$WORKFLOW_POLICY_RESULT"
+          require_when_changed "$JAVASCRIPT_CHANGED" "$WEB_RELAY_RESULT"
+          require_when_changed "$NATIVE_CHANGED" "$NATIVE_RESULT"

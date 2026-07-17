@@ -27,7 +27,9 @@ jobs:
     name: Detect product changes
     runs-on: ubuntu-latest
     outputs:
-      product: ${{ steps.paths.outputs.product }}
+      ui: ${{ steps.paths.outputs.ui_journey }}
+      native: ${{ steps.paths.outputs.native_journey }}
+      macos: ${{ steps.paths.outputs.macos }}
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -35,33 +37,12 @@ jobs:
           fetch-depth: 0
       - name: Detect executable product and journey changes
         id: paths
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -o pipefail
-          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-            echo "product=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! changed_files="$(git diff --no-renames --name-only "$BASE_SHA" "$GITHUB_SHA")"; then
-            echo "Could not compare the pull request with its base commit." >&2
-            exit 1
-          fi
-          if grep -Eq '^(apps|packages|e2e)/|^scripts/run-e2e\.mjs$|^package(-lock)?\.json$|^\.github/(actions|workflows/journeys\.yml)' <<< "$changed_files"; then
-            echo "product=true" >> "$GITHUB_OUTPUT"
-          else
-            grep_status=$?
-            if [ "$grep_status" -ne 1 ]; then
-              echo "Could not classify the changed paths." >&2
-              exit "$grep_status"
-            fi
-            echo "product=false" >> "$GITHUB_OUTPUT"
-          fi
+        uses: ./.github/actions/changed-domains
 
   web-shell-e2e:
     name: UI contract journeys
     needs: changes
-    if: needs.changes.outputs.product == 'true'
+    if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -87,7 +68,7 @@ jobs:
   native-shell-e2e:
     name: Real two-client native MLS journey
     needs: changes
-    if: needs.changes.outputs.product == 'true'
+    if: needs.changes.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -244,7 +225,7 @@ jobs:
   macos-desktop:
     name: macOS desktop package
     needs: changes
-    if: github.event_name != 'schedule' && needs.changes.outputs.product == 'true'
+    if: github.event_name != 'schedule' && needs.changes.outputs.macos == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     env:
@@ -318,7 +299,9 @@ jobs:
       - name: Require successful journeys when product code changed
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          PRODUCT_CHANGED: ${{ needs.changes.outputs.product }}
+          UI_CHANGED: ${{ needs.changes.outputs.ui }}
+          NATIVE_CHANGED: ${{ needs.changes.outputs.native }}
+          MACOS_CHANGED: ${{ needs.changes.outputs.macos }}
           UI_RESULT: ${{ needs.web-shell-e2e.result }}
           NATIVE_RESULT: ${{ needs.native-shell-e2e.result }}
           MACOS_RESULT: ${{ needs.macos-desktop.result }}
@@ -327,17 +310,22 @@ jobs:
             echo "Product-change detection did not succeed: $CHANGES_RESULT" >&2
             exit 1
           fi
-          if [ "$PRODUCT_CHANGED" = "false" ]; then
-            echo "No executable product or journey files changed."
-            exit 0
-          fi
-          if [ "$PRODUCT_CHANGED" != "true" ]; then
-            echo "Product-change detection returned an invalid result: $PRODUCT_CHANGED" >&2
-            exit 1
-          fi
-          for result in "$UI_RESULT" "$NATIVE_RESULT" "$MACOS_RESULT"; do
-            if [ "$result" != "success" ]; then
-              echo "A required product journey did not succeed: $result" >&2
+          require_when_changed() {
+            changed="$1"
+            result="$2"
+            if [ "$changed" != "true" ] && [ "$changed" != "false" ]; then
+              echo "Changed-path detection returned an invalid value: $changed" >&2
               exit 1
             fi
-          done
+            if [ "$changed" = "true" ] && [ "$result" != "success" ]; then
+              echo "A selected product journey did not succeed: $result" >&2
+              exit 1
+            fi
+            if [ "$changed" = "false" ] && [ "$result" != "skipped" ]; then
+              echo "An unselected product journey unexpectedly ran: $result" >&2
+              exit 1
+            fi
+          }
+          require_when_changed "$UI_CHANGED" "$UI_RESULT"
+          require_when_changed "$NATIVE_CHANGED" "$NATIVE_RESULT"
+          require_when_changed "$MACOS_CHANGED" "$MACOS_RESULT"

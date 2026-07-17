@@ -124,7 +124,7 @@ export function registerGitHubAuthRoutes({
     res.json({
       provider: "github",
       configured: true,
-      scopes: ["read:user", "repo"],
+      scopes: ["read:user"],
       mutationsRequireAuth,
       allowedOrigins: allowedCorsOrigins,
       sessionPersistence: "identity_only",

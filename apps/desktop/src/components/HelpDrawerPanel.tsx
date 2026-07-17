@@ -47,8 +47,8 @@ export function HelpDrawerPanel({
       <section className="drawer-section">
         <strong>Accounts work differently</strong>
         <p>
-          GitHub identity is used for workspace membership. The same alpha sign-in separately requests the broad
-          <code>repo</code> permission for optional pull-request and Actions API workflows, including private
+          GitHub identity is used for workspace membership and requests only <code>read:user</code>. Optional
+          pull-request and Actions workflows request the broad <code>repo</code> permission on demand, including private
           repositories. ChatGPT authorizes the local Codex process. These are separate authority domains.
         </p>
       </section>

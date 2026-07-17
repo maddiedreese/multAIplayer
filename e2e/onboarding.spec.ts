@@ -50,7 +50,7 @@ test("readiness blocks progress until direct repair actions succeed", async ({ p
   const continueButton = page.getByRole("button", { name: /Continue/ });
   await expect(continueButton).toBeDisabled();
   await expect(page.getByText(/GitHub.*identity is required for hosted workspaces/)).toBeVisible();
-  await expect(page.getByText(/repo.*optional pull-request and Actions API workflows/)).toBeVisible();
+  await expect(page.getByText(/Optional pull-request and Actions workflows ask for repo access later/)).toBeVisible();
   await expect(page.getByText(/ChatGPT.*authorizes the local Codex process/)).toBeVisible();
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(continueButton).toBeDisabled();

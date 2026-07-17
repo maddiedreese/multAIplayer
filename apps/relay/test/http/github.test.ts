@@ -24,7 +24,7 @@ test("relay advertises native OAuth configuration without a secret", async () =>
     assert.deepEqual(body, {
       provider: "github",
       configured: true,
-      scopes: ["read:user", "repo"],
+      scopes: ["read:user"],
       mutationsRequireAuth: true,
       allowedOrigins: ["https://multaiplayer.com", "tauri://localhost"],
       sessionPersistence: "identity_only",

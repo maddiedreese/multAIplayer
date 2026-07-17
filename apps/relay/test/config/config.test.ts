@@ -330,7 +330,7 @@ test("relay loads configuration from env files without overriding process env", 
       mutationsRequireAuth: boolean;
       allowedOrigins: string[];
     };
-    assert.deepEqual(body.scopes, ["read:user", "repo"]);
+    assert.deepEqual(body.scopes, ["read:user"]);
     assert.equal(body.mutationsRequireAuth, false);
     assert.deepEqual(body.allowedOrigins, ["https://env-file.example"]);
   } finally {

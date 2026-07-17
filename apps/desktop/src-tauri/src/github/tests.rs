@@ -48,7 +48,8 @@ fn rejects_untrusted_relay_and_response_urls() {
 #[test]
 fn native_configuration_and_cookie_attributes_are_pinned() {
     assert!(validate_client_id(GITHUB_CLIENT_ID).is_ok());
-    assert_eq!(GITHUB_SCOPES, ["read:user", "repo"]);
+    assert_eq!(GITHUB_IDENTITY_SCOPES, ["read:user"]);
+    assert_eq!(GITHUB_REPOSITORY_SCOPES, ["repo"]);
     let base = validate_relay_url(RELAY_HTTP_ORIGIN).unwrap();
     let cookie = build_session_cookie(&base, "session-value".to_owned()).unwrap();
     assert_eq!(cookie.domain(), base.host_str());
@@ -103,6 +104,9 @@ fn serialized_ipc_results_never_have_token_fields() {
     let encoded = value.to_string();
     assert!(!encoded.contains("access_token"));
     assert!(!encoded.contains("accessToken"));
+    let repository = serde_json::to_value(RepositoryDevicePollResult::Complete).unwrap();
+    assert_eq!(repository, serde_json::json!({ "status": "complete" }));
+    assert!(!repository.to_string().contains("user"));
     let start = serde_json::to_value(DeviceFlowStart {
         flow_id: "opaque-flow-id".into(),
         user_code: "ABCD-EFGH".into(),
@@ -127,6 +131,7 @@ fn device_poll_protocol_preserves_every_github_state() {
     ] {
         let actual = match token_poll_outcome(TokenResponse {
             access_token: None,
+            scope: None,
             error: Some(error.to_owned()),
         }) {
             TokenPollOutcome::Pending => "pending",
@@ -141,6 +146,7 @@ fn device_poll_protocol_preserves_every_github_state() {
     assert!(matches!(
         token_poll_outcome(TokenResponse {
             access_token: Some("debug-token".into()),
+            scope: Some("read:user".into()),
             error: None
         }),
         TokenPollOutcome::Complete(_)
@@ -148,8 +154,28 @@ fn device_poll_protocol_preserves_every_github_state() {
     assert!(matches!(
         token_poll_outcome(TokenResponse {
             access_token: Some("bad token".into()),
+            scope: Some("read:user".into()),
             error: None
         }),
         TokenPollOutcome::InvalidCredential
     ));
+}
+
+#[test]
+fn granted_scopes_are_purpose_bound_and_fail_closed() {
+    assert!(validate_granted_scopes(DeviceFlowPurpose::Identity, &["read:user".into()]).is_ok());
+    assert!(validate_granted_scopes(
+        DeviceFlowPurpose::Identity,
+        &["read:user".into(), "repo".into()]
+    )
+    .is_err());
+    assert!(validate_granted_scopes(DeviceFlowPurpose::Repository, &["repo".into()]).is_ok());
+    assert!(validate_granted_scopes(
+        DeviceFlowPurpose::Repository,
+        &["repo".into(), "read:user".into()]
+    )
+    .is_ok());
+    assert!(
+        validate_granted_scopes(DeviceFlowPurpose::Repository, &["public_repo".into()]).is_err()
+    );
 }

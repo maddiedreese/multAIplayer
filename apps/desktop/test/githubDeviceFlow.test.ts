@@ -18,7 +18,7 @@ test("GitHub OAuth copy separates identity from repository authority", () => {
   });
   assert.deepEqual(summarizeGitHubOAuthPurposes(["read:user"]), {
     identity: "read:user — workspace identity",
-    repositoryWorkflows: "No repository workflow scope"
+    repositoryWorkflows: "Requested separately when a repository workflow is used"
   });
 });
 

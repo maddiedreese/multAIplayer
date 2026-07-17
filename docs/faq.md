@@ -24,7 +24,7 @@ Official invites are HTTPS links with capability material in the URL fragment. A
 
 ## Why GitHub and ChatGPT sign-in?
 
-GitHub identity identifies room members. The current alpha's same device-code grant also requests broad `repo` access for optional repository workflows, including private repositories; that repository authority is not required by the relay identity model, but the UI cannot split the grant today. ChatGPT authorizes the Codex process on the active host. They are separate accounts and authority domains. GitHub-only identity is an alpha scope decision, not a permanent platform requirement.
+GitHub identity identifies room members and requests only `read:user`. Optional pull-request and Actions workflows request broad `repo` access on demand; the credentials are stored separately and only the identity token is sent to the relay. ChatGPT authorizes the Codex process on the active host. They are separate accounts and authority domains. GitHub-only identity is an alpha scope decision, not a permanent platform requirement.
 
 ## Can I self-host?
 

@@ -63,12 +63,6 @@ macro_rules! declare_registered_commands {
         infallible: [$($infallible:ident),+ $(,)?],
         fallible: [$($fallible:ident),+ $(,)?],
     ) => {
-        #[cfg(test)]
-        pub(crate) const REGISTERED_COMMANDS: &[&str] = &[
-            $(stringify!($infallible)),+,
-            $(stringify!($fallible)),+
-        ];
-
         fn attach_registered_commands(
             builder: tauri::Builder<tauri::Wry>,
         ) -> tauri::Builder<tauri::Wry> {
@@ -104,6 +98,9 @@ declare_registered_commands! {
     git_apply_patch,
     github_device_flow_start,
     github_device_flow_poll,
+    github_repository_device_flow_start,
+    github_repository_device_flow_poll,
+    github_repository_access_status,
     github_token_delete,
     github_create_pull_request,
     github_list_action_runs,

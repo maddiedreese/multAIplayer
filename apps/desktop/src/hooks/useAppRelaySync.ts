@@ -1,4 +1,5 @@
 import { approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
+import { createCodexBrowserOpenCommand } from "../application/codex/codexBrowserOpenCommand";
 import type { useAppInviteActions } from "./useAppInviteActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { createAppRoomActions } from "./appRoomActions";
@@ -6,9 +7,10 @@ import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import type { useRoomChatMutations } from "./useRoomChatMutations";
-import { useRelaySyncContext } from "./useRelaySyncContext";
+import { useRelaySubscription } from "./relay/useRelaySubscription";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
+import { useRelayPublishers } from "./useRelayPublishers";
 import { useTeamMembersRefresh } from "./useTeamMembersRefresh";
 
 type AppRefs = ReturnType<typeof useAppRefs>;
@@ -67,55 +69,57 @@ export function useAppRelaySync({
     }))
   );
   const { refreshTeamMembers } = useTeamMembersRefresh({ selectedTeam });
-
-  return useRelaySyncContext({
-    browserOpenCommand: {
-      localUser: localIdentity.localUser,
-      selectedRoomIdRef: appRefs.selectedRoomIdRef,
-      forgottenRoomIds,
-      revokedRoomIds,
-      revokedTeamIds,
-      defaultBrowserUrl
-    },
-    relayRoomSync: {
-      subscription: {
-        relayWsUrl,
-        deviceId: localIdentity.deviceId,
-        localUser: localIdentity.localUser,
-        ...(devicePublicKeyFingerprint ? { devicePublicKeyFingerprint } : {}),
-        deviceSessionToken: deviceSessionToken ?? "",
-        selectedTeam,
-        selectedRoom,
-        hasSelectedRoom,
-        inviteAdmissionsByRoom:
-          selectedInviteAdmission && selectedRoom ? { [selectedRoom.id]: selectedInviteAdmission } : {},
-        relayRef: appRefs.relayRef,
-        seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        roomsRef: appRefs.roomsRef,
-        selectedRoomIdRef: appRefs.selectedRoomIdRef,
-        markIncomingChatUnread: (...args) => useAppStore.getState().markIncomingChatUnread(...args),
-        handleRelayError: workspaceRecords.handleRelayError,
-        upsertRoom: workspaceRecords.upsertRoom,
-        upsertTeam: workspaceRecords.upsertTeam,
-        refreshTeamMembers,
-        handleInviteRequested: inviteActions.handleInviteRequested
-      },
-      publishers: {
-        relayRef: appRefs.relayRef,
-        seenEnvelopeIds: appRefs.seenEnvelopeIds,
-        relayStatus,
-        selectedRoom,
-        deviceId: localIdentity.deviceId,
-        localUser: localIdentity.localUser,
-        approvalPolicyLabels,
-        appendLocalPreviewEvent,
-        appendGitWorkflowEvent,
-        appendCodexEvent,
-        upsertCodexActivity: roomActions.upsertCodexActivity,
-        appendTerminalLinesForRoom,
-        appendRoomMessage: roomChatMutations.appendRoomMessage,
-        appendGitHubActionsEvent
-      }
-    }
+  const handleCodexBrowserOpenCommand = createCodexBrowserOpenCommand({
+    localUser: localIdentity.localUser,
+    selectedRoomIdRef: appRefs.selectedRoomIdRef,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    defaultBrowserUrl
   });
+
+  useRelaySubscription({
+    relayWsUrl,
+    deviceId: localIdentity.deviceId,
+    localUser: localIdentity.localUser,
+    ...(devicePublicKeyFingerprint ? { devicePublicKeyFingerprint } : {}),
+    deviceSessionToken: deviceSessionToken ?? "",
+    selectedTeam,
+    selectedRoom,
+    hasSelectedRoom,
+    inviteAdmissionsByRoom:
+      selectedInviteAdmission && selectedRoom ? { [selectedRoom.id]: selectedInviteAdmission } : {},
+    relayRef: appRefs.relayRef,
+    seenEnvelopeIds: appRefs.seenEnvelopeIds,
+    roomsRef: appRefs.roomsRef,
+    selectedRoomIdRef: appRefs.selectedRoomIdRef,
+    markIncomingChatUnread: (...args) => useAppStore.getState().markIncomingChatUnread(...args),
+    handleRelayError: workspaceRecords.handleRelayError,
+    upsertRoom: workspaceRecords.upsertRoom,
+    upsertTeam: workspaceRecords.upsertTeam,
+    refreshTeamMembers,
+    handleInviteRequested: inviteActions.handleInviteRequested,
+    handleCodexBrowserOpenCommand
+  });
+  const relayPublishers = useRelayPublishers({
+    relayRef: appRefs.relayRef,
+    seenEnvelopeIds: appRefs.seenEnvelopeIds,
+    relayStatus,
+    selectedRoom,
+    deviceId: localIdentity.deviceId,
+    localUser: localIdentity.localUser,
+    approvalPolicyLabels,
+    appendLocalPreviewEvent,
+    appendGitWorkflowEvent,
+    appendCodexEvent,
+    upsertCodexActivity: roomActions.upsertCodexActivity,
+    appendTerminalLinesForRoom,
+    appendRoomMessage: roomChatMutations.appendRoomMessage,
+    appendGitHubActionsEvent
+  });
+
+  return {
+    handleCodexBrowserOpenCommand,
+    ...relayPublishers
+  };
 }

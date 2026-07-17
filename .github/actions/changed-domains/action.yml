@@ -1,0 +1,43 @@
+name: Detect changed domains
+description: Classify the pull request or push diff for repository checks.
+
+outputs:
+  documentation:
+    value: ${{ steps.classify.outputs.documentation }}
+  workflow:
+    value: ${{ steps.classify.outputs.workflow }}
+  javascript:
+    value: ${{ steps.classify.outputs.javascript }}
+  native:
+    value: ${{ steps.classify.outputs.native }}
+  ui_journey:
+    value: ${{ steps.classify.outputs.ui_journey }}
+  native_journey:
+    value: ${{ steps.classify.outputs.native_journey }}
+  macos:
+    value: ${{ steps.classify.outputs.macos }}
+
+runs:
+  using: composite
+  steps:
+    - name: Classify changed paths
+      id: classify
+      shell: bash
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        set -o pipefail
+        if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || \
+           [ "$GITHUB_EVENT_NAME" = "schedule" ] || \
+           [[ "$GITHUB_REF" == refs/tags/* ]] || \
+           [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || \
+           [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+          node tools/ci/classify-changes.mjs --all --github-output "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        if ! git diff --no-renames --name-only "$BASE_SHA" "$GITHUB_SHA" |
+          node tools/ci/classify-changes.mjs --github-output "$GITHUB_OUTPUT"; then
+          echo "Could not classify changes between $BASE_SHA and $GITHUB_SHA." >&2
+          exit 1
+        fi
