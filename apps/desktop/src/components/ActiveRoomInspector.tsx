@@ -13,6 +13,7 @@ import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
 import { buildRoomInspectorModelProjection } from "../presentation/rooms/roomInspectorModelProjection";
 import { useFileTerminalDisplay } from "../hooks/useFileTerminalDisplay";
 import { useGitHubWorkflowState } from "../hooks/useGitHubWorkflowState";
+import { useGitHubRepositoryAccess } from "../hooks/useGitHubRepositoryAccess";
 import { useLocalIdentity } from "../hooks/useLocalIdentity";
 import { useRoomAccess } from "../hooks/useRoomAccess";
 import { approvalPolicyLabels, defaultBrowserUrl } from "../appDefaults";
@@ -132,6 +133,13 @@ export function ActiveRoomInspector({
     gitWorkflowDraft,
     projectPath: selectedRoom.projectPath
   });
+  const repositoryAccess = useGitHubRepositoryAccess(Boolean(currentUser));
+  const repositoryAccessProps = {
+    signedIn: Boolean(currentUser),
+    ...repositoryAccess,
+    onAuthorize: repositoryAccess.begin,
+    onCancel: repositoryAccess.cancel
+  };
   const teamMemberRows = useMemo(
     () =>
       buildTeamMemberRows({
@@ -218,7 +226,8 @@ export function ActiveRoomInspector({
         !access.canReadLocalWorkspace ||
         Boolean(gitRuntime.actions?.busy) ||
         !access.isActiveHost ||
-        !github.githubActionsReadiness.ready,
+        !github.githubActionsReadiness.ready ||
+        !repositoryAccess.authorized,
       currentUserSignedIn: Boolean(currentUser),
       message: gitRuntime.actions?.message ?? null,
       formatTimestamp,
@@ -323,6 +332,7 @@ export function ActiveRoomInspector({
         onTeamDefaultInviteApprovalGateChange: sources.workspaceFlow.updateTeamDefaultInviteApprovalGate
       },
       workspaceFiles: composeWorkspaceFilesProps(),
+      repositoryAccess: repositoryAccessProps,
       gitHandoff: {
         draft: gitWorkflowDraft,
         preview: github.gitApprovalPreview,
@@ -333,7 +343,8 @@ export function ActiveRoomInspector({
         message: gitRuntime.workflow?.message ?? null,
         onDraftChange: (patch) => editGitWorkflowDraftForRoom(selectedRoom.id, patch),
         onCopyPullRequestDraftMarkdown: sources.workspaceFlow.copyPullRequestDraftMarkdown,
-        onApproveGitWorkflow: sources.roomRuntime.approveGitWorkflow
+        onApproveGitWorkflow: sources.roomRuntime.approveGitWorkflow,
+        repositoryAccessAuthorized: repositoryAccess.authorized
       },
       githubActions: composeGithubActionsProps(),
       terminal: {

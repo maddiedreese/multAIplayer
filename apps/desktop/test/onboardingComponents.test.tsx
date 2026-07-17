@@ -134,8 +134,8 @@ test("readiness stays in canonical order, warnings are actionable, and blocked r
   assert.deepEqual(actions, ["update_codex"]);
   const authExplainer = view.container.querySelector(".onboarding-auth-explainer")?.textContent ?? "";
   assert.match(authExplainer, /GitHub identity is required for hosted workspaces/);
-  assert.match(authExplainer, /repo.*optional pull-request and Actions API workflows/);
-  assert.match(authExplainer, /private repositories/);
+  assert.match(authExplainer, /read:user/);
+  assert.match(authExplainer, /pull-request and Actions workflows ask for repo access later/);
 });
 
 test("create form keeps folder selection local and retries only the room after partial team success", async () => {

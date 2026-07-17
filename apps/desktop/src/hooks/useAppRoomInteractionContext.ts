@@ -3,8 +3,14 @@ import type { createAppRoomActions } from "./appRoomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
-import { useRoomInteractionContext } from "./useRoomInteractionContext";
+import { createChatActions } from "../application/chat/chatActions";
+import { createRoomVisibilityWarningActions } from "../application/rooms/roomVisibilityWarningActions";
+import { buildRoomMemberRows } from "../presentation/roster/rosterDisplayRows";
 import { useAppStore } from "../store/appStore";
+import { buildRoomNotices } from "./roomNotices";
+import { useGitHubWorkflowState } from "./useGitHubWorkflowState";
+import { useRoomAccess } from "./useRoomAccess";
+import { useRoomInFlightReporters } from "./useRoomInFlightReporters";
 import { useShallow } from "zustand/react/shallow";
 
 type AppRefs = ReturnType<typeof useAppRefs>;
@@ -55,54 +61,58 @@ export function useAppRoomInteractionContext({
     }))
   );
 
-  return useRoomInteractionContext({
-    inFlightReporters: {
-      hostBusyRef: appRefs.hostBusyRef,
-      settingsBusyRef: appRefs.settingsBusyRef,
-      membershipCommitBusyRef: appRefs.membershipCommitBusyRef,
-      fileBusyRef: appRefs.fileBusyRef,
-      terminalBusyRef: appRefs.terminalBusyRef,
-      setHostMessageForRoom,
-      setSettingsMessageForRoom,
-      setInviteMessageForRoom,
-      setFileMessageForRoom,
-      setTerminalErrorForRoom
-    },
-    notices: {
-      roomId: selectedRoom?.id ?? null,
-      hostMessage,
-      chatMessage
-    },
-    access: {
-      hasSelectedRoom,
-      selectedRoom,
-      localUser: localIdentity.localUser,
-      forgottenRoomIds,
-      revokedRoomIds,
-      revokedTeamIds,
-      historySettings,
-      inviteApprovalGate
-    },
-    chat: {
-      relayRef: appRefs.relayRef,
-      seenEnvelopeIds: appRefs.seenEnvelopeIds
-    },
-    githubWorkflow: {
-      actionRuns,
-      authConfig: githubAuth.authConfig,
-      currentUser: githubAuth.currentUser,
-      gitWorkflowDraft,
-      projectPath: selectedRoom?.projectPath ?? ""
-    },
-    memberRows: {
-      presence: roomPresence,
-      selectedRoom,
-      localUser: localIdentity.localUser,
-      localDeviceId: localIdentity.deviceId,
-      ...(deviceIdentity?.publicKeyFingerprint
-        ? { localPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint }
-        : {}),
-      deviceFingerprintComparisons
-    }
+  const reporters = useRoomInFlightReporters({
+    hostBusyRef: appRefs.hostBusyRef,
+    settingsBusyRef: appRefs.settingsBusyRef,
+    membershipCommitBusyRef: appRefs.membershipCommitBusyRef,
+    fileBusyRef: appRefs.fileBusyRef,
+    terminalBusyRef: appRefs.terminalBusyRef,
+    setHostMessageForRoom,
+    setSettingsMessageForRoom,
+    setInviteMessageForRoom,
+    setFileMessageForRoom,
+    setTerminalErrorForRoom
   });
+  const roomNotices = buildRoomNotices({ roomId: selectedRoom?.id ?? null, hostMessage, chatMessage });
+  const visibilityActions = createRoomVisibilityWarningActions();
+  const accessState = useRoomAccess({
+    hasSelectedRoom,
+    selectedRoom,
+    localUser: localIdentity.localUser,
+    forgottenRoomIds,
+    revokedRoomIds,
+    revokedTeamIds,
+    historySettings,
+    inviteApprovalGate
+  });
+  const chatActions = createChatActions({ relayRef: appRefs.relayRef, seenEnvelopeIds: appRefs.seenEnvelopeIds });
+  const githubWorkflowState = useGitHubWorkflowState({
+    actionRuns,
+    authConfig: githubAuth.authConfig,
+    currentUser: githubAuth.currentUser,
+    gitWorkflowDraft,
+    projectPath: selectedRoom?.projectPath ?? ""
+  });
+  const roomMemberRows = selectedRoom
+    ? buildRoomMemberRows({
+        presence: roomPresence ?? {},
+        room: selectedRoom,
+        localUser: localIdentity.localUser,
+        localDeviceId: localIdentity.deviceId,
+        ...(deviceIdentity?.publicKeyFingerprint
+          ? { localPublicKeyFingerprint: deviceIdentity.publicKeyFingerprint }
+          : {}),
+        deviceFingerprintComparisons
+      })
+    : [];
+
+  return {
+    ...reporters,
+    roomNotices,
+    ...visibilityActions,
+    ...accessState,
+    ...chatActions,
+    ...githubWorkflowState,
+    roomMemberRows
+  };
 }

@@ -84,8 +84,8 @@ export function ReadinessStep({
       )}
       <div className="onboarding-auth-explainer">
         <p>
-          <strong>GitHub</strong> identity is required for hosted workspaces. The alpha's separate <code>repo</code>
-          permission enables optional pull-request and Actions API workflows and can access private repositories.
+          <strong>GitHub</strong> identity is required for hosted workspaces and requests only <code>read:user</code>.
+          Optional pull-request and Actions workflows ask for <code>repo</code> access later, when you use them.
         </p>
         <p>
           <strong>ChatGPT</strong> authorizes the local Codex process that performs work.

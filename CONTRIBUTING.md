@@ -161,13 +161,15 @@ should also use [Self-hosting](docs/self-hosting.md); release reviewers should u
 
 ### Continuous-integration policy
 
-`ci.yml` contains blocking workspace lint, type, behavior-test, build, Rust
-formatting, Clippy, and native-test checks. `journeys.yml` always reports one
-required aggregate: executable product changes run the UI, native two-client,
-and packaged macOS journeys, while documentation-only changes report that there
-was no executable product change. Repository settings should require the
-always-present `Required product journeys` aggregate rather than path-filtered
-individual jobs.
+Every pull request and main push runs changed-path detection and the stable CI
+aggregates. Documentation-only changes run the lightweight maintained-documentation
+check and stop before builds and product journeys. JavaScript/workspace changes run
+the web, relay, package, and relevant UI/native journeys; Rust changes run formatting,
+Clippy, native tests, and native/macOS journeys; workflow changes run actionlint and
+Actions CodeQL. Shared package, lockfile, and setup-action changes select every
+consumer they can affect. Repository settings should require the
+always-present `Required core checks` and `Required product journeys` aggregates,
+not the path-selected individual jobs.
 
 Scheduled parser/native fuzzing, relay churn/restore exercises, container
 scanning, dependency review, and the macOS two-client run cover expensive or

@@ -118,57 +118,12 @@ jobs:
           fetch-depth: 0
       - name: Resolve the tag once and require a main-reachable commit
         id: release
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_EVENT_REF: ${{ github.ref }}
           RELEASE_EVENT_SHA: ${{ github.sha }}
-          RELEASE_INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          tag="${RELEASE_INPUT_TAG:-$GITHUB_REF_NAME}"
-          if [[ ! "$tag" =~ ^v[0-9][0-9A-Za-z._-]*$ ]]; then
-            echo "Release tag is invalid: $tag" >&2
-            exit 1
-          fi
-          if ! git show-ref --verify --quiet "refs/tags/$tag"; then
-            echo "Tag does not exist: $tag" >&2
-            exit 1
-          fi
-          if [ "$RELEASE_EVENT_REF" != "refs/tags/$tag" ]; then
-            echo "Release workflow ref must be refs/tags/$tag; found $RELEASE_EVENT_REF." >&2
-            echo "Dispatch the workflow on the release tag, not main or another branch." >&2
-            exit 1
-          fi
-          git fetch --no-tags origin main:refs/remotes/origin/main
-          commit="$(git rev-parse "refs/tags/$tag^{commit}")"
-          if [ "$commit" != "$RELEASE_EVENT_SHA" ]; then
-            echo "Release event SHA does not match the resolved tag: event $RELEASE_EVENT_SHA, tag $commit" >&2
-            exit 1
-          fi
-          if ! git merge-base --is-ancestor "$commit" refs/remotes/origin/main; then
-            echo "Release tag $tag does not resolve to a commit reachable from main: $commit" >&2
-            exit 1
-          fi
-          release_metadata="$RUNNER_TEMP/existing-release.json"
-          release_error="$RUNNER_TEMP/existing-release-error.txt"
-          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$release_metadata" 2> "$release_error"; then
-            if [ "$(jq -r .draft "$release_metadata")" = "false" ]; then
-              echo "Release $tag is already public; refusing to rebuild or replace it." >&2
-              echo "If updater-channel advancement failed in its original run, use GitHub's Re-run failed jobs action on that run." >&2
-              exit 1
-            fi
-          elif ! grep -q '(HTTP 404)' "$release_error"; then
-            cat "$release_error" >&2
-            exit 1
-          fi
-          prerelease=false
-          case "$tag" in
-            *alpha*|*beta*|*rc*) prerelease=true ;;
-          esac
-          {
-            echo "prerelease=$prerelease"
-            echo "tag=$tag"
-          } >> "$GITHUB_OUTPUT"
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: node tools/release/github-release.mjs resolve
 
   release-native-gate:
     name: Release two-client native MLS gate
@@ -471,144 +426,13 @@ jobs:
           name: release-assets-${{ needs.build.outputs.tag }}
           path: release-assets
 
-      - name: Classify an ambiguous publication retry
-        id: public-state
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_COMMIT: ${{ needs.build.outputs.commit }}
-          RELEASE_TAG: ${{ needs.build.outputs.tag }}
-        run: |
-          echo "already_public=false" >> "$GITHUB_OUTPUT"
-          release_metadata="$RUNNER_TEMP/release-metadata.json"
-          release_error="$RUNNER_TEMP/release-metadata-error.txt"
-          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
-            > "$release_metadata" 2> "$release_error"; then
-            if ! grep -q '(HTTP 404)' "$release_error"; then
-              cat "$release_error" >&2
-              exit 1
-            fi
-          fi
-          remote_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          publication_plan="$(node tools/release/plan-release-publication.mjs \
-            "$release_metadata" "$RELEASE_COMMIT" "$remote_commit")"
-          if [ "$publication_plan" != "verify-public" ]; then
-            exit 0
-          fi
-
-          mkdir -p "$RUNNER_TEMP/public-release-assets"
-          gh release download "$RELEASE_TAG" \
-            --dir "$RUNNER_TEMP/public-release-assets" \
-            --repo "$GITHUB_REPOSITORY"
-          node tools/release/check-release-assets.mjs published "$RUNNER_TEMP/public-release-assets"
-          node tools/release/validate-release-asset-digests.mjs \
-            "$RUNNER_TEMP/public-release-assets" \
-            "$release_metadata" \
-            "$RUNNER_TEMP/public-release-asset-names.txt"
-
-          node tools/release/check-release-assets.mjs build release-assets
-          find release-assets -maxdepth 1 -type f -exec basename {} \; | LC_ALL=C sort \
-            > "$RUNNER_TEMP/build-release-asset-names.txt"
-          node tools/release/validate-release-asset-digests.mjs \
-            release-assets \
-            "$release_metadata" \
-            "$RUNNER_TEMP/authenticated-build-asset-names.txt" \
-            "$RUNNER_TEMP/build-release-asset-names.txt"
-          echo "Release $RELEASE_TAG is already public with the retained build output and authenticated required asset set."
-          echo "already_public=true" >> "$GITHUB_OUTPUT"
-
-      - name: Validate required published assets
-        if: steps.public-state.outputs.already_public != 'true'
-        run: node tools/release/check-release-assets.mjs published release-assets
-
-      - name: Reconcile the private draft release to the build output
-        if: steps.public-state.outputs.already_public != 'true'
+      - name: Publish or authenticate an idempotent retry
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_COMMIT: ${{ needs.build.outputs.commit }}
           RELEASE_PRERELEASE: ${{ needs.build.outputs.prerelease }}
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
-        run: |
-          remote_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          assert_private_draft() {
-            if [ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != "true" ]; then
-              echo "Refusing to mutate already-public release $RELEASE_TAG." >&2
-              exit 1
-            fi
-          }
-          release_metadata="$RUNNER_TEMP/release-metadata.json"
-          release_error="$RUNNER_TEMP/release-metadata-error.txt"
-          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
-            > "$release_metadata" 2> "$release_error"; then
-            if ! grep -q '(HTTP 404)' "$release_error"; then
-              cat "$release_error" >&2
-              exit 1
-            fi
-          fi
-          publication_plan="$(node tools/release/plan-release-publication.mjs \
-            "$release_metadata" "$RELEASE_COMMIT" "$remote_commit")"
-          if [ "$publication_plan" = "verify-public" ]; then
-            mkdir -p "$RUNNER_TEMP/public-release-assets"
-            gh release download "$RELEASE_TAG" \
-              --dir "$RUNNER_TEMP/public-release-assets" \
-              --repo "$GITHUB_REPOSITORY"
-            node tools/release/validate-release-asset-digests.mjs \
-              release-assets \
-              "$release_metadata" \
-              "$RUNNER_TEMP/local-release-asset-names.txt"
-            node tools/release/check-release-assets.mjs \
-              published-list "$RUNNER_TEMP/local-release-asset-names.txt"
-            node tools/release/validate-release-asset-digests.mjs \
-              "$RUNNER_TEMP/public-release-assets" \
-              "$release_metadata" \
-              "$RUNNER_TEMP/public-release-asset-names.txt"
-            node tools/release/check-release-assets.mjs \
-              published-list "$RUNNER_TEMP/public-release-asset-names.txt"
-            echo "Release $RELEASE_TAG is already public with the authenticated required asset set; leaving it unchanged."
-            exit 0
-          fi
-          if [ "$publication_plan" = "create-draft" ]; then
-            node tools/release/finalize-changelog.mjs --extract="${RELEASE_TAG#v}" \
-              > "$RUNNER_TEMP/release-notes.md"
-            release_args=(--notes-file "$RUNNER_TEMP/release-notes.md" --draft)
-            if [ "$RELEASE_PRERELEASE" = "true" ]; then
-              release_args+=(--prerelease)
-            fi
-            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${release_args[@]}"
-          fi
-
-          # A failed private-draft attempt may have left either stale extras or
-          # an incomplete canonical set. Remove only draft assets, then upload
-          # the locally validated set without --clobber.
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
-            > "$RUNNER_TEMP/existing-release-assets.txt"
-          while IFS= read -r asset; do
-            if [ -n "$asset" ]; then
-              assert_private_draft
-              gh release delete-asset "$RELEASE_TAG" "$asset" --yes --repo "$GITHUB_REPOSITORY"
-            fi
-          done < "$RUNNER_TEMP/existing-release-assets.txt"
-          assert_private_draft
-          gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY"
-
-          assert_private_draft
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
-            > "$RUNNER_TEMP/remote-release-assets.txt"
-          node tools/release/check-release-assets.mjs published-list "$RUNNER_TEMP/remote-release-assets.txt"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_metadata"
-          node tools/release/validate-release-asset-digests.mjs \
-            release-assets "$release_metadata" "$RUNNER_TEMP/remote-release-assets.txt"
-          node tools/release/check-release-assets.mjs published-list "$RUNNER_TEMP/remote-release-assets.txt"
-
-          if [ "$RELEASE_PRERELEASE" = "true" ]; then
-            gh release edit "$RELEASE_TAG" --prerelease --repo "$GITHUB_REPOSITORY"
-          fi
-          remote_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          if [ "$remote_commit" != "$RELEASE_COMMIT" ]; then
-            echo "Release tag moved before publication: expected $RELEASE_COMMIT, found $remote_commit" >&2
-            exit 1
-          fi
-          assert_private_draft
-          gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
+        run: node tools/release/github-release.mjs publish
 
   advance-updater-channel:
     name: Advance updater availability channel
@@ -626,63 +450,12 @@ jobs:
           ref: ${{ needs.build.outputs.commit }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
-      - name: Download and authenticate the immutable public release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.build.outputs.tag }}
-        run: |
-          mkdir -p public-release-assets
-          remote_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          if [ "$remote_commit" != "${{ needs.build.outputs.commit }}" ]; then
-            echo "Release tag moved after source resolution." >&2
-            exit 1
-          fi
-          gh release download "$RELEASE_TAG" --dir public-release-assets --repo "$GITHUB_REPOSITORY"
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/release-metadata.json"
-          if [ "$(jq -r .draft "$RUNNER_TEMP/release-metadata.json")" != "false" ]; then
-            echo "Updater channel requires a public release: $RELEASE_TAG" >&2
-            exit 1
-          fi
-          node tools/release/validate-release-asset-digests.mjs \
-            public-release-assets "$RUNNER_TEMP/release-metadata.json" "$RUNNER_TEMP/release-asset-names.txt"
-          node tools/release/check-release-assets.mjs published-list "$RUNNER_TEMP/release-asset-names.txt"
-      - name: Advance without permitting a SemVer regression
+      - name: Advance the authenticated updater channel
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
           RELEASE_COMMIT: ${{ needs.build.outputs.commit }}
         run: |
-          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/update-channel" >/dev/null 2>&1; then
-            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
-              -f ref=refs/heads/update-channel \
-              -f sha="$RELEASE_COMMIT" >/dev/null
-          fi
-          existing_response="$RUNNER_TEMP/existing-channel.json"
-          existing_sha=""
-          if gh api "repos/$GITHUB_REPOSITORY/contents/releases/latest.json?ref=update-channel" > "$existing_response" 2>/dev/null; then
-            existing_sha="$(jq -r .sha "$existing_response")"
-            jq -r .content "$existing_response" | tr -d '\n' | base64 --decode > "$RUNNER_TEMP/existing-latest.json"
-            node tools/release/check-updater-channel-order.mjs \
-              public-release-assets/latest.json "$RUNNER_TEMP/existing-latest.json"
-            if cmp -s public-release-assets/latest.json "$RUNNER_TEMP/existing-latest.json"; then
-              echo "Updater channel already points to $RELEASE_TAG."
-              exit 0
-            fi
-          fi
-          encoded_manifest="$(base64 < public-release-assets/latest.json | tr -d '\n')"
-          request=(
-            --method PUT
-            "repos/$GITHUB_REPOSITORY/contents/releases/latest.json"
-            -f message="chore: advance updater channel to $RELEASE_TAG"
-            -f content="$encoded_manifest"
-            -f branch=update-channel
-          )
-          if [ -n "$existing_sha" ]; then
-            request+=(-f sha="$existing_sha")
-          fi
-          remote_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          if [ "$remote_commit" != "$RELEASE_COMMIT" ]; then
-            echo "Release tag moved before updater-channel advancement: expected $RELEASE_COMMIT, found $remote_commit" >&2
-            exit 1
-          fi
-          gh api "${request[@]}" >/dev/null
+          mkdir -p public-release-assets
+          gh release download "$RELEASE_TAG" --dir public-release-assets --repo "$GITHUB_REPOSITORY"
+          node tools/release/github-release.mjs advance-channel

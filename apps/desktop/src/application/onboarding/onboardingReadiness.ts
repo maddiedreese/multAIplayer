@@ -112,7 +112,7 @@ function projectGitHub(intent: OnboardingIntent, github: OnboardingReadinessInpu
       "github",
       "GitHub",
       "ready",
-      "Signed in for workspace identity. The separate repository permission enables optional GitHub workflows."
+      "Signed in for workspace identity. Optional GitHub workflows request repository permission when used."
     );
   }
   if (!github.config?.configured) {

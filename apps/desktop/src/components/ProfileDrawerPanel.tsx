@@ -281,8 +281,8 @@ function ProfileSignInControls({
       ) : (
         <>
           <p>
-            GitHub sign-in establishes workspace identity. The same alpha grant also requests <code>repo</code> for
-            optional pull-request and Actions API workflows, including private repositories available to your account.
+            GitHub sign-in establishes workspace identity with <code>read:user</code>. Optional pull-request and Actions
+            workflows request <code>repo</code> access later, when you choose to use them.
           </p>
           <button className="primary-wide" onClick={onSignIn} disabled={authBusy || !authConfigured}>
             <GitHubIcon size={15} />

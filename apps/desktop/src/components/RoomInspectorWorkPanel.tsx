@@ -5,6 +5,7 @@ import { CodexThreadGraphPanel } from "./CodexThreadGraphPanel";
 import { EncryptedInvitePanel } from "./EncryptedInvitePanel";
 import { GitHandoffPanel } from "./GitHandoffPanel";
 import { GitHubActionsPanel } from "./GitHubActionsPanel";
+import { GitHubRepositoryAccessPrompt, type GitHubRepositoryAccessPromptProps } from "./GitHubRepositoryAccessPrompt";
 import { HostHandoffPanel } from "./HostHandoffPanel";
 import { LocalHistoryPanel } from "./LocalHistoryPanel";
 import { ModelPanel } from "./ModelPanel";
@@ -27,6 +28,7 @@ export function RoomInspectorWorkPanel({
   codexRuntime,
   localHistory,
   workspaceFiles,
+  repositoryAccess,
   gitHandoff,
   githubActions,
   terminal
@@ -42,6 +44,7 @@ export function RoomInspectorWorkPanel({
   codexRuntime: { roomId: string; projectPath: string };
   localHistory: ComponentProps<typeof LocalHistoryPanel>;
   workspaceFiles: ComponentProps<typeof WorkspaceFilesPanel>;
+  repositoryAccess: GitHubRepositoryAccessPromptProps;
   gitHandoff: ComponentProps<typeof GitHandoffPanel>;
   githubActions: ComponentProps<typeof GitHubActionsPanel>;
   terminal: ComponentProps<typeof TerminalPanel>;
@@ -51,6 +54,7 @@ export function RoomInspectorWorkPanel({
       <>
         <ProjectPanel {...project} />
         <WorkspaceFilesPanel {...workspaceFiles} />
+        <GitHubRepositoryAccessPrompt {...repositoryAccess} />
         <GitHandoffPanel {...gitHandoff} />
         <GitHubActionsPanel {...githubActions} />
       </>

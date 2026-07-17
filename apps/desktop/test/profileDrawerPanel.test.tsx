@@ -55,7 +55,7 @@ test("accepted hosted-account deletion is reported as protected and pending clea
         authConfig={{
           provider: "github",
           configured: true,
-          scopes: ["repo", "read:user"],
+          scopes: ["read:user"],
           mutationsRequireAuth: true,
           allowedOrigins: ["tauri://localhost"],
           sessionPersistence: "identity_only"
@@ -82,7 +82,7 @@ test("accepted hosted-account deletion is reported as protected and pending clea
     assert.match(view.getByText("GitHub identity scope").parentElement?.textContent ?? "", /workspace identity/i);
     assert.match(
       view.getByText("Repository workflow scope").parentElement?.textContent ?? "",
-      /public and private repository workflows/i
+      /Requested separately when a repository workflow is used/i
     );
 
     fireEvent.click(view.getByRole("button", { name: "Delete hosted account data" }));

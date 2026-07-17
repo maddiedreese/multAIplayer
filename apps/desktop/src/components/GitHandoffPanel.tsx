@@ -19,7 +19,8 @@ export function GitHandoffPanel({
   message,
   onDraftChange,
   onCopyPullRequestDraftMarkdown,
-  onApproveGitWorkflow
+  onApproveGitWorkflow,
+  repositoryAccessAuthorized
 }: {
   draft: GitWorkflowDraft;
   preview: GitApprovalPreviewDisplay;
@@ -31,6 +32,7 @@ export function GitHandoffPanel({
   onDraftChange: (patch: Partial<GitWorkflowDraft>) => void;
   onCopyPullRequestDraftMarkdown: () => void;
   onApproveGitWorkflow: () => void;
+  repositoryAccessAuthorized: boolean;
 }) {
   return (
     <section className="panel git-approval-panel">
@@ -105,7 +107,7 @@ export function GitHandoffPanel({
           gitWorkflowBusy ||
           !isActiveHost ||
           Boolean(preview.error) ||
-          (draft.pushEnabled && !readiness.ready)
+          (draft.pushEnabled && (!readiness.ready || !repositoryAccessAuthorized))
         }
       >
         <GitHubIcon size={15} />

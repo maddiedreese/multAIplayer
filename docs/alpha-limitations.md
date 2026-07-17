@@ -23,7 +23,7 @@ claims, audit status, metadata exposure, and residual risks.
 ## Accounts, hosting, and storage
 
 - One native installation is bound to one GitHub identity because its MLS signing, HPKE, and encrypted-room state share that identity boundary. Signing out and back into the same account is supported; switching GitHub accounts on an existing installation is not. The app rejects a mismatched identity instead of reusing keys across accounts.
-- GitHub identity authorizes hosted-relay membership. The current alpha requests the separate broad `repo` permission in the same grant for optional repository workflows; identity-only sign-in followed by later permission escalation is not implemented.
+- GitHub identity authorizes hosted-relay membership with `read:user`. Optional repository workflows require a separate, on-demand broad `repo` grant, which can access private repositories available to the signed-in account.
   ChatGPT separately authorizes Codex on the active host. Joining a room does not
   require a Codex login until that device becomes the host.
 - The free alpha relay has no uptime, recovery, or support guarantee. Keep normal
