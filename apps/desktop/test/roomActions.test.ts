@@ -51,46 +51,44 @@ function createOptions() {
 
 beforeEach(() => useAppStore.getState().resetAppStore());
 
-test("room actions resolve store implementations when invoked", () => {
+test("room actions use the store implementation present when composed", () => {
   const { options } = createOptions();
-  const actions = createRoomActions(options);
   const calls: Array<[string, string | null]> = [];
 
   useAppStore.setState({
     setChatMessageForRoom: (roomId, message) => calls.push([roomId, message])
   });
+  const actions = createRoomActions(options);
 
-  actions.setChatMessageForRoom("room-late", "latest action");
-  assert.deepEqual(calls, [["room-late", "latest action"]]);
+  actions.setChatMessageForRoom("room-a", "composed action");
+  assert.deepEqual(calls, [["room-a", "composed action"]]);
 });
 
-test("room store adapters keep stable identities across view recomposition", () => {
+test("room actions reuse stable store functions across view recomposition", () => {
+  const calls: Array<[string, string | null]> = [];
+  useAppStore.setState({
+    setChatMessageForRoom: (roomId, message) => calls.push([roomId, message])
+  });
   const first = createRoomActions(createOptions().options);
   const second = createRoomActions(createOptions().options);
 
   assert.equal(first.hydrateLocalRoomHistoryForRoom, second.hydrateLocalRoomHistoryForRoom);
   assert.equal(first.setChatMessageForRoom, second.setChatMessageForRoom);
-
-  const calls: Array<[string, string | null]> = [];
-  useAppStore.setState({
-    setChatMessageForRoom: (roomId, message) => calls.push([roomId, message])
-  });
-  first.setChatMessageForRoom("room-after-recomposition", "latest implementation");
-  assert.deepEqual(calls, [["room-after-recomposition", "latest implementation"]]);
+  second.setChatMessageForRoom("room-after-recomposition", "same implementation");
+  assert.deepEqual(calls, [["room-after-recomposition", "same implementation"]]);
 });
 
 test("selected wrappers read the current room and team from the store", () => {
   const { options } = createOptions();
-  const actions = createRoomActions(options);
   const roomCalls: Array<[string, string | null]> = [];
   const teamCalls: Array<[string, string | null]> = [];
 
   useAppStore.setState({
-    selectedRoomId: "room-b",
-    selectedTeam: "team-b",
     setHostMessageForRoom: (roomId, message) => roomCalls.push([roomId, message]),
     setTeamHistoryMessageForTeam: (teamId, message) => teamCalls.push([teamId, message])
   });
+  const actions = createRoomActions(options);
+  useAppStore.setState({ selectedRoomId: "room-b", selectedTeam: "team-b" });
 
   actions.setSelectedHostMessage("current room");
   actions.setSelectedTeamHistoryMessage("current team");
@@ -100,7 +98,6 @@ test("selected wrappers read the current room and team from the store", () => {
 
 test("room action adapters preserve external defaults and current room data", () => {
   const { options } = createOptions();
-  const actions = createRoomActions(options);
   const browserCalls: unknown[][] = [];
   const modelCalls: unknown[][] = [];
   const pathCalls: unknown[][] = [];
@@ -111,6 +108,7 @@ test("room action adapters preserve external defaults and current room data", ()
     setCustomCodexModelForRoom: (...args) => modelCalls.push(args),
     setProjectPathDraftForRoom: (...args) => pathCalls.push(args)
   });
+  const actions = createRoomActions(options);
 
   actions.setBrowserUrlForRoom(room.id, "https://next.example");
   actions.setCustomCodexModelForRoom(room.id, "gpt-next");

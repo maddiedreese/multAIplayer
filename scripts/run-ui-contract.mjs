@@ -3,7 +3,7 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const relayDataPath = join(tmpdir(), `multaiplayer-playwright-relay-${process.pid}.sqlite`);
+const relayDataPath = join(tmpdir(), `multaiplayer-ui-contract-relay-${process.pid}.sqlite`);
 const playwrightCli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
 
 function removeRelayData() {

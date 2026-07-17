@@ -1,5 +1,5 @@
 import type { useAppRefs } from "./useAppRefs";
-import type { createAppRoomActions } from "./appRoomActions";
+import type { createRoomActions } from "../application/rooms/roomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
@@ -17,7 +17,7 @@ type AppRefs = ReturnType<typeof useAppRefs>;
 type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
-type RoomActions = ReturnType<typeof createAppRoomActions>;
+type RoomActions = ReturnType<typeof createRoomActions>;
 
 export function acknowledgeSelectedRoomVisibilityWarning() {
   const { selectedRoomId } = useAppStore.getState();

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable user-visible and security-relevant changes are curated here. Release automation versions the reviewed `Unreleased` section without synthesizing notes from internal commits.
+All notable user-visible and security-relevant changes are curated here. A release PR versions the reviewed `Unreleased` section without synthesizing notes from internal commits.
 
 ## [Unreleased]
 

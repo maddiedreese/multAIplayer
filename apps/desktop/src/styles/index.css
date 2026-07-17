@@ -3,7 +3,7 @@
 @import "./project-files.css";
 @import "./terminal-approvals.css";
 @import "./shell-controls.css";
-@import "./theme-tokens.css";
+@import "./theme.css";
 @import "./typography-navigation.css";
 @import "./inspector.css";
 @import "./sidebar-density.css";
@@ -14,4 +14,3 @@
 @import "./thread-activity.css";
 @import "./global-controls.css";
 @import "./onboarding.css";
-@import "./responsive-fixes.css";

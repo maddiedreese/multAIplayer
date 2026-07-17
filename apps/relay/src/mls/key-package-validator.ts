@@ -18,22 +18,35 @@ export interface KeyPackageValidator {
   ): Promise<ValidatedKeyPackage | null>;
 }
 
+export class KeyPackageValidatorBusyError extends Error {
+  constructor() {
+    super("KeyPackage validator capacity is exhausted.");
+  }
+}
+
 export const rejectUnvalidatedKeyPackages: KeyPackageValidator = {
   async validate() {
     return null;
   }
 };
 
-export function executableKeyPackageValidator(path: string): KeyPackageValidator {
+export function executableKeyPackageValidator(path: string, maxConcurrency = 2): KeyPackageValidator {
+  let activeValidations = 0;
   return {
     validate(upload, uploader) {
+      if (activeValidations >= maxConcurrency) return Promise.reject(new KeyPackageValidatorBusyError());
+      activeValidations += 1;
       return new Promise((resolve) => {
+        const finish = (value: ValidatedKeyPackage | null) => {
+          activeValidations -= 1;
+          resolve(value);
+        };
         const child = execFile(
           path.endsWith(".mjs") ? process.execPath : path,
           path.endsWith(".mjs") ? [path] : [],
           { timeout: 2_000, maxBuffer: 16_384 },
           (error, stdout) => {
-            if (error || Buffer.byteLength(stdout, "utf8") > 16_384) return resolve(null);
+            if (error || Buffer.byteLength(stdout, "utf8") > 16_384) return finish(null);
             try {
               const value = JSON.parse(stdout) as Record<string, unknown>;
               if (
@@ -43,8 +56,8 @@ export function executableKeyPackageValidator(path: string): KeyPackageValidator
                 typeof value.signature_key_fingerprint !== "string" ||
                 typeof value.signature_public_key !== "string"
               )
-                return resolve(null);
-              resolve({
+                return finish(null);
+              finish({
                 credentialIdentity: JSON.stringify({
                   github_user_id: value.github_user_id,
                   device_id: value.device_id
@@ -56,7 +69,7 @@ export function executableKeyPackageValidator(path: string): KeyPackageValidator
                 signatureKeyFingerprint: value.signature_key_fingerprint
               });
             } catch {
-              resolve(null);
+              finish(null);
             }
           }
         );

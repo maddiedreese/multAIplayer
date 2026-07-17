@@ -14,7 +14,7 @@ import { useAppStore } from "./store/appStore";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
-import { createAppRoomActions } from "./hooks/appRoomActions";
+import { createRoomActions } from "./application/rooms/roomActions";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
 import { useAppHostHandoffActions } from "./hooks/useAppHostHandoffActions";
 import { useAppInviteActions } from "./hooks/useAppInviteActions";
@@ -115,13 +115,20 @@ function NativeApp() {
     defaultBrowserUrl,
     defaultBrowserReason
   });
-  const roomActions = createAppRoomActions({
-    appRefs,
+  const roomActions = createRoomActions({
+    busy: {
+      gitWorkflowBusyRef: appRefs.gitWorkflowBusyRef,
+      actionsBusyRef: appRefs.actionsBusyRef,
+      localPreviewBusyRef: appRefs.localPreviewBusyRef,
+      hostBusyRef: appRefs.hostBusyRef,
+      settingsBusyRef: appRefs.settingsBusyRef,
+      membershipCommitBusyRef: appRefs.membershipCommitBusyRef,
+      fileBusyRef: appRefs.fileBusyRef,
+      terminalBusyRef: appRefs.terminalBusyRef
+    },
     maxTerminalActivityLines,
-    defaultBrowserUrl,
-    defaultBrowserReason,
-    defaultCodexModel,
-    defaultProjectPath
+    browser: { defaultBrowserUrl, defaultBrowserReason },
+    project: { defaultCodexModel, defaultProjectPath }
   });
   const {
     setHostMessageForRoom,

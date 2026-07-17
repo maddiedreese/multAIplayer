@@ -6,7 +6,9 @@ test.beforeEach(async ({ page }) => {
   await page.goto(uiContractHarnessUrl);
   await page.evaluate(() => localStorage.clear());
   await page.goto(uiContractScenarioUrl("onboarding"));
-  await expect(page.getByLabel("E2E coverage boundary")).toContainText("MLS invite verification and host approval");
+  await expect(page.getByLabel("UI contract coverage boundary")).toContainText(
+    "MLS invite verification and host approval"
+  );
 });
 
 test("welcome gives keyboard-equivalent create and join paths", async ({ page }) => {

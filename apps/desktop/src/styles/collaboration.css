@@ -606,3 +606,34 @@
   color: var(--text);
   border-color: var(--border-strong);
 }
+
+/* Keep native browser content below the complete tab strip. */
+.browser-panel :where(.browser-tabs) {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding-block: 4px 10px;
+  overflow-y: visible;
+}
+
+.browser-panel :where(.browser-tab) {
+  height: 34px;
+  flex-basis: min(220px, calc(100% - 12px));
+}
+
+.browser-panel :where(.browser-viewport) {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+}
+
+/* Reply is one stable text control; icon actions remain compact squares. */
+.message-meta :where(.message-reply-button) {
+  width: auto;
+  min-width: 64px;
+  height: 32px;
+  padding-inline: 12px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}

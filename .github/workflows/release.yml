@@ -2,8 +2,6 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -21,87 +19,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
-    name: Prepare release pull request
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Select release automation credential
-        id: credential
-        env:
-          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-        run: |
-          if [ -n "$RELEASE_PLEASE_TOKEN" ]; then
-            echo "uses_custom_token=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "uses_custom_token=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Open or update the release pull request
-        id: release
-        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
-      - name: Check out the generated release branch
-        if: steps.release.outputs.prs_created == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-        with:
-          fetch-depth: 0
-          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
-      - name: Set up locked Node and npm for release metadata synchronization
-        if: steps.release.outputs.prs_created == 'true'
-        uses: ./.github/actions/setup-node-npm
-      - name: Synchronize generated lock metadata
-        if: steps.release.outputs.prs_created == 'true'
-        run: |
-          npm run sync:release-versions
-          npm run finalize:release-changelog
-          npm run check:release-versions
-          if git diff --quiet; then
-            exit 0
-          fi
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add CHANGELOG.md package.json package-lock.json apps packages
-          git commit --signoff --message "chore: synchronize release metadata"
-          git push
-      - name: Use the reviewed changelog for the release pull request body
-        if: steps.release.outputs.prs_created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
-          RELEASE_PR: ${{ steps.release.outputs.pr }}
-        run: |
-          pr_number="$(jq --exit-status --raw-output '.number' <<< "$RELEASE_PR")"
-          version="$(node -p "require('./package.json').version")"
-          {
-            echo "## multAIplayer $version"
-            echo
-            node tools/release/finalize-changelog.mjs --extract="$version"
-            echo
-            echo "The complete reviewed notes are maintained in \`CHANGELOG.md\`."
-          } > "$RUNNER_TEMP/release-pr-body.md"
-          gh pr edit "$pr_number" --body-file "$RUNNER_TEMP/release-pr-body.md"
-      - name: Dispatch protected checks for a built-in-token release pull request
-        if: steps.release.outputs.prs_created == 'true' && steps.credential.outputs.uses_custom_token == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_PR: ${{ steps.release.outputs.pr }}
-        run: |
-          RELEASE_BRANCH="$(jq --exit-status --raw-output '.headBranchName | select(type == "string" and length > 0)' <<< "$RELEASE_PR")"
-          gh workflow run ci.yml --ref "$RELEASE_BRANCH"
-          gh workflow run journeys.yml --ref "$RELEASE_BRANCH" --field required_only=true
-          gh workflow run codeql.yml --ref "$RELEASE_BRANCH"
-      - name: Dispatch the signed release build when using the built-in token
-        if: steps.release.outputs.release_created == 'true' && steps.credential.outputs.uses_custom_token == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run release.yml --ref "$RELEASE_TAG" --field tag="$RELEASE_TAG"
-
   resolve:
     name: Resolve immutable release source
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
@@ -202,10 +119,8 @@ jobs:
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
 
-      - name: Set up repository Rust toolchain and native lint components
+      - name: Set up repository Rust toolchain
         uses: ./.github/actions/setup-rust
-        with:
-          components: rustfmt clippy
 
       - name: Install Apple silicon Rust target
         run: rustup target add aarch64-apple-darwin
@@ -289,8 +204,8 @@ jobs:
           case "$VITE_RELAY_HTTP_URL" in https://*) ;; *) echo "OFFICIAL_RELAY_HTTP_URL must be a configured HTTPS URL." >&2; exit 1 ;; esac
           case "$VITE_RELAY_URL" in wss://*) ;; *) echo "OFFICIAL_RELAY_WS_URL must be a configured WSS URL." >&2; exit 1 ;; esac
 
-      - name: Run release preflight
-        run: npm run release:preflight
+      - name: Verify release metadata
+        run: npm run check:release-versions
 
       - name: Verify live invitation app-site associations
         env:

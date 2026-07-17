@@ -5,8 +5,8 @@ test("host handoff requires a member request and explicit host approval before c
   attachPageDiagnostics(page);
   await page.goto(uiContractScenarioUrl("host-handoff"));
 
-  const boundary = page.getByRole("complementary", { name: "E2E coverage boundary" });
-  await expect(boundary).toContainText("UI-contract E2E harness");
+  const boundary = page.getByRole("complementary", { name: "UI contract coverage boundary" });
+  await expect(boundary).toContainText("UI contract harness");
   await expect(boundary).toContainText("native MLS host-transfer commit");
 
   const initiator = page.getByTestId("initiator-client");

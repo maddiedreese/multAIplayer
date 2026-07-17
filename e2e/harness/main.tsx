@@ -46,8 +46,8 @@ function Harness() {
   return (
     <main className={`e2e-harness-shell ${presentation ? "readme-presentation" : ""}`}>
       {!presentation && (
-        <aside className="e2e-harness-boundary" aria-label="E2E coverage boundary">
-          <strong>UI-contract E2E harness</strong>
+        <aside className="e2e-harness-boundary" aria-label="UI contract coverage boundary">
+          <strong>UI contract harness</strong>
           <span>{scenario.description}</span>
           <span>Simulated boundaries: {scenario.mockedBoundaries.join(", ") || "none"}</span>
         </aside>

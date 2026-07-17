@@ -16,8 +16,8 @@ multAIplayer. Choose the path that matches the work in front of you.
 2. [Product and architecture](product-architecture.md) — where code belongs and
    the main data flows.
 3. Read a deeper guide only for the boundary you are changing:
-   [message lifecycles](message-lifecycles.md), [Codex hosting](codex-hosting.md),
-   [protocol](protocol.md), or [cryptography](cryptography.md).
+   [Codex hosting](codex-hosting.md), [protocol](protocol.md), or
+   [cryptography](cryptography.md).
 
 Architecture decisions are constraints, not onboarding material. Consult the
 [ADR index](decisions/README.md) when a change crosses an existing design or trust

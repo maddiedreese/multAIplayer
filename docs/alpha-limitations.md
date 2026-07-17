@@ -9,10 +9,9 @@ claims, audit status, metadata exposure, and residual risks.
 
 - Treat a build as supported only when it passes the signed, notarized release
   process in [Verifying releases](reproducible-builds.md) and is published from this repository.
-- Public packages are Apple-silicon-only and declare macOS 11 as their minimum
-  deployment target. Automated packaged-app runtime testing currently runs on
-  macOS 15; macOS 11–14 remain unverified rather than claimed as tested support.
-  Intel Macs, Windows, and Linux are not release targets.
+- Public packages are tested on Apple-silicon macOS 15. They use macOS 11 as the
+  deployment target, but macOS 11–14 are compatibility targets rather than tested
+  support. Intel Macs, Windows, and Linux are not release targets.
 - Official invitations use macOS universal links. Each release still needs a
   cold-start and warm-app test; static entitlement and parser checks do not prove
   operating-system dispatch.
@@ -54,6 +53,12 @@ claims, audit status, metadata exposure, and residual risks.
   already received.
 - Each device has its own MLS state. State loss requires a clean rejoin and loses
   access to pre-rejoin history; multi-device recovery and backfill remain limited.
+- A new installation or new device keys consume another registered-device slot.
+  The hosted relay currently permits 25 registrations per GitHub identity and has
+  no device-retirement flow. Reuse an intact installation rather than deleting its
+  local state; if the quota is reached, report it through a non-sensitive support
+  issue. Account deletion removes the account and its registrations but is not a
+  device-management workaround.
 - Pre-v2 rooms and pre-v3 invite authenticators are intentionally incompatible.
   Browser builds are an install notice and initialize no workspace, identity,
   relay, or MLS state.

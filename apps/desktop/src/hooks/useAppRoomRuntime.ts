@@ -4,7 +4,7 @@ import type { useAppHostHandoffActions } from "./useAppHostHandoffActions";
 import type { useAppRefs } from "./useAppRefs";
 import type { useAppRelaySync } from "./useAppRelaySync";
 import type { useAppRoomInteractionContext } from "./useAppRoomInteractionContext";
-import type { createAppRoomActions } from "./appRoomActions";
+import type { createRoomActions } from "../application/rooms/roomActions";
 import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useAppSelectedRoomRuntime } from "./useAppSelectedRoomRuntime";
 import type { WorkspaceRecordActions } from "../application/workspace/workspaceRecordActions";
@@ -21,7 +21,7 @@ type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type SelectedRoomRuntime = ReturnType<typeof useAppSelectedRoomRuntime>;
 type RoomInteraction = ReturnType<typeof useAppRoomInteractionContext>;
-type RoomActions = ReturnType<typeof createAppRoomActions>;
+type RoomActions = ReturnType<typeof createRoomActions>;
 type RelaySync = ReturnType<typeof useAppRelaySync>;
 type HostHandoffActions = ReturnType<typeof useAppHostHandoffActions>;
 
