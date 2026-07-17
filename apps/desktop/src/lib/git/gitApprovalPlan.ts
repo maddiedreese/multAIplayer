@@ -19,16 +19,6 @@ export interface GitWorkflowApprovalPreview {
   commands: string[];
 }
 
-export interface GitStatusFile {
-  path: string;
-  status: "added" | "modified" | "deleted" | "renamed" | "untracked";
-}
-
-export interface GitStatusSummary {
-  branch: string;
-  files: GitStatusFile[];
-}
-
 export const maxGitBranchNameChars = 200;
 export const maxCommitMessageChars = 500;
 

@@ -8,7 +8,7 @@ import {
   maxCommitMessageChars,
   maxGitBranchNameChars,
   normalizeCommitMessage
-} from "../src/index";
+} from "../src/lib/git/gitApprovalPlan";
 
 test("createGitWorkflowApprovalPlan creates local-only branch and commit approvals", () => {
   const plan = createGitWorkflowApprovalPlan("/repo", "feature/room-chat", "  Add room chat   polish  ", false);

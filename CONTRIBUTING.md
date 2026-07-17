@@ -44,7 +44,9 @@ npm run verify
 The optional staged-file hook runs Prettier and ESLint. Enable it per clone with
 `npm run hooks:install`; CI remains authoritative. Use a cohesive Conventional
 Commit subject (`feat:`, `fix:`, `docs:`, or `chore:`), and split unrelated work.
-The pull request template records the checks and any security or release impact.
+Name the concrete defect or outcome; generic subjects such as `final audit`,
+`cleanup`, or `polish` make review and release history harder to evaluate. The
+pull request template records the checks and any security or release impact.
 
 ## Where changes belong
 
@@ -224,7 +226,10 @@ package-manager installation operations that do not execute repository code.
 
 Pull requests are squash-merged. Their title becomes the sole commit title and
 must use Conventional Commit form so Release Please receives one unambiguous
-change record. Before merging a release PR, review the generated section as
+change record. Describe extra agent or model passes as **additional automated
+review passes**, not independent review, and report the commands or check names
+that produced evidence instead of copying a volatile hand-counted test total.
+Before merging a release PR, review the generated section as
 customer-facing copy; manually remove duplicate merge-history entries and
 internal implementation noise rather than publishing raw automation output.
 Repository settings should disable merge commits and rebase merges, use the PR

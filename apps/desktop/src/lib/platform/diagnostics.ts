@@ -1,5 +1,5 @@
 import { loadAppConfig } from "../core/appConfig";
-import { configureNonFatalReporter } from "../core/nonFatalReporting";
+import { configureNonFatalReporter, reportExpectedFailure } from "../core/nonFatalReporting";
 import {
   recordPersistedDiagnostic,
   savePersistedDiagnosticBundle,
@@ -101,13 +101,13 @@ function formatDiagnosticValue(value: unknown): string {
       return message ? `${name}: ${message}` : name;
     }
   } catch {
-    console.debug("[expected failure] diagnostic Error fields were not safely readable");
+    reportExpectedFailure("diagnostic Error fields were not safely readable");
     return "[unserializable]";
   }
   try {
     return JSON.stringify(sanitizeDiagnosticValue(value, 0, new WeakSet<object>()));
   } catch {
-    console.debug("[expected failure] diagnostic value was not serializable");
+    reportExpectedFailure("diagnostic value was not serializable");
     return "[unserializable]";
   }
 }
@@ -128,7 +128,7 @@ function sanitizeDiagnosticValue(value: unknown, depth: number, seen: WeakSet<ob
   try {
     descriptors = Object.getOwnPropertyDescriptors(value);
   } catch {
-    console.debug("[expected failure] diagnostic object descriptors were not readable");
+    reportExpectedFailure("diagnostic object descriptors were not readable");
     return "[unserializable]";
   }
 
@@ -198,7 +198,7 @@ function redactText(value: string): string {
         const parsed = new URL(match);
         return `${parsed.origin}${parsed.pathname}`;
       } catch {
-        console.debug("[expected failure] diagnostic URL redaction rejected malformed input");
+        reportExpectedFailure("diagnostic URL redaction rejected malformed input");
         return "[url]";
       }
     })
@@ -213,7 +213,7 @@ function safeLoadAppConfig(): ReturnType<typeof loadAppConfig> | null {
   try {
     return loadAppConfig();
   } catch {
-    console.debug("[expected failure] diagnostic app configuration was unavailable");
+    reportExpectedFailure("diagnostic app configuration was unavailable");
     return null;
   }
 }
@@ -222,7 +222,7 @@ function safeOrigin(value: string): string {
   try {
     return new URL(value).origin;
   } catch {
-    console.debug("[expected failure] diagnostic relay origin was unavailable");
+    reportExpectedFailure("diagnostic relay origin was unavailable");
     return "unavailable";
   }
 }

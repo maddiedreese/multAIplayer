@@ -36,7 +36,7 @@ Host-local Codex, terminal, browser, filesystem, and Git work becomes unavailabl
 
 ## What platforms and Codex versions are supported?
 
-The public alpha targets Apple-silicon macOS 11 or later. Windows, Linux desktop, and Intel Mac releases are not supported. The exact tested Codex range is maintained in [Codex hosting](codex-hosting.md); newer versions remain unverified until their contracts are reviewed.
+The public alpha is Apple-silicon-only and declares macOS 11 as its minimum deployment target. Automated packaged-app runtime testing currently runs on macOS 15, so macOS 11–14 remain unverified rather than claimed as tested support. Windows, Linux desktop, and Intel Mac releases are not supported. The exact tested Codex range is maintained in [Codex hosting](codex-hosting.md); newer versions remain unverified until their contracts are reviewed.
 
 ## How are updates delivered?
 

@@ -1,14 +1,4 @@
-import { normalizeSafeBranchName } from "@multaiplayer/git";
-
-export interface PullRequestDraft {
-  owner: string;
-  repo: string;
-  title: string;
-  body: string;
-  head: string;
-  base: string;
-  draft: boolean;
-}
+import { normalizeSafeBranchName } from "./gitApprovalPlan";
 
 export interface GitHubRepoRef {
   owner: string;
@@ -38,19 +28,4 @@ export function normalizeGitHubBranchName(branch: string): string {
     required: "GitHub branch is required.",
     unsafe: (original) => `Unsafe GitHub branch name: ${original}`
   });
-}
-
-export function normalizePullRequestDraft(draft: PullRequestDraft): PullRequestDraft {
-  const repo = normalizeGitHubRepoRef(draft.owner, draft.repo);
-  const title = draft.title.trim();
-  if (!title) throw new Error("Pull request title is required.");
-  return {
-    owner: repo.owner,
-    repo: repo.repo,
-    title,
-    body: draft.body,
-    head: normalizeGitHubBranchName(draft.head),
-    base: normalizeGitHubBranchName(draft.base || "main"),
-    draft: draft.draft
-  };
 }

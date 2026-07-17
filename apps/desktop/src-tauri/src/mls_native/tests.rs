@@ -7,7 +7,7 @@ use super::{
     engine_error, fingerprint, group_state_command_error, is_corruption_error_message,
     quarantine_store, validate_room_config_payload, BasicAppCredential, CapabilityBinding,
     EncryptRequest, EncryptedStore, MlsEngine, PendingInviteRequestPublic,
-    PendingJoinAdmissionPublic, StoredMlsIdentity,
+    PendingJoinAdmissionPublic, SigningSecretLoadError, StoredMlsIdentity,
 };
 
 fn request_binding() -> CapabilityBinding {
@@ -161,8 +161,18 @@ fn stored_signing_identity_is_bound_to_user_and_device() {
         decode_stored_signing_secret(&encoded, "github:1", "device-1").unwrap(),
         vec![0; 32]
     );
-    assert!(decode_stored_signing_secret(&encoded, "github:2", "device-1").is_err());
-    assert!(decode_stored_signing_secret(&encoded, "github:1", "device-2").is_err());
+    assert_eq!(
+        decode_stored_signing_secret(&encoded, "github:2", "device-1"),
+        Err(SigningSecretLoadError::ScopeMismatch)
+    );
+    assert_eq!(
+        decode_stored_signing_secret(&encoded, "github:1", "device-2"),
+        Err(SigningSecretLoadError::ScopeMismatch)
+    );
+    assert_eq!(
+        decode_stored_signing_secret("corrupt", "github:1", "device-1"),
+        Err(SigningSecretLoadError::Internal)
+    );
 }
 
 #[test]

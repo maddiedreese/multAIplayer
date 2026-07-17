@@ -12,10 +12,14 @@ export function reportNonFatal(operation: string, error?: unknown) {
     reporter(operation, error);
     return;
   }
-  console.warn(`Non-fatal failure: ${operation}`);
+  if (!isTestRuntime()) console.warn(`Non-fatal failure: ${operation}`);
 }
 
 /** Document a normal fallback without logging rejected or attacker-controlled input. */
 export function reportExpectedFailure(operation: string) {
-  console.debug(`[expected failure] ${operation}`);
+  if (!isTestRuntime()) console.debug(`[expected failure] ${operation}`);
+}
+
+function isTestRuntime(): boolean {
+  return typeof process !== "undefined" && process.env.NODE_ENV === "test";
 }
