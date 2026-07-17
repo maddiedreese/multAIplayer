@@ -10,21 +10,23 @@ const matches = (path, patterns) => patterns.some((pattern) => pattern.test(path
 
 export function classifyChanges(paths) {
   const files = [...new Set(paths.filter(Boolean))];
+  const executableFiles = files.filter((path) => !path.endsWith(".md"));
   const documentation = files.some((path) =>
     matches(path, [
-      /^README\.md$/,
-      /^docs\/.*\.md$/,
+      /\.md$/,
+      /^\.github\/ISSUE_TEMPLATE\/.*\.ya?ml$/,
       /^scripts\/check-maintained-docs\.mjs$/,
+      /^scripts\/check-repository-content\.mjs$/,
       /^contracts\/codex-app-server\/support-policy\.json$/,
       /^apps\/desktop\/src-tauri\/updater-public\.key$/,
       /^apps\/desktop\/src-tauri\/src\/lib\.rs$/,
       /^\.github\/workflows\/ci\.yml$/
     ])
   );
-  const workflow = files.some((path) =>
+  const workflow = executableFiles.some((path) =>
     matches(path, [/^\.github\/(?:actions|workflows)\//, /^\.github\/codeql-config\.yml$/])
   );
-  const native = files.some((path) =>
+  const native = executableFiles.some((path) =>
     matches(path, [
       /^apps\/desktop\/src-tauri\//,
       /^contracts\//,
@@ -34,7 +36,7 @@ export function classifyChanges(paths) {
       /^\.github\/actions\/setup-rust\//
     ])
   );
-  const javascript = files.some((path) =>
+  const javascript = executableFiles.some((path) =>
     matches(path, [
       /^apps\/(?!desktop\/src-tauri\/)/,
       /^contracts\//,
@@ -54,7 +56,7 @@ export function classifyChanges(paths) {
       /^\.prettierignore$/
     ])
   );
-  const uiJourney = files.some((path) =>
+  const uiJourney = executableFiles.some((path) =>
     matches(path, [
       /^apps\/desktop\/(?!src-tauri\/)/,
       /^apps\/relay\//,
@@ -67,9 +69,10 @@ export function classifyChanges(paths) {
       /^\.github\/actions\/setup-node-npm\//
     ])
   );
-  const nativeJourney = files.some((path) =>
+  const nativeJourney = executableFiles.some((path) =>
     matches(path, [
-      /^apps\/desktop\//,
+      /^apps\/desktop\/src-tauri\//,
+      /^apps\/desktop\/(?:package\.json|native-command-error-codes\.json)$/,
       /^apps\/relay\//,
       /^packages\//,
       /^e2e\/native-shell\//,
@@ -80,9 +83,10 @@ export function classifyChanges(paths) {
       /^\.github\/actions\/setup-(?:node-npm|rust)\//
     ])
   );
-  const macos = files.some((path) =>
+  const macos = executableFiles.some((path) =>
     matches(path, [
-      /^apps\/desktop\//,
+      /^apps\/desktop\/src-tauri\//,
+      /^apps\/desktop\/(?:package\.json|native-command-error-codes\.json|vite\.config\.ts)$/,
       /^packages\//,
       /^e2e\/native-macos\//,
       /^scripts\/verify-macos-/,

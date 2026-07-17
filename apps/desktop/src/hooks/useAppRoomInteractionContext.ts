@@ -4,7 +4,7 @@ import type { useAppSelectedRoomContext } from "./useAppSelectedRoomContext";
 import type { useGitHubAuth } from "./useGitHubAuth";
 import type { useLocalIdentity } from "./useLocalIdentity";
 import { createChatActions } from "../application/chat/chatActions";
-import { createRoomVisibilityWarningActions } from "../application/rooms/roomVisibilityWarningActions";
+import { acknowledgeRoomVisibilityWarning as saveRoomVisibilityWarningAcknowledgement } from "../lib/history/roomVisibilityWarning";
 import { buildRoomMemberRows } from "../presentation/roster/rosterDisplayRows";
 import { useAppStore } from "../store/appStore";
 import { buildRoomNotices } from "./roomNotices";
@@ -18,6 +18,13 @@ type GitHubAuth = ReturnType<typeof useGitHubAuth>;
 type LocalIdentity = ReturnType<typeof useLocalIdentity>;
 type SelectedRoomContext = ReturnType<typeof useAppSelectedRoomContext>;
 type RoomActions = ReturnType<typeof createAppRoomActions>;
+
+export function acknowledgeSelectedRoomVisibilityWarning() {
+  const { selectedRoomId } = useAppStore.getState();
+  if (!selectedRoomId) return;
+  saveRoomVisibilityWarningAcknowledgement(selectedRoomId);
+  useAppStore.getState().setSecretWarningVisibleForRoom(selectedRoomId, false);
+}
 
 export function useAppRoomInteractionContext({
   appRefs,
@@ -74,7 +81,6 @@ export function useAppRoomInteractionContext({
     setTerminalErrorForRoom
   });
   const roomNotices = buildRoomNotices({ roomId: selectedRoom?.id ?? null, hostMessage, chatMessage });
-  const visibilityActions = createRoomVisibilityWarningActions();
   const accessState = useRoomAccess({
     hasSelectedRoom,
     selectedRoom,
@@ -109,7 +115,7 @@ export function useAppRoomInteractionContext({
   return {
     ...reporters,
     roomNotices,
-    ...visibilityActions,
+    acknowledgeRoomVisibilityWarning: acknowledgeSelectedRoomVisibilityWarning,
     ...accessState,
     ...chatActions,
     ...githubWorkflowState,

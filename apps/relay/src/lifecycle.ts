@@ -63,9 +63,22 @@ export function createRelayLifecycle({
   async function runShutdown() {
     if (drainMs > 0) await wait(drainMs);
     const socketClose = closeWebSockets(wss, graceMs, wait);
-    await Promise.allSettled([closeServer(), closeWebSocketServer(wss)]);
-    await socketClose;
-    await closeStore();
+    const errors: unknown[] = [];
+    const listenerResults = await Promise.allSettled([closeServer(), closeWebSocketServer(wss)]);
+    for (const result of listenerResults) {
+      if (result.status === "rejected") errors.push(result.reason);
+    }
+    try {
+      await socketClose;
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      await closeStore();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length > 0) throw new AggregateError(errors, "Relay shutdown failed.");
   }
 
   return {
@@ -81,8 +94,14 @@ function isShutdownExemptPath(path: string): boolean {
 }
 
 async function closeWebSocketServer(wss: WebSocketServer) {
-  await new Promise<void>((resolve) => {
-    wss.close(() => resolve());
+  await new Promise<void>((resolve, reject) => {
+    wss.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
   });
 }
 

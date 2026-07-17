@@ -1,4 +1,3 @@
-import { createAccountActions } from "../application/account/accountActions";
 import { createBrowserActions } from "../application/browser/browserActions";
 import { createGitWorkflowActions } from "../application/git/gitWorkflowActions";
 import { createLocalPreviewActions } from "../application/files/localPreviewActions";
@@ -6,8 +5,18 @@ import { createRoomSettingsActions } from "../application/rooms/roomSettingsActi
 import { createTerminalActions } from "../application/terminal/terminalActions";
 import { useGitHubActionsRefresh } from "./useGitHubActionsRefresh";
 
-type AccountActionsOptions = Omit<Parameters<typeof createAccountActions>[0], "stopOwnedLocalPreviews">;
+interface AccountActionsOptions {
+  signOutGitHub: () => Promise<void>;
+}
 type GitWorkflowActionsOptions = Omit<Parameters<typeof createGitWorkflowActions>[0], "refreshGitHubActions">;
+
+export async function signOutAfterStoppingPreviews({
+  stopOwnedLocalPreviews,
+  signOutGitHub
+}: AccountActionsOptions & { stopOwnedLocalPreviews: (reason: string) => Promise<void> }) {
+  await stopOwnedLocalPreviews("Stopped because the sharing user signed out.");
+  await signOutGitHub();
+}
 
 export function useRoomToolActions({
   settings,
@@ -29,10 +38,6 @@ export function useRoomToolActions({
   const roomSettingsActions = createRoomSettingsActions(settings);
   const terminalActions = createTerminalActions(terminal);
   const localPreviewActions = createLocalPreviewActions(localPreview);
-  const accountActions = createAccountActions({
-    ...account,
-    stopOwnedLocalPreviews: localPreviewActions.stopOwnedLocalPreviews
-  });
   const { refreshGitHubActions } = useGitHubActionsRefresh(githubActions);
   const gitWorkflowActions = createGitWorkflowActions({
     ...gitWorkflow,
@@ -44,7 +49,11 @@ export function useRoomToolActions({
     ...roomSettingsActions,
     ...terminalActions,
     ...localPreviewActions,
-    ...accountActions,
+    signOut: () =>
+      signOutAfterStoppingPreviews({
+        ...account,
+        stopOwnedLocalPreviews: localPreviewActions.stopOwnedLocalPreviews
+      }),
     refreshGitHubActions,
     ...gitWorkflowActions,
     ...browserActions

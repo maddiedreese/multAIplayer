@@ -38,8 +38,7 @@
     "docs:screenshots": "node e2e/capture-readme-screens.mjs",
     "test:e2e:native": "node --import tsx e2e/native-shell/journey.ts",
     "test:e2e:native:macos-smoke": "wdio run e2e/native-macos/wdio.conf.mjs",
-    "docs:check": "node scripts/check-maintained-docs.mjs",
-    "docs:sync-ipc-inventory": "node scripts/check-maintained-docs.mjs --write-ipc-inventory",
+    "docs:check": "node scripts/check-maintained-docs.mjs && node scripts/check-repository-content.mjs",
     "fmt:rust:check": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check",
     "lint:rust": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-targets --all-features -- -D warnings",
     "test:native": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace --all-features",
@@ -83,7 +82,8 @@
     "prettier": "3.9.5",
     "typescript": "6.0.3",
     "typescript-eslint": "8.64.0",
-    "webdriverio": "9.29.1"
+    "webdriverio": "9.29.1",
+    "yaml": "2.9.0"
   },
   "overrides": {
     "@wdio/native-utils": "2.5.0",

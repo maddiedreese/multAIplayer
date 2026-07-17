@@ -13,7 +13,6 @@ import { prepareCurrentEligibleHistorySnapshots } from "./application/history/lo
 import { useAppStore } from "./store/appStore";
 import { useGitHubAuth } from "./hooks/useGitHubAuth";
 import { useLocalIdentity } from "./hooks/useLocalIdentity";
-import { useRoomChatMutations } from "./hooks/useRoomChatMutations";
 import { useAppRoomInteractionContext } from "./hooks/useAppRoomInteractionContext";
 import { createAppRoomActions } from "./hooks/appRoomActions";
 import { useAppSelectedRoomRuntime } from "./hooks/useAppSelectedRoomRuntime";
@@ -131,7 +130,12 @@ function NativeApp() {
     setInviteLinkForRoom,
     setInviteMessageForRoom
   } = roomActions;
-  const roomChatMutations = useRoomChatMutations();
+  const roomChatMutations = {
+    appendRoomMessage: useAppStore((state) => state.appendRoomMessage),
+    editRoomMessage: useAppStore((state) => state.editRoomMessage),
+    deleteRoomMessage: useAppStore((state) => state.deleteRoomMessage),
+    applyMessageReaction: useAppStore((state) => state.applyMessageReaction)
+  };
   const workspaceRecords = createWorkspaceRecordActions({
     upsertTeamRecord: (team) => useAppStore.getState().upsertTeamRecord(team),
     upsertRoomRecord: (room) => useAppStore.getState().upsertRoomRecord(room),

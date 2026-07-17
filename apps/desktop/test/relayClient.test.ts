@@ -8,6 +8,7 @@ class FakeWebSocket extends EventTarget {
   readonly OPEN = 1;
   readyState = 0;
   sent: string[] = [];
+  closedWith: [number | undefined, string | undefined] | null = null;
   constructor(readonly url: string) {
     super();
     FakeWebSocket.latest = this;
@@ -19,12 +20,16 @@ class FakeWebSocket extends EventTarget {
   send(value: string) {
     this.sent.push(value);
   }
-  close() {
+  close(code?: number, reason?: string) {
+    this.closedWith = [code, reason];
     this.readyState = 3;
     this.dispatchEvent(new Event("close"));
   }
   receive(value: unknown) {
     this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(value) }));
+  }
+  receiveRaw(value: unknown) {
+    this.dispatchEvent(new MessageEvent("message", { data: value }));
   }
 }
 
@@ -156,6 +161,60 @@ test("scoped relay errors still reject only their matching publish", async () =>
 
   FakeWebSocket.latest.receive({ type: "published", messageId: secondMessage.message.id });
   await second;
+  client.close();
+});
+
+test("malformed relay JSON fails closed without reaching application handlers", async () => {
+  const received: string[] = [];
+  const statuses: string[] = [];
+  const client = connectRelay(
+    "ws://relay",
+    (message) => {
+      received.push(message.type);
+    },
+    (status) => statuses.push(status)
+  );
+  const socket = FakeWebSocket.latest;
+  socket.open();
+  const pending = client.publishAndWaitForAck(publishMessage, 100);
+
+  socket.receiveRaw("{not-json");
+
+  await assert.rejects(pending, /invalid server message/);
+  assert.deepEqual(received, []);
+  assert.deepEqual(socket.closedWith, [1002, "Invalid relay server message"]);
+  assert.deepEqual(statuses, ["connecting", "open", "error", "closed"]);
+  client.close();
+});
+
+test("relay messages that violate the protocol schema fail closed", async () => {
+  let handled = false;
+  const client = connectRelay(
+    "ws://relay",
+    () => {
+      handled = true;
+    },
+    () => undefined
+  );
+  const socket = FakeWebSocket.latest;
+  socket.open();
+  const pending = client.joinAndWaitForAck(
+    {
+      type: "join",
+      teamId: "team-test",
+      roomId: "room-test",
+      userId: "user-test",
+      deviceId: "device-test",
+      deviceSessionToken: "session-test"
+    },
+    100
+  );
+
+  socket.receive({ type: "joined", teamId: "team-test" });
+
+  await assert.rejects(pending, /invalid server message/);
+  assert.equal(handled, false);
+  assert.deepEqual(socket.closedWith, [1002, "Invalid relay server message"]);
   client.close();
 });
 

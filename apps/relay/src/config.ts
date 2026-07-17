@@ -88,18 +88,8 @@ export function loadRelayConfig(): RelayConfig {
   loadRelayEnvFiles();
 
   const nodeEnv = process.env.NODE_ENV ?? "development";
-  const attachmentBlobMaxBytes = parseIntegerEnv(
-    process.env.MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES,
-    5_000_000,
-    1,
-    50_000_000
-  );
-  const maxDurableEntries = parseIntegerEnv(
-    process.env.MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES,
-    250_000,
-    1_000,
-    10_000_000
-  );
+  const attachmentBlobMaxBytes = parseIntegerEnv("MULTAIPLAYER_ATTACHMENT_BLOB_MAX_BYTES", 5_000_000, 1, 50_000_000);
+  const maxDurableEntries = parseIntegerEnv("MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES", 250_000, 1_000, 10_000_000);
   const jsonBodyLimitBytes = Math.ceil(Math.max(1_000_000, attachmentBlobMaxBytes * 1.5 + 100_000));
 
   const deletionLedger = parseDeletionLedgerConfig(nodeEnv);
@@ -112,7 +102,7 @@ export function loadRelayConfig(): RelayConfig {
       "Production relay requires an external S3-compatible deletion ledger; the file backend is development-only."
     );
   }
-  const trustProxyHeadersRequested = parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS, false);
+  const trustProxyHeadersRequested = parseBooleanEnv("MULTAIPLAYER_RELAY_TRUST_PROXY_HEADERS", false);
   if (
     nodeEnv === "production" &&
     deletionProtection === "restore_safe" &&
@@ -124,151 +114,128 @@ export function loadRelayConfig(): RelayConfig {
 
   return {
     nodeEnv,
-    port: parseIntegerEnv(process.env.PORT, 4321, 1, 65_535),
+    port: parseIntegerEnv("PORT", 4321, 1, 65_535),
     dataPath: resolve(process.env.MULTAIPLAYER_RELAY_DATA_PATH ?? ".multaiplayer/relay-store.sqlite"),
     minimumDiskHeadroomBytes: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES,
+      "MULTAIPLAYER_RELAY_MIN_DISK_HEADROOM_BYTES",
       1_000_000_000,
       100_000_000,
       1_000_000_000_000
     ),
     sqliteWalAutoCheckpointPages: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_SQLITE_WAL_AUTOCHECKPOINT_PAGES,
+      "MULTAIPLAYER_RELAY_SQLITE_WAL_AUTOCHECKPOINT_PAGES",
       1_000,
       50,
       10_000
     ),
-    mlsBacklogLimit: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_LIMIT, 200, 1, 1000),
-    mlsBacklogRetentionDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS, 30, 1, 365),
-    inviteTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_INVITE_TTL_DAYS, 7, 1, 365),
-    attachmentBlobTtlDays: parseIntegerEnv(process.env.MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS, 30, 1, 365),
+    mlsBacklogLimit: parseIntegerEnv("MULTAIPLAYER_RELAY_BACKLOG_LIMIT", 200, 1, 1000),
+    mlsBacklogRetentionDays: parseIntegerEnv("MULTAIPLAYER_RELAY_BACKLOG_RETENTION_DAYS", 30, 1, 365),
+    inviteTtlDays: parseIntegerEnv("MULTAIPLAYER_RELAY_INVITE_TTL_DAYS", 7, 1, 365),
+    attachmentBlobTtlDays: parseIntegerEnv("MULTAIPLAYER_ATTACHMENT_BLOB_TTL_DAYS", 30, 1, 365),
     attachmentBlobMaxBytes,
     attachmentBlobLiveQuotaBytes: parseIntegerEnv(
-      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES,
+      "MULTAIPLAYER_ATTACHMENT_BLOB_LIVE_QUOTA_BYTES",
       250_000_000,
       attachmentBlobMaxBytes,
       10_000_000_000
     ),
     attachmentBlobTeamLiveQuotaBytes: parseIntegerEnv(
-      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_TEAM_LIVE_QUOTA_BYTES,
+      "MULTAIPLAYER_ATTACHMENT_BLOB_TEAM_LIVE_QUOTA_BYTES",
       1_000_000_000,
       attachmentBlobMaxBytes,
       10_000_000_000
     ),
     attachmentBlobUploadBytesPerWindow: parseIntegerEnv(
-      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW,
+      "MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_BYTES_PER_WINDOW",
       100_000_000,
       attachmentBlobMaxBytes,
       10_000_000_000
     ),
     attachmentBlobUploadWindowMs: parseIntegerEnv(
-      process.env.MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS,
+      "MULTAIPLAYER_ATTACHMENT_BLOB_UPLOAD_WINDOW_MS",
       3_600_000,
       60_000,
       86_400_000
     ),
     jsonBodyLimitBytes,
-    mlsMessageMaxBytes: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MLS_MESSAGE_MAX_BYTES,
-      1_000_000,
-      4096,
-      5_000_000
-    ),
+    mlsMessageMaxBytes: parseIntegerEnv("MULTAIPLAYER_RELAY_MLS_MESSAGE_MAX_BYTES", 1_000_000, 4096, 5_000_000),
     deletionLedger,
     deletionProtection,
     metricsToken: normalizeMetricsToken(process.env.MULTAIPLAYER_RELAY_METRICS_TOKEN),
-    debugEndpointsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_DEBUG, false),
+    debugEndpointsEnabled: parseBooleanEnv("MULTAIPLAYER_RELAY_DEBUG", false),
     allowedCorsOrigins: parseAllowedOriginEnv(process.env.MULTAIPLAYER_RELAY_ALLOWED_ORIGINS),
-    mutationsRequireAuth: !parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH, false),
-    rateLimitsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMITS, true),
+    mutationsRequireAuth: !parseBooleanEnv("MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH", false),
+    rateLimitsEnabled: parseBooleanEnv("MULTAIPLAYER_RELAY_RATE_LIMITS", true),
     trustProxyHeaders: trustProxyHeadersRequested,
-    structuredLogsEnabled: parseBooleanEnv(process.env.MULTAIPLAYER_RELAY_STRUCTURED_LOGS, nodeEnv === "production"),
-    exitOnPersistencePoison: parseBooleanEnv(
-      process.env.MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON,
-      nodeEnv === "production"
-    ),
-    rateLimitWindowMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS, 60_000, 1_000, 3_600_000),
+    structuredLogsEnabled: parseBooleanEnv("MULTAIPLAYER_RELAY_STRUCTURED_LOGS", nodeEnv === "production"),
+    exitOnPersistencePoison: parseBooleanEnv("MULTAIPLAYER_RELAY_EXIT_ON_PERSISTENCE_POISON", nodeEnv === "production"),
+    rateLimitWindowMs: parseIntegerEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_WINDOW_MS", 60_000, 1_000, 3_600_000),
     trustedNetworkRateLimitMultiplier: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER,
+      "MULTAIPLAYER_RELAY_RATE_LIMIT_TRUSTED_NETWORK_MULTIPLIER",
       8,
       1,
       100
     ),
     rateLimitCaps: {
-      auth: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH, 30, 1, 10_000),
-      read: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_READ, 300, 1, 100_000),
-      mutation: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION, 120, 1, 100_000),
-      attachment: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT, 60, 1, 10_000),
-      websocket: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET, 600, 1, 100_000),
-      websocketConnect: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT, 120, 1, 100_000)
+      auth: parseIntegerEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_AUTH", 30, 1, 10_000),
+      read: parseIntegerEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_READ", 300, 1, 100_000),
+      mutation: parseIntegerEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_MUTATION", 120, 1, 100_000),
+      attachment: parseIntegerEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_ATTACHMENT", 60, 1, 10_000),
+      websocket: parseIntegerEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET", 600, 1, 100_000),
+      websocketConnect: parseIntegerEnv("MULTAIPLAYER_RELAY_RATE_LIMIT_WEBSOCKET_CONNECT", 120, 1, 100_000)
     },
     websocketConnectionCaps: {
-      perUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER, 20, 1, 1_000),
-      perDevice: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE, 5, 1, 100)
+      perUser: parseIntegerEnv("MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_USER", 20, 1, 1_000),
+      perDevice: parseIntegerEnv("MULTAIPLAYER_RELAY_WEBSOCKET_CONNECTION_CAP_DEVICE", 5, 1, 100)
     },
     shutdown: {
-      drainMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS, 0, 0, 60_000),
-      graceMs: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS, 10_000, 1_000, 120_000)
+      drainMs: parseIntegerEnv("MULTAIPLAYER_RELAY_SHUTDOWN_DRAIN_MS", 0, 0, 60_000),
+      graceMs: parseIntegerEnv("MULTAIPLAYER_RELAY_SHUTDOWN_GRACE_MS", 10_000, 1_000, 120_000)
     },
     dailyCreationCaps: {
-      teamsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP, 25, 0, 10_000),
-      roomsPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP, 100, 0, 100_000)
+      teamsPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_DAILY_TEAM_CREATION_CAP", 25, 0, 10_000),
+      roomsPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_DAILY_ROOM_CREATION_CAP", 100, 0, 100_000)
     },
-    totalRoomCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER, 500, 1, 100_000),
-    registeredDeviceCapPerUser: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_REGISTERED_DEVICE_CAP_USER,
-      25,
-      1,
-      10_000
-    ),
-    retainedAuthSessionCapPerUser: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER,
-      20,
-      1,
-      1_000
-    ),
-    liveKeyPackageCapPerUser: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER,
-      250,
-      1,
-      100_000
-    ),
-    liveInviteCapPerUser: parseIntegerEnv(process.env.MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER, 100, 1, 100_000),
+    totalRoomCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_TOTAL_ROOM_CAP_USER", 500, 1, 100_000),
+    registeredDeviceCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_REGISTERED_DEVICE_CAP_USER", 25, 1, 10_000),
+    retainedAuthSessionCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_RETAINED_AUTH_SESSION_CAP_USER", 20, 1, 1_000),
+    liveKeyPackageCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_LIVE_KEY_PACKAGE_CAP_USER", 250, 1, 100_000),
+    liveInviteCapPerUser: parseIntegerEnv("MULTAIPLAYER_RELAY_LIVE_INVITE_CAP_USER", 100, 1, 100_000),
     maxDurableEntries,
     maxDurableEntriesPerTeam: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM,
-      25_000,
+      "MULTAIPLAYER_RELAY_MAX_DURABLE_ENTRIES_PER_TEAM",
+      Math.min(25_000, maxDurableEntries - 1),
       100,
-      maxDurableEntries
+      maxDurableEntries - 1
     ),
     // Byte ceilings complement record-count ceilings because ciphertext-bearing
     // records can differ by orders of magnitude in retained memory.
     maxMlsBacklogBytes: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES,
+      "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES",
       100_000_000,
       1_000_000,
       10_000_000_000
     ),
     maxMlsBacklogBytesPerTeam: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM,
+      "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_TEAM",
       50_000_000,
       500_000,
       10_000_000_000
     ),
     maxMlsBacklogBytesPerRoom: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM,
+      "MULTAIPLAYER_RELAY_MAX_MLS_BACKLOG_BYTES_PER_ROOM",
       10_000_000,
       100_000,
       1_000_000_000
     ),
     maxAttachmentBlobBytes: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES,
+      "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES",
       500_000_000,
       attachmentBlobMaxBytes,
       10_000_000_000
     ),
     maxAttachmentBlobBytesPerTeam: parseIntegerEnv(
-      process.env.MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM,
+      "MULTAIPLAYER_RELAY_MAX_ATTACHMENT_BLOB_BYTES_PER_TEAM",
       250_000_000,
       attachmentBlobMaxBytes,
       10_000_000_000
@@ -448,18 +415,27 @@ function parseListEnv(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-function parseIntegerEnv(value: string | undefined, fallback: number, min: number, max: number): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(parsed)));
+function parseIntegerEnv(name: string, fallback: number, min: number, max: number): number {
+  const value = process.env[name];
+  if (value === undefined) return fallback;
+  const normalized = value.trim();
+  if (!/^-?(?:0|[1-9]\d*)$/.test(normalized)) {
+    throw new Error(`${name} must be an integer between ${min} and ${max}.`);
+  }
+  const parsed = Number(normalized);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${name} must be an integer between ${min} and ${max}.`);
+  }
+  return parsed;
 }
 
-function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+function parseBooleanEnv(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
   if (value === undefined) return fallback;
   const normalized = value.trim().toLowerCase();
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
   if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return fallback;
+  throw new Error(`${name} must be true or false.`);
 }
 
 function normalizeMetricsToken(value: string | undefined): string | null {
