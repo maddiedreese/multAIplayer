@@ -281,7 +281,7 @@ jobs:
           }
           files[destination] = source;
           config.bundle.macOS.files = files;
-          writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o644 });
+          writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { mode: 0o644 });
           NODE
           node -e '
             const config = require(`./apps/desktop/src-tauri/tauri.release.conf.json`);
