@@ -455,6 +455,29 @@
   display: grid;
   gap: 12px;
   padding: 14px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.setup-checklist :where(button, strong, small, li, span) {
+  font-family: inherit !important;
+}
+
+.setup-checklist > header strong {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.setup-checklist > header small,
+.setup-checklist li,
+.setup-checklist li small {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.setup-checklist-actions button {
+  font-size: 12px;
 }
 
 .setup-checklist > header,

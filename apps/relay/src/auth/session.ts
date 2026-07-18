@@ -61,10 +61,14 @@ export function createRelayAuthSessionManager({
   isRestrictedIdentity = () => false
 }: RelayAuthSessionManagerOptions): RelayAuthSessionManager {
   function authCookieOptions(maxAge?: number): CookieOptions {
+    const production = nodeEnv === "production";
     return {
       httpOnly: true,
-      sameSite: "lax",
-      secure: nodeEnv === "production",
+      // The packaged WebView runs at tauri://localhost, so its HTTPS relay
+      // session is cross-site. Production still requires an allowlisted exact
+      // Origin for browser traffic and all cookie-authenticated mutations.
+      sameSite: production ? "none" : "lax",
+      secure: production,
       path: "/",
       ...(maxAge === undefined ? {} : { maxAge })
     };

@@ -100,7 +100,7 @@ test("session manager validates live state, cookies, authorization, and identity
   assert.equal(manager.getAuthSession(token)?.user.id, "github:active");
   assert.deepEqual(manager.authCookieOptions(500), {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "none",
     secure: true,
     path: "/",
     maxAge: 500

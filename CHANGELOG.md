@@ -6,6 +6,13 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.2] - 2026-07-18
+
+### Fixed
+
+- Packaged macOS clients now install a secure cross-site relay session cookie, allowing the authenticated `tauri://localhost` WebView to use the official relay after GitHub sign-in.
+- The sidebar setup checklist now uses the app's standard sans-serif typography at a compact size proportional to the surrounding sidebar controls.
+
 ## [0.1.0-alpha.1] - 2026-07-17
 
 ### Added
