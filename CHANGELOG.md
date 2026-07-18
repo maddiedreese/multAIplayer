@@ -6,6 +6,12 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.6] - 2026-07-18
+
+### Fixed
+
+- The release-only Linux crash-recovery journey now retains its loopback authentication fixture when the simulated Secret Service process is replaced, while packaged clients keep the native Keychain fail-closed behavior.
+
 ## [0.1.0-alpha.5] - 2026-07-18
 
 ### Fixed
