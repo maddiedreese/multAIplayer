@@ -374,7 +374,6 @@ fn validate_relay_origin(value: &str) -> Result<String, CliError> {
         || url.username() != ""
         || url.password().is_some()
         || url.host_str().is_none()
-        || url.port_or_known_default() != Some(443)
         || url.path() != "/"
         || url.query().is_some()
         || url.fragment().is_some()
@@ -887,6 +886,69 @@ mod tests {
             .headers
             .iter()
             .any(|(name, value)| name == "cookie" && value.contains(SESSION)));
+    }
+
+    #[test]
+    fn non_default_https_relay_port_is_preserved_and_origin_bound() {
+        const PORT_RELAY: &str = "https://relay.example.com:8443";
+        let store = MemoryCredentialStore::default();
+        store.values.borrow_mut().insert(
+            RELAY_SESSION_ACCOUNT.to_owned(),
+            serde_json::to_string(&StoredRelaySession {
+                version: 1,
+                relay_origin: PORT_RELAY.to_owned(),
+                session: SESSION.to_owned(),
+            })
+            .unwrap(),
+        );
+        let http = MockHttp::default();
+        http.push(MockHttp::respond(
+            &format!("{PORT_RELAY}/auth/me"),
+            200,
+            json!({ "user": { "id": "github:42", "login": "maddie" } }),
+        ));
+
+        let port_client = AuthClient::new(&store, &http, CLIENT_ID, PORT_RELAY).unwrap();
+        assert_eq!(port_client.relay_origin, PORT_RELAY);
+        let restored = port_client.restore_session().unwrap().unwrap();
+        assert_eq!(restored.relay_origin, PORT_RELAY);
+        assert_eq!(
+            http.requests.borrow().last().unwrap().url,
+            format!("{PORT_RELAY}/auth/me")
+        );
+
+        let default_port_client = AuthClient::new(&store, &http, CLIENT_ID, RELAY).unwrap();
+        assert_eq!(
+            default_port_client.restore_session(),
+            Err(CliError::RelayOriginMismatch)
+        );
+        assert_eq!(http.requests.borrow().len(), 1);
+        assert_eq!(
+            AuthClient::new(&store, &http, CLIENT_ID, "https://relay.example.com:443")
+                .unwrap()
+                .relay_origin,
+            RELAY
+        );
+    }
+
+    #[test]
+    fn relay_origin_still_rejects_non_https_and_non_origin_inputs() {
+        let store = MemoryCredentialStore::default();
+        let http = MockHttp::default();
+        for invalid in [
+            "http://relay.example.com:8443",
+            "https://user@relay.example.com",
+            "https://user:password@relay.example.com",
+            "https://relay.example.com/path",
+            "https://relay.example.com?query=value",
+            "https://relay.example.com#fragment",
+            "not a URL",
+        ] {
+            assert!(matches!(
+                AuthClient::new(&store, &http, CLIENT_ID, invalid),
+                Err(CliError::RelayOriginMismatch)
+            ));
+        }
     }
 
     #[test]
