@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import process from "node:process";
 
 export const associatedDomainHosts = ["multaiplayer.com", "open.multaiplayer.com"];
@@ -64,7 +66,11 @@ export async function verifyLiveAssociations({ teamId, fetchImpl = fetch }) {
   }
 }
 
-export function verifySignedAppEntitlements(appPath) {
+export function verifySignedAppEntitlements(appPath, { requireProvisioningProfile = false } = {}) {
+  const provisioningProfile = join(appPath, "Contents", "embedded.provisionprofile");
+  if (requireProvisioningProfile && !existsSync(provisioningProfile)) {
+    throw new Error("Signed application is missing its Developer ID provisioning profile.");
+  }
   let entitlements;
   try {
     entitlements = execFileSync("codesign", ["-d", "--entitlements", ":-", appPath], {
@@ -85,13 +91,25 @@ export function verifySignedAppEntitlements(appPath) {
 }
 
 async function main() {
-  const [mode] = process.argv.slice(2);
+  const [mode, appPath] = process.argv.slice(2);
   if (mode === "--live") {
     await verifyLiveAssociations({ teamId: process.env.APPLE_TEAM_ID });
     console.log("Verified live Apple app-site associations for both invitation hosts.");
     return;
   }
-  if (!mode) throw new Error("Usage: verify-macos-associated-domains.mjs --live | <path-to-app>");
+  if (mode === "--require-profile") {
+    if (!appPath) {
+      throw new Error("Usage: verify-macos-associated-domains.mjs --require-profile <path-to-app>");
+    }
+    verifySignedAppEntitlements(appPath, { requireProvisioningProfile: true });
+    console.log("Verified signed macOS associated-domain entitlements and Developer ID provisioning profile.");
+    return;
+  }
+  if (!mode || appPath) {
+    throw new Error(
+      "Usage: verify-macos-associated-domains.mjs --live | --require-profile <path-to-app> | <path-to-app>"
+    );
+  }
   verifySignedAppEntitlements(mode);
   console.log("Verified signed macOS associated-domain entitlements.");
 }
