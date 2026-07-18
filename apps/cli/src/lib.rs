@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod identity;
 pub mod platform;
+pub mod relay;
 
 use thiserror::Error;
 
@@ -31,6 +32,10 @@ pub enum CliError {
     RelayOriginMismatch,
     #[error("The relay could not complete authentication.")]
     RelayUnavailable,
+    #[error("Sign in with GitHub before reading workspace state.")]
+    RelayAuthenticationRequired,
+    #[error("The relay returned invalid or unsupported data.")]
+    InvalidRelayResponse,
     #[error("The secure credential store is unavailable.")]
     CredentialStoreUnavailable,
     #[error("Stored credentials are invalid.")]

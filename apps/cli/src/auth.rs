@@ -352,6 +352,31 @@ struct StoredRelaySession {
     session: String,
 }
 
+pub(crate) struct RelayTransportSession {
+    pub origin: String,
+    pub secret: Zeroizing<String>,
+}
+
+pub(crate) fn load_relay_transport_session(
+    store: &impl CredentialStore,
+    expected_origin: &str,
+) -> Result<Option<RelayTransportSession>, CliError> {
+    let expected_origin = validate_relay_origin(expected_origin)?;
+    let Some(encoded) = store.get(RELAY_SESSION_ACCOUNT)? else {
+        return Ok(None);
+    };
+    let record: StoredRelaySession =
+        serde_json::from_str(&encoded).map_err(|_| CliError::InvalidStoredCredential)?;
+    if record.version != 1 || record.relay_origin != expected_origin {
+        return Err(CliError::RelayOriginMismatch);
+    }
+    validate_relay_session(&record.session)?;
+    Ok(Some(RelayTransportSession {
+        origin: record.relay_origin,
+        secret: Zeroizing::new(record.session),
+    }))
+}
+
 #[derive(Serialize, Deserialize)]
 struct StoredGitHubCredential {
     version: u8,
@@ -368,7 +393,7 @@ fn validate_client_id(value: &str) -> Result<String, CliError> {
     }
 }
 
-fn validate_relay_origin(value: &str) -> Result<String, CliError> {
+pub(crate) fn validate_relay_origin(value: &str) -> Result<String, CliError> {
     let url = Url::parse(value).map_err(|_| CliError::RelayOriginMismatch)?;
     if url.scheme() != "https"
         || url.username() != ""
@@ -383,7 +408,7 @@ fn validate_relay_origin(value: &str) -> Result<String, CliError> {
     Ok(url.origin().ascii_serialization())
 }
 
-fn endpoint(origin: &str, path: &str) -> Result<String, CliError> {
+pub(crate) fn endpoint(origin: &str, path: &str) -> Result<String, CliError> {
     let origin = Url::parse(origin).map_err(|_| CliError::RelayOriginMismatch)?;
     origin
         .join(path)
