@@ -80,6 +80,7 @@ export async function restoreGitHubSession(): Promise<SignedInUser | null> {
   try {
     const restored = await invokeNative<RestoredGitHubSession | null>("github_session_restore");
     if (restored) installRelaySession(restored.relaySession, restored.relayOrigin);
+    else if (import.meta.env.VITE_NATIVE_E2E_COOKIE_AUTH === "1") return getCurrentUser();
     else clearRelaySession();
     return restored?.user ?? null;
   } catch (error) {

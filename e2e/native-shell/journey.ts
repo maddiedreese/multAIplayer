@@ -505,7 +505,14 @@ async function main() {
         "--no-watch"
       ],
       {
-        env: { VITE_RELAY_HTTP_URL: stableRelayProxy.baseUrl, VITE_RELAY_URL: stableRelayProxy.wsUrl },
+        env: {
+          VITE_RELAY_HTTP_URL: stableRelayProxy.baseUrl,
+          VITE_RELAY_URL: stableRelayProxy.wsUrl,
+          // The loopback-only debug fixture has no real GitHub token to place
+          // in Keychain. Permit its cookie session without weakening packaged
+          // clients, where this build-time flag is absent.
+          VITE_NATIVE_E2E_COOKIE_AUTH: "1"
+        },
         timeoutMs: 8 * 60_000
       }
     );
