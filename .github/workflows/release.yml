@@ -320,7 +320,17 @@ jobs:
             exit 1
           fi
           bash scripts/verify-macos-deployment-target.sh "$app_path"
-          npm run verify:macos-associated-domains -- --require-profile "$app_path"
+          embedded_profile="$app_path/Contents/embedded.provisionprofile"
+          source_profile="apps/desktop/src-tauri/release.provisionprofile"
+          if [ ! -f "$embedded_profile" ]; then
+            echo "Signed application is missing its Developer ID provisioning profile." >&2
+            exit 1
+          fi
+          if ! cmp -s "$source_profile" "$embedded_profile"; then
+            echo "Embedded Developer ID provisioning profile does not match the validated release profile." >&2
+            exit 1
+          fi
+          npm run verify:macos-associated-domains -- "$app_path"
 
       - name: Package release assets
         env:
