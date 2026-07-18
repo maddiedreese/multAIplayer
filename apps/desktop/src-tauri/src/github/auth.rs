@@ -410,7 +410,7 @@ pub(super) fn build_session_cookie(
         .host_str()
         .ok_or_else(|| "Relay URL is invalid.".to_owned())?;
     Cookie::parse(format!(
-        "multaiplayer_session={session_value}; Domain={host}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax"
+        "multaiplayer_session={session_value}; Domain={host}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=None"
     ))
     .map(Cookie::into_owned)
     .map_err(|_| "The relay returned an invalid session cookie.".to_owned())

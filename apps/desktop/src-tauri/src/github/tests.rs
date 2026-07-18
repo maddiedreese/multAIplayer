@@ -62,7 +62,7 @@ fn native_configuration_and_cookie_attributes_are_pinned() {
     );
     assert_eq!(
         cookie.same_site().map(|value| format!("{value:?}")),
-        Some("Lax".to_owned())
+        Some("None".to_owned())
     );
 }
 
