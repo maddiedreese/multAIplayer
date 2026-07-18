@@ -479,7 +479,11 @@ async function main() {
       env: {
         VITE_DESKTOP_PORT: "1420",
         VITE_RELAY_HTTP_URL: stableRelayProxy.baseUrl,
-        VITE_RELAY_URL: stableRelayProxy.wsUrl
+        VITE_RELAY_URL: stableRelayProxy.wsUrl,
+        // The loopback-only debug fixture has no real GitHub token to place
+        // in Keychain. Permit its cookie session without weakening packaged
+        // clients, where this build-time flag is absent.
+        VITE_NATIVE_E2E_COOKIE_AUTH: "1"
       }
     });
     void vite;
@@ -505,14 +509,7 @@ async function main() {
         "--no-watch"
       ],
       {
-        env: {
-          VITE_RELAY_HTTP_URL: stableRelayProxy.baseUrl,
-          VITE_RELAY_URL: stableRelayProxy.wsUrl,
-          // The loopback-only debug fixture has no real GitHub token to place
-          // in Keychain. Permit its cookie session without weakening packaged
-          // clients, where this build-time flag is absent.
-          VITE_NATIVE_E2E_COOKIE_AUTH: "1"
-        },
+        env: { VITE_RELAY_HTTP_URL: stableRelayProxy.baseUrl, VITE_RELAY_URL: stableRelayProxy.wsUrl },
         timeoutMs: 8 * 60_000
       }
     );
