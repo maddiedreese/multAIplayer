@@ -6,6 +6,14 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.5] - 2026-07-18
+
+### Fixed
+
+- The native Keychain identity now remains authoritative when WebKit storage is reset for the same GitHub account, automatically restoring the original device identity instead of blocking room hosting.
+- Blocking Codex account, thread, steering, Git, project-file, shell, archive, and preview operations now run away from the macOS UI thread, preventing multi-second app freezes while native work completes.
+- Dialogs, onboarding codes, and the setup checklist now use the app's standard sans-serif type scale instead of oversized or monospaced popup typography.
+
 ## [0.1.0-alpha.4] - 2026-07-18
 
 ### Fixed

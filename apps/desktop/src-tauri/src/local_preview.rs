@@ -112,7 +112,7 @@ pub(crate) struct LocalPreviewStatusResult {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn detect_local_preview_servers(
+pub(crate) async fn detect_local_preview_servers(
 ) -> crate::command_error::CommandResult<Vec<LocalPreviewDetectedServer>> {
     let mut servers = Vec::new();
     for port in LOCAL_PREVIEW_PORTS {
@@ -158,7 +158,7 @@ pub(crate) fn probe_cloudflared() -> CloudflaredProbe {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn local_preview_start(
+pub(crate) async fn local_preview_start(
     state: State<'_, LocalPreviewState>,
     request: LocalPreviewStartRequest,
 ) -> crate::command_error::CommandResult<LocalPreviewStartResult> {

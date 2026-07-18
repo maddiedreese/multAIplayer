@@ -3,7 +3,7 @@ use super::invites::{
     validate_invite_response_pair,
 };
 use super::{
-    decode_stored_signing_secret, delete_all_history_native, delete_room_local_data_native,
+    decode_stored_signing_identity, delete_all_history_native, delete_room_local_data_native,
     engine_error, fingerprint, group_state_command_error, quarantine_store,
     should_quarantine_store, validate_room_config_payload, BasicAppCredential, CapabilityBinding,
     EncryptRequest, EncryptedStore, MlsEngine, PendingInviteRequestPublic,
@@ -149,7 +149,7 @@ fn native_delete_all_history_removes_ciphertext_and_epoch_secret() {
 }
 
 #[test]
-fn stored_signing_identity_is_bound_to_user_and_device() {
+fn stored_signing_identity_repairs_device_id_drift_for_the_same_user() {
     let encoded = serde_json::to_string(&StoredMlsIdentity {
         version: 1,
         github_user_id: "github:1".into(),
@@ -158,19 +158,23 @@ fn stored_signing_identity_is_bound_to_user_and_device() {
     })
     .unwrap();
     assert_eq!(
-        decode_stored_signing_secret(&encoded, "github:1", "device-1").unwrap(),
+        decode_stored_signing_identity(&encoded, "github:1")
+            .unwrap()
+            .secret,
         vec![0; 32]
     );
     assert_eq!(
-        decode_stored_signing_secret(&encoded, "github:2", "device-1"),
+        decode_stored_signing_identity(&encoded, "github:2").map(|identity| identity.secret),
         Err(SigningSecretLoadError::ScopeMismatch)
     );
     assert_eq!(
-        decode_stored_signing_secret(&encoded, "github:1", "device-2"),
-        Err(SigningSecretLoadError::ScopeMismatch)
+        decode_stored_signing_identity(&encoded, "github:1")
+            .unwrap()
+            .device_id,
+        "device-1"
     );
     assert_eq!(
-        decode_stored_signing_secret("corrupt", "github:1", "device-1"),
+        decode_stored_signing_identity("corrupt", "github:1").map(|identity| identity.secret),
         Err(SigningSecretLoadError::Internal)
     );
 }

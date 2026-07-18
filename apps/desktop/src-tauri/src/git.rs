@@ -91,7 +91,9 @@ pub(crate) struct GitWorkflowRequest {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn git_status(cwd: String) -> crate::command_error::CommandResult<GitStatusSummary> {
+pub(crate) async fn git_status(
+    cwd: String,
+) -> crate::command_error::CommandResult<GitStatusSummary> {
     ensure_existing_dir(&cwd)?;
 
     let branch_output = Command::new("git")
@@ -145,7 +147,9 @@ pub(crate) fn git_status(cwd: String) -> crate::command_error::CommandResult<Git
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn git_remote_origin(cwd: String) -> crate::command_error::CommandResult<GitRemoteInfo> {
+pub(crate) async fn git_remote_origin(
+    cwd: String,
+) -> crate::command_error::CommandResult<GitRemoteInfo> {
     ensure_existing_dir(&cwd)?;
 
     let output = Command::new("git")
@@ -168,9 +172,11 @@ pub(crate) fn git_remote_origin(cwd: String) -> crate::command_error::CommandRes
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn git_create_patch(cwd: String) -> crate::command_error::CommandResult<GitPatchResult> {
+pub(crate) async fn git_create_patch(
+    cwd: String,
+) -> crate::command_error::CommandResult<GitPatchResult> {
     ensure_existing_dir(&cwd)?;
-    let status = git_status(cwd.clone())?;
+    let status = git_status(cwd.clone()).await?;
     if status.files.is_empty() {
         return Ok(GitPatchResult {
             patch: String::new(),
@@ -235,7 +241,7 @@ pub(crate) fn git_create_patch(cwd: String) -> crate::command_error::CommandResu
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn git_clone_repository(
+pub(crate) async fn git_clone_repository(
     request: GitCloneRequest,
 ) -> crate::command_error::CommandResult<GitCloneResult> {
     ensure_git_remote_url(&request.remote_url)?;
@@ -270,7 +276,7 @@ pub(crate) fn git_clone_repository(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn git_apply_patch(
+pub(crate) async fn git_apply_patch(
     request: GitApplyPatchRequest,
 ) -> crate::command_error::CommandResult<GitApplyPatchResult> {
     let cwd = ensure_within_project_root(&request.project_root, &request.cwd)?;
@@ -302,7 +308,7 @@ pub(crate) fn git_apply_patch(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn run_git_workflow(
+pub(crate) async fn run_git_workflow(
     request: GitWorkflowRequest,
 ) -> crate::command_error::CommandResult<Vec<CommandResult>> {
     ensure_existing_dir(&request.cwd)?;

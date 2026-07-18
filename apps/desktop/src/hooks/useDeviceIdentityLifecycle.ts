@@ -10,6 +10,7 @@ interface UseDeviceIdentityLifecycleOptions {
   relayHttpUrl: string;
   identityResolved: boolean;
   deviceId: string;
+  replaceDeviceId: (deviceId: string) => void;
   userId: string;
   displayName: string;
   deviceIdentity: DeviceIdentity | null;
@@ -21,6 +22,7 @@ export function useDeviceIdentityLifecycle({
   relayHttpUrl,
   identityResolved,
   deviceId,
+  replaceDeviceId,
   userId,
   displayName,
   deviceIdentity,
@@ -39,6 +41,7 @@ export function useDeviceIdentityLifecycle({
     loadOrCreateDeviceIdentity(userId, deviceId)
       .then((identity) => {
         if (cancelled) return;
+        if (identity.deviceId !== deviceId) replaceDeviceId(identity.deviceId);
         replaceDeviceIdentity(identity);
         if (identity.requiresRejoin) {
           const store = useAppStore.getState();
@@ -56,7 +59,7 @@ export function useDeviceIdentityLifecycle({
     return () => {
       cancelled = true;
     };
-  }, [deviceId, identityResolved, replaceDeviceIdentity, setDeviceIdentityStatusMessage, userId]);
+  }, [deviceId, identityResolved, replaceDeviceId, replaceDeviceIdentity, setDeviceIdentityStatusMessage, userId]);
 
   useEffect(() => {
     if (

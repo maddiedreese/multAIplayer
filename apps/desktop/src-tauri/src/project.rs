@@ -81,7 +81,7 @@ pub(crate) struct GitDiffResult {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn project_files(
+pub(crate) async fn project_files(
     request: ProjectFileSearchRequest,
 ) -> crate::command_error::CommandResult<Vec<ProjectFileEntry>> {
     ensure_existing_dir(&request.cwd)?;
@@ -95,7 +95,7 @@ pub(crate) fn project_files(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn project_file_read(
+pub(crate) async fn project_file_read(
     request: ProjectFileReadRequest,
 ) -> crate::command_error::CommandResult<ProjectFileContent> {
     ensure_existing_dir(&request.cwd)?;
@@ -224,7 +224,7 @@ fn verified_project_image_media_type(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn project_file_write(
+pub(crate) async fn project_file_write(
     request: ProjectFileWriteRequest,
 ) -> crate::command_error::CommandResult<ProjectFileWriteResult> {
     ensure_existing_dir(&request.cwd)?;
@@ -305,7 +305,7 @@ fn safe_project_write_path(root: &Path, relative_path: &str) -> Result<PathBuf, 
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn git_diff_file(
+pub(crate) async fn git_diff_file(
     request: GitDiffRequest,
 ) -> crate::command_error::CommandResult<GitDiffResult> {
     ensure_existing_dir(&request.cwd)?;

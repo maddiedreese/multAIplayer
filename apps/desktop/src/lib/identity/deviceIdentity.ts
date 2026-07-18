@@ -15,7 +15,7 @@ export async function loadOrCreateDeviceIdentity(githubUserId: string, deviceId:
   const existing = nativeIdentityPromises.get(scope);
   if (existing) return existing;
   const pending = initializeMlsIdentity(githubUserId, deviceId)
-    .then((identity) => normalizeIdentity(identity, githubUserId, deviceId))
+    .then((identity) => normalizeIdentity(identity, githubUserId))
     .catch((error: unknown) => {
       if (nativeIdentityPromises.get(scope) === pending) nativeIdentityPromises.delete(scope);
       throw error;
@@ -24,9 +24,9 @@ export async function loadOrCreateDeviceIdentity(githubUserId: string, deviceId:
   return pending;
 }
 
-function normalizeIdentity(identity: MlsIdentityPublic, githubUserId: string, deviceId: string): DeviceIdentity {
-  if (identity.githubUserId !== githubUserId || identity.deviceId !== deviceId) {
-    throw new Error("Native MLS identity does not match the requested account and device");
+function normalizeIdentity(identity: MlsIdentityPublic, githubUserId: string): DeviceIdentity {
+  if (identity.githubUserId !== githubUserId) {
+    throw new Error("Native MLS identity does not match the requested account");
   }
   if (
     identity.ciphersuite !== 2 ||

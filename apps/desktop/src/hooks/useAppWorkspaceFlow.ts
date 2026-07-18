@@ -102,6 +102,7 @@ export function useAppWorkspaceFlow({
         relayHttpUrl,
         identityResolved,
         deviceId: localIdentity.deviceId,
+        replaceDeviceId: localIdentity.replaceDeviceId,
         userId: localIdentity.localUser.id,
         displayName: localIdentity.localUser.name,
         deviceIdentity,

@@ -39,7 +39,7 @@ pub(crate) struct CodexThreadNode {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn list_codex_threads(
+pub(crate) async fn list_codex_threads(
     request: CodexThreadListRequest,
     app: AppHandle,
     state: State<'_, CodexHostState>,
@@ -69,7 +69,7 @@ pub(crate) fn list_codex_threads(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn fork_codex_thread(
+pub(crate) async fn fork_codex_thread(
     request: CodexThreadForkRequest,
     app: AppHandle,
     state: State<'_, CodexHostState>,

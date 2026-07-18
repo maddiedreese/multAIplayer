@@ -26,7 +26,7 @@ pub(crate) struct ShellCommandRequest {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn run_shell_command(
+pub(crate) async fn run_shell_command(
     state: State<'_, ShellAuthorizationState>,
     request: ShellCommandRequest,
 ) -> crate::command_error::CommandResult<CommandResult> {

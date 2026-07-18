@@ -107,7 +107,7 @@ pub(crate) struct ArchiveOpened {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn room_archive_export(
+pub(crate) async fn room_archive_export(
     request: ArchiveExportRequest,
 ) -> crate::command_error::CommandResult<ArchiveLibraryEntry> {
     let path = PathBuf::from(&request.path);
@@ -118,7 +118,7 @@ pub(crate) fn room_archive_export(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn room_archive_import(
+pub(crate) async fn room_archive_import(
     request: ArchiveImportRequest,
     app: tauri::AppHandle,
 ) -> crate::command_error::CommandResult<ArchiveOpened> {
@@ -144,7 +144,7 @@ pub(crate) fn room_archive_import(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn room_archive_list(
+pub(crate) async fn room_archive_list(
     app: tauri::AppHandle,
 ) -> crate::command_error::CommandResult<Vec<ArchiveLibraryEntry>> {
     let library = library_dir(&app)?;
@@ -155,7 +155,7 @@ pub(crate) fn room_archive_list(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn room_archive_open(
+pub(crate) async fn room_archive_open(
     request: ArchiveOpenRequest,
     app: tauri::AppHandle,
 ) -> crate::command_error::CommandResult<ArchiveOpened> {
@@ -171,7 +171,7 @@ pub(crate) fn room_archive_open(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn room_archive_delete(
+pub(crate) async fn room_archive_delete(
     request: ArchiveDeleteRequest,
     app: tauri::AppHandle,
 ) -> crate::command_error::CommandResult<()> {
