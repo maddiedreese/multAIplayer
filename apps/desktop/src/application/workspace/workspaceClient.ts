@@ -17,6 +17,7 @@ import { readJsonResponse } from "../../lib/core/httpResponse";
 import { deviceSessionHeaders } from "../../lib/identity/deviceSession";
 import { ensureRoomDefaults } from "../../lib/room/roomDefaults";
 import { useAppStore } from "../../store/appStore";
+import { relayFetch as fetch } from "../../lib/relay/relaySession";
 
 export interface WorkspaceSnapshot {
   teams: TeamRecord[];

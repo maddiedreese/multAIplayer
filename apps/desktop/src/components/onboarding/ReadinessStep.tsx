@@ -12,6 +12,7 @@ import type {
   OnboardingReadinessStatus
 } from "../../application/onboarding/onboardingReadiness";
 import { StepActions, StepHeading } from "./OnboardingPrimitives";
+import { GitHubKeychainNotice } from "../GitHubKeychainNotice";
 
 const actionLabels: Record<OnboardingReadinessAction, string> = {
   retry_workspace_bootstrap: "Try again",
@@ -90,6 +91,7 @@ export function ReadinessStep({
         <p>
           <strong>ChatGPT</strong> authorizes the local Codex process that performs work.
         </p>
+        <GitHubKeychainNotice />
       </div>
       <StepActions onBack={onBack}>
         <button type="button" className="onboarding-primary" onClick={onContinue} disabled={busy || blocking}>

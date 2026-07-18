@@ -99,11 +99,15 @@ fn serialized_ipc_results_never_have_token_fields() {
             name: None,
             avatar_url: None,
         },
+        relay_session: "opaque-relay-session".into(),
+        relay_origin: "https://relay.multaiplayer.com".into(),
     })
     .unwrap();
     let encoded = value.to_string();
     assert!(!encoded.contains("access_token"));
     assert!(!encoded.contains("accessToken"));
+    assert_eq!(value["relaySession"], "opaque-relay-session");
+    assert_eq!(value["relayOrigin"], "https://relay.multaiplayer.com");
     let repository = serde_json::to_value(RepositoryDevicePollResult::Complete).unwrap();
     assert_eq!(repository, serde_json::json!({ "status": "complete" }));
     assert!(!repository.to_string().contains("user"));

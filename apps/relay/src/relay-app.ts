@@ -6,6 +6,7 @@ import { WebSocketServer } from "ws";
 import {
   createRelayAuthSessionManager,
   createRelayAuthSessionPersistence,
+  nativeSessionHeaderMiddleware,
   pruneRetainedAuthSessions
 } from "./auth/session.js";
 import { createAccountRestrictionManager, isAccountRestricted } from "./auth/account-restrictions.js";
@@ -102,6 +103,7 @@ export async function createRelayApp(
   app.use(originPolicy.enforceAllowedOrigin);
   app.use(cors(originPolicy.corsOptions));
   app.use(cookieParser());
+  app.use(nativeSessionHeaderMiddleware());
   app.use(originPolicy.enforceCookieMutationCsrf);
   app.use(requestLoggingMiddleware(structuredLogsEnabled));
   const server = createServer(app);
@@ -109,6 +111,9 @@ export async function createRelayApp(
     server,
     path: "/rooms",
     maxPayload: mlsMessageMaxBytes * 2,
+    handleProtocols(protocols) {
+      return protocols.has("multaiplayer-v1") ? "multaiplayer-v1" : false;
+    },
     verifyClient(info, done) {
       if (originPolicy.isAllowedOrigin(info.origin)) {
         done(true);

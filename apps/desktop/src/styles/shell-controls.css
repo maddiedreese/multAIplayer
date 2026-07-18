@@ -111,6 +111,20 @@ button:not(:disabled):active {
   line-height: 1.2;
 }
 
+.github-keychain-notice {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.github-keychain-notice.compact {
+  margin-top: -2px;
+  padding: 0 2px;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
 .profile-card {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;

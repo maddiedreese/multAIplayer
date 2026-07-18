@@ -92,8 +92,24 @@ enum TokenPollOutcome {
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum DevicePollResult {
     Pending,
-    SlowDown { retry_after_seconds: u64 },
-    Complete { user: SignedInUser },
+    SlowDown {
+        retry_after_seconds: u64,
+    },
+    Complete {
+        user: SignedInUser,
+        #[serde(rename = "relaySession")]
+        relay_session: String,
+        #[serde(rename = "relayOrigin")]
+        relay_origin: String,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoredGitHubSession {
+    user: SignedInUser,
+    relay_session: String,
+    relay_origin: String,
 }
 
 #[derive(Serialize)]

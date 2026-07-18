@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   getAuthConfig,
-  getCurrentUser,
   githubDevicePollDelayMs,
   logout,
   nextGitHubDevicePollIntervalSeconds,
   pollGitHubDeviceFlow,
+  restoreGitHubSession,
   startGitHubDeviceFlow,
   type GitHubAuthConfig
 } from "../lib/identity/authClient";
@@ -70,7 +70,7 @@ export function useGitHubAuth(relayHttpUrl: string) {
         setAuthError(String(error));
         setAuthConfigResolved(true);
       });
-    getCurrentUser()
+    restoreGitHubSession()
       .then((user) => {
         if (!cancelled) setCurrentUser(user);
       })

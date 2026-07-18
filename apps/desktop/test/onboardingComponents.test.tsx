@@ -136,6 +136,9 @@ test("readiness stays in canonical order, warnings are actionable, and blocked r
   assert.match(authExplainer, /GitHub identity is required for hosted workspaces/);
   assert.match(authExplainer, /read:user/);
   assert.match(authExplainer, /pull-request and Actions workflows ask for repo access later/);
+  assert.match(authExplainer, /macOS may show a Keychain access dialog/);
+  assert.match(authExplainer, /cannot view unrelated Keychain items/);
+  assert.match(authExplainer, /Always Allow/);
 });
 
 test("create form keeps folder selection local and retries only the room after partial team success", async () => {

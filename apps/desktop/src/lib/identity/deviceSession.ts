@@ -1,5 +1,6 @@
 import { signDeviceChallenge } from "../mls/mlsClient";
 import { isRelayHttpErrorCode, readJsonResponse } from "../core/httpResponse";
+import { relayFetch as fetch } from "../relay/relaySession";
 
 export interface DeviceSession {
   token: string;

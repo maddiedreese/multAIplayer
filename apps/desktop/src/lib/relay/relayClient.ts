@@ -1,4 +1,5 @@
 import { RelayServerMessage, type RelayClientMessage } from "@multaiplayer/protocol";
+import { relayWebSocketProtocols } from "./relaySession";
 
 export class RelayPublishRejectedError extends Error {
   constructor(
@@ -129,7 +130,7 @@ export function connectRelay(
 
   function connect() {
     onStatus("connecting");
-    socket = new WebSocket(url);
+    socket = new WebSocket(url, relayWebSocketProtocols(url));
 
     socket.addEventListener("open", () => {
       reconnectAttempt = 0;

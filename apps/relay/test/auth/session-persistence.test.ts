@@ -109,6 +109,48 @@ test("session manager validates live state, cookies, authorization, and identity
     manager.getAuthSessionFromRequest({ headers: { cookie: `multaiplayer_session=${token}` } } as never)?.user.id,
     "github:active"
   );
+  assert.equal(
+    manager.getAuthSessionFromRequest({ headers: { "x-multaiplayer-session": token } } as never)?.user.id,
+    "github:active"
+  );
+  assert.equal(
+    manager.getAuthSessionFromRequest({
+      headers: { "sec-websocket-protocol": `multaiplayer-v1, multaiplayer-session.${token}` }
+    } as never)?.user.id,
+    "github:active"
+  );
+  assert.equal(
+    manager.getAuthSessionFromRequest({
+      headers: {
+        cookie: `multaiplayer_session=${token}`,
+        "x-multaiplayer-session": "different-session"
+      }
+    } as never),
+    undefined
+  );
+  assert.equal(
+    manager.getAuthSessionFromRequest({
+      headers: {
+        cookie: `multaiplayer_session=${token}`,
+        "sec-websocket-protocol": "multaiplayer-v1, multaiplayer-session.not valid"
+      }
+    } as never),
+    undefined
+  );
+  assert.equal(
+    manager.getAuthSessionFromRequest({
+      headers: { "x-multaiplayer-session": [token] }
+    } as never),
+    undefined
+  );
+  assert.equal(
+    manager.getAuthSessionFromRequest({
+      headers: {
+        "sec-websocket-protocol": `multaiplayer-session.${token}, multaiplayer-session.${token}`
+      }
+    } as never),
+    undefined
+  );
 
   const response = errorResponse();
   assert.equal(manager.allowRead(null, response.value), false);

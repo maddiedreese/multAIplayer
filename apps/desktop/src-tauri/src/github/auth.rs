@@ -141,20 +141,43 @@ async fn github_device_flow_poll_inner(
             CredentialPoll::Complete(credential) => credential,
         };
     validate_granted_scopes(DeviceFlowPurpose::Identity, &credential.scopes)?;
-    let (user, cookie) = verify_with_relay(RELAY_HTTP_ORIGIN, &credential.token).await?;
+    let (user, relay_session, cookie) =
+        verify_with_relay(RELAY_HTTP_ORIGIN, &credential.token).await?;
     // A new identity must never inherit repository authority from a previous account.
     clear_repository_token()?;
     store_identity_token(&credential.token)?;
-    if window.set_cookie(cookie).is_err() {
-        let _ = github_token_delete_inner();
-        return Err("Signed in, but the relay session could not be installed.".to_owned());
-    }
+    // Keep cookie auth for platforms that accept it. The packaged macOS app
+    // also receives the opaque relay session because WebKit may block this
+    // cross-site cookie for its tauri:// top-level origin.
+    let _ = window.set_cookie(cookie);
     state
         .pending
         .lock()
         .map_err(|_| "GitHub sign-in state is unavailable.".to_owned())?
         .remove(&flow_id);
-    Ok(DevicePollResult::Complete { user })
+    Ok(DevicePollResult::Complete {
+        user,
+        relay_session,
+        relay_origin: RELAY_HTTP_ORIGIN.to_owned(),
+    })
+}
+
+#[typed_tauri_command::command]
+pub async fn github_session_restore(
+    window: WebviewWindow,
+) -> crate::command_error::CommandResult<Option<RestoredGitHubSession>> {
+    let Some(token) = try_load_identity_token().map_err(github_command_error)? else {
+        return Ok(None);
+    };
+    let (user, relay_session, cookie) = verify_with_relay(RELAY_HTTP_ORIGIN, &token)
+        .await
+        .map_err(github_command_error)?;
+    let _ = window.set_cookie(cookie);
+    Ok(Some(RestoredGitHubSession {
+        user,
+        relay_session,
+        relay_origin: RELAY_HTTP_ORIGIN.to_owned(),
+    }))
 }
 
 #[typed_tauri_command::command]
@@ -365,7 +388,7 @@ pub fn github_device_flow_cancel(state: tauri::State<'_, GitHubState>, flow_id: 
 async fn verify_with_relay(
     relay_url: &str,
     token: &str,
-) -> Result<(SignedInUser, Cookie<'static>), String> {
+) -> Result<(SignedInUser, String, Cookie<'static>), String> {
     let base = validate_relay_url(relay_url)?;
     let endpoint = base
         .join("/auth/github/verify")
@@ -398,8 +421,8 @@ async fn verify_with_relay(
         .to_owned();
     let body: VerifyResponse = bounded_json(response).await?;
     let user = validate_signed_in_user(body.user)?;
-    let cookie = build_session_cookie(&base, session_value)?;
-    Ok((user, cookie))
+    let cookie = build_session_cookie(&base, session_value.clone())?;
+    Ok((user, session_value, cookie))
 }
 
 pub(super) fn build_session_cookie(
@@ -491,6 +514,18 @@ pub(super) fn load_identity_token() -> Result<String, String> {
         IDENTITY_KEYCHAIN_ACCOUNT,
         "Sign in to GitHub before using this feature.",
     )
+}
+
+fn try_load_identity_token() -> Result<Option<String>, String> {
+    let token = match token_entry(IDENTITY_KEYCHAIN_ACCOUNT)?.get_password() {
+        Ok(token) => token,
+        Err(keyring::Error::NoEntry) => return Ok(None),
+        Err(_) => return Err("The stored GitHub identity could not be read securely.".to_owned()),
+    };
+    if token.is_empty() || token.len() > MAX_TOKEN_CHARS || token.chars().any(char::is_whitespace) {
+        return Err("Stored GitHub credentials are invalid.".to_owned());
+    }
+    Ok(Some(token))
 }
 
 pub(super) fn load_repository_token() -> Result<String, String> {

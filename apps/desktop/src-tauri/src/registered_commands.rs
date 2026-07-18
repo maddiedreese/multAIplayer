@@ -22,6 +22,7 @@ macro_rules! with_registered_commands {
                 git_apply_patch,
                 github_device_flow_start,
                 github_device_flow_poll,
+                github_session_restore,
                 github_repository_device_flow_start,
                 github_repository_device_flow_poll,
                 github_repository_access_status,
