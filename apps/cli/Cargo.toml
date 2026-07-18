@@ -12,4 +12,5 @@ name = "multAIplayer"
 path = "src/main.rs"
 
 [workspace]
+members = ["crates/protocol"]
 resolver = "2"
