@@ -4,6 +4,10 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 ## [Unreleased]
 
+_No changes recorded._
+
+## [0.1.0-alpha.7] - 2026-07-18
+
 ### Fixed
 
 - The production relay image now includes the MLS validator's pinned OpenSSL runtime library, and an early validator exit fails the upload closed without crashing the relay process.
