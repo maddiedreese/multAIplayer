@@ -3,7 +3,7 @@
 Plan version: 1.0  
 Decision set: 1.0  
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: Governance setup  
+Current phase: Awaiting owner approval for CLI-010
 Implementation authorization: Not granted  
 Last update: 2026-07-18
 
@@ -11,9 +11,14 @@ Last update: 2026-07-18
 
 - Desktop pre-release `v0.1.0-alpha.7` exists.
 - CLI governance worktree: `/Users/maddiedreese/Documents/MultAIplayer-cli`.
+- Codex project: `MultAIplayer-cli`.
 - Governance branch: `codex/cli-governance`.
 - No CLI product code has been authorized or implemented.
 - Every task is `waiting_for_owner_approval`.
+- All 18 Codex tasks have read their governing files, reported readiness, and
+  stopped without implementation.
+- `[CLI-000] Program Control — Governance` and `[CLI-010] Desktop Release
+  Isolation` are pinned in the Codex project.
 - Tasks must be approved and executed one at a time unless the owner explicitly
   authorizes nonoverlapping parallel worktrees.
 
@@ -21,7 +26,7 @@ Last update: 2026-07-18
 
 | Task | Title | State | Depends on |
 | --- | --- | --- | --- |
-| CLI-000 | Governance and source of truth | in_progress | — |
+| CLI-000 | Governance and source of truth | complete | — |
 | CLI-010 | Desktop release isolation and CI classification | waiting_for_owner_approval | CLI-000 |
 | CLI-020 | Inert Rust CLI scaffold | waiting_for_owner_approval | CLI-010 |
 | CLI-030 | Rust protocol types and golden fixtures | waiting_for_owner_approval | CLI-020 |
@@ -55,4 +60,3 @@ An implementation task may update its state and evidence here after approval.
 It may not mark dependencies complete without their accepted verification. Any
 deviation from the plan is recorded as a blocker until the owner approves a
 plan change.
-
