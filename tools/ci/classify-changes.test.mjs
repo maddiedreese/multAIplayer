@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allDomains, classifyChanges } from "./classify-changes.mjs";
+import { allDomains, classifyChanges, protectedReleasePaths } from "./classify-changes.mjs";
 
 test("documentation-only changes do not select executable checks", () => {
   assert.deepEqual(classifyChanges(["README.md", "docs/using-the-app.md", "e2e/README.md"]), {
@@ -10,7 +10,12 @@ test("documentation-only changes do not select executable checks", () => {
     native: false,
     ui_journey: false,
     native_journey: false,
-    macos: false
+    macos: false,
+    cli: false,
+    desktop: false,
+    relay: false,
+    shared: false,
+    protected_release: false
   });
 });
 
@@ -22,7 +27,12 @@ test("relay changes select JavaScript and both relay-backed journeys", () => {
     native: false,
     ui_journey: true,
     native_journey: true,
-    macos: false
+    macos: false,
+    cli: false,
+    desktop: false,
+    relay: true,
+    shared: false,
+    protected_release: false
   });
 });
 
@@ -48,7 +58,12 @@ test("native changes select native checks without an unrelated UI journey", () =
     native: true,
     ui_journey: false,
     native_journey: true,
-    macos: true
+    macos: true,
+    cli: false,
+    desktop: true,
+    relay: false,
+    shared: false,
+    protected_release: false
   });
 });
 
@@ -111,7 +126,12 @@ test("workflow changes select policy checks and manual runs can opt into all dom
     native: false,
     ui_journey: false,
     native_journey: false,
-    macos: false
+    macos: false,
+    cli: false,
+    desktop: false,
+    relay: false,
+    shared: false,
+    protected_release: false
   });
   assert.deepEqual(allDomains(), {
     documentation: true,
@@ -120,7 +140,12 @@ test("workflow changes select policy checks and manual runs can opt into all dom
     native: true,
     ui_journey: true,
     native_journey: true,
-    macos: true
+    macos: true,
+    cli: true,
+    desktop: true,
+    relay: true,
+    shared: true,
+    protected_release: true
   });
 });
 
@@ -157,7 +182,12 @@ test("GitHub templates are documentation, while workflow code selects workflow c
     native: false,
     ui_journey: false,
     native_journey: false,
-    macos: false
+    macos: false,
+    cli: false,
+    desktop: false,
+    relay: false,
+    shared: false,
+    protected_release: false
   });
   assert.equal(classifyChanges([".github/actions/setup-rust/action.yml"]).workflow, true);
 });
@@ -171,4 +201,48 @@ test("changes to CI and its shared detector exercise the definitions being edite
   const detector = classifyChanges([".github/actions/changed-domains/action.yml"]);
   assert.equal(detector.workflow, true);
   assert.equal(detector.javascript, true);
+});
+
+test("CLI-only changes select CLI checks without selecting desktop or release surfaces", () => {
+  assert.deepEqual(classifyChanges(["apps/cli/src/main.rs", "apps/cli/Cargo.lock"]), {
+    documentation: false,
+    workflow: false,
+    javascript: false,
+    native: false,
+    ui_journey: false,
+    native_journey: false,
+    macos: false,
+    cli: true,
+    desktop: false,
+    relay: false,
+    shared: false,
+    protected_release: false
+  });
+});
+
+test("shared protocol, MLS, contract, and crate paths select both client suites", () => {
+  for (const path of [
+    "packages/protocol/src/relay-messages.ts",
+    "apps/desktop/src-tauri/crates/mls-core/src/lib.rs",
+    "contracts/codex-app-server/support-policy.json",
+    "crates/client-core/src/lib.rs"
+  ]) {
+    const result = classifyChanges([path]);
+    assert.equal(result.shared, true, `${path} must be shared`);
+    assert.equal(result.cli, true, `${path} must select CLI checks`);
+    assert.equal(result.desktop, true, `${path} must select desktop checks`);
+  }
+});
+
+test("protected desktop release paths are reported exactly", () => {
+  const paths = [
+    "apps/cli/src/main.rs",
+    ".github/workflows/release.yml",
+    "apps/desktop/src-tauri/Cargo.lock",
+    "apps/desktop/src-tauri/Entitlements.plist",
+    "docs/release-assets.v1.json",
+    "tools/release/sync-release-metadata.mjs"
+  ];
+  assert.deepEqual(protectedReleasePaths(paths), paths.slice(1).sort());
+  assert.equal(classifyChanges(paths).protected_release, true);
 });
