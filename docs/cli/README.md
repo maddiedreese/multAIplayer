@@ -9,7 +9,8 @@ Read in this order:
 2. [Locked decisions](decisions.md)
 3. [Current status](status.md)
 4. [Task catalog](task-catalog.md)
-5. The applicable file under [tasks](tasks/README.md)
+5. [Orchestration runbook](orchestration.md)
+6. The applicable file under [tasks](tasks/README.md)
 
 Implementation agents must also follow the repository-root `AGENTS.md`. The CLI
 is intentionally not implemented by this governance setup. Every implementation
@@ -28,4 +29,3 @@ When sources disagree, use this order:
 
 Material plan changes require explicit owner approval. Routine implementation
 progress belongs in `status.md`; historical detail belongs in Git history.
-

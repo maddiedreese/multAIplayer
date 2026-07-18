@@ -5,7 +5,7 @@ start paused. Opening or reading a task is not approval to implement it.
 
 | Task | Deliverable | Primary gate |
 | --- | --- | --- |
-| [CLI-000](tasks/CLI-000.md) | Governance, plan, decisions, and task system | Documentation validation and owner review |
+| [CLI-000](tasks/CLI-000.md) | Program orchestration, governance, verification, and task advancement | Orchestration invariants and owner review |
 | [CLI-010](tasks/CLI-010.md) | Release isolation and path-aware CI | Existing desktop release contract unchanged |
 | [CLI-020](tasks/CLI-020.md) | Inert `multAIplayer` Rust binary | CLI-only check; no desktop lock/package change |
 | [CLI-030](tasks/CLI-030.md) | Strict Rust protocol and shared fixtures | TypeScript/Rust compatibility fixtures |
@@ -23,4 +23,3 @@ start paused. Opening or reading a task is not approval to implement it.
 | [CLI-150](tasks/CLI-150.md) | Security hardening and threat-model alignment | Redaction, fuzz, and adversarial journeys |
 | [CLI-160](tasks/CLI-160.md) | Signed independent CLI artifacts | Packaging/release isolation verification |
 | [CLI-170](tasks/CLI-170.md) | External-alpha release decision | Full acceptance checklist and owner signoff |
-

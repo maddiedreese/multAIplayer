@@ -2,7 +2,7 @@
 
 Status: Approved  
 Owner: Maddie D. Reese  
-Decision set: 1.0  
+Decision set: 1.1
 Last material update: 2026-07-18
 
 These decisions remain in force until the owner explicitly approves a change.
@@ -31,6 +31,10 @@ These decisions remain in force until the owner explicitly approves a change.
 | Automation | Human-interactive only; no global auto-approval or unattended host mode |
 | Initial platform | Apple-silicon macOS, matching the desktop alpha |
 | Release coupling | CLI source may coexist on `main`, but packaging, versions, locks, and artifacts remain isolated until launch |
+| Program orchestration | CLI-000 may verify, integrate, and advance tasks automatically under bounded delegated authority |
+| Integration target | Automated task merges may target only `codex/cli-integration`; `main` remains owner-controlled |
+| Concurrency | At most one implementation task may be active unless the owner explicitly authorizes nonoverlapping parallel work |
+| Automation cadence | CLI-000 receives a 15-minute heartbeat while the program is active |
 
 ## Recommended defaults
 
@@ -46,4 +50,3 @@ These decisions remain in force until the owner explicitly approves a change.
 - Local room history is bounded and encrypted.
 - Unsupported desktop event types render a safe placeholder in the CLI.
 - No `--yes` flag may bypass human approval.
-

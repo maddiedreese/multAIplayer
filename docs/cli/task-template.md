@@ -1,7 +1,7 @@
 # CLI-NNN: Task title
 
-State: waiting_for_owner_approval  
-Plan version: 1.0
+State: waiting_for_orchestrator_approval
+Plan version: 1.1
 
 ## Mandatory startup behavior
 
@@ -9,8 +9,9 @@ Read `AGENTS.md`, `docs/cli/development-plan.md`, `docs/cli/decisions.md`,
 `docs/cli/status.md`, and this task completely. Summarize the outcome, allowed
 scope, protected scope, dependencies, risks, and verification. Do not edit
 files, create or switch branches, install dependencies, run mutating commands,
-commit, push, or open a pull request. Wait for explicit owner approval in the
-task before implementation.
+commit, push, or open a pull request. Wait for explicit approval in the task
+before implementation. Approval may come from the owner or from CLI-000 under
+the checked-in orchestration runbook.
 
 ## Outcome
 
@@ -47,4 +48,3 @@ dependency-boundary, or approved-plan change becomes necessary.
 ## Completion evidence
 
 Record tests, reviewed diff, commit/PR, and `status.md` update after approval.
-

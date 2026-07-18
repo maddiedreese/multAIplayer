@@ -1,7 +1,7 @@
 # multAIplayer CLI development plan
 
 Status: Approved  
-Plan version: 1.0  
+Plan version: 1.1
 Owner: Maddie D. Reese  
 Approved baseline: GitHub `main` at `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
 Last material update: 2026-07-18
@@ -242,6 +242,14 @@ allow two writers in the same checkout or overlapping shared boundary. Desktop
 hotfixes land on `main`; new CLI tasks begin from current `main` or the approved
 CLI integration baseline.
 
+CLI-000 is the program orchestrator. A 15-minute heartbeat wakes it to inspect
+the active task, verify completion evidence, maintain the status ledger, merge
+accepted work into `codex/cli-integration`, and approve the next dependency-ready
+task. It may keep exactly one implementation task active. It never merges to
+`main`, publishes a release, changes the approved plan, waives a gate, or resolves
+an owner-only decision. The complete procedure and task-thread registry live in
+`docs/cli/orchestration.md`.
+
 CLI-only changes run CLI formatting, clippy, tests, protocol fixtures, and
 journeys. Desktop-only changes retain existing gates. Shared protocol/MLS/Codex
 changes run desktop, CLI, relay, and mixed-client verification. CLI path changes
@@ -290,3 +298,6 @@ admission, auto-approval, wire formats, MLS policy, host handoff scope, workspac
 layout, lockfile coupling, or shared-output policy. Implementation agents stop
 and ask rather than resolving such conflicts themselves.
 
+The owner approved plan version 1.1 to delegate bounded task advancement and
+CLI-only integration authority to CLI-000. This delegation does not extend to
+`main`, desktop releases, publication, plan changes, or stop-condition decisions.
