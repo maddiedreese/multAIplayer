@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-020 inert Rust CLI scaffold
+Current phase: CLI-030 Rust protocol types and golden fixtures
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -13,14 +13,20 @@ Last update: 2026-07-18
 - CLI governance worktree: `/Users/maddiedreese/Documents/MultAIplayer-cli`.
 - Codex project: `MultAIplayer-cli`.
 - Governance branch: `codex/cli-governance`.
-- No CLI product code has been implemented.
+- The dependency-free CLI scaffold is present; no relay, MLS, authentication, or
+  other product behavior has been implemented.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
   `d7fd5d73e9f6b612a904cc8f4e639be9b89751fb` passed 23 CI tests, 21 release-tool
   tests, documentation checks, the CLI isolation check, and the protected-path
   audit. The task's full `npm run verify` also passed before integration.
-- CLI-020 is the only active implementation task.
+- CLI-020 is complete and integrated. Its accepted task commit is
+  `fc54881490473d9f2aab7ff822c5560041315af6`; integration merge
+  `9d0e71b154fc59c9bdfc783da9f8df36ff699b0c` passed CLI formatting, Clippy,
+  two unit tests, bounded help/version checks, 18 classification/isolation tests,
+  and the protected desktop-release audit.
+- CLI-030 is the only active implementation task.
 - Every other implementation task is `waiting_for_orchestrator_approval` until
   CLI-000 confirms dependencies and grants exact task approval.
 - All 18 Codex tasks have read their governing files, reported readiness, and
@@ -36,8 +42,8 @@ Last update: 2026-07-18
 | --- | --- | --- | --- |
 | CLI-000 | Program orchestration and governance | active_orchestrator | — |
 | CLI-010 | Desktop release isolation and CI classification | complete | CLI-000 |
-| CLI-020 | Inert Rust CLI scaffold | active | CLI-010 |
-| CLI-030 | Rust protocol types and golden fixtures | waiting_for_orchestrator_approval | CLI-020 |
+| CLI-020 | Inert Rust CLI scaffold | complete | CLI-010 |
+| CLI-030 | Rust protocol types and golden fixtures | active | CLI-020 |
 | CLI-040 | GitHub authentication and secure device identity | waiting_for_orchestrator_approval | CLI-030 |
 | CLI-050 | Relay transport and workspace reads | waiting_for_orchestrator_approval | CLI-030, CLI-040 |
 | CLI-060 | MLS client state, storage, and outbox | waiting_for_orchestrator_approval | CLI-030, CLI-040 |
