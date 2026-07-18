@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isPrereleaseTag, planChannelUpdate, validateReleaseEvent } from "./github-release.mjs";
+import { findReleaseByTag, isPrereleaseTag, planChannelUpdate, validateReleaseEvent } from "./github-release.mjs";
+
+test("draft releases can be resolved from the authenticated releases list", () => {
+  const draft = { id: 7, draft: true, tag_name: "v0.1.0-alpha.7" };
+  assert.equal(findReleaseByTag([{ id: 6, draft: false, tag_name: "v0.1.0-alpha.6" }, draft], draft.tag_name), draft);
+  assert.equal(findReleaseByTag([], draft.tag_name), null);
+  assert.throws(() => findReleaseByTag([draft, { ...draft, id: 8 }], draft.tag_name), /multiple releases/);
+});
 
 test("release tags are validated and classified without loose substring rules", () => {
   assert.equal(isPrereleaseTag("v0.1.0-alpha.1"), true);

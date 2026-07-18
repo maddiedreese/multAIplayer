@@ -34,6 +34,28 @@ function api(path, { optional = false } = {}) {
   throw new Error(result.stderr.trim() || `gh api ${path} failed`);
 }
 
+export function findReleaseByTag(releases, tag) {
+  assert.ok(Array.isArray(releases), "GitHub releases response must be an array");
+  const matches = releases.filter((release) => release?.tag_name === tag);
+  assert.ok(matches.length <= 1, `GitHub returned multiple releases for ${tag}`);
+  return matches[0] ?? null;
+}
+
+function releaseByTag(repository, tag, { optional = false } = {}) {
+  const published = api(`repos/${repository}/releases/tags/${tag}`, { optional: true });
+  if (published) return published;
+
+  for (let page = 1; ; page += 1) {
+    const releases = api(`repos/${repository}/releases?per_page=100&page=${page}`);
+    const release = findReleaseByTag(releases, tag);
+    if (release) return release;
+    if (releases.length < 100) break;
+  }
+
+  if (optional) return null;
+  throw new Error(`GitHub release ${tag} was not found`);
+}
+
 function tagCommit(repository, tag) {
   const metadata = api(`repos/${repository}/commits/${tag}`);
   assert.match(metadata.sha, /^[0-9a-f]{40}$/, "GitHub did not resolve the release tag to a commit");
@@ -54,7 +76,7 @@ export function planChannelUpdate(candidateBytes, currentBytes) {
 }
 
 function assertPrivateDraft(repository, tag) {
-  const metadata = api(`repos/${repository}/releases/tags/${tag}`);
+  const metadata = releaseByTag(repository, tag);
   assert.equal(metadata.draft, true, `refusing to mutate already-public release ${tag}`);
 }
 
@@ -86,14 +108,14 @@ export function resolveReleaseSource({ tag, eventName, eventRef, eventSha, repos
   const commit = command("git", ["rev-parse", `refs/tags/${tag}^{commit}`]);
   validateReleaseEvent({ eventName, eventRef, eventSha, tag, tagCommitSha: commit });
   command("git", ["merge-base", "--is-ancestor", commit, "refs/remotes/origin/main"]);
-  const existing = api(`repos/${repository}/releases/tags/${tag}`, { optional: true });
+  const existing = releaseByTag(repository, tag, { optional: true });
   assert.ok(existing === null || existing.draft, `release ${tag} is already public; refusing to rebuild or replace it`);
   appendFileSync(outputPath, `commit=${commit}\nprerelease=${isPrereleaseTag(tag)}\ntag=${tag}\n`);
 }
 
 export function publishRelease({ assetsDirectory, expectedCommit, prerelease, repository, tag }) {
   checkReleaseAssets("published", assetsDirectory);
-  let metadata = api(`repos/${repository}/releases/tags/${tag}`, { optional: true });
+  let metadata = releaseByTag(repository, tag, { optional: true });
   const plan = planReleasePublication({
     releaseMetadata: metadata,
     expectedCommit,
@@ -119,7 +141,7 @@ export function publishRelease({ assetsDirectory, expectedCommit, prerelease, re
     gh(args, { stdio: "inherit" });
   }
 
-  metadata = api(`repos/${repository}/releases/tags/${tag}`);
+  metadata = releaseByTag(repository, tag);
   for (const asset of metadata.assets) {
     assertPrivateDraft(repository, tag);
     gh(["release", "delete-asset", tag, asset.name, "--yes", "--repo", repository], { stdio: "inherit" });
@@ -131,7 +153,7 @@ export function publishRelease({ assetsDirectory, expectedCommit, prerelease, re
   gh(["release", "upload", tag, ...assetPaths, "--repo", repository], { stdio: "inherit" });
 
   assertPrivateDraft(repository, tag);
-  metadata = api(`repos/${repository}/releases/tags/${tag}`);
+  metadata = releaseByTag(repository, tag);
   authenticateAssets(assetsDirectory, metadata);
   if (prerelease) gh(["release", "edit", tag, "--prerelease", "--repo", repository], { stdio: "inherit" });
   assert.equal(tagCommit(repository, tag), expectedCommit, `release tag moved before publication`);
