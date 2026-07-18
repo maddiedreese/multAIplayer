@@ -85,6 +85,11 @@ export async function restoreGitHubSession(): Promise<SignedInUser | null> {
     return restored?.user ?? null;
   } catch (error) {
     clearRelaySession();
+    // Linux crash-recovery E2E deliberately replaces the Secret Service
+    // process while retaining the WebKit profile. Its loopback-only cookie
+    // fixture must remain usable when that synthetic credential store cannot
+    // be restored; packaged clients never receive this build-time flag.
+    if (import.meta.env.VITE_NATIVE_E2E_COOKIE_AUTH === "1") return getCurrentUser();
     throw error;
   }
 }
