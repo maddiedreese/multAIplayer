@@ -13,7 +13,7 @@ use multaiplayer_protocol::{
     MlsMessageType, MlsRelayMessage, RelayClientMessage, RelayErrorCode, RelayServerMessage,
     Validate,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeSet,
     fs,
@@ -21,7 +21,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 pub const MLS_STORAGE_KEY_ACCOUNT: &str = "mls-store-wrap:v1";
 
@@ -61,7 +61,65 @@ struct StoredMlsStorageKey {
     version: u8,
     github_user_id: String,
     device_id: String,
-    wrapping_key: String,
+    wrapping_key: SecretString,
+}
+
+impl Zeroize for StoredMlsStorageKey {
+    fn zeroize(&mut self) {
+        self.wrapping_key.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for StoredMlsStorageKey {}
+
+impl Drop for StoredMlsStorageKey {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+struct SecretString(String);
+
+impl SecretString {
+    fn new(value: String) -> Self {
+        Self(value)
+    }
+
+    fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl Serialize for SecretString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for SecretString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer).map(Self::new)
+    }
+}
+
+impl Zeroize for SecretString {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for SecretString {}
+
+impl Drop for SecretString {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
 }
 
 pub trait MlsPublisher {
@@ -126,7 +184,7 @@ impl MlsClientService {
         };
         let signing_secret = identity.mls_signing_secret();
         let engine =
-            MlsEngine::open_persistent(credential, signing_secret.to_vec(), path, wrapping_key)
+            MlsEngine::open_persistent(credential, signing_secret.to_vec(), path, *wrapping_key)
                 .map_err(|_| {
                     if state_exists {
                         MlsClientError::RequiresRejoin
@@ -134,7 +192,7 @@ impl MlsClientService {
                         MlsClientError::StorageUnavailable
                     }
                 })?;
-        let store = EncryptedStore::open(path, wrapping_key).map_err(map_store_open_error)?;
+        let store = EncryptedStore::open(path, *wrapping_key).map_err(map_store_open_error)?;
         secure_store_permissions(path)?;
         Ok(Self {
             engine,
@@ -286,20 +344,21 @@ fn load_or_create_storage_key(
     user_id: &str,
     device_id: &str,
     state_exists: bool,
-) -> Result<[u8; 32], MlsClientError> {
+) -> Result<Zeroizing<[u8; 32]>, MlsClientError> {
     if let Some(value) = store
         .get(MLS_STORAGE_KEY_ACCOUNT)
         .map_err(map_credential_error)?
     {
+        let value = Zeroizing::new(value);
         let stored: StoredMlsStorageKey =
-            serde_json::from_str(&value).map_err(|_| MlsClientError::RequiresRejoin)?;
+            serde_json::from_str(value.as_str()).map_err(|_| MlsClientError::RequiresRejoin)?;
         if stored.version != 1 {
             return Err(MlsClientError::RequiresRejoin);
         }
         if stored.github_user_id != user_id || stored.device_id != device_id {
             return Err(MlsClientError::IdentityScopeMismatch);
         }
-        return decode_fixed_key(&stored.wrapping_key);
+        return decode_fixed_key(stored.wrapping_key.as_str());
     }
     if state_exists {
         return Err(MlsClientError::RequiresRejoin);
@@ -307,38 +366,49 @@ fn load_or_create_storage_key(
     let generated = Zeroizing::new(
         generate_device_signing_secret().map_err(|_| MlsClientError::StorageUnavailable)?,
     );
-    let key: [u8; 32] = generated
-        .as_slice()
-        .try_into()
-        .map_err(|_| MlsClientError::StorageUnavailable)?;
+    let key = normalize_generated_storage_key(generated.as_slice())?;
     let stored = StoredMlsStorageKey {
         version: 1,
         github_user_id: user_id.to_owned(),
         device_id: device_id.to_owned(),
-        wrapping_key: STANDARD.encode(key),
+        wrapping_key: SecretString::new(STANDARD.encode(key.as_ref())),
     };
+    let serialized = Zeroizing::new(
+        serde_json::to_string(&stored).map_err(|_| MlsClientError::StorageUnavailable)?,
+    );
     store
-        .set(
-            MLS_STORAGE_KEY_ACCOUNT,
-            &serde_json::to_string(&stored).map_err(|_| MlsClientError::StorageUnavailable)?,
-        )
+        .set(MLS_STORAGE_KEY_ACCOUNT, serialized.as_str())
         .map_err(map_credential_error)?;
     Ok(key)
 }
 
-fn decode_fixed_key(value: &str) -> Result<[u8; 32], MlsClientError> {
+fn normalize_generated_storage_key(
+    generated: &[u8],
+) -> Result<Zeroizing<[u8; 32]>, MlsClientError> {
+    if generated.is_empty() || generated.len() > 32 {
+        return Err(MlsClientError::StorageUnavailable);
+    }
+    let mut key = Zeroizing::new([0; 32]);
+    key[32 - generated.len()..].copy_from_slice(generated);
+    Ok(key)
+}
+
+fn decode_fixed_key(value: &str) -> Result<Zeroizing<[u8; 32]>, MlsClientError> {
     let bytes = Zeroizing::new(
         STANDARD
             .decode(value)
             .map_err(|_| MlsClientError::RequiresRejoin)?,
     );
-    if STANDARD.encode(bytes.as_slice()) != value {
+    let canonical = Zeroizing::new(STANDARD.encode(bytes.as_slice()));
+    if canonical.as_str() != value {
         return Err(MlsClientError::RequiresRejoin);
     }
-    bytes
-        .as_slice()
-        .try_into()
-        .map_err(|_| MlsClientError::RequiresRejoin)
+    if bytes.len() != 32 {
+        return Err(MlsClientError::RequiresRejoin);
+    }
+    let mut key = Zeroizing::new([0; 32]);
+    key.copy_from_slice(bytes.as_slice());
+    Ok(key)
 }
 
 fn relay_message_for_item(
@@ -669,7 +739,7 @@ mod tests {
                     version: 1,
                     github_user_id: "github:42".into(),
                     device_id: "device_1".into(),
-                    wrapping_key,
+                    wrapping_key: SecretString::new(wrapping_key),
                 })
                 .unwrap(),
             );
@@ -684,7 +754,7 @@ mod tests {
                 version: 2,
                 github_user_id: "github:42".into(),
                 device_id: "device_1".into(),
-                wrapping_key: STANDARD.encode([7; 32]),
+                wrapping_key: SecretString::new(STANDARD.encode([7; 32])),
             })
             .unwrap(),
         );
@@ -748,7 +818,7 @@ mod tests {
         let mut stored: StoredMlsStorageKey =
             serde_json::from_str(store.values.borrow().get(MLS_STORAGE_KEY_ACCOUNT).unwrap())
                 .unwrap();
-        stored.wrapping_key = STANDARD.encode([99; 32]);
+        stored.wrapping_key = SecretString::new(STANDARD.encode([99; 32]));
         store.values.borrow_mut().insert(
             MLS_STORAGE_KEY_ACCOUNT.into(),
             serde_json::to_string(&stored).unwrap(),
@@ -996,5 +1066,51 @@ mod tests {
             assert!(!rendered.contains("/private/"));
             assert!(!rendered.contains("attacker-controlled"));
         }
+    }
+
+    #[test]
+    fn wrapping_key_credential_types_are_zeroizing_and_keep_the_v1_schema() {
+        fn assert_zeroize_on_drop<T: ZeroizeOnDrop>() {}
+        assert_zeroize_on_drop::<SecretString>();
+        assert_zeroize_on_drop::<StoredMlsStorageKey>();
+        assert_zeroize_on_drop::<Zeroizing<String>>();
+
+        let mut secret = SecretString::new(STANDARD.encode([7; 32]));
+        secret.zeroize();
+        assert!(secret.as_str().is_empty());
+
+        let stored = StoredMlsStorageKey {
+            version: 1,
+            github_user_id: "github:42".into(),
+            device_id: "device_1".into(),
+            wrapping_key: SecretString::new(STANDARD.encode([8; 32])),
+        };
+        let serialized = Zeroizing::new(serde_json::to_string(&stored).unwrap());
+        let expected_key = Zeroizing::new(STANDARD.encode([8; 32]));
+        let expected = Zeroizing::new(format!(
+            "{{\"version\":1,\"githubUserId\":\"github:42\",\"deviceId\":\"device_1\",\"wrappingKey\":\"{}\"}}",
+            expected_key.as_str()
+        ));
+        assert_eq!(serialized.as_str(), expected.as_str());
+    }
+
+    #[test]
+    fn minimally_encoded_p256_scalars_are_normalized_without_retry_or_entropy_loss() {
+        let scalar = [9; 31];
+        let normalized = normalize_generated_storage_key(&scalar).unwrap();
+        assert_eq!(normalized[0], 0);
+        assert_eq!(&normalized[1..], scalar.as_slice());
+        assert_eq!(
+            normalize_generated_storage_key(&[7; 32]).unwrap().as_ref(),
+            &[7; 32]
+        );
+        assert_eq!(
+            normalize_generated_storage_key(&[]),
+            Err(MlsClientError::StorageUnavailable)
+        );
+        assert_eq!(
+            normalize_generated_storage_key(&[1; 33]),
+            Err(MlsClientError::StorageUnavailable)
+        );
     }
 }
