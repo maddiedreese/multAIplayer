@@ -114,7 +114,7 @@ test("a rejected native identity initialization can be retried for the same scop
   assert.equal(attempts, 2);
 });
 
-test("native identity output must match the requested account and device before it can be cached", async () => {
+test("native identity accepts an authoritative stored device for the requested account", async () => {
   let returnMismatchedIdentity = true;
   Object.defineProperty(globalThis, "window", {
     configurable: true,
@@ -123,19 +123,33 @@ test("native identity output must match the requested account and device before 
         invoke: (_command: string, args: { request: { githubUserId: string; deviceId: string } }) =>
           Promise.resolve(
             returnMismatchedIdentity
-              ? nativeIdentity("github:other", "device-other")
+              ? nativeIdentity("github:expected", "device-stored")
               : nativeIdentity(args.request.githubUserId, args.request.deviceId)
           )
       }
     }
   });
 
-  await assert.rejects(
-    loadOrCreateDeviceIdentity("github:expected", "device-expected"),
-    /does not match the requested account and device/
-  );
+  const repaired = await loadOrCreateDeviceIdentity("github:expected", "device-expected");
+  assert.equal(repaired.deviceId, "device-stored");
   returnMismatchedIdentity = false;
-  const identity = await loadOrCreateDeviceIdentity("github:expected", "device-expected");
+  const identity = await loadOrCreateDeviceIdentity("github:expected", "device-new-request");
   assert.equal(identity.githubUserId, "github:expected");
-  assert.equal(identity.deviceId, "device-expected");
+  assert.equal(identity.deviceId, "device-new-request");
+});
+
+test("native identity still rejects an identity from another GitHub account", async () => {
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      __TAURI_INTERNALS__: {
+        invoke: () => Promise.resolve(nativeIdentity("github:other", "device-stored"))
+      }
+    }
+  });
+
+  await assert.rejects(
+    loadOrCreateDeviceIdentity("github:expected-account", "device-browser"),
+    /does not match the requested account/
+  );
 });

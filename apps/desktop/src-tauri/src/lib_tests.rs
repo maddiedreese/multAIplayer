@@ -128,26 +128,28 @@ fn project_file_write_saves_inside_project_and_rejects_escape() {
     let root = test_temp_dir("project-file-write");
     let cwd = root.to_str().expect("utf8 temp path").to_string();
 
-    let written = project_file_write(project::ProjectFileWriteRequest {
-        cwd: cwd.clone(),
-        path: "src/new-file.ts".to_string(),
-        content: "export const saved = true;\n".to_string(),
-        expected_content: None,
-    })
-    .expect("write project file");
+    let written =
+        tauri::async_runtime::block_on(project_file_write(project::ProjectFileWriteRequest {
+            cwd: cwd.clone(),
+            path: "src/new-file.ts".to_string(),
+            content: "export const saved = true;\n".to_string(),
+            expected_content: None,
+        }))
+        .expect("write project file");
 
     assert_eq!(written.path, "src/new-file.ts");
     assert_eq!(
         fs::read_to_string(root.join("src/new-file.ts")).expect("read saved file"),
         "export const saved = true;\n"
     );
-    let error = project_file_write(project::ProjectFileWriteRequest {
-        cwd,
-        path: "../secret.txt".to_string(),
-        content: "nope".to_string(),
-        expected_content: None,
-    })
-    .expect_err("path escape should fail");
+    let error =
+        tauri::async_runtime::block_on(project_file_write(project::ProjectFileWriteRequest {
+            cwd,
+            path: "../secret.txt".to_string(),
+            content: "nope".to_string(),
+            expected_content: None,
+        }))
+        .expect_err("path escape should fail");
     assert_eq!(error.code, command_error::CommandErrorCode::InvalidArgument);
 
     let _ = fs::remove_dir_all(root);
@@ -158,13 +160,14 @@ fn project_file_write_rejects_stale_content_and_symlink_parent_escape() {
     let root = test_temp_dir("project-file-cas");
     let outside = test_temp_dir("project-file-cas-outside");
     fs::write(root.join("tracked.txt"), "newer\n").expect("seed current file");
-    let stale = project_file_write(project::ProjectFileWriteRequest {
-        cwd: root.to_string_lossy().to_string(),
-        path: "tracked.txt".to_string(),
-        content: "overwrite\n".to_string(),
-        expected_content: Some("older\n".to_string()),
-    })
-    .expect_err("stale editor content must not overwrite disk");
+    let stale =
+        tauri::async_runtime::block_on(project_file_write(project::ProjectFileWriteRequest {
+            cwd: root.to_string_lossy().to_string(),
+            path: "tracked.txt".to_string(),
+            content: "overwrite\n".to_string(),
+            expected_content: Some("older\n".to_string()),
+        }))
+        .expect_err("stale editor content must not overwrite disk");
     assert_eq!(stale.code, command_error::CommandErrorCode::InvalidArgument);
     assert_eq!(
         fs::read_to_string(root.join("tracked.txt")).unwrap(),
@@ -175,13 +178,14 @@ fn project_file_write_rejects_stale_content_and_symlink_parent_escape() {
     {
         std::os::unix::fs::symlink(&outside, root.join("linked"))
             .expect("create directory symlink");
-        let escaped = project_file_write(project::ProjectFileWriteRequest {
-            cwd: root.to_string_lossy().to_string(),
-            path: "linked/secret.txt".to_string(),
-            content: "escape".to_string(),
-            expected_content: None,
-        })
-        .expect_err("symlink parent must not escape the project");
+        let escaped =
+            tauri::async_runtime::block_on(project_file_write(project::ProjectFileWriteRequest {
+                cwd: root.to_string_lossy().to_string(),
+                path: "linked/secret.txt".to_string(),
+                content: "escape".to_string(),
+                expected_content: None,
+            }))
+            .expect_err("symlink parent must not escape the project");
         assert_eq!(
             escaped.code,
             command_error::CommandErrorCode::InvalidArgument
@@ -208,12 +212,13 @@ fn project_file_read_returns_allowlisted_raster_images_as_bounded_data_urls() {
     ];
     for (path, bytes, expected_media_type) in fixtures {
         write(root.join(path), bytes).expect("write image fixture");
-        let read = project_file_read(project::ProjectFileReadRequest {
-            cwd: cwd.clone(),
-            path: path.to_string(),
-            max_bytes: Some(1_024),
-        })
-        .expect("read image fixture");
+        let read =
+            tauri::async_runtime::block_on(project_file_read(project::ProjectFileReadRequest {
+                cwd: cwd.clone(),
+                path: path.to_string(),
+                max_bytes: Some(1_024),
+            }))
+            .expect("read image fixture");
         assert_eq!(read.media_type.as_deref(), Some(expected_media_type));
         assert!(read
             .content
@@ -229,23 +234,27 @@ fn project_file_read_rejects_mislabeled_and_oversized_raster_images() {
     let cwd = root.to_str().expect("utf8 temp path").to_string();
     write(root.join("not-really.png"), b"<svg onload='bad'></svg>")
         .expect("write mismatched image");
-    assert!(project_file_read(project::ProjectFileReadRequest {
-        cwd: cwd.clone(),
-        path: "not-really.png".to_string(),
-        max_bytes: None,
-    })
-    .is_err());
+    assert!(
+        tauri::async_runtime::block_on(project_file_read(project::ProjectFileReadRequest {
+            cwd: cwd.clone(),
+            path: "not-really.png".to_string(),
+            max_bytes: None,
+        }))
+        .is_err()
+    );
 
     let oversized = fs::File::create(root.join("oversized.webp")).expect("create oversized image");
     oversized
         .set_len(2_500_001)
         .expect("size oversized image fixture");
-    assert!(project_file_read(project::ProjectFileReadRequest {
-        cwd,
-        path: "oversized.webp".to_string(),
-        max_bytes: None,
-    })
-    .is_err());
+    assert!(
+        tauri::async_runtime::block_on(project_file_read(project::ProjectFileReadRequest {
+            cwd,
+            path: "oversized.webp".to_string(),
+            max_bytes: None,
+        }))
+        .is_err()
+    );
     let _ = fs::remove_dir_all(root);
 }
 
@@ -254,20 +263,22 @@ fn project_file_read_emits_stable_not_found_and_invalid_argument_codes() {
     let root = test_temp_dir("project-file-error-codes");
     let cwd = root.to_str().expect("utf8 temp path").to_string();
 
-    let missing = project_file_read(project::ProjectFileReadRequest {
-        cwd: cwd.clone(),
-        path: "missing.txt".to_string(),
-        max_bytes: None,
-    })
-    .expect_err("missing file should fail");
+    let missing =
+        tauri::async_runtime::block_on(project_file_read(project::ProjectFileReadRequest {
+            cwd: cwd.clone(),
+            path: "missing.txt".to_string(),
+            max_bytes: None,
+        }))
+        .expect_err("missing file should fail");
     assert_eq!(missing.code, command_error::CommandErrorCode::NotFound);
 
-    let escape = project_file_read(project::ProjectFileReadRequest {
-        cwd,
-        path: "../secret.txt".to_string(),
-        max_bytes: None,
-    })
-    .expect_err("path escape should fail");
+    let escape =
+        tauri::async_runtime::block_on(project_file_read(project::ProjectFileReadRequest {
+            cwd,
+            path: "../secret.txt".to_string(),
+            max_bytes: None,
+        }))
+        .expect_err("path escape should fail");
     assert_eq!(
         escape.code,
         command_error::CommandErrorCode::InvalidArgument
@@ -357,14 +368,16 @@ fn host_handoff_patch_round_trips_tracked_changes() {
     }
 
     fs::write(source.join("README.md"), "after\n").expect("modify source file");
-    let patch = git_create_patch(source.to_string_lossy().to_string()).expect("create patch");
+    let patch =
+        tauri::async_runtime::block_on(git_create_patch(source.to_string_lossy().to_string()))
+            .expect("create patch");
     assert!(!patch.patch.is_empty());
     assert!(!patch.truncated);
-    let applied = git_apply_patch(GitApplyPatchRequest {
+    let applied = tauri::async_runtime::block_on(git_apply_patch(GitApplyPatchRequest {
         cwd: target.to_string_lossy().to_string(),
         project_root: target.to_string_lossy().to_string(),
         patch: patch.patch,
-    })
+    }))
     .expect("apply patch");
     assert_eq!(applied.status, Some(0), "{applied:?}");
     assert_eq!(

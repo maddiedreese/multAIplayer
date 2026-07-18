@@ -1,10 +1,14 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { SignedInUser } from "../lib/identity/authClient";
-import { loadOrCreateDeviceId } from "../application/runtime/appRuntime";
+import { loadOrCreateDeviceId, saveDeviceId } from "../application/runtime/appRuntime";
 import { trustedAvatarUrl } from "../lib/core/avatarUrl";
 
 export function useLocalIdentity(currentUser: SignedInUser | null) {
-  const deviceId = useMemo(() => loadOrCreateDeviceId(), []);
+  const [deviceId, setDeviceId] = useState(loadOrCreateDeviceId);
+  const replaceDeviceId = useCallback((nextDeviceId: string) => {
+    saveDeviceId(nextDeviceId);
+    setDeviceId(nextDeviceId);
+  }, []);
   const localUser = useMemo(() => {
     const avatarUrl = trustedAvatarUrl(currentUser?.avatarUrl);
     return {
@@ -14,5 +18,5 @@ export function useLocalIdentity(currentUser: SignedInUser | null) {
     };
   }, [currentUser, deviceId]);
 
-  return { deviceId, localUser };
+  return { deviceId, localUser, replaceDeviceId };
 }

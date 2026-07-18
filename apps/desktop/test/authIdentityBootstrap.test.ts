@@ -146,6 +146,7 @@ test("device identity lifecycle never invokes native MLS before identity resolut
       return {
         githubUserId: "github:native-host",
         deviceId: "device-native-host",
+        replaceDeviceId: noop,
         ciphersuite: 2,
         signaturePublicKey: "signature-key",
         signatureKeyFingerprint: "sha256:signature",
@@ -165,6 +166,7 @@ test("device identity lifecycle never invokes native MLS before identity resolut
         userId: "github:native-host",
         displayName: "Native Host",
         deviceIdentity: null,
+        replaceDeviceId: noop,
         replaceDeviceIdentity: noop,
         setDeviceIdentityStatusMessage: noop
       }),
@@ -180,6 +182,46 @@ test("device identity lifecycle never invokes native MLS before identity resolut
     command: "mls_identity_initialize",
     args: { request: { githubUserId: "github:native-host", deviceId: "device-native-host" } }
   });
+});
+
+test("device identity lifecycle repairs browser device-id drift from the same-account native identity", async () => {
+  const repairedDeviceIds: string[] = [];
+  const identities: Array<{ githubUserId: string; deviceId: string }> = [];
+  (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {
+    invoke: async (command: string) => {
+      assert.equal(command, "mls_identity_initialize");
+      return {
+        githubUserId: "github:repair-user",
+        deviceId: "device-keychain-authoritative",
+        ciphersuite: 2,
+        signaturePublicKey: "signature-key",
+        signatureKeyFingerprint: "sha256:signature",
+        hpkePublicKey: "hpke-key",
+        hpkeKeyFingerprint: "sha256:hpke",
+        requiresRejoin: false
+      };
+    }
+  };
+
+  renderHook(() =>
+    useDeviceIdentityLifecycle({
+      relayHttpUrl: "http://127.0.0.1:4322",
+      identityResolved: true,
+      deviceId: "device-webkit-drifted",
+      userId: "github:repair-user",
+      displayName: "Repair User",
+      deviceIdentity: null,
+      replaceDeviceId: (deviceId) => repairedDeviceIds.push(deviceId),
+      replaceDeviceIdentity: (identity) => {
+        if (identity) identities.push(identity);
+      },
+      setDeviceIdentityStatusMessage: () => undefined
+    })
+  );
+
+  await waitFor(() => assert.deepEqual(repairedDeviceIds, ["device-keychain-authoritative"]));
+  assert.equal(identities.at(-1)?.githubUserId, "github:repair-user");
+  assert.equal(identities.at(-1)?.deviceId, "device-keychain-authoritative");
 });
 
 test("device identity remediation reserves account-switching copy for a typed scope mismatch", () => {
@@ -248,6 +290,7 @@ test("an old identity registration cannot restore its device session after ident
         userId: identity.githubUserId,
         displayName: "Old account",
         deviceIdentity: identity,
+        replaceDeviceId: () => undefined,
         replaceDeviceIdentity: () => undefined,
         setDeviceIdentityStatusMessage: (message) => statuses.push(message)
       }),

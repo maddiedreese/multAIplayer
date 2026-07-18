@@ -469,7 +469,7 @@ fn safe_error_text(value: &str) -> String {
 mod compatibility;
 use compatibility::*;
 #[typed_tauri_command::command]
-pub(crate) fn codex_host_snapshot(
+pub(crate) async fn codex_host_snapshot(
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
 ) -> crate::command_error::CommandResult<CodexHostSnapshot> {
@@ -596,7 +596,7 @@ fn parse_mcp_servers(value: &Value) -> Result<Vec<CodexHostMcpServer>, String> {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn codex_account_login_start(
+pub(crate) async fn codex_account_login_start(
     request: CodexLoginStartRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
@@ -645,7 +645,7 @@ pub(crate) fn codex_account_login_start(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn codex_account_login_cancel(
+pub(crate) async fn codex_account_login_cancel(
     request: CodexLoginCancelRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
@@ -662,7 +662,7 @@ pub(crate) fn codex_account_login_cancel(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn codex_account_logout(
+pub(crate) async fn codex_account_logout(
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
 ) -> crate::command_error::CommandResult<()> {
@@ -671,7 +671,7 @@ pub(crate) fn codex_account_logout(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn codex_mcp_login_start(
+pub(crate) async fn codex_mcp_login_start(
     request: CodexMcpLoginRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,
@@ -691,7 +691,7 @@ pub(crate) fn codex_mcp_login_start(
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn codex_app_approval_mode_set(
+pub(crate) async fn codex_app_approval_mode_set(
     request: CodexAppApprovalRequest,
     state: tauri::State<'_, CodexHostState>,
     app: AppHandle,

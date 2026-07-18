@@ -10,24 +10,25 @@ pub(crate) fn mls_identity_initialize(
         .identity
         .lock()
         .map_err(|_| "MLS identity state is unavailable".to_string())?;
-    if let Some((user, device, public)) = identity_lock.as_ref() {
-        if user == &request.github_user_id && device == &request.device_id {
+    if let Some((user, _device, public)) = identity_lock.as_ref() {
+        if user == &request.github_user_id {
             return Ok(public.clone());
         }
         return Err(crate::command_error::CommandError::identity_scope_mismatch(
             "This installation is already bound to another GitHub account or device identity.",
         ));
     }
+    let material = load_or_create_signing_identity(&request.github_user_id, &request.device_id)
+        .map_err(identity_initialization_error)?;
     let identity = BasicAppCredential {
-        github_user_id: request.github_user_id.clone(),
-        device_id: request.device_id.clone(),
+        github_user_id: material.github_user_id.clone(),
+        device_id: material.device_id.clone(),
     };
     validate_credential(
         &serde_json::to_vec(&identity).map_err(|_| "MLS identity is invalid".to_string())?,
     )
     .map_err(display_error)?;
-    let secret = load_or_create_signing_secret(&request.github_user_id, &request.device_id)
-        .map_err(identity_initialization_error)?;
+    let secret = material.secret;
     let wrapping_key = load_or_create_store_wrapping_key()?;
     let data_dir = app
         .path()
@@ -48,8 +49,8 @@ pub(crate) fn mls_identity_initialize(
                 requires_rejoin = true;
                 MlsEngine::open_persistent(
                     BasicAppCredential {
-                        github_user_id: request.github_user_id.clone(),
-                        device_id: request.device_id.clone(),
+                        github_user_id: material.github_user_id.clone(),
+                        device_id: material.device_id.clone(),
                     },
                     secret.clone(),
                     &database_path,
@@ -63,8 +64,8 @@ pub(crate) fn mls_identity_initialize(
     secure_store_permissions(&database_path)?;
     let signer = DeviceAuthSigner::from_secret(
         secret,
-        request.github_user_id.clone(),
-        request.device_id.clone(),
+        material.github_user_id.clone(),
+        material.device_id.clone(),
     )
     .map_err(display_error)?;
     let signature_public_key =
@@ -94,8 +95,8 @@ pub(crate) fn mls_identity_initialize(
         .lock()
         .map_err(|_| "MLS store is unavailable".to_string())? = Some(store);
     let public = IdentityPublic {
-        github_user_id: request.github_user_id.clone(),
-        device_id: request.device_id.clone(),
+        github_user_id: material.github_user_id.clone(),
+        device_id: material.device_id.clone(),
         ciphersuite: 2,
         signature_public_key,
         signature_key_fingerprint,
@@ -103,7 +104,7 @@ pub(crate) fn mls_identity_initialize(
         hpke_key_fingerprint,
         requires_rejoin,
     };
-    *identity_lock = Some((request.github_user_id, request.device_id, public.clone()));
+    *identity_lock = Some((material.github_user_id, material.device_id, public.clone()));
     Ok(public)
 }
 

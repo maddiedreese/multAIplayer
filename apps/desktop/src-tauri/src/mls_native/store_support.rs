@@ -96,14 +96,20 @@ pub(super) fn secure_store_permissions(path: &std::path::Path) -> Result<(), Str
     Ok(())
 }
 
-pub(super) fn load_or_create_signing_secret(
+pub(super) struct SigningIdentityMaterial {
+    pub(super) github_user_id: String,
+    pub(super) device_id: String,
+    pub(super) secret: Vec<u8>,
+}
+
+pub(super) fn load_or_create_signing_identity(
     github_user_id: &str,
     device_id: &str,
-) -> Result<Vec<u8>, SigningSecretLoadError> {
+) -> Result<SigningIdentityMaterial, SigningSecretLoadError> {
     let entry = keyring::Entry::new(MLS_KEYCHAIN_SERVICE, MLS_IDENTITY_ACCOUNT)
         .map_err(|_| SigningSecretLoadError::Internal)?;
     match entry.get_password() {
-        Ok(value) => decode_stored_signing_secret(&value, github_user_id, device_id),
+        Ok(value) => decode_stored_signing_identity(&value, github_user_id),
         Err(keyring::Error::NoEntry) => {
             let secret =
                 generate_device_signing_secret().map_err(|_| SigningSecretLoadError::Internal)?;
@@ -119,7 +125,11 @@ pub(super) fn load_or_create_signing_secret(
                         .map_err(|_| SigningSecretLoadError::Internal)?,
                 )
                 .map_err(|_| SigningSecretLoadError::Internal)?;
-            Ok(secret)
+            Ok(SigningIdentityMaterial {
+                github_user_id: github_user_id.to_owned(),
+                device_id: device_id.to_owned(),
+                secret,
+            })
         }
         Err(_) => Err(SigningSecretLoadError::Internal),
     }
@@ -131,22 +141,23 @@ pub(super) enum SigningSecretLoadError {
     Internal,
 }
 
-pub(super) fn decode_stored_signing_secret(
+pub(super) fn decode_stored_signing_identity(
     value: &str,
     github_user_id: &str,
-    device_id: &str,
-) -> Result<Vec<u8>, SigningSecretLoadError> {
+) -> Result<SigningIdentityMaterial, SigningSecretLoadError> {
     let stored: StoredMlsIdentity =
         serde_json::from_str(value).map_err(|_| SigningSecretLoadError::Internal)?;
-    if stored.version != 1
-        || stored.github_user_id != github_user_id
-        || stored.device_id != device_id
-    {
+    if stored.version != 1 || stored.github_user_id != github_user_id {
         return Err(SigningSecretLoadError::ScopeMismatch);
     }
-    fixed32(&stored.signing_secret)
+    let secret = fixed32(&stored.signing_secret)
         .map(Vec::from)
-        .map_err(|_| SigningSecretLoadError::Internal)
+        .map_err(|_| SigningSecretLoadError::Internal)?;
+    Ok(SigningIdentityMaterial {
+        github_user_id: stored.github_user_id,
+        device_id: stored.device_id,
+        secret,
+    })
 }
 pub(super) fn load_or_create_store_wrapping_key() -> Result<[u8; 32], String> {
     let entry = keyring::Entry::new(MLS_KEYCHAIN_SERVICE, "mls-store-wrap:v1")

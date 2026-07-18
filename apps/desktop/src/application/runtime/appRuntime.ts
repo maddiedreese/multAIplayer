@@ -13,6 +13,11 @@ export function loadOrCreateDeviceId(): string {
   return created;
 }
 
+export function saveDeviceId(deviceId: string): void {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem("multaiplayer:device-id", deviceId);
+}
+
 export function loadThemeMode(): ThemeMode {
   const stored = localStorage.getItem("multaiplayer:theme");
   if (stored === "light" || stored === "dark") return stored;

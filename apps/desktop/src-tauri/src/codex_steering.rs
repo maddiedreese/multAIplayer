@@ -46,7 +46,7 @@ pub(crate) struct CodexSteerResult {
 }
 
 #[typed_tauri_command::command]
-pub(crate) fn steer_codex_turn(
+pub(crate) async fn steer_codex_turn(
     request: CodexSteerRequest,
 ) -> crate::command_error::CommandResult<CodexSteerResult> {
     ensure_room_id(&request.room_id)
@@ -260,20 +260,20 @@ mod tests {
 
     #[test]
     fn command_emits_typed_validation_and_availability_codes() {
-        let invalid = steer_codex_turn(CodexSteerRequest {
+        let invalid = tauri::async_runtime::block_on(steer_codex_turn(CodexSteerRequest {
             room_id: "".to_string(),
             input: "steer".to_string(),
-        })
+        }))
         .expect_err("empty room id should fail validation");
         assert_eq!(
             invalid.code,
             crate::command_error::CommandErrorCode::InvalidArgument
         );
 
-        let unavailable = steer_codex_turn(CodexSteerRequest {
+        let unavailable = tauri::async_runtime::block_on(steer_codex_turn(CodexSteerRequest {
             room_id: "native-error-code-no-active-turn".to_string(),
             input: "steer".to_string(),
-        })
+        }))
         .expect_err("room without active turn should be unavailable");
         assert_eq!(
             unavailable.code,
