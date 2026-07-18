@@ -320,7 +320,7 @@ jobs:
             exit 1
           fi
           bash scripts/verify-macos-deployment-target.sh "$app_path"
-          npm run verify:macos-associated-domains -- "$app_path"
+          npm run verify:macos-associated-domains -- --require-profile "$app_path"
 
       - name: Package release assets
         env:
