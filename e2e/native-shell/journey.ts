@@ -165,23 +165,36 @@ async function authenticate(
   if (keepOnboarding) {
     await visible(browser, ".onboarding-assistant");
     await visible(browser, "h1=Work with Codex together");
+    await waitForAuthenticatedDevice(browser, identity.id);
     return;
   }
   // The debug-auth refresh can recreate the isolated WebKitGTK test page.
   // Keep the setup bypass idempotent so this relay-auth fixture does not
   // mistake a second first-run surface for an authentication failure.
   await dismissFirstRunAfterRefresh(browser);
+  await waitForAuthenticatedDevice(browser, identity.id);
+}
+
+async function waitForAuthenticatedDevice(browser: Browser, expectedUserId: string) {
   await browser.waitUntil(
     () =>
       browser.executeAsync((expectedUserId, done) => {
         const storeModule = "/src/store/appStore.ts";
         import(/* @vite-ignore */ storeModule)
-          .then(({ useAppStore }) => done(useAppStore.getState().currentUser?.id === expectedUserId))
+          .then(({ useAppStore }) => {
+            const state = useAppStore.getState();
+            done(
+              state.currentUser?.id === expectedUserId &&
+                state.deviceIdentity?.githubUserId === expectedUserId &&
+                state.deviceIdentity.deviceId === state.deviceId &&
+                Boolean(state.deviceSessionToken)
+            );
+          })
           .catch(() => done(false));
-      }, identity.id),
+      }, expectedUserId),
     {
-      timeout: 30_000,
-      timeoutMsg: `authenticated app state did not resolve for ${identity.id}`
+      timeout: 60_000,
+      timeoutMsg: `authenticated device session did not resolve for ${expectedUserId}`
     }
   );
 }
