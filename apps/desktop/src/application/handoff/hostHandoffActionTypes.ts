@@ -15,6 +15,7 @@ export interface UseHostHandoffActionsOptions {
   queuedCodexTurns: QueuedCodexTurn[];
   localUser: { id: string; name: string };
   deviceId: string;
+  deviceSessionToken: string;
   relayStatus: RelayStatus;
   relayRef: MutableRefObject<RelayClient | null>;
   seenEnvelopeIds: MutableRefObject<Set<string>>;
