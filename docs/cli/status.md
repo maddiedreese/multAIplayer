@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-050 Relay transport and workspace reads
+Current phase: CLI-060 MLS client state, storage, and outbox
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -14,8 +14,8 @@ Last update: 2026-07-18
 - Codex project: `MultAIplayer-cli`.
 - Governance branch: `codex/cli-governance`.
 - The CLI scaffold, strict Rust protocol parity layer, GitHub authentication,
-  and secure device identity are present; relay transport, MLS room state, and
-  later product behavior have not been implemented.
+  secure device identity, and authenticated relay transport/workspace reads are
+  present; MLS room state and later product behavior have not been implemented.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -42,7 +42,15 @@ Last update: 2026-07-18
   test, dependency advisories/sources/license audits, Apple Keychain selection,
   origin-binding/redaction/logout audits, and the protected desktop-release
   audit.
-- CLI-050 is the only active implementation task.
+- CLI-050 is complete and integrated. Its accepted task commit is
+  `27cf278d2c35a10047da1e41dfe79b25d1a46a32`; integration merge
+  `f7abf8d92fd570d41d99edb8ded5991d39cda6d0` passed the CLI runner with 48
+  locked CLI/protocol tests, 90 focused existing relay/desktop compatibility
+  tests, 18 classification/isolation tests, protocol build, advisories and
+  source checks, RustSec and license audits, Apple-silicon Rustls dependency
+  verification, acknowledgement/origin/redaction audits, and the protected
+  desktop-release audit.
+- CLI-060 is the only active implementation task.
 - Every other implementation task is `waiting_for_orchestrator_approval` until
   CLI-000 confirms dependencies and grants exact task approval.
 - All 18 Codex tasks have read their governing files, reported readiness, and
@@ -61,8 +69,8 @@ Last update: 2026-07-18
 | CLI-020 | Inert Rust CLI scaffold | complete | CLI-010 |
 | CLI-030 | Rust protocol types and golden fixtures | complete | CLI-020 |
 | CLI-040 | GitHub authentication and secure device identity | complete | CLI-030 |
-| CLI-050 | Relay transport and workspace reads | active | CLI-030, CLI-040 |
-| CLI-060 | MLS client state, storage, and outbox | waiting_for_orchestrator_approval | CLI-030, CLI-040 |
+| CLI-050 | Relay transport and workspace reads | complete | CLI-030, CLI-040 |
+| CLI-060 | MLS client state, storage, and outbox | active | CLI-030, CLI-040 |
 | CLI-070 | Room creation and local project association | waiting_for_orchestrator_approval | CLI-050, CLI-060 |
 | CLI-080 | Secure invite codes and host-mediated admission | waiting_for_orchestrator_approval | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | waiting_for_orchestrator_approval | CLI-050, CLI-060, CLI-080 |
@@ -82,7 +90,8 @@ Last update: 2026-07-18
 - Desktop updater/signing/notarization changed by governance: no.
 - CLI included in desktop packaging: no.
 - CLI implementation dependencies installed: protocol, authentication, secure
-  storage, HTTPS, and existing `mls-core` path dependencies only.
+  storage, HTTPS/WebSocket relay transport, and existing `mls-core` path
+  dependencies only.
 - CLI release publication enabled: no.
 
 ## Update rules
