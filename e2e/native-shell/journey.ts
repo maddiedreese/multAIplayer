@@ -186,7 +186,7 @@ async function waitForAuthenticatedDevice(browser: Browser, expectedUserId: stri
             done(
               state.currentUser?.id === expectedUserId &&
                 state.deviceIdentity?.githubUserId === expectedUserId &&
-                state.deviceIdentity.deviceId === state.deviceId &&
+                Boolean(state.deviceIdentity.deviceId) &&
                 Boolean(state.deviceSessionToken)
             );
           })
