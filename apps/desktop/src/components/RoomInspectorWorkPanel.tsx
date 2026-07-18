@@ -11,10 +11,12 @@ import { LocalHistoryPanel } from "./LocalHistoryPanel";
 import { ModelPanel } from "./ModelPanel";
 import { ProjectPanel } from "./ProjectPanel";
 import { RoomMembersPanel, TeamRosterPanel } from "./RosterPanels";
-import { TerminalPanel } from "./TerminalPanel";
 import { WorkspaceFilesPanel } from "./WorkspaceFilesPanel";
 import type { InspectorTab } from "../lib/core/uiTypes";
 import type { HostHandoffRecord, InviteJoinRequest } from "../types";
+
+type TerminalPanelComponent = typeof import("./TerminalPanel").TerminalPanel;
+const TerminalPanel = React.lazy(() => import("./TerminalPanel").then((module) => ({ default: module.TerminalPanel })));
 
 export function RoomInspectorWorkPanel({
   activeTab,
@@ -47,7 +49,7 @@ export function RoomInspectorWorkPanel({
   repositoryAccess: GitHubRepositoryAccessPromptProps;
   gitHandoff: ComponentProps<typeof GitHandoffPanel>;
   githubActions: ComponentProps<typeof GitHubActionsPanel>;
-  terminal: ComponentProps<typeof TerminalPanel>;
+  terminal: ComponentProps<TerminalPanelComponent>;
 }) {
   if (activeTab === "files") {
     return (
@@ -62,7 +64,11 @@ export function RoomInspectorWorkPanel({
   }
 
   if (activeTab === "terminal") {
-    return <TerminalPanel {...terminal} />;
+    return (
+      <React.Suspense fallback={<div className="workflow-message">Opening terminal…</div>}>
+        <TerminalPanel {...terminal} />
+      </React.Suspense>
+    );
   }
 
   if (activeTab === "browser") {

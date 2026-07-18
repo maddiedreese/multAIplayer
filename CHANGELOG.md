@@ -6,6 +6,17 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.3] - 2026-07-18
+
+### Fixed
+
+- Packaged macOS clients now authenticate relay HTTP and WebSocket traffic with a memory-only opaque relay session scoped to the exact official relay origin, so GitHub sign-in remains usable when WebKit blocks cross-site cookies. GitHub OAuth credentials remain in the native Keychain boundary.
+- GitHub sign-in surfaces now explain the possible macOS Keychain prompt before authorization, including what multAIplayer stores, what it cannot access, and how “Always Allow” affects future prompts.
+
+### Performance
+
+- The terminal runtime now loads only when the Terminal tab is opened, reducing the initial desktop JavaScript bundle by about 28% and its compressed transfer size by about 26%.
+
 ## [0.1.0-alpha.2] - 2026-07-18
 
 ### Fixed

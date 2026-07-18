@@ -1,5 +1,5 @@
 import { sendRelayError } from "../http/errors.js";
-import type { CookieOptions, Response } from "express";
+import type { CookieOptions, RequestHandler, Response } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { parseCookie } from "cookie";
@@ -25,6 +25,28 @@ export interface RelayAuthSessionManager {
   getAuthSessionFromRequest(request: IncomingMessage): AuthSession | undefined;
   allowRead(session: AuthSession | null, res: Response): boolean;
   allowMutation(session: AuthSession | null, res: Response): boolean;
+}
+
+export const nativeSessionHeaderName = "x-multaiplayer-session";
+const webSocketSessionProtocolPrefix = "multaiplayer-session.";
+
+/** Promote the packaged app's opaque session header into the existing route auth path. */
+export function nativeSessionHeaderMiddleware(): RequestHandler {
+  return (req, res, next) => {
+    const suppliedHeader = req.get(nativeSessionHeaderName);
+    const headerSession = normalizeTransportSession(suppliedHeader);
+    if (suppliedHeader !== undefined && !headerSession) {
+      sendRelayError(res, 400, "invalid_request", "Invalid relay session header.");
+      return;
+    }
+    const cookieSession = normalizeTransportSession(req.cookies?.multaiplayer_session);
+    if (headerSession && cookieSession && headerSession !== cookieSession) {
+      sendRelayError(res, 400, "invalid_request", "Conflicting relay sessions.");
+      return;
+    }
+    if (headerSession) req.cookies.multaiplayer_session = headerSession;
+    next();
+  };
 }
 
 export interface StoredAuthSession {
@@ -110,7 +132,18 @@ export function createRelayAuthSessionManager({
 
   function getAuthSessionFromRequest(request: IncomingMessage): AuthSession | undefined {
     const cookies = parseCookieHeader(request.headers.cookie);
-    return getAuthSession(cookies.get("multaiplayer_session")) ?? undefined;
+    const rawHeaderSession = request.headers[nativeSessionHeaderName];
+    const headerSession = normalizeTransportSession(rawHeaderSession);
+    if (rawHeaderSession !== undefined && !headerSession) return undefined;
+    const webSocketSession = sessionFromWebSocketProtocols(request.headers["sec-websocket-protocol"]);
+    if (webSocketSession === null) return undefined;
+    const supplied = [
+      normalizeTransportSession(cookies.get("multaiplayer_session")),
+      headerSession,
+      webSocketSession
+    ].filter((value): value is string => Boolean(value));
+    if (new Set(supplied).size > 1) return undefined;
+    return getAuthSession(supplied[0]) ?? undefined;
   }
 
   function allowRead(session: AuthSession | null, res: Response): boolean {
@@ -135,6 +168,22 @@ export function createRelayAuthSessionManager({
     allowRead,
     allowMutation
   };
+}
+
+function sessionFromWebSocketProtocols(header: string | string[] | undefined): string | null | undefined {
+  if (Array.isArray(header)) return null;
+  const candidates = (header ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.startsWith(webSocketSessionProtocolPrefix));
+  if (candidates.length === 0) return undefined;
+  if (candidates.length !== 1) return null;
+  return normalizeTransportSession(candidates[0]!.slice(webSocketSessionProtocolPrefix.length));
+}
+
+function normalizeTransportSession(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 256) return null;
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : null;
 }
 
 export function parseCookieHeader(header: string | undefined): Map<string, string> {

@@ -89,6 +89,37 @@ test("relay applies configured CORS origin allowlist", async () => {
   }
 });
 
+test("relay preflights the packaged app session header only for an allowed exact origin", async () => {
+  const relay = await startRelay({
+    MULTAIPLAYER_RELAY_ALLOWED_ORIGINS: "tauri://localhost"
+  });
+  try {
+    const allowed = await fetch(`${relay.baseUrl}/auth/me`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "tauri://localhost",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "x-multaiplayer-session"
+      }
+    });
+    assert.equal(allowed.status, 204);
+    assert.equal(allowed.headers.get("access-control-allow-origin"), "tauri://localhost");
+    assert.match(allowed.headers.get("access-control-allow-headers") ?? "", /x-multaiplayer-session/i);
+
+    const denied = await fetch(`${relay.baseUrl}/auth/me`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://attacker.example",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "x-multaiplayer-session"
+      }
+    });
+    assert.equal(denied.status, 403);
+  } finally {
+    await relay.close();
+  }
+});
+
 test("relay denies browser CORS origins by default in production", async () => {
   const relay = await startRelay({ NODE_ENV: "production" });
   try {

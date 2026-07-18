@@ -3,6 +3,7 @@ import { readJsonResponse } from "../core/httpResponse";
 import { trustedAuthenticationUrl } from "./authExternalUrl";
 import { invokeNative } from "../platform/nativeCommandError";
 import { isTauriRuntime } from "../platform/localBackend/runtime";
+import { clearRelaySession, installRelaySession, relayFetch as fetch } from "../relay/relaySession";
 
 export interface GitHubAuthConfig {
   provider: "github";
@@ -25,7 +26,7 @@ export interface GitHubDeviceStart {
 export type GitHubDevicePollResult =
   | { status: "pending" }
   | { status: "slow_down"; retryAfterSeconds: number }
-  | { status: "complete"; user: SignedInUser };
+  | { status: "complete"; user: SignedInUser; relaySession: string; relayOrigin: string };
 
 export type GitHubRepositoryDevicePollResult =
   { status: "pending" } | { status: "slow_down"; retryAfterSeconds: number } | { status: "complete" };
@@ -67,6 +68,27 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
   return body.user;
 }
 
+interface RestoredGitHubSession {
+  user: SignedInUser;
+  relaySession: string;
+  relayOrigin: string;
+}
+
+/** Restores an opaque relay session from the native Keychain-held identity. */
+export async function restoreGitHubSession(): Promise<SignedInUser | null> {
+  if (!isTauriRuntime()) return getCurrentUser();
+  try {
+    const restored = await invokeNative<RestoredGitHubSession | null>("github_session_restore");
+    if (restored) installRelaySession(restored.relaySession, restored.relayOrigin);
+    else if (import.meta.env.VITE_NATIVE_E2E_COOKIE_AUTH === "1") return getCurrentUser();
+    else clearRelaySession();
+    return restored?.user ?? null;
+  } catch (error) {
+    clearRelaySession();
+    throw error;
+  }
+}
+
 export type HostedAccountDeletionRecheck =
   { status: "signed_in"; user: SignedInUser } | { status: "signed_out_or_deleted" };
 
@@ -89,9 +111,11 @@ export async function startGitHubDeviceFlow(): Promise<GitHubDeviceStart> {
 
 export async function pollGitHubDeviceFlow(flowId: string): Promise<GitHubDevicePollResult> {
   if (!isTauriRuntime()) throw new Error("GitHub sign-in is available only in the native desktop app.");
-  return invokeNative<GitHubDevicePollResult>("github_device_flow_poll", {
+  const result = await invokeNative<GitHubDevicePollResult>("github_device_flow_poll", {
     flowId
   });
+  if (result.status === "complete") installRelaySession(result.relaySession, result.relayOrigin);
+  return result;
 }
 
 export async function getGitHubRepositoryAccessStatus(): Promise<boolean> {
@@ -135,6 +159,7 @@ export async function logout(): Promise<void> {
   }).then((response) => readJsonResponse(response, "Failed to sign out"));
   const credentialDelete = isTauriRuntime() ? invokeNative<void>("github_token_delete") : Promise.resolve();
   const [relayResult, credentialResult] = await Promise.allSettled([relayLogout, credentialDelete]);
+  clearRelaySession();
 
   if (relayResult.status === "rejected" && credentialResult.status === "rejected") {
     throw new AggregateError(
@@ -206,6 +231,7 @@ export async function deleteHostedAccount(
       retainedSharedData: string[];
     }>(response, "Failed to delete hosted account data");
     if (isTauriRuntime()) await invokeNative<void>("github_token_delete");
+    clearRelaySession();
     return {
       status: "deleted",
       deleted: body.deleted,
@@ -226,6 +252,7 @@ async function recoverHostedAccountDeletionAfterResponseLoss(cause: unknown): Pr
     const currentUser = await getCurrentUser();
     if (currentUser) throw cause;
     if (isTauriRuntime()) await invokeNative<void>("github_token_delete");
+    clearRelaySession();
     return { status: "indeterminate", signedOut: true };
   } catch (probeError) {
     if (probeError === cause) throw cause;

@@ -145,6 +145,46 @@ test("relay treats malformed session cookies as unauthenticated", async () => {
   }
 });
 
+test("native opaque sessions authenticate HTTP and WebSocket without relying on cookies", async () => {
+  const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
+  let socket: WebSocket | null = null;
+  try {
+    const cookie = await createDebugSession(relay.baseUrl, "github:maddiedreese", "maddiedreese");
+    const token = cookie.slice("multaiplayer_session=".length);
+    const me = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { "x-multaiplayer-session": token }
+    });
+    assert.equal(me.status, 200);
+
+    const malformed = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { "x-multaiplayer-session": "not valid" }
+    });
+    assert.equal(malformed.status, 400);
+
+    const otherCookie = await createDebugSession(relay.baseUrl, "github:other", "other");
+    const conflict = await fetch(`${relay.baseUrl}/auth/me`, {
+      headers: { cookie: otherCookie, "x-multaiplayer-session": token }
+    });
+    assert.equal(conflict.status, 400);
+
+    socket = new WebSocket(relay.wsUrl, ["multaiplayer-v1", `multaiplayer-session.${token}`]);
+    await onceOpen(socket);
+    assert.equal(socket.protocol, "multaiplayer-v1");
+    const subscribed = waitForWorkspaceSubscribed(socket);
+    socket.send(
+      JSON.stringify({
+        type: "subscribe.workspace",
+        userId: "github:maddiedreese",
+        deviceId: "device-native-session"
+      })
+    );
+    await subscribed;
+  } finally {
+    socket?.close();
+    await relay.close();
+  }
+});
+
 test("relay expires server-side auth sessions independently of cookies", async () => {
   const relay = await startRelay({ MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH: "false" });
   try {

@@ -25,6 +25,7 @@
     "allow-git-apply-patch",
     "allow-github-device-flow-start",
     "allow-github-device-flow-poll",
+    "allow-github-session-restore",
     "allow-github-repository-device-flow-start",
     "allow-github-repository-device-flow-poll",
     "allow-github-repository-access-status",

@@ -1,6 +1,7 @@
 import { ExternalLink, Search, X } from "lucide-react";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/identity/authClient";
 import { GitHubIcon } from "./GitHubIcon";
+import { GitHubKeychainNotice } from "./GitHubKeychainNotice";
 
 const brandIcon = new URL("../assets/multaiplayer-icon.png", import.meta.url).href;
 
@@ -50,14 +51,17 @@ export function SidebarAccountSection({
           <button onClick={onSignOut}>Sign out</button>
         </div>
       ) : (
-        <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
-          <GitHubIcon size={16} />
-          {authConfig?.configured === false
-            ? "GitHub sign-in not configured"
-            : authBusy
-              ? "Waiting for GitHub"
-              : "Sign in with GitHub"}
-        </button>
+        <>
+          <button className="github-button" onClick={onSignIn} disabled={authBusy || authConfig?.configured === false}>
+            <GitHubIcon size={16} />
+            {authConfig?.configured === false
+              ? "GitHub sign-in not configured"
+              : authBusy
+                ? "Waiting for GitHub"
+                : "Sign in with GitHub"}
+          </button>
+          <GitHubKeychainNotice compact />
+        </>
       )}
       {deviceFlow && (
         <div className="device-flow">

@@ -1,5 +1,6 @@
 import { ClipboardList, ExternalLink, X } from "lucide-react";
 import { GitHubIcon } from "./GitHubIcon";
+import { GitHubKeychainNotice } from "./GitHubKeychainNotice";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import type { DeviceIdentity } from "../lib/identity/deviceIdentity";
@@ -278,6 +279,7 @@ function ProfileSignInControls({
             GitHub sign-in establishes workspace identity with <code>read:user</code>. Optional pull-request and Actions
             workflows request <code>repo</code> access later, when you choose to use them.
           </p>
+          <GitHubKeychainNotice />
           <button className="primary-wide" onClick={onSignIn} disabled={authBusy || !authConfigured}>
             <GitHubIcon size={15} />
             {!authConfigured

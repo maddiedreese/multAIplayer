@@ -9,7 +9,10 @@ class FakeWebSocket extends EventTarget {
   readyState = 0;
   sent: string[] = [];
   closedWith: [number | undefined, string | undefined] | null = null;
-  constructor(readonly url: string) {
+  constructor(
+    readonly url: string,
+    readonly protocols?: string | string[]
+  ) {
     super();
     FakeWebSocket.latest = this;
   }
