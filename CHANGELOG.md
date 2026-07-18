@@ -6,6 +6,12 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.4] - 2026-07-18
+
+### Fixed
+
+- The release two-client native MLS journey now verifies restored authentication from the app state instead of requiring the profile card to be rendered, preventing a late crash-recovery UI timing race from blocking signed builds.
+
 ## [0.1.0-alpha.3] - 2026-07-18
 
 ### Fixed

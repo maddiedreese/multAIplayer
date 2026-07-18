@@ -171,16 +171,17 @@ async function authenticate(
   // Keep the setup bypass idempotent so this relay-auth fixture does not
   // mistake a second first-run surface for an authentication failure.
   await dismissFirstRunAfterRefresh(browser);
-  await visible(browser, ".profile-card strong");
   await browser.waitUntil(
     () =>
-      browser.execute(
-        (expectedName) => document.querySelector(".profile-card strong")?.textContent?.trim() === expectedName,
-        identity.name
-      ),
+      browser.executeAsync((expectedUserId, done) => {
+        const storeModule = "/src/store/appStore.ts";
+        import(/* @vite-ignore */ storeModule)
+          .then(({ useAppStore }) => done(useAppStore.getState().currentUser?.id === expectedUserId))
+          .catch(() => done(false));
+      }, identity.id),
     {
       timeout: 30_000,
-      timeoutMsg: `authenticated profile did not resolve for ${identity.id}`
+      timeoutMsg: `authenticated app state did not resolve for ${identity.id}`
     }
   );
 }
