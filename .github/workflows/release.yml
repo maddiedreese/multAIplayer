@@ -149,6 +149,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -161,6 +162,7 @@ jobs:
             APPLE_SIGNING_IDENTITY \
             APPLE_ID \
             APPLE_PASSWORD \
+            APPLE_PROVISIONING_PROFILE \
             APPLE_TEAM_ID \
             KEYCHAIN_PASSWORD \
             TAURI_SIGNING_PRIVATE_KEY \
@@ -200,6 +202,42 @@ jobs:
             build.keychain
           security find-identity -v -p codesigning build.keychain
           rm -f certificate.p12
+
+      - name: Install and validate Developer ID provisioning profile
+        env:
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          profile_path="apps/desktop/src-tauri/release.provisionprofile"
+          profile_plist="$RUNNER_TEMP/release-profile.plist"
+          profile_certificate="$RUNNER_TEMP/profile-certificate.der"
+          signing_certificate="$RUNNER_TEMP/signing-certificate.der"
+          echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > "$profile_path"
+          openssl cms -verify \
+            -inform DER \
+            -noverify \
+            -in "$profile_path" \
+            -out "$profile_plist"
+          application_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$profile_plist")"
+          if [ "$application_identifier" != "$APPLE_TEAM_ID.com.multaiplayer.desktop" ]; then
+            echo "Developer ID provisioning profile does not authorize the release bundle identifier." >&2
+            exit 1
+          fi
+          /usr/libexec/PlistBuddy \
+            -c 'Print :Entitlements:com.apple.developer.associated-domains' \
+            "$profile_plist" >/dev/null
+          plutil -extract DeveloperCertificates.0 raw -o - "$profile_plist" \
+            | base64 --decode > "$profile_certificate"
+          security find-certificate \
+            -c "$APPLE_SIGNING_IDENTITY" \
+            -p build.keychain \
+            | openssl x509 -outform DER -out "$signing_certificate"
+          if ! cmp -s "$profile_certificate" "$signing_certificate"; then
+            echo "Developer ID provisioning profile does not contain the release signing certificate." >&2
+            exit 1
+          fi
+          echo "Validated the release provisioning profile without exposing account metadata."
 
       - name: Validate official relay endpoints
         run: |

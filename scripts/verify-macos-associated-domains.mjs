@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import process from "node:process";
 
 export const associatedDomainHosts = ["multaiplayer.com", "open.multaiplayer.com"];
@@ -65,6 +67,10 @@ export async function verifyLiveAssociations({ teamId, fetchImpl = fetch }) {
 }
 
 export function verifySignedAppEntitlements(appPath) {
+  const provisioningProfile = join(appPath, "Contents", "embedded.provisionprofile");
+  if (!existsSync(provisioningProfile)) {
+    throw new Error("Signed application is missing its Developer ID provisioning profile.");
+  }
   let entitlements;
   try {
     entitlements = execFileSync("codesign", ["-d", "--entitlements", ":-", appPath], {
