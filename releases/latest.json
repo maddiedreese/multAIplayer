@@ -1,0 +1,10 @@
+{
+  "version": "0.1.0-alpha.7",
+  "notes": "{\"schema\":\"multaiplayer-updater-envelope-v1\",\"payload\":\"{\\\"schema\\\":\\\"multaiplayer-updater-metadata-v1\\\",\\\"version\\\":\\\"0.1.0-alpha.7\\\",\\\"url\\\":\\\"https://github.com/maddiedreese/multAIplayer/releases/download/v0.1.0-alpha.7/multAIplayer-macos-arm64.app.tar.gz\\\",\\\"archiveSignature\\\":\\\"dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdmErRUxKcTZYWDgrcklLeVZjcFFzbkV2d0YrY0hoWkNmNy9oSTlpWWRRcVVrTkhpYWRvVGM4MGpQU2pKbldPanh4YU15Z1pqd0VvODVmRGt6cElHV1pCOTI5V1BudlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MzY3MTYwCWZpbGU6bXVsdEFJcGxheWVyLmFwcC50YXIuZ3oKVjJ6R3JFMlFXcW1oa3B6NlhOdTBaUnZ5Uk9iWUpJUjh2ZWplL2M3WFlYYjd6ZFAwOVZPUktuVHpJYlVHazdZcWpmelhBZnhMdDg1dUVJY1V6Z2VHQ3c9PQo=\\\",\\\"notes\\\":\\\"See the v0.1.0-alpha.7 GitHub Release for reviewed release notes.\\\"}\",\"signature\":\"dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdmErRUxKcTZYWCtJeHpvTWg0R21JTlk1WFJFcU9ZWVpNZG9YRmtIV3BoeWNVMlpGVE8raUFuQ3dIeTFMdnZtYjRlTC9TbWxERThBRDRINEJ0WS9EQmRpQk9kejJSc0FFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MzY3MTkwCWZpbGU6bXVsdGFpcGxheWVyLXVwZGF0ZXItbWV0YWRhdGEuanNvbgprL08wVFlrTGRvWGF1Zk9nVnlQckpjMzRIRWtLODRaWEJGdytVZ3ZNMlU2cm15VlkvMmF5OXlDbTY3djFEU2huTTJWejQ4b2h3MzNaSFNHdkxTckhEQT09Cg==\"}",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRdmErRUxKcTZYWDgrcklLeVZjcFFzbkV2d0YrY0hoWkNmNy9oSTlpWWRRcVVrTkhpYWRvVGM4MGpQU2pKbldPanh4YU15Z1pqd0VvODVmRGt6cElHV1pCOTI5V1BudlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MzY3MTYwCWZpbGU6bXVsdEFJcGxheWVyLmFwcC50YXIuZ3oKVjJ6R3JFMlFXcW1oa3B6NlhOdTBaUnZ5Uk9iWUpJUjh2ZWplL2M3WFlYYjd6ZFAwOVZPUktuVHpJYlVHazdZcWpmelhBZnhMdDg1dUVJY1V6Z2VHQ3c9PQo=",
+      "url": "https://github.com/maddiedreese/multAIplayer/releases/download/v0.1.0-alpha.7/multAIplayer-macos-arm64.app.tar.gz"
+    }
+  }
+}
