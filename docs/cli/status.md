@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: Orchestrator activation; CLI-010 is next
+Current phase: CLI-010 desktop release isolation and CI classification
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -13,10 +13,12 @@ Last update: 2026-07-18
 - CLI governance worktree: `/Users/maddiedreese/Documents/MultAIplayer-cli`.
 - Codex project: `MultAIplayer-cli`.
 - Governance branch: `codex/cli-governance`.
-- No CLI product code has been authorized or implemented.
+- No CLI product code has been implemented.
 - CLI-000 is the authorized program orchestrator.
-- Every implementation task is `waiting_for_orchestrator_approval` until CLI-000
-  confirms dependencies and grants exact task approval.
+- CLI-010 is the only active implementation task and is approved from integration
+  baseline `5e1f040a70ba78edd9d87b26a76527617b1f29aa`.
+- Every other implementation task is `waiting_for_orchestrator_approval` until
+  CLI-000 confirms dependencies and grants exact task approval.
 - All 18 Codex tasks have read their governing files, reported readiness, and
   stopped without implementation.
 - `[CLI-000] Program Control — Governance` and `[CLI-010] Desktop Release
@@ -29,7 +31,7 @@ Last update: 2026-07-18
 | Task | Title | State | Depends on |
 | --- | --- | --- | --- |
 | CLI-000 | Program orchestration and governance | active_orchestrator | — |
-| CLI-010 | Desktop release isolation and CI classification | waiting_for_orchestrator_approval | CLI-000 |
+| CLI-010 | Desktop release isolation and CI classification | active | CLI-000 |
 | CLI-020 | Inert Rust CLI scaffold | waiting_for_orchestrator_approval | CLI-010 |
 | CLI-030 | Rust protocol types and golden fixtures | waiting_for_orchestrator_approval | CLI-020 |
 | CLI-040 | GitHub authentication and secure device identity | waiting_for_orchestrator_approval | CLI-030 |
