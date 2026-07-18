@@ -48,6 +48,7 @@ export function useAppHostHandoffActions({
     appendHostHandoff
   } = roomActions;
   const relayStatus = useAppStore((state) => state.relayStatus);
+  const deviceSessionToken = useAppStore((state) => state.deviceSessionToken ?? "");
   const terminals = useAppStore((state) => state.terminals);
   const browserRequests = useAppStore((state) =>
     selectedRoom ? state.browserByRoom[selectedRoom.id]?.requests : undefined
@@ -64,6 +65,7 @@ export function useAppHostHandoffActions({
     queuedCodexTurns: selectedRuntime.queuedCodexApprovals,
     localUser: localIdentity.localUser,
     deviceId: localIdentity.deviceId,
+    deviceSessionToken,
     relayStatus,
     relayRef: appRefs.relayRef,
     seenEnvelopeIds: appRefs.seenEnvelopeIds,

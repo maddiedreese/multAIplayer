@@ -7,6 +7,8 @@ All notable user-visible and security-relevant changes are curated here. A relea
 ### Fixed
 
 - The production relay image now includes the MLS validator's pinned OpenSSL runtime library, and an early validator exit fails the upload closed without crashing the relay process.
+- First-time hosts now join a newly created MLS room with the authenticated device session before publishing its encrypted configuration, preventing a one-time “Device session expired” notice.
+- New-room encrypted-history hydration now retries automatically after the MLS group is created instead of leaving a false load-failure warning.
 
 ## [0.1.0-alpha.6] - 2026-07-18
 

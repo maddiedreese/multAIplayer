@@ -56,6 +56,7 @@ export function createHostHandoffActions(
     queuedCodexTurns,
     localUser,
     deviceId,
+    deviceSessionToken,
     relayStatus,
     relayRef,
     seenEnvelopeIds,
@@ -147,6 +148,19 @@ export function createHostHandoffActions(
       incrementRevision
     });
   }
+  async function joinRelayRoom(room: ClientRoomRecord) {
+    const client = relayRef.current;
+    if (!client) throw new Error("Relay is unavailable for room admission.");
+    if (!deviceSessionToken) throw new Error("Device session is unavailable for room admission.");
+    await client.joinAndWaitForAck({
+      type: "join",
+      teamId: room.teamId,
+      roomId: room.id,
+      userId: localUser.id,
+      deviceId,
+      deviceSessionToken
+    });
+  }
   async function setRoomHost(action: "active" | "handoff") {
     if (!selectedRoom) {
       setSelectedHostMessage("Create or join a room before changing the host.");
@@ -173,7 +187,18 @@ export function createHostHandoffActions(
       }
       const host = localUser.name;
       const hostUserId = localUser.id;
-      if (selectedRoom.acceptedMlsEpoch === undefined) await createMlsGroupWithHistorySettings(roomId);
+      if (selectedRoom.acceptedMlsEpoch === undefined) {
+        await createMlsGroupWithHistorySettings(roomId);
+        // A newly created relay room is selected before its MLS group exists, so
+        // the first local-history hydration intentionally fails closed. Retry as
+        // soon as the group is durable instead of leaving a false corruption warning.
+        useAppStore.getState().retryHistoryHydrationForRoom(roomId);
+      }
+      freshRoomHostState(selectedRoom, "Host claim");
+      // The initial workspace subscription cannot join a brand-new room until
+      // the local MLS group exists. Bind this socket to the authenticated device
+      // before publishing the first encrypted room configuration.
+      await joinRelayRoom(selectedRoom);
       freshRoomHostState(selectedRoom, "Host claim");
       const room = await updateRoomHost(roomId, host, hostUserId, deviceId);
       // The websocket may install the exact HTTP response before this await

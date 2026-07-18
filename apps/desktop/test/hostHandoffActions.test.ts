@@ -56,6 +56,8 @@ const tauriInternals = {
       };
     }
     if (command === "mls_publish_succeeded") return 2;
+    if (command === "mls_create_group") return 0;
+    if (command === "mls_history_retention_set") return null;
     if (command === "mls_device_auth_sign") return { signatureDer: "signature", publicKeySpkiDer: "public-key" };
     if (command === "mls_clear_pending_commit") return 2;
     if (command === "mls_current_epoch") return 3;
@@ -145,6 +147,7 @@ function options(publish: () => Promise<void>, seen = new Set<string>()): UseHos
     queuedCodexTurns: [],
     localUser: { id: "github:candidate", name: "Candidate" },
     deviceId: "device-candidate",
+    deviceSessionToken: "session-token",
     relayStatus: "open",
     relayRef: {
       current: {
@@ -424,6 +427,81 @@ test("offline handoff publication preserves the package without attempting encry
   assert.equal(appendedHandoffs.at(-1)?.status, "available");
   assert.match(hostMessage, /saved locally/);
   assert.equal(nativeCommands.includes("mls_encrypt_application"), false);
+});
+
+test("first host claim joins the new MLS room before publishing and retries history hydration", async () => {
+  const originalFetch = globalThis.fetch;
+  const claimableRoom = {
+    ...room,
+    host: "",
+    hostUserId: "",
+    activeHostDeviceId: undefined,
+    hostStatus: "offline" as const,
+    acceptedMlsEpoch: undefined
+  };
+  const activeRoom = {
+    ...claimableRoom,
+    host: "Candidate",
+    hostUserId: "github:candidate",
+    activeHostDeviceId: "device-candidate",
+    hostStatus: "active" as const
+  };
+  let currentRoom: ClientRoomRecord = claimableRoom;
+  const sequence: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    const json = url.endsWith("/challenge")
+      ? { challenge: "challenge", expiresAt: "2099-01-01T00:00:00.000Z" }
+      : url.endsWith("/session")
+        ? { deviceSessionToken: "session-token", expiresAt: "2099-01-01T00:00:00.000Z" }
+        : ((currentRoom = activeRoom), sequence.push("host-patch"), { room: activeRoom });
+    return new Response(JSON.stringify(json), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    localStorage.setItem(
+      "multaiplayer:app-config",
+      JSON.stringify({ relayHttpUrl: "http://127.0.0.1:8787", relayWsUrl: "ws://127.0.0.1:8787" })
+    );
+    await establishDeviceSession(getRelayHttpUrl(), "device-candidate");
+    useAppStore.getState().setHistoryHydrationStatusForRoom(room.id, "failed");
+    const input = {
+      ...options(async () => undefined),
+      selectedRoom: claimableRoom,
+      relayRef: {
+        current: {
+          publish: noop,
+          publishAndWaitForAck: async () => {
+            sequence.push("publish");
+          },
+          joinAndWaitForAck: async () => {
+            sequence.push("join");
+          },
+          rejoinForBacklog: async () => undefined,
+          close: noop
+        }
+      },
+      replaceRoom: (next: ClientRoomRecord) => {
+        currentRoom = next;
+      },
+      getHostHandoffSnapshot: () => ({
+        selectedRoomId: room.id,
+        room: currentRoom,
+        isActiveHost: currentRoom.hostUserId === "github:candidate" && currentRoom.hostStatus === "active",
+        hostHandoffs: []
+      })
+    };
+    const { result } = renderHook(() => useHostHandoffActions(input));
+
+    await act(() => result.current.setRoomHost("active"));
+
+    assert.deepEqual(sequence, ["join", "host-patch", "publish"]);
+    assert.equal(useAppStore.getState().historyPresenceByRoom[room.id]?.historyHydrationStatus, "loading");
+    assert.equal(useAppStore.getState().historyPresenceByRoom[room.id]?.historyHydrationAttempt, 1);
+    assert.equal(currentRoom.hostStatus, "active");
+  } finally {
+    localStorage.removeItem("multaiplayer:app-config");
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("host claim accepts the exact returned authority installed by websocket before HTTP resumes", async () => {
