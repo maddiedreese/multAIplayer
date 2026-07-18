@@ -284,8 +284,8 @@ jobs:
           writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { mode: 0o644 });
           NODE
           node -e '
-            const config = require(`./apps/desktop/src-tauri/tauri.release.conf.json`);
-            if (config.bundle?.macOS?.files?.[`embedded.provisionprofile`] !== `./release.provisionprofile`) process.exit(1);
+            const config = require("./apps/desktop/src-tauri/tauri.release.conf.json");
+            if (config.bundle?.macOS?.files?.["embedded.provisionprofile"] !== "./release.provisionprofile") process.exit(1);
           '
           test -s "apps/desktop/src-tauri/release.provisionprofile"
           echo "Configured the validated profile at Contents/embedded.provisionprofile before signing."
