@@ -27,6 +27,13 @@ pub struct DeviceIdentity {
     pub public: DeviceIdentityPublic,
     pub signer: DeviceAuthSigner,
     pub hpke: HpkeKeyPair,
+    mls_signing_secret: Zeroizing<Vec<u8>>,
+}
+
+impl DeviceIdentity {
+    pub(crate) fn mls_signing_secret(&self) -> Zeroizing<Vec<u8>> {
+        self.mls_signing_secret.clone()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -78,6 +85,7 @@ pub fn load_or_create_identity(
         },
         signer,
         hpke,
+        mls_signing_secret: secret,
     })
 }
 
