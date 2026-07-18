@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-030 Rust protocol types and golden fixtures
+Current phase: CLI-040 GitHub authentication and secure device identity
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -13,8 +13,8 @@ Last update: 2026-07-18
 - CLI governance worktree: `/Users/maddiedreese/Documents/MultAIplayer-cli`.
 - Codex project: `MultAIplayer-cli`.
 - Governance branch: `codex/cli-governance`.
-- The dependency-free CLI scaffold is present; no relay, MLS, authentication, or
-  other product behavior has been implemented.
+- The CLI scaffold and strict Rust protocol parity layer are present; no relay,
+  MLS, authentication, or other product runtime behavior has been implemented.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -26,7 +26,14 @@ Last update: 2026-07-18
   `9d0e71b154fc59c9bdfc783da9f8df36ff699b0c` passed CLI formatting, Clippy,
   two unit tests, bounded help/version checks, 18 classification/isolation tests,
   and the protected desktop-release audit.
-- CLI-030 is the only active implementation task.
+- CLI-030 is complete and integrated. Its accepted task commit is
+  `09cddb0c6734844e6457a86ccd9d24f601b0e055`; integration merge
+  `c9471059b0ee06a25e3be2f050a884069c1af566` passed Rust formatting,
+  warnings-denied Clippy, 11 locked CLI/protocol tests, protocol typecheck and
+  build, 27 TypeScript protocol tests, fixture drift verification, the CLI
+  runner, 18 classification/isolation tests, and the protected desktop-release
+  audit. The task's full `npm run verify` also passed before integration.
+- CLI-040 is the only active implementation task.
 - Every other implementation task is `waiting_for_orchestrator_approval` until
   CLI-000 confirms dependencies and grants exact task approval.
 - All 18 Codex tasks have read their governing files, reported readiness, and
@@ -43,8 +50,8 @@ Last update: 2026-07-18
 | CLI-000 | Program orchestration and governance | active_orchestrator | — |
 | CLI-010 | Desktop release isolation and CI classification | complete | CLI-000 |
 | CLI-020 | Inert Rust CLI scaffold | complete | CLI-010 |
-| CLI-030 | Rust protocol types and golden fixtures | active | CLI-020 |
-| CLI-040 | GitHub authentication and secure device identity | waiting_for_orchestrator_approval | CLI-030 |
+| CLI-030 | Rust protocol types and golden fixtures | complete | CLI-020 |
+| CLI-040 | GitHub authentication and secure device identity | active | CLI-030 |
 | CLI-050 | Relay transport and workspace reads | waiting_for_orchestrator_approval | CLI-030, CLI-040 |
 | CLI-060 | MLS client state, storage, and outbox | waiting_for_orchestrator_approval | CLI-030, CLI-040 |
 | CLI-070 | Room creation and local project association | waiting_for_orchestrator_approval | CLI-050, CLI-060 |
@@ -65,7 +72,7 @@ Last update: 2026-07-18
 - Desktop release workflow changed by governance: no.
 - Desktop updater/signing/notarization changed by governance: no.
 - CLI included in desktop packaging: no.
-- CLI implementation dependencies installed: no.
+- CLI implementation dependencies installed: Rust protocol dependencies only.
 - CLI release publication enabled: no.
 
 ## Update rules
