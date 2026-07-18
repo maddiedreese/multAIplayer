@@ -73,19 +73,23 @@ export function executableKeyPackageValidator(path: string, maxConcurrency = 2):
             }
           }
         );
-        child.stdin?.end(
-          JSON.stringify({
-            key_package: upload.keyPackage,
-            uploader_github_user_id: uploader.userId,
-            uploader_device_id: uploader.deviceId,
-            ...(path.endsWith(".mjs")
-              ? {
-                  expected_signature_public_key: uploader.signaturePublicKey,
-                  expected_signature_key_fingerprint: uploader.signatureKeyFingerprint
-                }
-              : {})
-          })
-        );
+        const input = JSON.stringify({
+          key_package: upload.keyPackage,
+          uploader_github_user_id: uploader.userId,
+          uploader_device_id: uploader.deviceId,
+          ...(path.endsWith(".mjs")
+            ? {
+                expected_signature_public_key: uploader.signaturePublicKey,
+                expected_signature_key_fingerprint: uploader.signatureKeyFingerprint
+              }
+            : {})
+        });
+        // A missing runtime dependency or other early child exit can close the
+        // pipe before Node finishes writing. execFile reports that failure to
+        // its callback; consume the stream error as well so EPIPE cannot crash
+        // the relay process before the callback fails validation closed.
+        child.stdin?.on("error", () => undefined);
+        child.stdin?.end(input);
       });
     }
   };

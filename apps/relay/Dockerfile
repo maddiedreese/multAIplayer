@@ -4,7 +4,11 @@ ARG SOURCE_DATE_EPOCH=0
 FROM ${RUST_IMAGE} AS mls-validator
 WORKDIR /src/apps/desktop/src-tauri
 COPY apps/desktop/src-tauri ./
-RUN cargo build --locked --release -p mls-core --bin mls-keypackage-validator
+RUN cargo build --locked --release -p mls-core --bin mls-keypackage-validator && \
+    validator_crypto="$(ldd target/release/mls-keypackage-validator | awk '$1 == "libcrypto.so.3" { print $3 }')" && \
+    test -n "$validator_crypto" && \
+    mkdir -p /validator-runtime-libs && \
+    cp "$validator_crypto" /validator-runtime-libs/libcrypto.so.3
 
 FROM ${NODE_IMAGE} AS build
 
@@ -36,6 +40,7 @@ ENV NODE_ENV=production
 ENV PORT=4321
 ENV MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 ENV MULTAIPLAYER_MLS_VALIDATOR_PATH=/app/bin/mls-keypackage-validator
+ENV LD_LIBRARY_PATH=/app/lib
 
 WORKDIR /app
 
@@ -54,10 +59,12 @@ COPY --from=build /app/apps/relay/package.json ./apps/relay/package.json
 COPY --from=build /app/apps/relay/node_modules ./apps/relay/node_modules
 COPY --from=build /app/apps/relay/dist ./apps/relay/dist
 COPY --from=mls-validator /src/apps/desktop/src-tauri/target/release/mls-keypackage-validator /app/bin/mls-keypackage-validator
+COPY --from=mls-validator /validator-runtime-libs/libcrypto.so.3 /app/lib/libcrypto.so.3
 
 RUN node tools/release/relay-runtime-dependency-closure.mjs \
       verify node_modules relay-runtime-dependencies.json && \
-    node --input-type=module -e "await import('./apps/relay/dist/auth/session.js')"
+    node --input-type=module -e "await import('./apps/relay/dist/auth/session.js')" && \
+    sh -c 'set +e; /app/bin/mls-keypackage-validator </dev/null >/dev/null 2>&1; validator_status=$?; test "$validator_status" -eq 1'
 RUN mkdir -p /data && chown node:node /data
 
 USER node
