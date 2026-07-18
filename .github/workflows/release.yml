@@ -224,9 +224,31 @@ jobs:
             echo "Developer ID provisioning profile does not authorize the release bundle identifier." >&2
             exit 1
           fi
-          /usr/libexec/PlistBuddy \
-            -c 'Print :Entitlements:com.apple.developer.associated-domains' \
-            "$profile_plist" >/dev/null
+          team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$profile_plist")"
+          entitlement_team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.team-identifier' "$profile_plist")"
+          provisions_all_devices="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' "$profile_plist")"
+          associated_domains="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.associated-domains' "$profile_plist")"
+          if [ "$team_identifier" != "$APPLE_TEAM_ID" ] || [ "$entitlement_team_identifier" != "$APPLE_TEAM_ID" ]; then
+            echo "Developer ID provisioning profile does not authorize the release team." >&2
+            exit 1
+          fi
+          if [ "$provisions_all_devices" != "true" ]; then
+            echo "Release profile must be a Developer ID distribution profile." >&2
+            exit 1
+          fi
+          if [ "$associated_domains" != "*" ]; then
+            echo "Developer ID provisioning profile does not authorize Associated Domains." >&2
+            exit 1
+          fi
+          if /usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$profile_plist" >/dev/null 2>&1; then
+            echo "Release profile must not be device-scoped." >&2
+            exit 1
+          fi
+          profile_expiration="$(plutil -extract ExpirationDate raw -o - "$profile_plist")"
+          node -e 'const expiration = Date.parse(process.argv[1]); const minimum = Date.now() + 30 * 24 * 60 * 60 * 1000; if (!Number.isFinite(expiration) || expiration <= minimum) process.exit(1)' "$profile_expiration" || {
+            echo "Developer ID provisioning profile is invalid or expires within 30 days." >&2
+            exit 1
+          }
           plutil -extract DeveloperCertificates.0 raw -o - "$profile_plist" \
             | base64 --decode > "$profile_certificate"
           security find-certificate \
@@ -238,6 +260,35 @@ jobs:
             exit 1
           fi
           echo "Validated the release provisioning profile without exposing account metadata."
+
+      - name: Configure provisioning profile before bundle signing
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const path = "apps/desktop/src-tauri/tauri.release.conf.json";
+          const config = JSON.parse(readFileSync(path, "utf8"));
+          config.bundle ??= {};
+          config.bundle.macOS ??= {};
+          const files = config.bundle.macOS.files ?? {};
+          if (!files || typeof files !== "object" || Array.isArray(files)) {
+            throw new Error("Tauri macOS bundle files configuration must be an object.");
+          }
+          const destination = "embedded.provisionprofile";
+          const source = "./release.provisionprofile";
+          if (files[destination] !== undefined && files[destination] !== source) {
+            throw new Error("Tauri release configuration has a conflicting provisioning profile mapping.");
+          }
+          files[destination] = source;
+          config.bundle.macOS.files = files;
+          writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { mode: 0o644 });
+          NODE
+          node -e '
+            const config = require("./apps/desktop/src-tauri/tauri.release.conf.json");
+            if (config.bundle?.macOS?.files?.["embedded.provisionprofile"] !== "./release.provisionprofile") process.exit(1);
+          '
+          test -s "apps/desktop/src-tauri/release.provisionprofile"
+          echo "Configured the validated profile at Contents/embedded.provisionprofile before signing."
 
       - name: Validate official relay endpoints
         run: |
@@ -319,6 +370,27 @@ jobs:
             echo "Release minimum macOS version must be 11.0; found: $minimum_system_version" >&2
             exit 1
           fi
+          bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
+          if [ "$bundle_identifier" != "com.multaiplayer.desktop" ]; then
+            echo "Release bundle identifier is incorrect." >&2
+            exit 1
+          fi
+          entitlement_output="$(codesign -d --entitlements - "$app_path" 2>/dev/null)"
+          expected_domains="$(printf '%s\n' 'applinks:multaiplayer.com' 'applinks:open.multaiplayer.com')"
+          signed_domains="$(printf '%s\n' "$entitlement_output" | sed -n 's/^[[:space:]]*\[String\] \(applinks:.*\)$/\1/p')"
+          if ! printf '%s\n' "$entitlement_output" | grep -q '^.*\[Key\] com\.apple\.developer\.associated-domains$' || \
+            [ "$signed_domains" != "$expected_domains" ]; then
+            echo "Signed application has incorrect Associated Domains entitlements." >&2
+            exit 1
+          fi
+          if printf '%s\n' "$entitlement_output" | grep -q '\[Key\] com\.apple\.security\.get-task-allow$'; then
+            echo "Signed release application must not be debug-enabled." >&2
+            exit 1
+          fi
+          if ! codesign -dvv "$app_path" 2>&1 | grep -Eq 'flags=.*runtime'; then
+            echo "Signed release application is missing the hardened runtime." >&2
+            exit 1
+          fi
           bash scripts/verify-macos-deployment-target.sh "$app_path"
           embedded_profile="$app_path/Contents/embedded.provisionprofile"
           source_profile="apps/desktop/src-tauri/release.provisionprofile"
@@ -330,7 +402,18 @@ jobs:
             echo "Embedded Developer ID provisioning profile does not match the validated release profile." >&2
             exit 1
           fi
-          npm run verify:macos-associated-domains -- "$app_path"
+          mount_dir="$RUNNER_TEMP/release-dmg"
+          mkdir -p "$mount_dir"
+          hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$mount_dir" >/dev/null
+          trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true' EXIT
+          dmg_app="$mount_dir/multAIplayer.app"
+          if [ ! -d "$dmg_app" ] || ! cmp -s "$source_profile" "$dmg_app/Contents/embedded.provisionprofile"; then
+            echo "Notarized DMG is missing the validated Developer ID provisioning profile." >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$dmg_app"
+          hdiutil detach "$mount_dir" >/dev/null
+          trap - EXIT
 
       - name: Package release assets
         env:
@@ -350,6 +433,11 @@ jobs:
           updater_path="$(find "$bundle_root/macos" -maxdepth 1 -type f -name '*.app.tar.gz' | head -n 1)"
           if [ -z "$updater_path" ] || [ ! -f "$updater_path.sig" ]; then
             echo "Signed Tauri updater bundle and signature are required." >&2
+            exit 1
+          fi
+          if ! tar -xOzf "$updater_path" multAIplayer.app/Contents/embedded.provisionprofile \
+            | cmp -s "apps/desktop/src-tauri/release.provisionprofile" -; then
+            echo "Signed Tauri updater bundle is missing the validated Developer ID provisioning profile." >&2
             exit 1
           fi
           updater_name="multAIplayer-macos-arm64.app.tar.gz"

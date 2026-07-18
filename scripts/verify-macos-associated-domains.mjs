@@ -73,7 +73,7 @@ export function verifySignedAppEntitlements(appPath, { requireProvisioningProfil
   }
   let entitlements;
   try {
-    entitlements = execFileSync("codesign", ["-d", "--entitlements", ":-", appPath], {
+    entitlements = execFileSync("codesign", ["-d", "--entitlements", "-", appPath], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -82,11 +82,16 @@ export function verifySignedAppEntitlements(appPath, { requireProvisioningProfil
     if (!stdout) throw error;
     entitlements = stdout;
   }
-  for (const host of associatedDomainHosts) {
-    const domain = `applinks:${host}`;
-    if (!entitlements.includes(`<string>${domain}</string>`)) {
-      throw new Error(`Signed application is missing ${domain}.`);
-    }
+  if (!entitlements.includes("[Key] com.apple.developer.associated-domains")) {
+    throw new Error("Signed application is missing its Associated Domains entitlement.");
+  }
+  const domains = [...entitlements.matchAll(/^\s*\[String\] (applinks:[^\r\n]+)$/gm)].map((match) => match[1]);
+  const expectedDomains = associatedDomainHosts.map((host) => `applinks:${host}`);
+  if (JSON.stringify(domains) !== JSON.stringify(expectedDomains)) {
+    throw new Error("Signed application has incorrect Associated Domains entitlements.");
+  }
+  if (entitlements.includes("[Key] com.apple.security.get-task-allow")) {
+    throw new Error("Signed release application must not be debug-enabled.");
   }
 }
 
