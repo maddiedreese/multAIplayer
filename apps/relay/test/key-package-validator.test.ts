@@ -15,6 +15,11 @@ test("KeyPackage validator fails closed on timeout", async () => {
   const path = fileURLToPath(new URL("./fixtures/slow-keypackage-validator.mjs", import.meta.url));
   assert.equal(await executableKeyPackageValidator(path).validate(upload, uploader), null);
 });
+test("KeyPackage validator fails closed when a child exits before consuming stdin", async () => {
+  const path = fileURLToPath(new URL("./fixtures/exit-keypackage-validator.mjs", import.meta.url));
+  const oversizedPipeWrite = { ...upload, keyPackage: "A".repeat(512 * 1024) };
+  assert.equal(await executableKeyPackageValidator(path).validate(oversizedPipeWrite, uploader), null);
+});
 test("KeyPackage validator bounds concurrent child processes without queueing work", async () => {
   const path = fileURLToPath(new URL("./fixtures/delayed-keypackage-validator.mjs", import.meta.url));
   const validator = executableKeyPackageValidator(path, 2);
