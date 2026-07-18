@@ -16,6 +16,16 @@ outputs:
     value: ${{ steps.classify.outputs.native_journey }}
   macos:
     value: ${{ steps.classify.outputs.macos }}
+  cli:
+    value: ${{ steps.classify.outputs.cli }}
+  desktop:
+    value: ${{ steps.classify.outputs.desktop }}
+  relay:
+    value: ${{ steps.classify.outputs.relay }}
+  shared:
+    value: ${{ steps.classify.outputs.shared }}
+  protected_release:
+    value: ${{ steps.classify.outputs.protected_release }}
 
 runs:
   using: composite
@@ -32,12 +42,12 @@ runs:
            [[ "$GITHUB_REF" == refs/tags/* ]] || \
            [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || \
            [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-          node tools/ci/classify-changes.mjs --all --github-output "$GITHUB_OUTPUT"
+          node tools/ci/classify-changes.mjs --all --github-output "$GITHUB_OUTPUT" --github-summary "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
 
         if ! git diff --no-renames --name-only "$BASE_SHA" "$GITHUB_SHA" |
-          node tools/ci/classify-changes.mjs --github-output "$GITHUB_OUTPUT"; then
+          node tools/ci/classify-changes.mjs --github-output "$GITHUB_OUTPUT" --github-summary "$GITHUB_STEP_SUMMARY"; then
           echo "Could not classify changes between $BASE_SHA and $GITHUB_SHA." >&2
           exit 1
         fi
