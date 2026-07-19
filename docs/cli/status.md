@@ -3,9 +3,9 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-110 UI-independent Codex host extraction
+Current phase: CLI-110-R1 shared MLS fuzz lockfile reconciliation
 Implementation authorization: Delegated to CLI-000 within the approved runbook
-Last update: 2026-07-18
+Last update: 2026-07-19
 
 ## Current state
 
@@ -144,6 +144,13 @@ Last update: 2026-07-18
   accepted CLI-010-R1 integration commit without rewriting its original task
   ancestry, then must rerun its complete verification on the resulting exact
   head before integration review.
+- CLI-110 is preserved and paused at merge head
+  `b7e269e43546563fac0caf1c0515360246d9a14b` after locked dependency
+  verification proved the checked-in `mls-core` fuzz lockfile stale relative to
+  already accepted manifests. The owner authorized exactly CLI-110-R1 to
+  reconcile only that fuzz lockfile, review the exact resolution delta, and run
+  locked dependency audits plus complete fuzz, MLS, CLI, desktop,
+  classification, and protected-path verification. No other task is active.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -171,7 +178,8 @@ Last update: 2026-07-18
 | CLI-080 | Secure invite codes and host-mediated admission | complete | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | complete | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | complete | CLI-090 |
-| CLI-110 | UI-independent Codex host extraction | active | CLI-020 |
+| CLI-110 | UI-independent Codex host extraction | paused_for_CLI-110-R1 | CLI-020 |
+| CLI-110-R1 | Shared MLS fuzz lockfile reconciliation | active | CLI-010-R1 |
 | CLI-120 | Codex proposals, context, and hosted turns | waiting_for_orchestrator_approval | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | waiting_for_orchestrator_approval | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | waiting_for_orchestrator_approval | CLI-100, CLI-130 |

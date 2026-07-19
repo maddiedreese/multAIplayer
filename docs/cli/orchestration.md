@@ -25,6 +25,7 @@ by the approved plan, decisions, task specifications, and root `AGENTS.md`.
 | CLI-090 | `019f76c9-da25-76c3-967f-d08c25d3634e` |
 | CLI-100 | `019f76c9-e8ee-7c23-80af-1dbeb8a501de` |
 | CLI-110 | `019f76c9-ee31-7631-b291-129e041f539e` |
+| CLI-110-R1 | `019f76c9-ee31-7631-b291-129e041f539e` |
 | CLI-120 | `019f76ca-10de-70b0-ab93-71230a5a21a7` |
 | CLI-130 | `019f76ca-19e9-7110-870b-5873eca50335` |
 | CLI-140 | `019f76ca-10df-7553-92d5-9b8a93bec411` |
