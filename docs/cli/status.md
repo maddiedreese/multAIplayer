@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-070 room creation and local project association
+Current phase: CLI-040-R1 device identity reliability correction
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -59,11 +59,16 @@ Last update: 2026-07-18
   dependency advisories/source/license audits, durable state/outbox and
   crash-replay review, secret-lifetime review, and the protected
   desktop-release audit.
-- CLI-070 is the only active implementation task.
-- Every other implementation task is `waiting_for_orchestrator_approval` until
-  CLI-000 confirms dependencies and grants exact task approval.
-- All 18 Codex tasks have read their governing files, reported readiness, and
-  stopped without implementation.
+- CLI-070 is paused with its original baseline ancestry and work preserved until
+  the identity-reliability correction is accepted and integrated.
+- CLI-040-R1 is the only active implementation task. The owner authorized this
+  isolated correction after an intermittent existing identity-generation test
+  failure reproduced outside the sandbox during CLI-070 verification.
+- CLI-070 is paused; every later implementation task is
+  `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
+  grants exact task approval.
+- All 18 original Codex tasks read their governing files and reported readiness
+  before sequential implementation began.
 - `[CLI-000] Program Control — Governance` and `[CLI-010] Desktop Release
   Isolation` are pinned in the Codex project.
 - Tasks must be approved and executed one at a time unless the owner explicitly
@@ -78,9 +83,10 @@ Last update: 2026-07-18
 | CLI-020 | Inert Rust CLI scaffold | complete | CLI-010 |
 | CLI-030 | Rust protocol types and golden fixtures | complete | CLI-020 |
 | CLI-040 | GitHub authentication and secure device identity | complete | CLI-030 |
+| CLI-040-R1 | Device identity reliability correction | active | CLI-040 |
 | CLI-050 | Relay transport and workspace reads | complete | CLI-030, CLI-040 |
 | CLI-060 | MLS client state, storage, and outbox | complete | CLI-030, CLI-040 |
-| CLI-070 | Room creation and local project association | active | CLI-050, CLI-060 |
+| CLI-070 | Room creation and local project association | paused_waiting_on_CLI-040-R1 | CLI-050, CLI-060, CLI-040-R1 |
 | CLI-080 | Secure invite codes and host-mediated admission | waiting_for_orchestrator_approval | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | waiting_for_orchestrator_approval | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | waiting_for_orchestrator_approval | CLI-090 |
