@@ -14,6 +14,8 @@ import {
   CodexQueuePlaintextPayload
 } from "@multaiplayer/protocol";
 import { handleCodexQueueEvent } from "../../apps/desktop/src/hooks/relay/routeActivityMessage.js";
+import { useCodexTurnActions } from "../../apps/desktop/src/hooks/useCodexTurnActions.js";
+import { useAppStore } from "../../apps/desktop/src/store/appStore.js";
 import {
   WebSocket,
   createDebugSession,
@@ -51,6 +53,7 @@ interface NativeResponse {
 class NativeClient {
   readonly kind: ClientKind;
   readonly identity: DeviceIdentity;
+  readonly stateDir: string | null;
   readonly #child: ChildProcessWithoutNullStreams;
   readonly #lines: Interface;
   readonly #responses: Array<(response: NativeResponse) => void> = [];
@@ -60,12 +63,14 @@ class NativeClient {
     kind: ClientKind,
     child: ChildProcessWithoutNullStreams,
     lines: Interface,
-    identity: DeviceIdentity
+    identity: DeviceIdentity,
+    stateDir: string | null
   ) {
     this.kind = kind;
     this.#child = child;
     this.#lines = lines;
     this.identity = identity;
+    this.stateDir = stateDir;
     child.stderr.on("data", (chunk) => (this.#errorOutput += chunk.toString()));
     lines.on("line", (line) => this.#responses.shift()?.(JSON.parse(line) as NativeResponse));
   }
@@ -75,11 +80,13 @@ class NativeClient {
     userId: string,
     displayName: string,
     roomId: string,
-    stateRoot: string
+    stateRoot: string,
+    existingStateDir?: string
   ): Promise<NativeClient> {
+    const stateDir = kind === "cli" ? (existingStateDir ?? join(stateRoot, `cli-${randomUUID()}`)) : null;
     const args =
       kind === "cli"
-        ? [userId, displayName, roomId, join(stateRoot, `cli-${randomUUID()}`)]
+        ? [userId, displayName, roomId, stateDir as string]
         : [userId, `device-desktop-${randomUUID()}`, roomId];
     const child = spawn(kind === "cli" ? requireCliBinary() : desktopBinary, args, {
       stdio: ["pipe", "pipe", "pipe"]
@@ -95,7 +102,7 @@ class NativeClient {
       });
       child.once("error", reject);
     });
-    return new NativeClient(kind, child, lines, identity);
+    return new NativeClient(kind, child, lines, identity, stateDir);
   }
 
   command<T>(command: Record<string, unknown>): Promise<T> {
@@ -319,7 +326,9 @@ async function createAndActivateRoom(
     body: JSON.stringify({ teamId: "team-core", name: label, approvalPolicy: "ask_every_turn" })
   });
   assert.equal(created.status, 201);
-  const { room } = (await created.json()) as { room: { id: string; hostUserId: string; hostStatus: string } };
+  const { room } = (await created.json()) as {
+    room: Record<string, unknown> & { id: string; hostUserId: string; hostStatus: string };
+  };
   assert.equal(room.hostUserId, host.identity.userId);
   assert.equal(room.hostStatus, "offline");
   await host.command({ command: "setRoom", roomId: room.id });
@@ -336,7 +345,8 @@ async function createAndActivateRoom(
     })
   });
   assert.equal(activated.status, 200);
-  return room.id;
+  const body = (await activated.json()) as { room: Record<string, unknown> & { id: string } };
+  return body.room;
 }
 
 async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
@@ -349,7 +359,7 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
     provisionalRoomId,
     stateRoot
   );
-  const guest = await NativeClient.start(
+  let guest = await NativeClient.start(
     guestKind,
     `github:${guestKind}-guest-${randomUUID()}`,
     `${guestKind} guest`,
@@ -365,13 +375,14 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
       authenticate(relay.baseUrl, host),
       authenticate(relay.baseUrl, guest)
     ]);
-    const roomId = await createAndActivateRoom(
+    const activeRoom = await createAndActivateRoom(
       relay.baseUrl,
       host,
       hostAuth,
       hostSocket,
       `${hostKind}-created cross-client room`
     );
+    const roomId = activeRoom.id;
     await guest.command({ command: "setRoom", roomId });
 
     const cli = host.kind === "cli" ? host : guest;
@@ -405,6 +416,30 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
     await host.command({ command: "publishSucceeded", messageId: admission.commitOutboxId });
     await guest.command({ command: "joinWelcome", welcome: admission.welcome });
     await joinRoom(guestSocket, guest, guestAuth.token, roomId);
+
+    if (guest.kind === "cli") {
+      const relayOrigin = "https://cross-client.invalid";
+      await guest.command({ command: "recordCompletedAdmission", relayOrigin, room: activeRoom });
+      const priorIdentity = guest.identity;
+      const stateDir = guest.stateDir;
+      assert.ok(stateDir);
+      await guest.close();
+      guest = await NativeClient.start(
+        "cli",
+        priorIdentity.userId,
+        priorIdentity.displayName,
+        roomId,
+        stateRoot,
+        stateDir
+      );
+      assert.equal(guest.identity.deviceId, priorIdentity.deviceId);
+      const opened = await guest.command<{
+        roomId: string;
+        isActiveHost: boolean;
+        projectPath: string | null;
+      }>({ command: "openJoinedRoom", relayOrigin, room: activeRoom });
+      assert.deepEqual(opened, { roomId, isActiveHost: false, projectPath: null });
+    }
 
     const hostChat = {
       id: `chat-${randomUUID()}`,
@@ -478,41 +513,95 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
         nowUnix: Math.floor(Date.now() / 1_000)
       });
       assert.equal(approval.phase, "Running");
+      const turn = {
+        eventType: "codex.turn",
+        turnId: proposal.turnId,
+        status: "completed",
+        message: "Mixed-client CLI host turn completed.",
+        model: "gpt-5.6-sol",
+        threadId: `thread-${randomUUID()}`,
+        eventName: "hosted_turn_completed",
+        host: host.identity.displayName,
+        hostUserId: host.identity.userId,
+        createdAt: new Date().toISOString()
+      } as const;
+      const turnOpened = await sendApplication({
+        sender: host,
+        senderSocket: hostSocket,
+        receiver: guest,
+        receiverSocket: guestSocket,
+        roomId,
+        kind: "codex.turn",
+        payload: turn,
+        id: `turn-event-${randomUUID()}`
+      });
+      assert.deepEqual(CodexEventPlaintextPayload.parse(turnOpened.payload), turn);
     } else {
-      const queued: string[] = [];
-      handleCodexQueueEvent(parsedProposal, roomId, {
-        enqueueCodexApprovalForRoom: (_roomId: string, turn: { turnId: string }) => queued.push(turn.turnId),
-        setHostMessageForRoom: () => undefined,
-        removeQueuedCodexApprovalForRoom: () => undefined,
-        setPendingCodexApprovalForRoom: () => undefined,
-        setApprovalVisibleForRoom: () => undefined
+      const desktopRoom = {
+        ...activeRoom,
+        projectPath: stateRoot,
+        unread: 0,
+        configPending: false
+      };
+      useAppStore.getState().resetAppStore();
+      useAppStore.setState({
+        rooms: [desktopRoom],
+        selectedRoomId: roomId,
+        messagesByRoom: { [roomId]: [guestChat] }
       } as never);
-      assert.deepEqual(queued, [proposal.turnId]);
-    }
+      handleCodexQueueEvent(parsedProposal, roomId, useAppStore.getState());
+      const queued = useAppStore
+        .getState()
+        .codexRuntimeByRoom[roomId]?.queuedApprovals?.find((item) => item.turnId === proposal.turnId);
+      assert.ok(queued);
+      assert.equal(queued.roomId, roomId);
+      assert.equal(queued.requestedByUserId, guest.identity.userId);
 
-    const turn = {
-      eventType: "codex.turn",
-      turnId: proposal.turnId,
-      status: "completed",
-      message: "Mixed-client host turn completed.",
-      model: "gpt-5.6-sol",
-      threadId: `thread-${randomUUID()}`,
-      eventName: "hosted_turn_completed",
-      host: host.identity.displayName,
-      hostUserId: host.identity.userId,
-      createdAt: new Date().toISOString()
-    } as const;
-    const turnOpened = await sendApplication({
-      sender: host,
-      senderSocket: hostSocket,
-      receiver: guest,
-      receiverSocket: guestSocket,
-      roomId,
-      kind: "codex.turn",
-      payload: turn,
-      id: `turn-event-${randomUUID()}`
-    });
-    assert.deepEqual(CodexEventPlaintextPayload.parse(turnOpened.payload), turn);
+      const publishedTurns: Array<ReturnType<typeof CodexEventPlaintextPayload.parse>> = [];
+      const actions = useCodexTurnActions({
+        localUser: { id: host.identity.userId, name: host.identity.displayName },
+        maxTerminalActivityLines: 100,
+        replaceRoom: () => undefined,
+        publishCodexEvent: async (event, boundRoom) => {
+          assert.equal(boundRoom?.id, roomId);
+          assert.equal(boundRoom?.hostUserId, host.identity.userId);
+          assert.equal(boundRoom?.activeHostDeviceId, host.identity.deviceId);
+          const payload = {
+            ...event,
+            eventType: "codex.turn",
+            host: host.identity.displayName,
+            hostUserId: host.identity.userId,
+            createdAt: new Date().toISOString()
+          };
+          const opened = await sendApplication({
+            sender: host,
+            senderSocket: hostSocket,
+            receiver: guest,
+            receiverSocket: guestSocket,
+            roomId,
+            kind: "codex.turn",
+            payload,
+            id: `desktop-approval-${randomUUID()}`
+          });
+          assert.equal(opened.authenticatedData.senderUserId, host.identity.userId);
+          assert.equal(opened.authenticatedData.senderDeviceId, host.identity.deviceId);
+          publishedTurns.push(CodexEventPlaintextPayload.parse(opened.payload));
+        },
+        publishChatMessage: async () => undefined,
+        publishHostHandoff: async () => undefined
+      });
+      await actions.approveCodexTurn(queued as never);
+      assert.equal(publishedTurns[0]?.status, "started");
+      assert.equal(publishedTurns[0]?.turnId, proposal.turnId);
+      assert.equal(publishedTurns[0]?.hostUserId, host.identity.userId);
+      assert.ok(publishedTurns.some((event) => event.status === "failed"));
+      assert.equal(useAppStore.getState().codexRuntimeByRoom[roomId]?.running, undefined);
+      assert.ok(
+        !useAppStore
+          .getState()
+          .codexRuntimeByRoom[roomId]?.queuedApprovals?.some((item) => item.turnId === proposal.turnId)
+      );
+    }
 
     const activity = {
       eventType: "codex.activity",
@@ -620,6 +709,7 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
     assert.equal(removal.status, 200);
     await removed;
   } finally {
+    useAppStore.getState().resetAppStore();
     hostSocket.close();
     guestSocket.close();
     await Promise.allSettled([host.close(), guest.close()]);

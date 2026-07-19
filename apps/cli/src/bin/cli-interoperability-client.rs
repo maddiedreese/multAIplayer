@@ -6,12 +6,14 @@ mod debug_client {
         chat::{ProjectedEvent, RenderMode, TerminalRenderer},
         codex::{CodexProposal, ProposalMachine},
         identity::load_or_create_identity,
+        invite::interoperability_persist_completed_admission_association,
         mls::MlsClientService,
         platform::JourneyFileStore,
-        room::interoperability_validate_cli_host_role,
+        relay::WorkspaceSnapshot,
+        room::{interoperability_validate_cli_host_role, RoomBackend, RoomError, RoomService},
     };
     use multaiplayer_protocol::{
-        CodexQueueAction, CodexQueuePlaintextPayload, RoomEvent, Validate,
+        CodexQueueAction, CodexQueuePlaintextPayload, RoomEvent, RoomRecord, Validate,
     };
     use serde::Deserialize;
     use serde_json::{json, Value};
@@ -63,10 +65,19 @@ mod debug_client {
             created_as_host: bool,
             is_active_host: bool,
         },
+        RecordCompletedAdmission {
+            relay_origin: String,
+            room: RoomRecord,
+        },
+        OpenJoinedRoom {
+            relay_origin: String,
+            room: RoomRecord,
+        },
     }
 
     struct Client {
         room_id: String,
+        store: JourneyFileStore,
         identity: multaiplayer_cli::identity::DeviceIdentity,
         mls: MlsClientService,
         proposals: ProposalMachine,
@@ -88,6 +99,7 @@ mod debug_client {
         let proposals = ProposalMachine::new(&room_id)?;
         let mut client = Client {
             room_id,
+            store,
             identity,
             mls,
             proposals,
@@ -235,7 +247,71 @@ mod debug_client {
                     interoperability_validate_cli_host_role(created_as_host, is_active_host)?;
                     Ok(Value::Null)
                 }
+                Command::RecordCompletedAdmission { relay_origin, room } => {
+                    interoperability_persist_completed_admission_association(
+                        &self.store,
+                        &self.identity,
+                        &relay_origin,
+                        &room,
+                    )?;
+                    Ok(Value::Null)
+                }
+                Command::OpenJoinedRoom { relay_origin, room } => {
+                    let mut backend = JourneyRoomBackend { room };
+                    let mut service = RoomService::new(
+                        &self.store,
+                        &mut backend,
+                        &mut self.mls,
+                        &self.identity.public.user_id,
+                        &self.identity.public.device_id,
+                        &relay_origin,
+                    );
+                    let opened = service.open(&self.room_id)?;
+                    let project_path = service.local_project_path(&self.room_id)?;
+                    Ok(json!({
+                        "roomId": opened.room.id,
+                        "isActiveHost": opened.is_active_host,
+                        "projectPath": project_path,
+                    }))
+                }
             }
+        }
+    }
+
+    struct JourneyRoomBackend {
+        room: RoomRecord,
+    }
+
+    impl RoomBackend for JourneyRoomBackend {
+        fn workspace(&mut self) -> Result<WorkspaceSnapshot, RoomError> {
+            Ok(WorkspaceSnapshot {
+                teams: Vec::new(),
+                rooms: vec![self.room.clone()],
+            })
+        }
+
+        fn create_room(&mut self, _team_id: &str, _name: &str) -> Result<RoomRecord, RoomError> {
+            Err(RoomError::RelayUnavailable)
+        }
+
+        fn establish_device_session(&mut self) -> Result<zeroize::Zeroizing<String>, RoomError> {
+            Err(RoomError::RelayUnavailable)
+        }
+
+        fn join_room(
+            &mut self,
+            _room: &RoomRecord,
+            _device_session: &str,
+        ) -> Result<(), RoomError> {
+            Err(RoomError::RelayUnavailable)
+        }
+
+        fn activate_host(
+            &mut self,
+            _room: &RoomRecord,
+            _device_session: &str,
+        ) -> Result<RoomRecord, RoomError> {
+            Err(RoomError::RelayUnavailable)
         }
     }
 

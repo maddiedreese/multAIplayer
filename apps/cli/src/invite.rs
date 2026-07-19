@@ -765,14 +765,13 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
                 device_session,
             )?;
             if let Some(relay_origin) = relay_origin {
-                record_joined_room_association(
+                persist_completed_admission_association(
                     self.store,
                     &request.binding.requester_user_id,
                     &request.binding.requester_device_id,
                     relay_origin,
                     &lookup.room,
-                )
-                .map_err(|_| InviteError::RecoveryRequired)?;
+                )?;
             }
         }
         self.backend.acknowledge_response(
@@ -873,14 +872,13 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
                 device_session,
             )?;
             if let Some(relay_origin) = relay_origin {
-                record_joined_room_association(
+                persist_completed_admission_association(
                     self.store,
                     &pending.requester_user_id,
                     &pending.requester_device_id,
                     relay_origin,
                     &lookup.room,
-                )
-                .map_err(|_| InviteError::RecoveryRequired)?;
+                )?;
             }
         }
         self.backend.acknowledge_response(
@@ -892,6 +890,36 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
         mls.complete_invite_response(&pending.request_id, &pending.room_id, epoch.is_some())?;
         Ok(epoch)
     }
+}
+
+fn persist_completed_admission_association(
+    store: &impl CredentialStore,
+    user_id: &str,
+    device_id: &str,
+    relay_origin: &str,
+    room: &RoomRecord,
+) -> Result<(), InviteError> {
+    record_joined_room_association(store, user_id, device_id, relay_origin, room)
+        .map_err(|_| InviteError::RecoveryRequired)
+}
+
+/// Debug-only boundary for proving the same durable association step used by
+/// successful production admission completion before restart/open.
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn interoperability_persist_completed_admission_association(
+    store: &impl CredentialStore,
+    identity: &DeviceIdentity,
+    relay_origin: &str,
+    room: &RoomRecord,
+) -> Result<(), InviteError> {
+    persist_completed_admission_association(
+        store,
+        &identity.public.user_id,
+        &identity.public.device_id,
+        relay_origin,
+        room,
+    )
 }
 
 fn ensure_active_host(room: &RoomRecord, identity: &DeviceIdentity) -> Result<(), InviteError> {
