@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-040-R1 device identity reliability correction
+Current phase: CLI-070 room creation and local project association
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -59,12 +59,20 @@ Last update: 2026-07-18
   dependency advisories/source/license audits, durable state/outbox and
   crash-replay review, secret-lifetime review, and the protected
   desktop-release audit.
-- CLI-070 is paused with its original baseline ancestry and work preserved until
-  the identity-reliability correction is accepted and integrated.
-- CLI-040-R1 is the only active implementation task. The owner authorized this
-  isolated correction after an intermittent existing identity-generation test
-  failure reproduced outside the sandbox during CLI-070 verification.
-- CLI-070 is paused; every later implementation task is
+- CLI-040-R1 is complete and integrated. Its accepted task commit is
+  `58207abb3f8ca53c14b377a1483b42257e19d59b`; integration merge
+  `a20836f6f67ff98e7b9275797f2b7e0a34697958` passed the CLI runner with 65
+  executed tests, all 52 `mls-core` tests, 18 classification/isolation tests,
+  and the protected release audit after independent review. The task also
+  passed 1,000 serial identity runs, 12,800 parallel generation/restoration
+  cycles, repeated durability/rollback matrices, 695 desktop frontend tests,
+  244 desktop native tests, relay/protocol compatibility, and dependency audits.
+  The correction left-pads minimally encoded valid P-256 scalars without retry,
+  entropy replacement, public-key change, contract change, or dependency change.
+- CLI-070 is the only active implementation task and may incorporate the
+  integrated corrective baseline through a merge without rewriting its original
+  baseline ancestry, then resume its full verification.
+- Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
 - All 18 original Codex tasks read their governing files and reported readiness
@@ -83,10 +91,10 @@ Last update: 2026-07-18
 | CLI-020 | Inert Rust CLI scaffold | complete | CLI-010 |
 | CLI-030 | Rust protocol types and golden fixtures | complete | CLI-020 |
 | CLI-040 | GitHub authentication and secure device identity | complete | CLI-030 |
-| CLI-040-R1 | Device identity reliability correction | active | CLI-040 |
+| CLI-040-R1 | Device identity reliability correction | complete | CLI-040 |
 | CLI-050 | Relay transport and workspace reads | complete | CLI-030, CLI-040 |
 | CLI-060 | MLS client state, storage, and outbox | complete | CLI-030, CLI-040 |
-| CLI-070 | Room creation and local project association | paused_waiting_on_CLI-040-R1 | CLI-050, CLI-060, CLI-040-R1 |
+| CLI-070 | Room creation and local project association | active | CLI-050, CLI-060, CLI-040-R1 |
 | CLI-080 | Secure invite codes and host-mediated admission | waiting_for_orchestrator_approval | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | waiting_for_orchestrator_approval | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | waiting_for_orchestrator_approval | CLI-090 |
