@@ -93,6 +93,16 @@ fn load_or_create_signing(
     store: &impl CredentialStore,
     github_user_id: &str,
 ) -> Result<(String, Zeroizing<Vec<u8>>, bool), CliError> {
+    load_or_create_signing_with(store, github_user_id, || {
+        generate_device_signing_secret().map_err(|_| CliError::IdentityUnavailable)
+    })
+}
+
+fn load_or_create_signing_with(
+    store: &impl CredentialStore,
+    github_user_id: &str,
+    generate: impl FnOnce() -> Result<Vec<u8>, CliError>,
+) -> Result<(String, Zeroizing<Vec<u8>>, bool), CliError> {
     if let Some(value) = store.get(SIGNING_IDENTITY_ACCOUNT)? {
         let stored: StoredSigningIdentity =
             serde_json::from_str(&value).map_err(|_| CliError::InvalidStoredCredential)?;
@@ -110,12 +120,8 @@ fn load_or_create_signing(
     }
 
     let device_id = format!("device_{}", Uuid::new_v4());
-    let secret = Zeroizing::new(
-        generate_device_signing_secret().map_err(|_| CliError::IdentityUnavailable)?,
-    );
-    if secret.len() != 32 {
-        return Err(CliError::IdentityUnavailable);
-    }
+    let generated = Zeroizing::new(generate()?);
+    let secret = normalize_generated_signing_secret(generated.as_slice())?;
     let stored = StoredSigningIdentity {
         version: 1,
         github_user_id: github_user_id.to_owned(),
@@ -127,6 +133,15 @@ fn load_or_create_signing(
         &serde_json::to_string(&stored).map_err(|_| CliError::IdentityUnavailable)?,
     )?;
     Ok((device_id, secret, true))
+}
+
+fn normalize_generated_signing_secret(generated: &[u8]) -> Result<Zeroizing<Vec<u8>>, CliError> {
+    if generated.is_empty() || generated.len() > 32 {
+        return Err(CliError::IdentityUnavailable);
+    }
+    let mut secret = Zeroizing::new(vec![0; 32]);
+    secret[32 - generated.len()..].copy_from_slice(generated);
+    Ok(secret)
 }
 
 fn load_or_create_hpke(
@@ -216,6 +231,7 @@ pub fn fingerprint(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::platform::tests::MemoryCredentialStore;
+    use std::sync::{Arc, Barrier};
 
     #[test]
     fn identity_persists_and_matches_desktop_registration_contract() {
@@ -255,6 +271,70 @@ mod tests {
             "hpkeKeyFingerprint",
         ] {
             assert!(json.get(field).is_some(), "missing desktop field {field}");
+        }
+    }
+
+    #[test]
+    fn minimally_encoded_p256_signing_scalar_is_normalized_without_retry() {
+        let store = MemoryCredentialStore::default();
+        let generated = vec![7; 31];
+        let (_, secret, created) =
+            load_or_create_signing_with(&store, "github:42", || Ok(generated.clone())).unwrap();
+
+        assert!(created);
+        assert_eq!(secret.len(), 32);
+        assert_eq!(secret[0], 0);
+        assert_eq!(&secret[1..], generated.as_slice());
+
+        let minimally_encoded = DeviceAuthSigner::from_secret(
+            generated,
+            "github:42".to_owned(),
+            "device-test".to_owned(),
+        )
+        .unwrap();
+        let normalized = DeviceAuthSigner::from_secret(
+            secret.to_vec(),
+            "github:42".to_owned(),
+            "device-test".to_owned(),
+        )
+        .unwrap();
+        let minimally_encoded_public = minimally_encoded.public_key_spki_der().unwrap();
+        let normalized_public = normalized.public_key_spki_der().unwrap();
+        assert_eq!(normalized_public.len(), 91);
+        assert_eq!(normalized_public, minimally_encoded_public);
+    }
+
+    #[test]
+    fn concurrent_identity_generation_and_restoration_remains_reliable() {
+        const WORKERS: usize = 8;
+        const ITERATIONS_PER_WORKER: usize = 32;
+
+        let barrier = Arc::new(Barrier::new(WORKERS));
+        let workers = (0..WORKERS)
+            .map(|worker| {
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    for iteration in 0..ITERATIONS_PER_WORKER {
+                        let store = MemoryCredentialStore::default();
+                        let user_id = format!("github:{worker}-{iteration}");
+                        let first = load_or_create_identity(&store, &user_id, "Device").unwrap();
+                        let durable_identity = store.values.borrow().clone();
+                        let restored = load_or_create_identity(&store, &user_id, "Device").unwrap();
+
+                        assert_eq!(first.public, restored.public);
+                        assert!(matches!(
+                            load_or_create_identity(&store, "github:other", "Other"),
+                            Err(CliError::IdentityScopeMismatch)
+                        ));
+                        assert_eq!(*store.values.borrow(), durable_identity);
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for worker in workers {
+            worker.join().unwrap();
         }
     }
 
