@@ -1266,7 +1266,7 @@ fn run_room(command: Command) -> ExitCode {
         _ => None,
     };
     enum Outcome {
-        Opened(multaiplayer_cli::room::OpenedRoom, PathBuf),
+        Opened(multaiplayer_cli::room::OpenedRoom, Option<PathBuf>),
         Left(RoomRecord),
         Forgotten(String),
     }
@@ -1281,8 +1281,10 @@ fn run_room(command: Command) -> ExitCode {
         );
         match command {
             Command::RoomCreate(request) => service.create(&request).and_then(|opened| {
-                let project = service.local_project_path(&opened.room.id)?;
-                Ok(Outcome::Opened(opened, project))
+                let project = service
+                    .local_project_path(&opened.room.id)?
+                    .ok_or(multaiplayer_cli::room::RoomError::LocalStateUnavailable)?;
+                Ok(Outcome::Opened(opened, Some(project)))
             }),
             Command::RoomOpen { selector, .. } => service.open(&selector).and_then(|opened| {
                 let project = service.local_project_path(&opened.room.id)?;
@@ -1338,7 +1340,7 @@ fn run_opened_room_chat<S, H>(
     device_id: &str,
     display_name: &str,
     public_key_fingerprint: &str,
-    project_path: PathBuf,
+    project_path: Option<PathBuf>,
     mode: RenderMode,
 ) -> ExitCode
 where
@@ -1388,26 +1390,37 @@ where
         renderer: TerminalRenderer::new(mode),
     };
     let previous_thread_id = chat.codex_thread_id();
-    let mut codex = match CodexRoomController::new(
-        room,
-        project_path,
-        display_name,
-        user_id,
-        previous_thread_id,
-    ) {
-        Ok(controller) => controller,
-        Err(()) => {
-            eprintln!("error: The Codex room controller could not start safely.");
+    let mut codex = if chat.is_active_host() {
+        let Some(project_path) = project_path else {
+            eprintln!("error: The active host has no local project association.");
             return ExitCode::from(1);
+        };
+        match CodexRoomController::new(
+            room,
+            project_path,
+            display_name,
+            user_id,
+            previous_thread_id,
+        ) {
+            Ok(controller) => Some(controller),
+            Err(()) => {
+                eprintln!("error: The Codex room controller could not start safely.");
+                return ExitCode::from(1);
+            }
         }
+    } else {
+        None
     };
     for event in chat.persisted_history() {
-        if codex.observe(&event, unix_now(), false).is_err() {
+        if codex
+            .as_mut()
+            .is_some_and(|controller| controller.observe(&event, unix_now(), false).is_err())
+        {
             eprintln!("error: The persisted Codex room state is invalid.");
             return ExitCode::from(1);
         }
     }
-    match drive_room_loop(&mut chat, &mut adapter, Some(&mut codex)) {
+    match drive_room_loop(&mut chat, &mut adapter, codex.as_mut()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => {
             eprintln!("error: The encrypted room loop failed safely.");
@@ -1641,8 +1654,13 @@ where
             let started = Instant::now();
             let epoch = loop {
                 let now = utc_timestamp()?;
-                match service.finish_admission_at(&request, device_session.as_str(), &now, &mut mls)
-                {
+                match service.finish_admission_and_record_at(
+                    &request,
+                    device_session.as_str(),
+                    relay_origin,
+                    &now,
+                    &mut mls,
+                ) {
                     Ok(epoch) => break epoch,
                     Err(InviteError::Pending) if started.elapsed() < ADMISSION_WAIT_LIMIT => {
                         thread::sleep(Duration::from_secs(1));
@@ -1657,6 +1675,7 @@ where
             } else {
                 return Err(InviteCliError::Denied);
             }
+            return Ok(());
         }
         Command::RoomFinish { request_id } => {
             let pending = mls
@@ -1665,7 +1684,13 @@ where
                 .ok_or(InviteCliError::Invite(InviteError::Unavailable))?;
             let now = utc_timestamp()?;
             let epoch = service
-                .finish_pending_admission(&pending, device_session.as_str(), &now, &mut mls)
+                .finish_pending_admission_and_record(
+                    &pending,
+                    device_session.as_str(),
+                    relay_origin,
+                    &now,
+                    &mut mls,
+                )
                 .map_err(InviteCliError::Invite)?;
             if let Some(epoch) = epoch {
                 writeln!(output, "Admission approved. Joined MLS epoch {epoch}.")
@@ -1673,6 +1698,7 @@ where
             } else {
                 return Err(InviteCliError::Denied);
             }
+            return Ok(());
         }
         _ => unreachable!("invite runner received non-invite command"),
     }
@@ -2633,8 +2659,8 @@ mod tests {
             "MlsClientService::open(",
             ".request_admission(",
             ".decide_from_trusted_prompt(",
-            ".finish_admission_at(",
-            ".finish_pending_admission(",
+            ".finish_admission_and_record_at(",
+            ".finish_pending_admission_and_record(",
             ".revoke(",
         ] {
             assert!(
