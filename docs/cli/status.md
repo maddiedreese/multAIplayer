@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-140 desktop/CLI interoperability journeys
+Current phase: CLI-150 security hardening and threat-model update
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -206,9 +206,25 @@ Last update: 2026-07-19
   reported 0 vulnerabilities; RustSec, dependency source, and license audits
   also passed. Manifests, lockfiles, dependency files, shared contracts, desktop
   behavior, and protected release paths remain unchanged.
-- CLI-140 is the sole active implementation task, approved from accepted
-  integration baseline `b4c125839950c9d62ccc949e217974411095cf8c` for only
-  its documented mixed desktop/CLI interoperability journey scope.
+- CLI-140 is complete and integrated. Its accepted corrected head is
+  `3e88c49fc161895bba18281d03b4e16c84419b46`; integration merge
+  `256c010101933576b0e047e06b2beca4bae126a2` changes only nine reviewed CLI,
+  debug-adapter, and cross-client journey paths. Independent review returned
+  the original head for two acceptance corrections, then verified that the
+  real-relay matrix invokes the production desktop approval action with exact
+  room/turn/host binding and restarts a CLI participant through the production
+  admission-association and `RoomService::open` boundaries. The corrected task
+  and integration branch passed 108 CLI library tests, 10 binary tests, 2 host
+  boundary tests, the corrected mixed-client matrix, 9 Rust protocol tests, and
+  all 18 classification/release-isolation tests. Task evidence also passed the
+  full repository suite, 695 desktop frontend tests, 285 relay tests, 27
+  TypeScript protocol tests, 16 UI contracts, desktop native checks, npm and
+  RustSec audits, license checks, and protected-path review. No manifest,
+  lockfile, dependency, wire contract, MLS policy, or protected release surface
+  changed.
+- CLI-150 is the sole active implementation task for its documented security
+  hardening, executed evidence, and threat-model scope. Owner review remains
+  mandatory before its threat-model acceptance criterion can be closed.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -240,8 +256,8 @@ Last update: 2026-07-19
 | CLI-110-R1 | Shared MLS fuzz lockfile reconciliation | complete | CLI-010-R1 |
 | CLI-120 | Codex proposals, context, and hosted turns | complete | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | complete | CLI-120 |
-| CLI-140 | Desktop/CLI interoperability journeys | active | CLI-100, CLI-130 |
-| CLI-150 | Security hardening and threat-model update | waiting_for_orchestrator_approval | CLI-140 |
+| CLI-140 | Desktop/CLI interoperability journeys | complete | CLI-100, CLI-130 |
+| CLI-150 | Security hardening and threat-model update | active | CLI-140 |
 | CLI-160 | Signed CLI packaging and release isolation | waiting_for_orchestrator_approval | CLI-150 |
 | CLI-170 | External-alpha readiness review | waiting_for_orchestrator_approval | CLI-160 |
 
