@@ -120,7 +120,30 @@ Last update: 2026-07-18
   after durable success, and preserves sibling rooms and global identity. No
   dependency, wire contract, MLS policy, desktop behavior, or protected release
   surface changed.
-- CLI-110 is the only active implementation task.
+- CLI-110 has task commit `9c6f72d063503df58112c25ba17855db7dcdee99`
+  based directly on accepted integration commit
+  `b8ec7fd244d543c3434432d203dbd99e11588bac`, but is paused before integration.
+  GitHub Actions run `29676780266` executed the real two-client native journey
+  successfully, then failed its metrics upload with `ETIMEDOUT`; the native fuzz
+  job did not execute because pinned `cargo-fuzz 0.12.0` failed to compile with
+  moving nightly `1.99.0-nightly` through `rustix 0.36.5`.
+- CLI-010-R1 is complete and integrated. Its accepted task commit is
+  `219cfd77fc88df1f10360c45b558f12bdfcb6715`; integration merge
+  `129e6158086a4f66b39d662783878ac831084ed4` pins
+  `nightly-2026-07-18` with `cargo-fuzz 0.13.2 --locked` and changes only the
+  two authorized fuzz toolchain selectors. Complete Product journeys runs
+  `29680873838` and `29681119913` both passed on the exact task head: both
+  unchanged 120-second native fuzz targets executed, the real two-client native
+  MLS journey passed, every required job and aggregation passed, and all five
+  required artifact classes uploaded in each run. Integration also passed all
+  18 classification/release-isolation tests and the protected release audit.
+  No target, argument, timeout, failure behavior, corpus, artifact requirement,
+  product source, dependency, lockfile, desktop behavior, or release surface
+  changed.
+- CLI-110 is again the sole active implementation task. It may incorporate the
+  accepted CLI-010-R1 integration commit without rewriting its original task
+  ancestry, then must rerun its complete verification on the resulting exact
+  head before integration review.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -137,6 +160,7 @@ Last update: 2026-07-18
 | --- | --- | --- | --- |
 | CLI-000 | Program orchestration and governance | active_orchestrator | — |
 | CLI-010 | Desktop release isolation and CI classification | complete | CLI-000 |
+| CLI-010-R1 | Journey CI toolchain reliability correction | complete | CLI-010 |
 | CLI-020 | Inert Rust CLI scaffold | complete | CLI-010 |
 | CLI-030 | Rust protocol types and golden fixtures | complete | CLI-020 |
 | CLI-040 | GitHub authentication and secure device identity | complete | CLI-030 |
