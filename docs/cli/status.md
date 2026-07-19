@@ -5,7 +5,7 @@ Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
 Current phase: CLI-110 UI-independent Codex host extraction
 Implementation authorization: Delegated to CLI-000 within the approved runbook
-Last update: 2026-07-18
+Last update: 2026-07-19
 
 ## Current state
 
@@ -144,6 +144,28 @@ Last update: 2026-07-18
   accepted CLI-010-R1 integration commit without rewriting its original task
   ancestry, then must rerun its complete verification on the resulting exact
   head before integration review.
+- CLI-110 is preserved and paused at merge head
+  `b7e269e43546563fac0caf1c0515360246d9a14b` after locked dependency
+  verification proved the checked-in `mls-core` fuzz lockfile stale relative to
+  already accepted manifests. The owner authorized exactly CLI-110-R1 to
+  reconcile only that fuzz lockfile, review the exact resolution delta, and run
+  locked dependency audits plus complete fuzz, MLS, CLI, desktop,
+  classification, and protected-path verification. No other task was active
+  during the correction.
+- CLI-110-R1 is complete and integrated. Its accepted task commit is
+  `4decbcb5c34e83bfb50108b461577f1505f6d119`; integration merge
+  `9c6f74511c61fbab2e45aa3a6bd070f120fcb397` changes only
+  `apps/desktop/src-tauri/crates/mls-core/fuzz/Cargo.lock`. The resolved graph
+  decreased from 171 to 154 packages, with 47 exact records removed and 30
+  added, all from crates.io and within existing license families. Locked
+  advisories/sources passed without mutation; both unchanged 120-second fuzz
+  targets executed 4,294,833 and 11,716,480 runs. Verification also passed 56
+  `mls-core`, 101 locked CLI, 248 desktop native/shared, 27 protocol, 285 relay,
+  695 desktop frontend, and 18 classification/release-isolation tests, plus
+  formatting, warnings-denied Clippy, exact-path, ancestry, cleanliness, and
+  protected-release audits. CLI-110 may now incorporate this correction with a
+  normal merge that preserves its original ancestry and rerun its complete
+  final verification.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -172,6 +194,7 @@ Last update: 2026-07-18
 | CLI-090 | Encrypted chat, presence, and safe rendering | complete | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | complete | CLI-090 |
 | CLI-110 | UI-independent Codex host extraction | active | CLI-020 |
+| CLI-110-R1 | Shared MLS fuzz lockfile reconciliation | complete | CLI-010-R1 |
 | CLI-120 | Codex proposals, context, and hosted turns | waiting_for_orchestrator_approval | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | waiting_for_orchestrator_approval | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | waiting_for_orchestrator_approval | CLI-100, CLI-130 |
