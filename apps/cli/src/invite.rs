@@ -1,5 +1,6 @@
 use crate::{
     auth::{endpoint, load_relay_transport_session, RestoredSession},
+    chat::safe_untrusted_text,
     identity::DeviceIdentity,
     mls::{
         InviteDecision, MlsClientError, MlsClientService, OpenedInviteRequest, OutboxRoute,
@@ -955,17 +956,7 @@ fn validate_lookup(parsed: &ParsedInviteCode, lookup: &InviteLookup) -> Result<(
 }
 
 fn safe_prompt_text(value: &str) -> String {
-    value
-        .chars()
-        .take(120)
-        .map(|character| {
-            if character.is_control() {
-                '�'
-            } else {
-                character
-            }
-        })
-        .collect()
+    safe_untrusted_text(value, 120)
 }
 
 fn valid_utc_timestamp(value: &str) -> bool {
