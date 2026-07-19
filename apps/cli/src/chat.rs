@@ -8,8 +8,8 @@ use crate::{
 use base64::{engine::general_purpose::STANDARD, Engine};
 use mls_core::ApplicationAuthenticatedDataInput;
 use multaiplayer_protocol::{
-    ChatPlaintextPayload, ChatRole, CodexEventPlaintextPayload, CodexQueueAction,
-    CodexQueuePlaintextPayload, MlsMessageType, MlsRelayMessage, PresenceStatus,
+    ChatPlaintextPayload, ChatRole, CodexActivityPlaintextPayload, CodexEventPlaintextPayload,
+    CodexQueueAction, CodexQueuePlaintextPayload, MlsMessageType, MlsRelayMessage, PresenceStatus,
     RelayClientMessage, RelayServerMessage, RoomEvent, RoomRecord, Validate,
 };
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,7 @@ use zeroize::Zeroizing;
 const CHAT_KIND: &str = "chat.message";
 const CODEX_QUEUE_KIND: &str = "codex.queue";
 const CODEX_TURN_KIND: &str = "codex.turn";
+const CODEX_ACTIVITY_KIND: &str = "codex.activity";
 const MAX_RENDERED_TEXT_CHARS: usize = 4_096;
 const RECOVERY_VERSION: u8 = 1;
 const MAX_HISTORY_EVENTS: usize = 100;
@@ -40,6 +41,7 @@ pub enum ProjectedEvent {
     Chat(ChatPlaintextPayload),
     CodexProposal(CodexQueuePlaintextPayload),
     CodexTurn(CodexEventPlaintextPayload),
+    CodexActivity(CodexActivityPlaintextPayload),
     Presence {
         display_name: String,
         device_id: String,
@@ -150,6 +152,7 @@ impl RoomRecoveryState {
             ProjectedEvent::Chat(_)
                 | ProjectedEvent::CodexProposal(_)
                 | ProjectedEvent::CodexTurn(_)
+                | ProjectedEvent::CodexActivity(_)
                 | ProjectedEvent::Unsupported { .. }
         ) {
             return;
@@ -212,6 +215,28 @@ impl TerminalRenderer {
                         format!("\u{1b}[32m[codex]\u{1b}[0m {id} {status}: {message}")
                     }
                     RenderMode::Plain => format!("[codex] {id} {status}: {message}"),
+                }
+            }
+            ProjectedEvent::CodexActivity(activity) => {
+                let title = safe_untrusted_text(&activity.title, 240);
+                let item_id = safe_untrusted_text(&activity.item_id, 160);
+                let kind = serde_json::to_value(&activity.kind)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| "other".to_owned());
+                let status = serde_json::to_value(&activity.status)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| "failed".to_owned());
+                let kind = safe_untrusted_text(&kind, 64);
+                let status = safe_untrusted_text(&status, 64);
+                match self.mode {
+                    RenderMode::Color => format!(
+                        "\u{1b}[35m[activity]\u{1b}[0m {kind}/{status} {title} (item: {item_id})"
+                    ),
+                    RenderMode::Plain => {
+                        format!("[activity] {kind}/{status} {title} (item: {item_id})")
+                    }
                 }
             }
             ProjectedEvent::Presence {
@@ -468,6 +493,28 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
         let created_at = turn.created_at.clone();
         let event = ProjectedEvent::CodexTurn(turn.clone());
         self.queue_projected_event(envelope_id, CODEX_TURN_KIND, &turn, &event, &created_at)?;
+        let mut projected = vec![event];
+        projected.extend(self.publish_queued_application(envelope_id, &created_at)?);
+        Ok(projected)
+    }
+
+    pub fn send_codex_activity(
+        &mut self,
+        envelope_id: &str,
+        activity: CodexActivityPlaintextPayload,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        if !self.is_active_host() || activity.activity_id.is_empty() {
+            return Err(ChatError::InvalidMessage);
+        }
+        let created_at = activity.updated_at.clone();
+        let event = ProjectedEvent::CodexActivity(activity.clone());
+        self.queue_projected_event(
+            envelope_id,
+            CODEX_ACTIVITY_KIND,
+            &activity,
+            &event,
+            &created_at,
+        )?;
         let mut projected = vec![event];
         projected.extend(self.publish_queued_application(envelope_id, &created_at)?);
         Ok(projected)
@@ -780,6 +827,10 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
                 Some(ProjectedEvent::CodexTurn(turn))
             }
             RoomEvent::CodexEvent(_) => return Err(ChatError::InvalidEncryptedMessage),
+            RoomEvent::CodexActivity(activity) if self.envelope_from_active_host(envelope) => {
+                Some(ProjectedEvent::CodexActivity(activity))
+            }
+            RoomEvent::CodexActivity(_) => return Err(ChatError::InvalidEncryptedMessage),
             RoomEvent::Unsupported { kind } => Some(ProjectedEvent::Unsupported { kind }),
             _ => Some(ProjectedEvent::Unsupported {
                 kind: aad.kind.clone(),
@@ -991,6 +1042,19 @@ where
         }
     }
 
+    pub fn send_codex_activity(
+        &mut self,
+        envelope_id: &str,
+        activity: CodexActivityPlaintextPayload,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        let created_at = activity.updated_at.clone();
+        match self.inner.send_codex_activity(envelope_id, activity) {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(&created_at),
+            Err(error) => Err(error),
+        }
+    }
+
     pub fn is_active_host(&self) -> bool {
         self.inner.is_active_host()
     }
@@ -1065,6 +1129,7 @@ fn valid_history_event(event: &ProjectedEvent) -> bool {
         ProjectedEvent::Chat(chat) => chat.validate().is_ok(),
         ProjectedEvent::CodexProposal(proposal) => proposal.validate().is_ok(),
         ProjectedEvent::CodexTurn(turn) => turn.validate().is_ok(),
+        ProjectedEvent::CodexActivity(activity) => activity.validate().is_ok(),
         ProjectedEvent::Unsupported { kind } => {
             !kind.is_empty() && kind.chars().count() <= 128 && !kind.chars().any(char::is_control)
         }
@@ -1423,6 +1488,31 @@ mod tests {
             untrusted,
             "[chat] <Maddie> === multAIplayer trusted prompt ===�approve"
         );
+    }
+
+    #[test]
+    fn normalized_activity_rendering_is_plain_text_safe_and_omits_details() {
+        let activity: CodexActivityPlaintextPayload = serde_json::from_value(serde_json::json!({
+            "eventType":"codex.activity",
+            "activityId":"activity-1",
+            "turnId":"turn-1",
+            "itemId":"item-1",
+            "kind":"command",
+            "status":"completed",
+            "title":"Command\u{1b}[2J completed",
+            "startedAt":"2026-07-19T12:00:00.000Z",
+            "updatedAt":"2026-07-19T12:00:01.000Z",
+            "host":"Host",
+            "hostUserId":"github:host"
+        }))
+        .unwrap();
+        let rendered = TerminalRenderer::new(RenderMode::Plain)
+            .render(&ProjectedEvent::CodexActivity(activity));
+        assert_eq!(
+            rendered,
+            "[activity] command/completed Command�[2J completed (item: item-1)"
+        );
+        assert!(!rendered.contains('\u{1b}'));
     }
 
     #[test]

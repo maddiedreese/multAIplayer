@@ -1,22 +1,22 @@
 use codex_host_core::host::{
-    capabilities_for_version, extract_text_delta, send_json_shared, thread_id_from_response,
-    thread_request, ActiveTimeout, AppServerProcess, AppServerProcessConfig, RpcId, RpcInbox,
-    RpcMessage,
+    allocate_rpc_session_id, capabilities_for_version, extract_text_delta, send_json_shared,
+    thread_id_from_response, thread_request, ActiveTimeout, AppServerProcess,
+    AppServerProcessConfig, RpcId, RpcInbox, RpcMessage,
 };
 use multaiplayer_protocol::{
-    CatalogSelectionPolicy, ChatPlaintextPayload, ChatRole, CodexReasoningEffort,
-    CodexSandboxLevel, CodexSpeed,
+    CatalogSelectionPolicy, ChatPlaintextPayload, ChatRole, CodexActivityPlaintextPayload,
+    CodexReasoningEffort, CodexSandboxLevel, CodexSpeed, Validate,
 };
-use serde_json::json;
+use serde_json::{json, Map, Value};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     path::{Path, PathBuf},
     process::Command,
     sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc, Arc,
     },
-    time::Duration,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 
@@ -25,6 +25,21 @@ pub const MAX_CONTEXT_MESSAGES: usize = 32;
 pub const MAX_CONTEXT_MESSAGE_CHARS: usize = 2_000;
 pub const MAX_CONTEXT_CHARS: usize = 24_000;
 pub const MAX_ASSISTANT_CHARS: usize = 120_000;
+pub const PRIVILEGED_REQUEST_TTL: Duration = Duration::from_secs(15 * 60);
+const MAX_PRIVILEGED_PARAMS_BYTES: usize = 256 * 1024;
+const MAX_PRIVILEGED_TEXT_CHARS: usize = 8_000;
+
+const INTERACTIVE_SERVER_METHODS: &[&str] = &[
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval",
+    "item/permissions/requestApproval",
+    "item/tool/requestUserInput",
+    "tool/requestUserInput",
+    "mcpServer/elicitation/request",
+    "applyPatchApproval",
+    "execCommandApproval",
+];
+static NEXT_PRIVILEGED_REQUEST_KEY: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CodexProposal {
@@ -557,6 +572,165 @@ pub struct HostedTurnResult {
     pub assistant_message: String,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum PrivilegedDecision {
+    Approve,
+    Deny,
+    Respond(Value),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrivilegedRequestPrompt {
+    pub request_key: String,
+    pub room_id: String,
+    pub session_id: u64,
+    pub request_id: RpcId,
+    pub method: String,
+    pub params: Value,
+    pub expires_at_unix_ms: u64,
+}
+
+impl PrivilegedRequestPrompt {
+    pub fn trusted_text(&self) -> String {
+        let params = safe_terminal_text(&self.params.to_string(), MAX_PRIVILEGED_TEXT_CHARS);
+        let response_help = if matches!(
+            self.method.as_str(),
+            "item/tool/requestUserInput"
+                | "tool/requestUserInput"
+                | "mcpServer/elicitation/request"
+        ) {
+            format!(
+                "Respond with: /respond {} <JSON response>",
+                self.request_key
+            )
+        } else {
+            format!(
+                "Approve with: /approve {}\nDeny with: /deny {}",
+                self.request_key, self.request_key
+            )
+        };
+        format!(
+            "Codex privileged request\nRoom: {}\nRequest: {}\nMethod: {}\nExpires: {}\nProjected request: {}\n{}",
+            safe_terminal_text(&self.room_id, 160),
+            safe_terminal_text(&self.request_key, 160),
+            safe_terminal_text(&self.method, 256),
+            self.expires_at_unix_ms,
+            params,
+            response_help,
+        )
+    }
+
+    pub fn response(
+        &self,
+        decision: PrivilegedDecision,
+        active_host: bool,
+    ) -> Result<PrivilegedResponse, HostedTurnError> {
+        if !active_host {
+            return Err(HostedTurnError::Cancelled);
+        }
+        let now_unix_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| HostedTurnError::InvalidResponse)?
+            .as_millis()
+            .min(u64::MAX as u128) as u64;
+        if now_unix_ms >= self.expires_at_unix_ms {
+            return Err(HostedTurnError::Timeout);
+        }
+        validate_privileged_result(&self.method, &self.params, &decision)
+            .map_err(|_| HostedTurnError::InvalidResponse)?;
+        Ok(PrivilegedResponse {
+            request_key: self.request_key.clone(),
+            room_id: self.room_id.clone(),
+            session_id: self.session_id,
+            request_id: self.request_id.clone(),
+            method: self.method.clone(),
+            active_host,
+            decision,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrivilegedResponse {
+    pub request_key: String,
+    pub room_id: String,
+    pub session_id: u64,
+    pub request_id: RpcId,
+    pub method: String,
+    pub active_host: bool,
+    pub decision: PrivilegedDecision,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum HostedTurnEvent {
+    PrivilegedRequest(PrivilegedRequestPrompt),
+    Activity(Box<CodexActivityPlaintextPayload>),
+}
+
+pub struct HostedTurnInteraction {
+    event_rx: mpsc::Receiver<HostedTurnEvent>,
+    response_tx: mpsc::Sender<PrivilegedResponse>,
+}
+
+impl HostedTurnInteraction {
+    pub fn try_recv(&self) -> Result<HostedTurnEvent, mpsc::TryRecvError> {
+        self.event_rx.try_recv()
+    }
+
+    pub fn respond(&self, response: PrivilegedResponse) -> Result<(), HostedTurnError> {
+        self.response_tx
+            .send(response)
+            .map_err(|_| HostedTurnError::Cancelled)
+    }
+}
+
+pub struct HostedTurnWorkerInteraction {
+    room_id: String,
+    turn_id: String,
+    host: String,
+    host_user_id: String,
+    session_id: u64,
+    event_tx: mpsc::Sender<HostedTurnEvent>,
+    response_rx: mpsc::Receiver<PrivilegedResponse>,
+    approved_project_root: Option<PathBuf>,
+    allow_network: bool,
+}
+
+pub fn hosted_turn_interaction(
+    room_id: &str,
+    turn_id: &str,
+    host: &str,
+    host_user_id: &str,
+) -> Result<(HostedTurnInteraction, HostedTurnWorkerInteraction), HostedTurnError> {
+    if !bounded_identifier(room_id, 160)
+        || !bounded_identifier(turn_id, 160)
+        || !bounded_text(host, 120)
+        || !bounded_identifier(host_user_id, 128)
+    {
+        return Err(HostedTurnError::InvalidResponse);
+    }
+    let (event_tx, event_rx) = mpsc::channel();
+    let (response_tx, response_rx) = mpsc::channel();
+    let session_id = allocate_rpc_session_id();
+    Ok((
+        HostedTurnInteraction {
+            event_rx,
+            response_tx,
+        },
+        HostedTurnWorkerInteraction {
+            room_id: room_id.to_owned(),
+            turn_id: turn_id.to_owned(),
+            host: host.to_owned(),
+            host_user_id: host_user_id.to_owned(),
+            session_id,
+            event_tx,
+            response_rx,
+            approved_project_root: None,
+            allow_network: false,
+        },
+    ))
+}
+
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum HostedTurnError {
     #[error("Codex compatibility could not be verified.")]
@@ -814,9 +988,31 @@ pub fn run_hosted_turn(
     request: &HostedTurnRequest,
     cancelled: &AtomicBool,
 ) -> Result<HostedTurnResult, HostedTurnError> {
+    run_hosted_turn_inner(process_config, request, cancelled, None)
+}
+
+pub fn run_hosted_turn_with_interaction(
+    process_config: &HostedProcessConfig,
+    request: &HostedTurnRequest,
+    cancelled: &AtomicBool,
+    interaction: &mut HostedTurnWorkerInteraction,
+) -> Result<HostedTurnResult, HostedTurnError> {
+    run_hosted_turn_inner(process_config, request, cancelled, Some(interaction))
+}
+
+fn run_hosted_turn_inner(
+    process_config: &HostedProcessConfig,
+    request: &HostedTurnRequest,
+    cancelled: &AtomicBool,
+    mut interaction: Option<&mut HostedTurnWorkerInteraction>,
+) -> Result<HostedTurnResult, HostedTurnError> {
     capabilities_for_version(&process_config.version)
         .map_err(|_| HostedTurnError::Compatibility)?;
     let canonical_project = canonical_project(&request.project_path)?;
+    if let Some(interaction) = interaction.as_deref_mut() {
+        interaction.approved_project_root = Some(canonical_project.clone());
+        interaction.allow_network = request.settings.network_access();
+    }
     if request.input.is_empty() || request.input.chars().count() > MAX_CONTEXT_CHARS {
         return Err(HostedTurnError::InvalidResponse);
     }
@@ -868,7 +1064,14 @@ pub fn run_hosted_turn(
         }),
     )
     .map_err(|_| HostedTurnError::Start)?;
-    wait_exact_response(&mut inbox, RpcId::Number(1.into()), &mut budget, cancelled)?;
+    wait_exact_response_interactive(
+        &mut inbox,
+        RpcId::Number(1.into()),
+        &mut budget,
+        cancelled,
+        interaction.as_deref_mut(),
+        &stdin,
+    )?;
     send_json_shared(&stdin, json!({"method":"initialized","params":{}}))
         .map_err(|_| HostedTurnError::Failed)?;
     let cwd = canonical_project
@@ -884,8 +1087,14 @@ pub fn run_hosted_turn(
         ),
     )
     .map_err(|_| HostedTurnError::Failed)?;
-    let thread_response =
-        wait_exact_response(&mut inbox, RpcId::Number(2.into()), &mut budget, cancelled)?;
+    let thread_response = wait_exact_response_interactive(
+        &mut inbox,
+        RpcId::Number(2.into()),
+        &mut budget,
+        cancelled,
+        interaction.as_deref_mut(),
+        &stdin,
+    )?;
     let thread_id = thread_id_from_response(&thread_response, "thread")
         .map_err(|_| HostedTurnError::InvalidResponse)?;
     send_json_shared(
@@ -906,6 +1115,7 @@ pub fn run_hosted_turn(
     .map_err(|_| HostedTurnError::Failed)?;
     let mut acknowledged = false;
     let mut assistant = String::new();
+    let mut started_by_item = HashMap::new();
     loop {
         if cancelled.load(Ordering::Acquire) {
             process.terminate();
@@ -930,6 +1140,16 @@ pub fn run_hosted_turn(
                 acknowledged = true;
             }
             Ok(RpcMessage::Notification { method, value }) => {
+                if let Some(interaction) = interaction.as_deref_mut() {
+                    if let Some(activity) =
+                        project_shared_activity(&method, &value, interaction, &mut started_by_item)
+                    {
+                        interaction
+                            .event_tx
+                            .send(HostedTurnEvent::Activity(Box::new(activity)))
+                            .map_err(|_| HostedTurnError::Cancelled)?;
+                    }
+                }
                 if method.contains("agentMessage") {
                     if let Some(delta) = extract_text_delta(&value) {
                         append_bounded(&mut assistant, &delta, MAX_ASSISTANT_CHARS);
@@ -951,11 +1171,835 @@ pub fn run_hosted_turn(
                     });
                 }
             }
-            Ok(RpcMessage::ServerRequest { .. }) => {
-                process.terminate();
-                return Err(HostedTurnError::PrivilegedRequestUnsupported);
+            Ok(RpcMessage::ServerRequest { id, method, params }) => {
+                let Some(interaction) = interaction.as_deref_mut() else {
+                    process.terminate();
+                    return Err(HostedTurnError::PrivilegedRequestUnsupported);
+                };
+                handle_privileged_request(
+                    &stdin,
+                    id,
+                    method,
+                    params,
+                    interaction,
+                    cancelled,
+                    &mut budget,
+                )?;
             }
             Ok(RpcMessage::Response { .. }) => return Err(HostedTurnError::InvalidResponse),
+            Err(error) if error == "timeout" => {}
+            Err(_) => return Err(HostedTurnError::Failed),
+        }
+    }
+}
+
+fn handle_privileged_request(
+    stdin: &codex_host_core::host::SharedStdin,
+    id: RpcId,
+    method: String,
+    params: Value,
+    interaction: &mut HostedTurnWorkerInteraction,
+    cancelled: &AtomicBool,
+    budget: &mut ActiveTimeout,
+) -> Result<(), HostedTurnError> {
+    if !INTERACTIVE_SERVER_METHODS.contains(&method.as_str()) {
+        return send_privileged_error(stdin, &id, -32601, "Unsupported app-server request")
+            .map_err(|_| HostedTurnError::Failed);
+    }
+    let projected = match project_privileged_request(&method, &params) {
+        Ok(projected) => projected,
+        Err(()) => {
+            return send_privileged_error(
+                stdin,
+                &id,
+                -32602,
+                "Invalid or unsupported interactive request",
+            )
+            .map_err(|_| HostedTurnError::Failed)
+        }
+    };
+    if !privileged_request_allowed(&method, &projected, interaction) {
+        return send_privileged_error(
+            stdin,
+            &id,
+            -32001,
+            "Privileged request exceeds the approved project sandbox",
+        )
+        .map_err(|_| HostedTurnError::Failed);
+    }
+    let request_key = format!(
+        "rpc-{}-{}",
+        interaction.session_id,
+        NEXT_PRIVILEGED_REQUEST_KEY.fetch_add(1, Ordering::Relaxed)
+    );
+    let expires_at = Instant::now() + PRIVILEGED_REQUEST_TTL;
+    let expires_at_unix_ms = SystemTime::now()
+        .checked_add(PRIVILEGED_REQUEST_TTL)
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
+        .unwrap_or(u64::MAX);
+    let prompt = PrivilegedRequestPrompt {
+        request_key,
+        room_id: interaction.room_id.clone(),
+        session_id: interaction.session_id,
+        request_id: id.clone(),
+        method,
+        params: projected,
+        expires_at_unix_ms,
+    };
+    interaction
+        .event_tx
+        .send(HostedTurnEvent::PrivilegedRequest(prompt.clone()))
+        .map_err(|_| HostedTurnError::Cancelled)?;
+    let _ = budget.expired(true);
+    loop {
+        let _ = budget.expired(true);
+        if cancelled.load(Ordering::Acquire) {
+            let _ = send_privileged_error(
+                stdin,
+                &id,
+                -32800,
+                "Codex request cancelled because host authority changed",
+            );
+            return Err(HostedTurnError::Cancelled);
+        }
+        if Instant::now() >= expires_at {
+            return send_privileged_error(
+                stdin,
+                &id,
+                -32800,
+                "Codex request expired while waiting for the host",
+            )
+            .map_err(|_| HostedTurnError::Failed);
+        }
+        match interaction
+            .response_rx
+            .recv_timeout(Duration::from_millis(100))
+        {
+            Ok(response) => {
+                if validate_privileged_response_binding(&prompt, &response).is_err() {
+                    continue;
+                }
+                let result = match validate_privileged_result(
+                    &prompt.method,
+                    &prompt.params,
+                    &response.decision,
+                ) {
+                    Ok(result) => result,
+                    Err(()) => continue,
+                };
+                if !privileged_request_allowed(&prompt.method, &prompt.params, interaction) {
+                    return send_privileged_error(
+                        stdin,
+                        &id,
+                        -32001,
+                        "Privileged request is no longer within the approved project sandbox",
+                    )
+                    .map_err(|_| HostedTurnError::Failed);
+                }
+                send_json_shared(stdin, json!({"id": id.to_value(), "result": result}))
+                    .map_err(|_| HostedTurnError::Failed)?;
+                let _ = budget.expired(false);
+                return Ok(());
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => return Err(HostedTurnError::Cancelled),
+        }
+    }
+}
+
+pub fn validate_privileged_response_binding(
+    prompt: &PrivilegedRequestPrompt,
+    response: &PrivilegedResponse,
+) -> Result<(), HostedTurnError> {
+    if !response.active_host {
+        return Err(HostedTurnError::Cancelled);
+    }
+    if response.request_key != prompt.request_key
+        || response.room_id != prompt.room_id
+        || response.session_id != prompt.session_id
+        || response.request_id != prompt.request_id
+        || response.method != prompt.method
+    {
+        return Err(HostedTurnError::InvalidResponse);
+    }
+    Ok(())
+}
+
+fn send_privileged_error(
+    stdin: &codex_host_core::host::SharedStdin,
+    id: &RpcId,
+    code: i64,
+    message: &str,
+) -> Result<(), String> {
+    send_json_shared(
+        stdin,
+        json!({"id": id.to_value(), "error": {"code": code, "message": message}}),
+    )
+}
+
+fn project_privileged_request(method: &str, params: &Value) -> Result<Value, ()> {
+    if serde_json::to_vec(params).map_err(|_| ())?.len() > MAX_PRIVILEGED_PARAMS_BYTES {
+        return Err(());
+    }
+    let input = params.as_object().ok_or(())?;
+    let mut output = Map::new();
+    match method {
+        "item/commandExecution/requestApproval" | "execCommandApproval" => {
+            copy_projected_text(input, &mut output, "reason", 2_000)?;
+            copy_projected_text(input, &mut output, "cwd", 4_096)?;
+            let command = input.get("command").ok_or(())?;
+            let command = if let Some(command) = command.as_str() {
+                Value::String(bounded_prompt_text(command, MAX_PRIVILEGED_TEXT_CHARS)?)
+            } else if let Some(parts) = command.as_array() {
+                if parts.len() > 200 {
+                    return Err(());
+                }
+                Value::Array(
+                    parts
+                        .iter()
+                        .map(|part| {
+                            part.as_str()
+                                .ok_or(())
+                                .and_then(|part| bounded_prompt_text(part, 2_000))
+                                .map(Value::String)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                )
+            } else {
+                return Err(());
+            };
+            output.insert("command".to_owned(), command);
+        }
+        "item/fileChange/requestApproval" | "applyPatchApproval" => {
+            copy_projected_text(input, &mut output, "reason", 2_000)?;
+            copy_projected_text(input, &mut output, "grantRoot", 4_096)?;
+        }
+        "item/permissions/requestApproval" => {
+            copy_projected_text(input, &mut output, "reason", 2_000)?;
+            copy_projected_text(input, &mut output, "cwd", 4_096)?;
+            let permissions = project_permissions(input.get("permissions").ok_or(())?)?;
+            output.insert("permissions".to_owned(), permissions);
+        }
+        "item/tool/requestUserInput" | "tool/requestUserInput" => {
+            output.insert(
+                "questions".to_owned(),
+                project_questions(input.get("questions").ok_or(())?)?,
+            );
+        }
+        "mcpServer/elicitation/request" => return project_elicitation(input),
+        _ => return Err(()),
+    }
+    for key in ["threadId", "turnId", "itemId"] {
+        copy_projected_text(input, &mut output, key, 512)?;
+    }
+    Ok(Value::Object(output))
+}
+
+fn copy_projected_text(
+    input: &Map<String, Value>,
+    output: &mut Map<String, Value>,
+    key: &str,
+    max: usize,
+) -> Result<(), ()> {
+    if let Some(value) = input.get(key) {
+        output.insert(
+            key.to_owned(),
+            Value::String(bounded_prompt_text(value.as_str().ok_or(())?, max)?),
+        );
+    }
+    Ok(())
+}
+
+fn bounded_prompt_text(value: &str, max: usize) -> Result<String, ()> {
+    if value.chars().count() > max || value.chars().any(char::is_control) {
+        Err(())
+    } else {
+        Ok(value.to_owned())
+    }
+}
+
+fn project_permissions(value: &Value) -> Result<Value, ()> {
+    let input = value.as_object().ok_or(())?;
+    if input
+        .keys()
+        .any(|key| !matches!(key.as_str(), "network" | "fileSystem"))
+    {
+        return Err(());
+    }
+    let mut output = Map::new();
+    if let Some(network) = input.get("network") {
+        let network = network.as_object().ok_or(())?;
+        if network.keys().any(|key| key != "enabled") {
+            return Err(());
+        }
+        let enabled = network.get("enabled").and_then(Value::as_bool).ok_or(())?;
+        output.insert("network".to_owned(), json!({"enabled": enabled}));
+    }
+    if let Some(files) = input.get("fileSystem") {
+        let files = files.as_object().ok_or(())?;
+        if files
+            .keys()
+            .any(|key| !matches!(key.as_str(), "read" | "write"))
+        {
+            return Err(());
+        }
+        let mut projected = Map::new();
+        for key in ["read", "write"] {
+            if let Some(paths) = files.get(key) {
+                let paths = paths.as_array().ok_or(())?;
+                if paths.len() > 100 {
+                    return Err(());
+                }
+                projected.insert(
+                    key.to_owned(),
+                    Value::Array(
+                        paths
+                            .iter()
+                            .map(|path| {
+                                bounded_prompt_text(path.as_str().ok_or(())?, 4_096)
+                                    .map(Value::String)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
+                    ),
+                );
+            }
+        }
+        output.insert("fileSystem".to_owned(), Value::Object(projected));
+    }
+    Ok(Value::Object(output))
+}
+
+fn privileged_request_allowed(
+    method: &str,
+    projected: &Value,
+    interaction: &HostedTurnWorkerInteraction,
+) -> bool {
+    let Some(root) = interaction.approved_project_root.as_deref() else {
+        return false;
+    };
+    if matches!(
+        method,
+        "item/fileChange/requestApproval" | "applyPatchApproval"
+    ) {
+        return projected
+            .get("grantRoot")
+            .and_then(Value::as_str)
+            .is_none_or(|path| path_within_project(path, root));
+    }
+    if method != "item/permissions/requestApproval" {
+        return true;
+    }
+    let Some(permissions) = projected.get("permissions").and_then(Value::as_object) else {
+        return false;
+    };
+    if permissions
+        .get("network")
+        .and_then(|network| network.get("enabled"))
+        .and_then(Value::as_bool)
+        .is_some_and(|enabled| enabled && !interaction.allow_network)
+    {
+        return false;
+    }
+    permissions
+        .get("fileSystem")
+        .and_then(Value::as_object)
+        .is_none_or(|files| {
+            ["read", "write"].into_iter().all(|key| {
+                files
+                    .get(key)
+                    .and_then(Value::as_array)
+                    .is_none_or(|paths| {
+                        paths.iter().all(|path| {
+                            path.as_str()
+                                .is_some_and(|path| path_within_project(path, root))
+                        })
+                    })
+            })
+        })
+}
+
+fn path_within_project(path: &str, root: &Path) -> bool {
+    use std::path::Component;
+
+    if path.is_empty() || path.chars().any(char::is_control) {
+        return false;
+    }
+    let path = Path::new(path);
+    let candidate = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    };
+    if candidate
+        .components()
+        .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_)))
+    {
+        return false;
+    }
+    if candidate.exists() {
+        return candidate
+            .canonicalize()
+            .is_ok_and(|candidate| candidate.starts_with(root));
+    }
+    let mut existing = candidate.as_path();
+    while !existing.exists() {
+        let Some(parent) = existing.parent() else {
+            return false;
+        };
+        existing = parent;
+    }
+    existing
+        .canonicalize()
+        .is_ok_and(|existing| existing.starts_with(root))
+}
+
+fn project_questions(value: &Value) -> Result<Value, ()> {
+    let questions = value.as_array().ok_or(())?;
+    if questions.is_empty() || questions.len() > 3 {
+        return Err(());
+    }
+    let projected = questions
+        .iter()
+        .map(|question| {
+            let question = question.as_object().ok_or(())?;
+            let id = bounded_prompt_text(question.get("id").and_then(Value::as_str).ok_or(())?, 128)?;
+            let text = question
+                .get("question")
+                .or_else(|| question.get("header"))
+                .and_then(Value::as_str)
+                .ok_or(())?;
+            let mut output = Map::from_iter([
+                ("id".to_owned(), Value::String(id)),
+                (
+                    "question".to_owned(),
+                    Value::String(bounded_prompt_text(text, 2_000)?),
+                ),
+                (
+                    "isSecret".to_owned(),
+                    Value::Bool(
+                        question
+                            .get("isSecret")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                    ),
+                ),
+            ]);
+            if let Some(options) = question.get("options") {
+                let options = options.as_array().ok_or(())?;
+                if options.len() > 50 {
+                    return Err(());
+                }
+                output.insert(
+                    "options".to_owned(),
+                    Value::Array(
+                        options
+                            .iter()
+                            .map(|option| {
+                                let option = option.as_object().ok_or(())?;
+                                Ok(json!({
+                                    "label": bounded_prompt_text(option.get("label").and_then(Value::as_str).ok_or(())?, 200)?,
+                                    "description": bounded_prompt_text(option.get("description").and_then(Value::as_str).unwrap_or(""), 500)?
+                                }))
+                            })
+                            .collect::<Result<Vec<_>, ()>>()?,
+                    ),
+                );
+            }
+            Ok(Value::Object(output))
+        })
+        .collect::<Result<Vec<_>, ()>>()?;
+    Ok(Value::Array(projected))
+}
+
+fn project_elicitation(input: &Map<String, Value>) -> Result<Value, ()> {
+    let mode = bounded_prompt_text(input.get("mode").and_then(Value::as_str).ok_or(())?, 32)?;
+    let message = bounded_prompt_text(
+        input.get("message").and_then(Value::as_str).ok_or(())?,
+        2_000,
+    )?;
+    match mode.as_str() {
+        "url" => {
+            let url =
+                bounded_prompt_text(input.get("url").and_then(Value::as_str).ok_or(())?, 4_096)?;
+            if !(url.starts_with("https://") || url.starts_with("http://")) {
+                return Err(());
+            }
+            Ok(json!({"mode":"url", "message":message, "url":url}))
+        }
+        "form" | "openai/form" => {
+            let schema = input.get("requestedSchema").cloned().ok_or(())?;
+            validate_form_schema(&schema)?;
+            Ok(json!({"mode":mode, "message":message, "requestedSchema":schema}))
+        }
+        _ => Err(()),
+    }
+}
+
+fn validate_form_schema(value: &Value) -> Result<(), ()> {
+    let schema = value.as_object().ok_or(())?;
+    let properties = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .ok_or(())?;
+    if properties.len() > 24 {
+        return Err(());
+    }
+    for (name, property) in properties {
+        bounded_prompt_text(name, 128)?;
+        let property = property.as_object().ok_or(())?;
+        if !matches!(
+            property.get("type").and_then(Value::as_str),
+            Some("string" | "number" | "integer" | "boolean")
+        ) {
+            return Err(());
+        }
+    }
+    Ok(())
+}
+
+fn validate_privileged_result(
+    method: &str,
+    projected_params: &Value,
+    decision: &PrivilegedDecision,
+) -> Result<Value, ()> {
+    match (method, decision) {
+        (
+            "item/commandExecution/requestApproval" | "item/fileChange/requestApproval",
+            PrivilegedDecision::Approve,
+        ) => Ok(json!({"decision":"accept"})),
+        (
+            "item/commandExecution/requestApproval" | "item/fileChange/requestApproval",
+            PrivilegedDecision::Deny,
+        ) => Ok(json!({"decision":"decline"})),
+        ("execCommandApproval" | "applyPatchApproval", PrivilegedDecision::Approve) => {
+            Ok(json!({"decision":"approved"}))
+        }
+        ("execCommandApproval" | "applyPatchApproval", PrivilegedDecision::Deny) => {
+            Ok(json!({"decision":"denied"}))
+        }
+        ("item/permissions/requestApproval", PrivilegedDecision::Approve) => Ok(json!({
+            "permissions": projected_params.get("permissions").cloned().ok_or(())?,
+            "scope":"turn",
+            "strictAutoReview":false
+        })),
+        ("item/permissions/requestApproval", PrivilegedDecision::Deny) => {
+            Ok(json!({"permissions":{}}))
+        }
+        (
+            "item/tool/requestUserInput" | "tool/requestUserInput",
+            PrivilegedDecision::Respond(result),
+        ) => {
+            validate_answers(projected_params, result)?;
+            Ok(result.clone())
+        }
+        ("item/tool/requestUserInput" | "tool/requestUserInput", PrivilegedDecision::Deny) => {
+            Ok(json!({"answers":{}}))
+        }
+        ("mcpServer/elicitation/request", PrivilegedDecision::Approve)
+            if projected_params.get("mode") == Some(&json!("url")) =>
+        {
+            Ok(json!({"action":"accept"}))
+        }
+        ("mcpServer/elicitation/request", PrivilegedDecision::Deny) => {
+            Ok(json!({"action":"decline"}))
+        }
+        ("mcpServer/elicitation/request", PrivilegedDecision::Respond(result)) => {
+            validate_elicitation_response(projected_params, result)?;
+            Ok(result.clone())
+        }
+        _ => Err(()),
+    }
+}
+
+fn validate_answers(params: &Value, result: &Value) -> Result<(), ()> {
+    let answers = result.get("answers").and_then(Value::as_object).ok_or(())?;
+    if result.as_object().is_none_or(|result| result.len() != 1) {
+        return Err(());
+    }
+    let questions = params
+        .get("questions")
+        .and_then(Value::as_array)
+        .ok_or(())?;
+    let ids = questions
+        .iter()
+        .filter_map(|question| question.get("id").and_then(Value::as_str))
+        .collect::<BTreeSet<_>>();
+    if answers.keys().any(|id| !ids.contains(id.as_str())) {
+        return Err(());
+    }
+    for answer in answers.values() {
+        let values = answer.get("answers").and_then(Value::as_array).ok_or(())?;
+        if values.len() > 20
+            || values.iter().any(|value| {
+                value.as_str().is_none_or(|value| {
+                    value.chars().count() > MAX_PRIVILEGED_TEXT_CHARS
+                        || value.chars().any(char::is_control)
+                })
+            })
+        {
+            return Err(());
+        }
+    }
+    Ok(())
+}
+
+fn validate_elicitation_response(params: &Value, result: &Value) -> Result<(), ()> {
+    let result = result.as_object().ok_or(())?;
+    let action = result.get("action").and_then(Value::as_str).ok_or(())?;
+    if !matches!(action, "accept" | "decline" | "cancel")
+        || result
+            .keys()
+            .any(|key| !matches!(key.as_str(), "action" | "content"))
+    {
+        return Err(());
+    }
+    if action != "accept" {
+        return result
+            .get("content")
+            .is_none_or(Value::is_null)
+            .then_some(())
+            .ok_or(());
+    }
+    if params.get("mode") == Some(&json!("url")) {
+        return result
+            .get("content")
+            .is_none_or(Value::is_null)
+            .then_some(())
+            .ok_or(());
+    }
+    let schema = params
+        .get("requestedSchema")
+        .and_then(Value::as_object)
+        .ok_or(())?;
+    let properties = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .ok_or(())?;
+    let content = result.get("content").and_then(Value::as_object).ok_or(())?;
+    if content.keys().any(|key| !properties.contains_key(key)) {
+        return Err(());
+    }
+    for required in schema
+        .get("required")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let required = required.as_str().ok_or(())?;
+        if !content.contains_key(required) {
+            return Err(());
+        }
+    }
+    for (key, value) in content {
+        let field = properties.get(key).and_then(Value::as_object).ok_or(())?;
+        let field_type = field.get("type").and_then(Value::as_str).ok_or(())?;
+        let valid = match field_type {
+            "string" => value.as_str().is_some_and(|value| {
+                let length = value.chars().count();
+                length <= MAX_PRIVILEGED_TEXT_CHARS
+                    && !value.chars().any(char::is_control)
+                    && field
+                        .get("minLength")
+                        .and_then(Value::as_u64)
+                        .is_none_or(|minimum| length >= minimum as usize)
+                    && field
+                        .get("maxLength")
+                        .and_then(Value::as_u64)
+                        .is_none_or(|maximum| length <= maximum as usize)
+                    && field
+                        .get("enum")
+                        .and_then(Value::as_array)
+                        .is_none_or(|options| {
+                            options.len() <= 50
+                                && options.iter().any(|option| option.as_str() == Some(value))
+                        })
+            }),
+            "number" | "integer" => value.as_f64().is_some_and(|number| {
+                (field_type != "integer" || number.fract() == 0.0)
+                    && field
+                        .get("minimum")
+                        .and_then(Value::as_f64)
+                        .is_none_or(|minimum| number >= minimum)
+                    && field
+                        .get("maximum")
+                        .and_then(Value::as_f64)
+                        .is_none_or(|maximum| number <= maximum)
+            }),
+            "boolean" => value.as_bool().is_some(),
+            _ => false,
+        };
+        if !valid {
+            return Err(());
+        }
+    }
+    Ok(())
+}
+
+fn project_shared_activity(
+    method: &str,
+    notification: &Value,
+    interaction: &HostedTurnWorkerInteraction,
+    started_by_item: &mut HashMap<String, String>,
+) -> Option<CodexActivityPlaintextPayload> {
+    let projected = codex_host_core::project_codex_activity(
+        method,
+        notification,
+        &interaction.room_id,
+        &interaction.turn_id,
+        started_by_item,
+        false,
+    )?;
+    let mut value = serde_json::to_value(projected).ok()?;
+    let object = value.as_object_mut()?;
+    // The CLI shares lifecycle metadata and configured reasoning summaries only.
+    // Raw command output, diffs, tool arguments/results, and unknown upstream
+    // fields remain host-local.
+    if object.get("kind").and_then(Value::as_str) != Some("reasoning") {
+        object.remove("details");
+    } else if let Some(details) = object.get_mut("details").and_then(Value::as_object_mut) {
+        details.remove("rawContent");
+        if let Some(summaries) = details.get_mut("summaries").and_then(Value::as_array_mut) {
+            for summary in summaries {
+                if let Some(text) = summary.as_str() {
+                    *summary = Value::String(redact_shared_text(text, 4_096));
+                }
+            }
+        }
+    }
+    object.insert("host".to_owned(), Value::String(interaction.host.clone()));
+    object.insert(
+        "eventType".to_owned(),
+        Value::String("codex.activity".to_owned()),
+    );
+    object.insert(
+        "hostUserId".to_owned(),
+        Value::String(interaction.host_user_id.clone()),
+    );
+    let payload: CodexActivityPlaintextPayload = serde_json::from_value(value).ok()?;
+    payload.validate().ok()?;
+    Some(payload)
+}
+
+fn redact_shared_text(value: &str, max: usize) -> String {
+    safe_terminal_text(value, max)
+        .split_whitespace()
+        .map(|part| {
+            let lower = part.to_ascii_lowercase();
+            let credential_shaped = part.contains('=')
+                || part.contains("://")
+                || lower.starts_with("bearer")
+                || lower.starts_with("ghp_")
+                || lower.starts_with("github_pat_")
+                || lower.starts_with("sk-")
+                || lower.starts_with("akia")
+                || (part.chars().count() >= 24
+                    && part.chars().all(|character| {
+                        character.is_ascii_alphanumeric() || "_-".contains(character)
+                    })
+                    && part
+                        .chars()
+                        .any(|character| character.is_ascii_alphabetic())
+                    && part.chars().any(|character| character.is_ascii_digit()));
+            if credential_shaped
+                || [
+                    "token",
+                    "secret",
+                    "password",
+                    "authorization",
+                    "cookie",
+                    "api_key",
+                    "apikey",
+                    "passphrase",
+                    ".env",
+                ]
+                .iter()
+                .any(|marker| lower.contains(marker))
+                || part.starts_with('/')
+                || part.starts_with("~/")
+            {
+                "[redacted]".to_owned()
+            } else {
+                part.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn safe_terminal_text(value: &str, max: usize) -> String {
+    value
+        .chars()
+        .take(max)
+        .map(|character| {
+            if unsafe_terminal_character(character) {
+                '\u{fffd}'
+            } else {
+                character
+            }
+        })
+        .collect()
+}
+
+fn unsafe_terminal_character(character: char) -> bool {
+    character.is_control()
+        || matches!(
+            character,
+            '\u{061c}'
+                | '\u{200b}'..='\u{200f}'
+                | '\u{2028}'..='\u{202e}'
+                | '\u{2060}'..='\u{206f}'
+                | '\u{feff}'
+                | '\u{fff9}'..='\u{fffb}'
+        )
+        || (character as u32) & 0xffff == 0xffff
+        || (character as u32) & 0xffff == 0xfffe
+}
+
+fn wait_exact_response_interactive(
+    inbox: &mut RpcInbox,
+    id: RpcId,
+    budget: &mut ActiveTimeout,
+    cancelled: &AtomicBool,
+    mut interaction: Option<&mut HostedTurnWorkerInteraction>,
+    stdin: &codex_host_core::host::SharedStdin,
+) -> Result<Value, HostedTurnError> {
+    loop {
+        if cancelled.load(Ordering::Acquire) {
+            return Err(HostedTurnError::Cancelled);
+        }
+        if budget.expired(false) {
+            return Err(HostedTurnError::Timeout);
+        }
+        match inbox.receive(Duration::from_millis(100)) {
+            Ok(RpcMessage::Response {
+                id: response_id,
+                value,
+            }) if response_id == id => {
+                if value.get("error").is_some() {
+                    return Err(HostedTurnError::Failed);
+                }
+                return Ok(value);
+            }
+            Ok(RpcMessage::ServerRequest {
+                id: request_id,
+                method,
+                params,
+            }) => {
+                let Some(interaction) = interaction.as_deref_mut() else {
+                    return Err(HostedTurnError::PrivilegedRequestUnsupported);
+                };
+                handle_privileged_request(
+                    stdin,
+                    request_id,
+                    method,
+                    params,
+                    interaction,
+                    cancelled,
+                    budget,
+                )?;
+            }
+            Ok(_) => return Err(HostedTurnError::InvalidResponse),
             Err(error) if error == "timeout" => {}
             Err(_) => return Err(HostedTurnError::Failed),
         }
@@ -1333,6 +2377,267 @@ mod tests {
         assert!(!rendered.contains("/Users/"));
     }
 
+    fn request_prompt(method: &str, params: Value) -> PrivilegedRequestPrompt {
+        PrivilegedRequestPrompt {
+            request_key: "rpc-7-1".into(),
+            room_id: "room-1".into(),
+            session_id: 7,
+            request_id: RpcId::Number(99.into()),
+            method: method.into(),
+            params: project_privileged_request(method, &params).unwrap(),
+            expires_at_unix_ms: u64::MAX,
+        }
+    }
+
+    #[test]
+    fn complete_privileged_request_matrix_requires_an_exact_human_decision() {
+        let cases = [
+            (
+                "item/commandExecution/requestApproval",
+                json!({"command":"cargo test","cwd":"/project","reason":"verify"}),
+                PrivilegedDecision::Approve,
+                json!({"decision":"accept"}),
+            ),
+            (
+                "item/fileChange/requestApproval",
+                json!({"grantRoot":"/project","reason":"edit"}),
+                PrivilegedDecision::Deny,
+                json!({"decision":"decline"}),
+            ),
+            (
+                "item/permissions/requestApproval",
+                json!({"permissions":{"fileSystem":{"read":["src"]}}}),
+                PrivilegedDecision::Approve,
+                json!({"permissions":{"fileSystem":{"read":["src"]}},"scope":"turn","strictAutoReview":false}),
+            ),
+            (
+                "item/tool/requestUserInput",
+                json!({"questions":[{"id":"choice","question":"Continue?","options":[{"label":"yes"}]}]}),
+                PrivilegedDecision::Respond(json!({"answers":{"choice":{"answers":["yes"]}}})),
+                json!({"answers":{"choice":{"answers":["yes"]}}}),
+            ),
+            (
+                "mcpServer/elicitation/request",
+                json!({"mode":"url","message":"Authenticate","url":"https://example.invalid"}),
+                PrivilegedDecision::Approve,
+                json!({"action":"accept"}),
+            ),
+            (
+                "mcpServer/elicitation/request",
+                json!({"mode":"form","message":"Configure","requestedSchema":{"properties":{"name":{"type":"string"}}}}),
+                PrivilegedDecision::Respond(json!({"action":"accept","content":{"name":"safe"}})),
+                json!({"action":"accept","content":{"name":"safe"}}),
+            ),
+            (
+                "execCommandApproval",
+                json!({"command":["cargo","test"]}),
+                PrivilegedDecision::Approve,
+                json!({"decision":"approved"}),
+            ),
+            (
+                "applyPatchApproval",
+                json!({"reason":"edit"}),
+                PrivilegedDecision::Deny,
+                json!({"decision":"denied"}),
+            ),
+        ];
+        for (method, params, decision, expected) in cases {
+            let prompt = request_prompt(method, params);
+            assert_eq!(
+                validate_privileged_result(method, &prompt.params, &decision),
+                Ok(expected),
+                "request matrix mismatch for {method}"
+            );
+            assert!(prompt.response(decision, true).is_ok());
+        }
+    }
+
+    #[test]
+    fn privileged_responses_bind_host_room_session_request_method_and_expiry() {
+        let prompt = request_prompt(
+            "item/commandExecution/requestApproval",
+            json!({"command":"cargo test"}),
+        );
+        let valid = prompt.response(PrivilegedDecision::Approve, true).unwrap();
+        assert!(validate_privileged_response_binding(&prompt, &valid).is_ok());
+        for response in [
+            PrivilegedResponse {
+                room_id: "other-room".into(),
+                ..valid.clone()
+            },
+            PrivilegedResponse {
+                session_id: 8,
+                ..valid.clone()
+            },
+            PrivilegedResponse {
+                request_key: "rpc-7-2".into(),
+                ..valid.clone()
+            },
+            PrivilegedResponse {
+                request_id: RpcId::Number(100.into()),
+                ..valid.clone()
+            },
+            PrivilegedResponse {
+                method: "item/fileChange/requestApproval".into(),
+                ..valid.clone()
+            },
+            PrivilegedResponse {
+                active_host: false,
+                ..valid.clone()
+            },
+        ] {
+            assert!(validate_privileged_response_binding(&prompt, &response).is_err());
+        }
+        assert_eq!(
+            prompt.response(PrivilegedDecision::Approve, false),
+            Err(HostedTurnError::Cancelled)
+        );
+        let expired = PrivilegedRequestPrompt {
+            expires_at_unix_ms: 0,
+            ..prompt
+        };
+        assert_eq!(
+            expired.response(PrivilegedDecision::Approve, true),
+            Err(HostedTurnError::Timeout)
+        );
+    }
+
+    #[test]
+    fn malformed_unknown_and_oversized_privileged_requests_fail_closed() {
+        assert!(project_privileged_request("unknown/request", &json!({})).is_err());
+        assert!(project_privileged_request(
+            "item/commandExecution/requestApproval",
+            &json!({"command": 7})
+        )
+        .is_err());
+        assert!(project_privileged_request(
+            "item/permissions/requestApproval",
+            &json!({"permissions":{"unknown":true}})
+        )
+        .is_err());
+        assert!(
+            project_privileged_request("item/tool/requestUserInput", &json!({"questions":[]}))
+                .is_err()
+        );
+        assert!(project_privileged_request(
+            "mcpServer/elicitation/request",
+            &json!({"mode":"unsupported","message":"x"})
+        )
+        .is_err());
+        assert!(project_privileged_request(
+            "item/commandExecution/requestApproval",
+            &json!({"command":"x".repeat(MAX_PRIVILEGED_PARAMS_BYTES)})
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn permission_and_file_authority_are_rechecked_against_the_project_root() {
+        let (_, mut worker) =
+            hosted_turn_interaction("room-1", "turn-1", "Host", "github:host").unwrap();
+        worker.approved_project_root = Some(std::env::temp_dir().canonicalize().unwrap());
+        worker.allow_network = false;
+        let allowed = project_privileged_request(
+            "item/permissions/requestApproval",
+            &json!({"permissions":{"fileSystem":{"write":["multaiplayer-new-file"]}}}),
+        )
+        .unwrap();
+        assert!(privileged_request_allowed(
+            "item/permissions/requestApproval",
+            &allowed,
+            &worker
+        ));
+        let escaped = project_privileged_request(
+            "item/permissions/requestApproval",
+            &json!({"permissions":{"fileSystem":{"read":["../outside"]}}}),
+        )
+        .unwrap();
+        assert!(!privileged_request_allowed(
+            "item/permissions/requestApproval",
+            &escaped,
+            &worker
+        ));
+        let network = project_privileged_request(
+            "item/permissions/requestApproval",
+            &json!({"permissions":{"network":{"enabled":true}}}),
+        )
+        .unwrap();
+        assert!(!privileged_request_allowed(
+            "item/permissions/requestApproval",
+            &network,
+            &worker
+        ));
+        let file_escape = project_privileged_request(
+            "item/fileChange/requestApproval",
+            &json!({"grantRoot":"/"}),
+        )
+        .unwrap();
+        assert!(!privileged_request_allowed(
+            "item/fileChange/requestApproval",
+            &file_escape,
+            &worker
+        ));
+    }
+
+    #[test]
+    fn trusted_prompt_neutralizes_terminal_spoofing_and_bounds_display() {
+        let mut prompt = request_prompt(
+            "item/tool/requestUserInput",
+            json!({"questions":[{"id":"q","question":"safe"}]}),
+        );
+        prompt.params = json!({"question": format!("approve\u{1b}[2J{}", "x".repeat(20_000))});
+        let rendered = prompt.trusted_text();
+        assert!(!rendered.contains('\u{1b}'));
+        assert!(rendered.contains("\\u001b"));
+        assert!(rendered.chars().count() < 10_000);
+        assert!(rendered.contains("Codex privileged request"));
+    }
+
+    #[test]
+    fn shared_activity_is_normalized_bounded_and_excludes_raw_host_fields() {
+        let (_, worker) =
+            hosted_turn_interaction("room-1", "turn-1", "Host", "github:host").unwrap();
+        let command = json!({"params":{"item":{
+            "id":"command-1","type":"commandExecution","status":"completed",
+            "command":"cat /Users/host/.env TOKEN=secret",
+            "aggregatedOutput":"arbitrary stdout password=hunter2",
+            "unknown":{"accessToken":"never"}
+        }}});
+        let activity =
+            project_shared_activity("item/completed", &command, &worker, &mut HashMap::new())
+                .unwrap();
+        let encoded = serde_json::to_string(&activity).unwrap();
+        assert!(encoded.contains("command"));
+        for forbidden in [
+            "/Users/host",
+            "TOKEN=secret",
+            "arbitrary stdout",
+            "hunter2",
+            "accessToken",
+            "unknown",
+        ] {
+            assert!(!encoded.contains(forbidden));
+        }
+        assert!(activity.details.is_none());
+
+        let reasoning = json!({"params":{"item":{
+            "id":"reason-1","type":"reasoning","status":"completed",
+            "summary":[{"type":"summary_text","text":"Checked token=secret /private/path AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE ghp_abcdefghijklmnopqrstuvwxyz012345 https://user:pass@example.invalid \u{202e}"}],
+            "content":[{"type":"reasoning_text","text":"raw chain of thought"}]
+        }}});
+        let activity =
+            project_shared_activity("item/completed", &reasoning, &worker, &mut HashMap::new())
+                .unwrap();
+        let encoded = serde_json::to_string(&activity).unwrap();
+        assert!(encoded.contains("[redacted]"));
+        assert!(!encoded.contains("token=secret"));
+        assert!(!encoded.contains("raw chain of thought"));
+        assert!(!encoded.contains("AKIAIOSFODNN7EXAMPLE"));
+        assert!(!encoded.contains("ghp_"));
+        assert!(!encoded.contains("example.invalid"));
+        assert!(!encoded.contains("\\u202e"));
+    }
+
     #[test]
     fn cancellation_fails_before_start_without_reporting_success() {
         let cancelled = AtomicBool::new(true);
@@ -1445,6 +2750,117 @@ done
         .unwrap();
         assert_eq!(result.thread_id, "thread-fixture");
         assert_eq!(result.assistant_message, "Fixture assistant response");
+        let _ = std::fs::remove_file(fixture);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn real_compatible_request_waits_for_the_exact_active_host_response() {
+        use std::os::unix::fs::PermissionsExt;
+        let fixture = std::env::temp_dir().join(format!(
+            "multaiplayer-codex-approval-fixture-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let source = r#"#!/bin/sh
+while IFS= read -r line; do
+  case "$line" in
+    *\"method\":\"initialize\"*) printf '%s\n' '{"id":1,"result":{}}' ;;
+    *\"method\":\"thread/start\"*) printf '%s\n' '{"id":2,"result":{"thread":{"id":"thread-fixture"}}}' ;;
+    *\"method\":\"turn/start\"*)
+      printf '%s\n' '{"id":3,"result":{"turn":{"id":"turn-fixture"}}}'
+      printf '%s\n' '{"id":99,"method":"item/commandExecution/requestApproval","params":{"threadId":"thread-fixture","turnId":"turn-fixture","itemId":"command-1","command":"cargo test","reason":"verify"}}' ;;
+    *\"id\":99*\"decision\":\"accept\"*)
+      printf '%s\n' '{"method":"item/agentMessage/delta","params":{"delta":"Approved assistant response"}}'
+      printf '%s\n' '{"method":"turn/completed","params":{"turn":{"status":"completed"}}}' ;;
+  esac
+done
+"#;
+        std::fs::write(&fixture, source).unwrap();
+        let mut permissions = std::fs::metadata(&fixture).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&fixture, permissions).unwrap();
+        let config = HostedProcessConfig {
+            executable: fixture.to_string_lossy().into_owned(),
+            version: "0.144.0".into(),
+            extra_arguments: vec![],
+        };
+        let (interaction, mut worker_interaction) =
+            hosted_turn_interaction("room-1", "turn-1", "Host", "github:host").unwrap();
+        let worker = std::thread::spawn(move || {
+            run_hosted_turn_with_interaction(
+                &config,
+                &HostedTurnRequest {
+                    project_path: std::env::temp_dir(),
+                    input: "bounded input".into(),
+                    settings: CodexTurnSettings::default(),
+                    previous_thread_id: None,
+                    timeout: Duration::from_secs(5),
+                },
+                &AtomicBool::new(false),
+                &mut worker_interaction,
+            )
+        });
+        let prompt = loop {
+            match interaction.event_rx.recv_timeout(Duration::from_secs(2)) {
+                Ok(HostedTurnEvent::PrivilegedRequest(prompt)) => break prompt,
+                Ok(HostedTurnEvent::Activity(_)) => {}
+                Err(error) => panic!("approval prompt not received: {error}"),
+            }
+        };
+        assert_eq!(prompt.room_id, "room-1");
+        assert_eq!(prompt.method, "item/commandExecution/requestApproval");
+        let valid = prompt.response(PrivilegedDecision::Approve, true).unwrap();
+        interaction
+            .respond(PrivilegedResponse {
+                room_id: "other-room".into(),
+                ..valid.clone()
+            })
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(!worker.is_finished());
+        interaction.respond(valid).unwrap();
+        let result = worker.join().unwrap().unwrap();
+        assert_eq!(result.thread_id, "thread-fixture");
+        assert_eq!(result.assistant_message, "Approved assistant response");
+
+        let (shutdown_interaction, mut shutdown_worker_interaction) =
+            hosted_turn_interaction("room-1", "turn-2", "Host", "github:host").unwrap();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_shutdown = shutdown.clone();
+        let shutdown_config = HostedProcessConfig {
+            executable: fixture.to_string_lossy().into_owned(),
+            version: "0.144.0".into(),
+            extra_arguments: vec![],
+        };
+        let shutdown_worker = std::thread::spawn(move || {
+            run_hosted_turn_with_interaction(
+                &shutdown_config,
+                &HostedTurnRequest {
+                    project_path: std::env::temp_dir(),
+                    input: "bounded input".into(),
+                    settings: CodexTurnSettings::default(),
+                    previous_thread_id: None,
+                    timeout: Duration::from_secs(5),
+                },
+                &worker_shutdown,
+                &mut shutdown_worker_interaction,
+            )
+        });
+        loop {
+            match shutdown_interaction
+                .event_rx
+                .recv_timeout(Duration::from_secs(2))
+            {
+                Ok(HostedTurnEvent::PrivilegedRequest(_)) => break,
+                Ok(HostedTurnEvent::Activity(_)) => {}
+                Err(error) => panic!("shutdown prompt not received: {error}"),
+            }
+        }
+        shutdown.store(true, Ordering::Release);
+        assert_eq!(
+            shutdown_worker.join().unwrap(),
+            Err(HostedTurnError::Cancelled)
+        );
         let _ = std::fs::remove_file(fixture);
     }
 

@@ -2,10 +2,11 @@ use multaiplayer_cli::{
     auth::{AuthClient, DevicePollResult},
     chat::{RecoveringChatRoomSession, RenderMode, TerminalRenderer},
     codex::{
-        build_bounded_context, cancellation_flag, probe_codex_process,
-        proposal_expiry_from_rfc3339, resolve_turn_settings, run_hosted_turn, CodexProposal,
-        CodexTurnSettings, HostPreview, HostedTurnRequest, HostedTurnResult, ProposalError,
-        ProposalMachine,
+        build_bounded_context, cancellation_flag, hosted_turn_interaction, probe_codex_process,
+        proposal_expiry_from_rfc3339, resolve_turn_settings, run_hosted_turn_with_interaction,
+        CodexProposal, CodexTurnSettings, HostPreview, HostedTurnEvent, HostedTurnInteraction,
+        HostedTurnRequest, HostedTurnResult, PrivilegedDecision, PrivilegedRequestPrompt,
+        ProposalError, ProposalMachine,
     },
     identity::load_or_create_identity,
     invite::{parse_invite_code, InviteError, InviteService, RelayInviteBackend},
@@ -57,7 +58,8 @@ const HELP: &str = concat!(
     "                  Create and host a room with a local project\n",
     "  open <ROOM> [--plain]\n",
     "                  Open a locally associated room and enter encrypted chat\n\n",
-    "                  In-room: @codex <TASK>, /approve <ID>, /deny <ID>, /quit\n\n",
+    "                  In-room: @codex <TASK>, /approve <ID>, /deny <ID>,\n",
+    "                  /respond <REQUEST-ID> <JSON>, /quit\n\n",
     "  leave <ROOM>    Leave locally while retaining encrypted room data\n",
     "  forget <ROOM>   Destructively forget local association and history\n",
     "  invite <ROOM>   Create and display a secret invite code\n",
@@ -269,6 +271,7 @@ enum RoomLoopDirective {
     Propose(String),
     Approve(String),
     Deny(String),
+    Respond(String, serde_json::Value),
     Quit,
 }
 
@@ -279,6 +282,7 @@ trait RoomLoopAdapter {
     fn directive(&mut self, projected_chat_count: usize) -> Result<RoomLoopDirective, ()>;
     fn emit(&mut self, event: &multaiplayer_cli::chat::ProjectedEvent);
     fn trusted_codex_preview(&mut self, _preview: &HostPreview) {}
+    fn trusted_codex_request(&mut self, _request: &PrivilegedRequestPrompt) {}
     fn complete(&self, projected_chat_count: usize) -> Result<bool, ()>;
 }
 
@@ -311,6 +315,7 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
                 | RoomLoopDirective::Propose(_)
                 | RoomLoopDirective::Approve(_)
                 | RoomLoopDirective::Deny(_)
+                | RoomLoopDirective::Respond(_, _)
         );
         let events = match directive {
             RoomLoopDirective::Quit => {
@@ -363,6 +368,13 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
                 .map_err(|_| {
                     eprintln!("room loop: proposal denial failed safely");
                 })?,
+            RoomLoopDirective::Respond(request_key, response) => codex
+                .as_deref_mut()
+                .ok_or(())?
+                .respond_privileged(chat, &request_key, PrivilegedDecision::Respond(response))
+                .map_err(|_| {
+                    eprintln!("room loop: privileged response failed safely");
+                })?,
             RoomLoopDirective::Wait => {
                 thread::sleep(Duration::from_millis(10));
                 Vec::new()
@@ -405,6 +417,9 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
             })?;
             for event in events {
                 emit_room_event(chat, adapter, Some(controller), event)?;
+            }
+            if let Some(request) = controller.take_privileged_prompt() {
+                adapter.trusted_codex_request(&request);
             }
         }
         if adapter.complete(projected_chat_count).map_err(|()| {
@@ -449,6 +464,12 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
             Ok(Ok(line)) if line.starts_with("/deny ") => {
                 Ok(RoomLoopDirective::Deny(line[6..].trim().to_owned()))
             }
+            Ok(Ok(line)) if line.starts_with("/respond ") => {
+                let remainder = line[9..].trim();
+                let (request_key, response) = remainder.split_once(' ').ok_or(())?;
+                let response = serde_json::from_str(response).map_err(|_| ())?;
+                Ok(RoomLoopDirective::Respond(request_key.to_owned(), response))
+            }
             Ok(Ok(line)) => Ok(RoomLoopDirective::Send(line)),
             Ok(Err(_)) | Err(TryRecvError::Disconnected) => Ok(RoomLoopDirective::Quit),
             Err(TryRecvError::Empty) => Ok(RoomLoopDirective::Idle),
@@ -463,6 +484,10 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
         eprintln!("{}", self.renderer.trusted_prompt(&preview.trusted_text()));
     }
 
+    fn trusted_codex_request(&mut self, request: &PrivilegedRequestPrompt) {
+        eprintln!("{}", self.renderer.trusted_prompt(&request.trusted_text()));
+    }
+
     fn complete(&self, _projected_chat_count: usize) -> Result<bool, ()> {
         Ok(false)
     }
@@ -473,6 +498,7 @@ struct ActiveHostedTurn {
     cancelled: Arc<AtomicBool>,
     receiver: mpsc::Receiver<Result<HostedTurnResult, multaiplayer_cli::codex::HostedTurnError>>,
     authority_lost: bool,
+    interaction: HostedTurnInteraction,
 }
 
 struct CodexRoomController {
@@ -490,6 +516,8 @@ struct CodexRoomController {
     participants: BTreeSet<String>,
     previous_thread_id: Option<String>,
     active: Option<ActiveHostedTurn>,
+    pending_privileged_request: Option<PrivilegedRequestPrompt>,
+    privileged_prompt_ready: bool,
 }
 
 impl CodexRoomController {
@@ -517,6 +545,8 @@ impl CodexRoomController {
             participants,
             previous_thread_id,
             active: None,
+            pending_privileged_request: None,
+            privileged_prompt_ready: false,
         })
     }
 
@@ -648,6 +678,13 @@ impl CodexRoomController {
         proposal_id: &str,
         now_unix: i64,
     ) -> Result<Vec<multaiplayer_cli::chat::ProjectedEvent>, ()> {
+        if self
+            .pending_privileged_request
+            .as_ref()
+            .is_some_and(|request| request.request_key == proposal_id)
+        {
+            return self.respond_privileged(chat, proposal_id, PrivilegedDecision::Approve);
+        }
         let active_host = chat.is_active_host();
         let approved = self
             .machine
@@ -688,6 +725,13 @@ impl CodexRoomController {
             .map_err(|_| ())?;
 
         let (sender, receiver) = mpsc::channel();
+        let (interaction, mut worker_interaction) = hosted_turn_interaction(
+            &self.room_id,
+            proposal_id,
+            &self.host_name,
+            &self.host_user_id,
+        )
+        .map_err(|_| ())?;
         let cancelled = cancellation_flag();
         let worker_cancelled = cancelled.clone();
         let request = HostedTurnRequest {
@@ -698,8 +742,14 @@ impl CodexRoomController {
             timeout: Duration::from_secs(30 * 60),
         };
         thread::spawn(move || {
-            let result = probe_codex_process("codex")
-                .and_then(|config| run_hosted_turn(&config, &request, &worker_cancelled));
+            let result = probe_codex_process("codex").and_then(|config| {
+                run_hosted_turn_with_interaction(
+                    &config,
+                    &request,
+                    &worker_cancelled,
+                    &mut worker_interaction,
+                )
+            });
             let _ = sender.send(result);
         });
         self.active = Some(ActiveHostedTurn {
@@ -707,6 +757,7 @@ impl CodexRoomController {
             cancelled,
             receiver,
             authority_lost: false,
+            interaction,
         });
         projected.shrink_to_fit();
         Ok(projected)
@@ -718,6 +769,13 @@ impl CodexRoomController {
         proposal_id: &str,
         _now_unix: i64,
     ) -> Result<Vec<multaiplayer_cli::chat::ProjectedEvent>, ()> {
+        if self
+            .pending_privileged_request
+            .as_ref()
+            .is_some_and(|request| request.request_key == proposal_id)
+        {
+            return self.respond_privileged(chat, proposal_id, PrivilegedDecision::Deny);
+        }
         if !chat.is_active_host() {
             return Err(());
         }
@@ -740,6 +798,40 @@ impl CodexRoomController {
         .map_err(|_| ())
     }
 
+    fn respond_privileged<C: RelayConnector, R: RetrySleeper>(
+        &mut self,
+        chat: &RecoveringChatRoomSession<'_, C, R>,
+        request_key: &str,
+        decision: PrivilegedDecision,
+    ) -> Result<Vec<multaiplayer_cli::chat::ProjectedEvent>, ()> {
+        let request = self.pending_privileged_request.as_ref().ok_or(())?;
+        if request.request_key != request_key || request.room_id != self.room_id {
+            return Err(());
+        }
+        let active_host = chat.is_active_host();
+        if !active_host {
+            return Err(());
+        }
+        let response = request.response(decision, active_host).map_err(|_| ())?;
+        self.active
+            .as_ref()
+            .ok_or(())?
+            .interaction
+            .respond(response)
+            .map_err(|_| ())?;
+        self.pending_privileged_request = None;
+        self.privileged_prompt_ready = false;
+        Ok(Vec::new())
+    }
+
+    fn take_privileged_prompt(&mut self) -> Option<PrivilegedRequestPrompt> {
+        if !self.privileged_prompt_ready {
+            return None;
+        }
+        self.privileged_prompt_ready = false;
+        self.pending_privileged_request.clone()
+    }
+
     fn tick<C: RelayConnector, R: RetrySleeper>(
         &mut self,
         chat: &mut RecoveringChatRoomSession<'_, C, R>,
@@ -747,34 +839,72 @@ impl CodexRoomController {
         let Some(active) = self.active.as_mut() else {
             return Ok(Vec::new());
         };
+        let mut projected = Vec::new();
         if !chat.is_active_host() {
             active.authority_lost = true;
             active.cancelled.store(true, Ordering::Release);
+            self.pending_privileged_request = None;
+            self.privileged_prompt_ready = false;
+        }
+        loop {
+            match active.interaction.try_recv() {
+                Ok(HostedTurnEvent::PrivilegedRequest(request)) => {
+                    if !chat.is_active_host()
+                        || request.room_id != self.room_id
+                        || self.pending_privileged_request.is_some()
+                    {
+                        active.authority_lost = true;
+                        active.cancelled.store(true, Ordering::Release);
+                        continue;
+                    }
+                    self.pending_privileged_request = Some(request);
+                    self.privileged_prompt_ready = true;
+                }
+                Ok(HostedTurnEvent::Activity(activity)) => {
+                    if !chat.is_active_host() || activity.turn_id != active.proposal_id {
+                        active.authority_lost = true;
+                        active.cancelled.store(true, Ordering::Release);
+                        continue;
+                    }
+                    projected.extend(
+                        chat.send_codex_activity(
+                            &format!("activity-{}", uuid::Uuid::new_v4()),
+                            *activity,
+                        )
+                        .map_err(|_| ())?,
+                    );
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => break,
+            }
         }
         let result = match active.receiver.try_recv() {
             Ok(result) => result,
-            Err(TryRecvError::Empty) => return Ok(Vec::new()),
+            Err(TryRecvError::Empty) => return Ok(projected),
             Err(TryRecvError::Disconnected) => {
                 Err(multaiplayer_cli::codex::HostedTurnError::Failed)
             }
         };
         let active = self.active.take().ok_or(())?;
+        self.pending_privileged_request = None;
+        self.privileged_prompt_ready = false;
         if active.authority_lost || !chat.is_active_host() {
             let _ = self.machine.cancel(&self.room_id, &active.proposal_id);
-            return Ok(Vec::new());
+            return Ok(projected);
         }
         let created_at = utc_timestamp().map_err(|_| ())?;
         let display_time = created_at.get(11..16).unwrap_or("--:--");
         match result {
             Ok(result) => {
-                let mut projected = chat
-                    .send_assistant_message(
+                projected.extend(
+                    chat.send_assistant_message(
                         &format!("assistant-{}", uuid::Uuid::new_v4()),
                         &result.assistant_message,
                         &created_at,
                         display_time,
                     )
-                    .map_err(|_| ())?;
+                    .map_err(|_| ())?,
+                );
                 if !chat.is_active_host() {
                     let _ = self.machine.cancel(&self.room_id, &active.proposal_id);
                     return Ok(projected);
@@ -830,8 +960,11 @@ impl CodexRoomController {
                     host_user_id: self.host_user_id.clone(),
                     created_at,
                 };
-                chat.send_codex_turn(&format!("turn-failed-{}", uuid::Uuid::new_v4()), failed)
-                    .map_err(|_| ())
+                projected.extend(
+                    chat.send_codex_turn(&format!("turn-failed-{}", uuid::Uuid::new_v4()), failed)
+                        .map_err(|_| ())?,
+                );
+                Ok(projected)
             }
         }
     }
@@ -2149,6 +2282,33 @@ mod tests {
         }
         assert!(!HELP.contains("<invite-code>"));
         assert!(HELP.contains("Read a secret invite code from stdin"));
+        assert!(!HELP.contains("--yes"));
+        assert!(!HELP.contains("auto-approve"));
+    }
+
+    #[test]
+    fn interactive_privileged_response_requires_an_exact_key_and_valid_json() {
+        let (sender, receiver) = mpsc::channel();
+        let mut adapter = InteractiveRoomLoop {
+            receiver,
+            renderer: TerminalRenderer::new(RenderMode::Plain),
+        };
+        sender
+            .send(Ok(
+                "/respond rpc-7-1 {\"answers\":{\"q\":{\"answers\":[\"yes\"]}}}".to_owned(),
+            ))
+            .unwrap();
+        match adapter.directive(0).unwrap() {
+            RoomLoopDirective::Respond(key, response) => {
+                assert_eq!(key, "rpc-7-1");
+                assert_eq!(response["answers"]["q"]["answers"][0], "yes");
+            }
+            _ => panic!("expected a privileged response"),
+        }
+        sender
+            .send(Ok("/respond rpc-7-1 not-json".to_owned()))
+            .unwrap();
+        assert!(adapter.directive(0).is_err());
     }
 
     #[test]
