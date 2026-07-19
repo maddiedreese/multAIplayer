@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-160-R1 packaging parser correction
+Current phase: CLI-170 external-alpha readiness review
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -263,14 +263,28 @@ Last update: 2026-07-19
   review. Desktop updater, notarization, signing, versions, release workflows,
   Cargo.lock, and asset manifests remain unchanged. Developer ID signing and CLI
   publication remain owner-controlled and were not performed.
-- CLI-170 is paused after its locked clean install succeeded without tracked
-  dependency changes, but `npm run verify` found unsupported JavaScript regex
-  escape `\z` in the CLI Cargo package parser. No later readiness gates ran and
-  no fix was attempted in CLI-170.
-- The owner authorized CLI-160-R1 as the sole active implementation task to
-  correct only that absolute-end match and add its packaging-policy regression
-  coverage. CLI-170 may restart only after the correction is independently
-  verified and integrated. Publication remains owner-controlled.
+- CLI-160-R1 is complete and integrated. Its accepted task head is
+  `d052e0fac7d4c18f1620718323cf5f4f9084da48`; integration merge
+  `05afa00737cba993ac0ce32147d9b6c4a62437c4` changes exactly the two authorized
+  CLI packaging-parser and regression-test paths. The correction replaces the
+  unsupported JavaScript `\z` escape with a fail-closed absolute-end assertion
+  and proves parsing both before another Cargo section and at literal EOF while
+  retaining invalid-manifest failures. Independent and post-merge checks passed
+  unsuppressed ESLint, all 8 packaging-policy tests, and all 18
+  classification/release-isolation tests. Task evidence additionally passed the
+  full repository verification (695 desktop, 285 relay, 27 protocol, and 250
+  native Rust tests), the locked 131-test CLI/protocol matrix, 21 desktop
+  release-tool tests, license/notices and Rust dependency audits, exact-head
+  package build and clean-install verification, ancestry, cleanliness, and
+  protected-path review. The accepted final ad-hoc artifact is source-bound to
+  the task head with archive, manifest, and binary SHA-256 values
+  `80b4d6f85673c81b62c0de1f4754e8976b8d9791425bd220446909962918bc4a`,
+  `76804b48932609d13c70b99a4c44469e73e681c39fd4aea409336087455ae6f3`,
+  and `37a3c43867d4feba4a9afabb91b906c9fa8f4dbe72b52ded607713aeaa910727`.
+  No manifest, lockfile, dependency, desktop, or protected release path changed.
+- CLI-170 is again the sole active task and must restart its complete readiness
+  audit from the first gate on the corrected integration baseline. Publication
+  remains owner-controlled.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -305,8 +319,8 @@ Last update: 2026-07-19
 | CLI-140 | Desktop/CLI interoperability journeys | complete | CLI-100, CLI-130 |
 | CLI-150 | Security hardening and threat-model update | complete | CLI-140 |
 | CLI-160 | Signed CLI packaging and release isolation | complete | CLI-150 |
-| CLI-160-R1 | CLI Cargo package parser EOF correction | active | CLI-160 |
-| CLI-170 | External-alpha readiness review | paused_waiting_for_cli_160_r1 | CLI-160, CLI-160-R1 |
+| CLI-160-R1 | CLI Cargo package parser EOF correction | complete | CLI-160 |
+| CLI-170 | External-alpha readiness review | active | CLI-160, CLI-160-R1 |
 
 ## Release safety snapshot
 
