@@ -30,3 +30,18 @@ and runs formatting, Clippy, and tests with that workspace manifest.
 Desktop release verification remains the existing `npm run verify` and release
 tool test suite. CLI CI does not call desktop packaging, signing, notarization,
 updater publication, version synchronization, or release-asset creation.
+
+## CLI package boundary
+
+CLI archives are configured and built only by `apps/cli/release`. They use the
+CLI Cargo version, the `multAIplayer-cli-v<version>-darwin-arm64` artifact
+namespace, an independent checksum manifest, and source-revision metadata.
+The local default uses a timestamp-free ad-hoc Apple signature for deterministic
+package verification. Owner-authorized distribution builds select an
+owner-managed Developer ID identity without exporting its private key and
+require Apple's secure signing timestamp. Manifest metadata and verification
+keep those modes fail-closed and distinct.
+
+The CLI packager requires a clean exact source commit and cannot tag, upload,
+publish, notarize, update a channel, or write desktop release metadata. CLI
+publication remains a separate manual owner decision.

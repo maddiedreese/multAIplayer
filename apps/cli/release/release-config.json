@@ -1,0 +1,10 @@
+{
+  "schema": "multaiplayer-cli-release-v1",
+  "product": "multAIplayer CLI",
+  "binary": "multAIplayer",
+  "version": "0.1.0-alpha.1",
+  "target": "aarch64-apple-darwin",
+  "platform": "darwin-arm64",
+  "archivePrefix": "multAIplayer-cli",
+  "publication": "manual-owner-approval-required"
+}
