@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   artifactStem,
   assertSafeOutputDirectory,
+  inspectCodeSignature,
   parseCargoPackageVersion,
   readReleaseConfig,
   sha256File,
@@ -83,7 +84,12 @@ run("codesign", signingArguments(signingIdentity, resolve(packageRoot, config.bi
 run("codesign", ["--verify", "--strict", "--verbose=2", resolve(packageRoot, config.binary)]);
 
 const binarySha256 = sha256File(resolve(packageRoot, config.binary));
-const signature = signatureMetadata(resolve(packageRoot, config.binary), signingIdentity);
+const signature = inspectCodeSignature(resolve(packageRoot, config.binary));
+assert.equal(
+  signature.mode,
+  signingIdentity === "-" ? "adhoc-local-verification" : "developer-id-distribution",
+  "observed signing mode must match the selected signing identity"
+);
 validateSignatureMetadata(signature);
 const buildMetadata = {
   schema: "multaiplayer-cli-build-v1",
@@ -172,38 +178,4 @@ function dependencyNotices() {
 
 function escapeCell(value) {
   return String(value).replaceAll("|", "\\|");
-}
-
-function signatureMetadata(binary, identity) {
-  const result = spawnSync("codesign", ["-d", "--verbose=4", binary], {
-    cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-  if (result.error) throw result.error;
-  assert.equal(result.status, 0, "codesign signature inspection failed");
-  const detail = `${result.stdout}${result.stderr}`;
-  const authority = detail.match(/^Authority=(.+)$/m)?.[1] || null;
-  const rawTeamIdentifier = detail.match(/^TeamIdentifier=(.+)$/m)?.[1] || null;
-  const timestamp = detail.match(/^Timestamp=(.+)$/m)?.[1] || null;
-  if (identity === "-") {
-    assert.match(detail, /^Signature=adhoc$/m, "local package must carry an ad-hoc signature");
-    return {
-      mode: "adhoc-local-verification",
-      identityKind: "adhoc",
-      secureTimestamp: false,
-      authority: null,
-      teamIdentifier: null,
-      timestamp: null
-    };
-  }
-  assert.doesNotMatch(detail, /^Signature=adhoc$/m, "distribution package must not carry an ad-hoc signature");
-  return {
-    mode: "developer-id-distribution",
-    identityKind: "developer-id-application",
-    secureTimestamp: true,
-    authority,
-    teamIdentifier: rawTeamIdentifier === "not set" ? null : rawTeamIdentifier,
-    timestamp
-  };
 }

@@ -6,7 +6,14 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { artifactStem, readReleaseConfig, sha256File, validateSignatureMetadata } from "./release-lib.mjs";
+import {
+  artifactStem,
+  assertSignatureMetadataMatchesObserved,
+  inspectCodeSignature,
+  readReleaseConfig,
+  sha256File,
+  validateSignatureMetadata
+} from "./release-lib.mjs";
 
 const releaseDir = dirname(fileURLToPath(import.meta.url));
 const cliRoot = resolve(releaseDir, "..");
@@ -58,6 +65,8 @@ try {
   const packageRoot = resolve(temporary, stem);
   const binary = resolve(packageRoot, config.binary);
   run("codesign", ["--verify", "--strict", "--verbose=2", binary]);
+  const observedSignature = inspectCodeSignature(binary);
+  assertSignatureMetadataMatchesObserved(observedSignature, manifest.signature);
   const architectures = execFileSync("lipo", ["-archs", binary], { encoding: "utf8" }).trim().split(/\s+/);
   assert.deepEqual(architectures, ["arm64"], "package must contain only an Apple-silicon executable");
   assert.equal(execFileSync(binary, ["--version"], { encoding: "utf8" }), `${config.binary} ${config.version}\n`);

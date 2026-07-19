@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -74,6 +75,47 @@ export function validateSignatureMetadata(signature) {
   assert.match(signature.authority, /^Developer ID Application:/);
   assert.match(signature.teamIdentifier, /^[A-Z0-9]{10}$/);
   assert.ok(typeof signature.timestamp === "string" && signature.timestamp.length > 0);
+}
+
+export function parseCodeSignatureDetails(detail) {
+  const isAdhoc = /^Signature=adhoc$/m.test(detail);
+  if (isAdhoc) {
+    return {
+      mode: "adhoc-local-verification",
+      identityKind: "adhoc",
+      secureTimestamp: false,
+      authority: null,
+      teamIdentifier: null,
+      timestamp: null
+    };
+  }
+  const authority = detail.match(/^Authority=(.+)$/m)?.[1] || null;
+  const rawTeamIdentifier = detail.match(/^TeamIdentifier=(.+)$/m)?.[1] || null;
+  const timestamp = detail.match(/^Timestamp=(.+)$/m)?.[1] || null;
+  return {
+    mode: "developer-id-distribution",
+    identityKind: "developer-id-application",
+    secureTimestamp: timestamp !== null,
+    authority,
+    teamIdentifier: rawTeamIdentifier === "not set" ? null : rawTeamIdentifier,
+    timestamp
+  };
+}
+
+export function inspectCodeSignature(binary) {
+  const result = spawnSync("codesign", ["-d", "--verbose=4", binary], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, "codesign signature inspection failed");
+  return parseCodeSignatureDetails(`${result.stdout}${result.stderr}`);
+}
+
+export function assertSignatureMetadataMatchesObserved(observed, claimed) {
+  validateSignatureMetadata(observed);
+  validateSignatureMetadata(claimed);
+  assert.deepEqual(claimed, observed, "claimed signature metadata must exactly match the extracted binary");
 }
 
 export function validateDependencyLicenses(packages, allowedExpressions) {

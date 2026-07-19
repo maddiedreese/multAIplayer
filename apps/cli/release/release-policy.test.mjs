@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   artifactStem,
+  assertSignatureMetadataMatchesObserved,
   assertSafeOutputDirectory,
+  parseCodeSignatureDetails,
   parseCargoPackageVersion,
   readReleaseConfig,
   signingArguments,
@@ -104,6 +106,32 @@ test("ad-hoc and Developer ID signing modes are explicit and cannot be confused"
   assert.doesNotThrow(() => validateSignatureMetadata(developerId));
   assert.throws(() => validateSignatureMetadata({ ...adhoc, mode: developerId.mode }));
   assert.throws(() => validateSignatureMetadata({ ...developerId, secureTimestamp: false }));
+});
+
+test("observed codesign metadata rejects forged Developer ID and mode claims", () => {
+  const observedAdhoc = parseCodeSignatureDetails(
+    "Executable=/tmp/multAIplayer\nSignature=adhoc\nTeamIdentifier=not set\n"
+  );
+  const forgedDeveloperId = {
+    mode: "developer-id-distribution",
+    identityKind: "developer-id-application",
+    secureTimestamp: true,
+    authority: "Developer ID Application: Forged (ABCDEFGHIJ)",
+    teamIdentifier: "ABCDEFGHIJ",
+    timestamp: "Jul 19, 2026 at 12:00:00 PM"
+  };
+  assert.throws(() => assertSignatureMetadataMatchesObserved(observedAdhoc, forgedDeveloperId));
+
+  const observedDeveloperId = parseCodeSignatureDetails(
+    "Executable=/tmp/multAIplayer\nAuthority=Developer ID Application: Example (ABCDEFGHIJ)\nTeamIdentifier=ABCDEFGHIJ\nTimestamp=Jul 19, 2026 at 12:00:00 PM\n"
+  );
+  assert.throws(() => assertSignatureMetadataMatchesObserved(observedDeveloperId, observedAdhoc));
+  assert.doesNotThrow(() =>
+    assertSignatureMetadataMatchesObserved(observedDeveloperId, {
+      ...forgedDeveloperId,
+      authority: "Developer ID Application: Example (ABCDEFGHIJ)"
+    })
+  );
 });
 
 test("dependency license expressions are fail-closed against the reviewed release allowlist", () => {
