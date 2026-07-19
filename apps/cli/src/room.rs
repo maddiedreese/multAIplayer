@@ -18,6 +18,9 @@ use std::{fmt, fs, path::Path, time::Duration};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
+#[cfg(test)]
+use crate::relay::decode_workspace_response;
+
 pub const ROOM_STATE_ACCOUNT: &str = "room-associations:v1";
 const NATIVE_SESSION_HEADER: &str = "x-multaiplayer-session";
 const DEVICE_SESSION_HEADER: &str = "x-device-session";
@@ -70,6 +73,14 @@ pub struct OpenedRoom {
     pub is_active_host: bool,
 }
 
+pub fn opened_room_message(opened: &OpenedRoom) -> String {
+    format!(
+        "Opened {} ({}). Local project association retained on this device.",
+        safe_terminal_text(&opened.room.name),
+        opened.room.id
+    )
+}
+
 pub trait RoomBackend {
     fn workspace(&mut self) -> Result<WorkspaceSnapshot, RoomError>;
     fn create_room(&mut self, team_id: &str, name: &str) -> Result<RoomRecord, RoomError>;
@@ -103,6 +114,10 @@ pub struct RelayRoomBackend<'a, S, H> {
     relay_origin: String,
     session: &'a RestoredSession,
     identity: &'a DeviceIdentity,
+    #[cfg(test)]
+    loopback_session: Option<Zeroizing<String>>,
+    #[cfg(test)]
+    loopback_websocket_url: Option<String>,
 }
 
 impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
@@ -120,10 +135,55 @@ impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
             relay_origin: relay_origin.to_owned(),
             session,
             identity,
+            #[cfg(test)]
+            loopback_session: None,
+            #[cfg(test)]
+            loopback_websocket_url: None,
+        })
+    }
+
+    #[cfg(test)]
+    fn new_for_loopback_test(
+        store: &'a S,
+        http: &'a H,
+        relay_origin: &str,
+        websocket_url: &str,
+        relay_session: &str,
+        session: &'a RestoredSession,
+        identity: &'a DeviceIdentity,
+    ) -> Result<Self, RoomError> {
+        let parsed = reqwest::Url::parse(relay_origin).map_err(|_| RoomError::RelayUnavailable)?;
+        let loopback = matches!(parsed.host_str(), Some("127.0.0.1") | Some("::1"));
+        if parsed.scheme() != "http"
+            || !loopback
+            || parsed.port().is_none()
+            || parsed.path() != "/"
+            || parsed.username() != ""
+            || parsed.password().is_some()
+            || parsed.query().is_some()
+            || parsed.fragment().is_some()
+            || relay_session.is_empty()
+        {
+            return Err(RoomError::RelayUnavailable);
+        }
+        TungsteniteConnector::from_loopback_test_url(websocket_url, relay_session)
+            .map_err(map_relay)?;
+        Ok(Self {
+            store,
+            http,
+            relay_origin: parsed.origin().ascii_serialization(),
+            session,
+            identity,
+            loopback_session: Some(Zeroizing::new(relay_session.to_owned())),
+            loopback_websocket_url: Some(websocket_url.to_owned()),
         })
     }
 
     fn headers(&self) -> Result<Zeroizing<String>, RoomError> {
+        #[cfg(test)]
+        if let Some(session) = &self.loopback_session {
+            return Ok(session.clone());
+        }
         load_relay_transport_session(self.store, &self.relay_origin)
             .map_err(map_cli_error)?
             .map(|session| session.secret)
@@ -162,6 +222,16 @@ impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
 
 impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, H> {
     fn workspace(&mut self) -> Result<WorkspaceSnapshot, RoomError> {
+        #[cfg(test)]
+        if self.loopback_session.is_some() {
+            let url = endpoint(&self.relay_origin, "/teams").map_err(map_cli_error)?;
+            let session = self.headers()?;
+            let response = self
+                .http
+                .get(&url, &[(NATIVE_SESSION_HEADER, session.as_str())])
+                .map_err(map_cli_error)?;
+            return decode_workspace_response(response, &url).map_err(map_cli_error);
+        }
         WorkspaceClient::new(self.store, self.http, &self.relay_origin)
             .and_then(|client| client.load())
             .map_err(map_cli_error)
@@ -267,6 +337,15 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
     }
 
     fn join_room(&mut self, room: &RoomRecord, device_session: &str) -> Result<(), RoomError> {
+        #[cfg(test)]
+        let mut connector = if let Some(websocket_url) = &self.loopback_websocket_url {
+            let session = self.headers()?;
+            TungsteniteConnector::from_loopback_test_url(websocket_url, session.as_str())
+                .map_err(map_relay)?
+        } else {
+            TungsteniteConnector::from_store(self.store, &self.relay_origin).map_err(map_relay)?
+        };
+        #[cfg(not(test))]
         let mut connector =
             TungsteniteConnector::from_store(self.store, &self.relay_origin).map_err(map_relay)?;
         let socket = connect_with_retries(
@@ -539,8 +618,9 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
                 associations: Vec::new(),
             });
         };
+        let encoded = Zeroizing::new(encoded);
         let state: StoredRoomState =
-            serde_json::from_str(&encoded).map_err(|_| RoomError::LocalStateUnavailable)?;
+            serde_json::from_str(encoded.as_str()).map_err(|_| RoomError::LocalStateUnavailable)?;
         if state.version != 1
             || state.user_id != self.user_id
             || state.device_id != self.device_id
@@ -568,6 +648,20 @@ fn validate_room_name(name: &str) -> Result<(), RoomError> {
     } else {
         Ok(())
     }
+}
+
+fn safe_terminal_text(value: &str) -> String {
+    value
+        .chars()
+        .take(120)
+        .map(|character| {
+            if character.is_control() {
+                '�'
+            } else {
+                character
+            }
+        })
+        .collect()
 }
 
 fn canonical_project(project: &str) -> Result<String, RoomError> {
@@ -683,9 +777,20 @@ fn map_relay(_error: RelayTransportError) -> RoomError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::platform::tests::MemoryCredentialStore;
+    use crate::{
+        auth::SignedInUser,
+        identity::load_or_create_identity,
+        platform::{tests::MemoryCredentialStore, HttpResponse},
+    };
     use multaiplayer_protocol::{TeamRecord, TeamRole};
-    use std::{cell::RefCell, collections::VecDeque};
+    use serde_json::Value;
+    use std::{
+        cell::RefCell,
+        collections::{BTreeMap, VecDeque},
+        io::{BufRead, BufReader, Read, Write},
+        path::PathBuf,
+        process::{Child, ChildStdout, Command, Stdio},
+    };
 
     const USER: &str = "github:42";
     const DEVICE: &str = "device_cli";
@@ -1054,5 +1159,391 @@ mod tests {
             RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN).open("room-cli");
         assert_eq!(result, Err(RoomError::HostHandoffUnsupported));
         assert_eq!(mls.opens, 1);
+    }
+
+    struct RecordingLoopbackHttp {
+        client: reqwest::blocking::Client,
+        trace: RefCell<Vec<String>>,
+        required_mls_before_host_patch: Option<PathBuf>,
+    }
+
+    impl RecordingLoopbackHttp {
+        fn new() -> Self {
+            Self {
+                client: reqwest::blocking::Client::builder()
+                    .redirect(reqwest::redirect::Policy::none())
+                    .build()
+                    .unwrap(),
+                trace: RefCell::new(Vec::new()),
+                required_mls_before_host_patch: None,
+            }
+        }
+
+        fn require_mls_before_host_patch(mut self, path: &Path) -> Self {
+            self.required_mls_before_host_patch = Some(path.to_owned());
+            self
+        }
+
+        fn send(
+            &self,
+            method: reqwest::Method,
+            url: &str,
+            headers: &[(&str, &str)],
+            body: Option<&Value>,
+        ) -> Result<HttpResponse, CliError> {
+            let parsed = reqwest::Url::parse(url).map_err(|_| CliError::RelayUnavailable)?;
+            if parsed.scheme() != "http"
+                || !matches!(parsed.host_str(), Some("127.0.0.1") | Some("::1"))
+                || parsed.port().is_none()
+            {
+                return Err(CliError::RelayUnavailable);
+            }
+            self.trace
+                .borrow_mut()
+                .push(format!("{} {}", method.as_str(), parsed));
+            if method == reqwest::Method::PATCH && parsed.path().ends_with("/host") {
+                if let Some(path) = &self.required_mls_before_host_patch {
+                    let metadata = fs::metadata(path).map_err(|_| CliError::RelayUnavailable)?;
+                    if !metadata.is_file() || metadata.len() == 0 {
+                        return Err(CliError::RelayUnavailable);
+                    }
+                }
+            }
+            let mut request = self.client.request(method, parsed);
+            for (name, value) in headers {
+                request = request.header(*name, *value);
+            }
+            if let Some(body) = body {
+                self.trace.borrow_mut().push(body.to_string());
+                request = request.json(body);
+            }
+            let response = request.send().map_err(|_| CliError::RelayUnavailable)?;
+            let status = response.status().as_u16();
+            let final_url = response.url().to_string();
+            let response_headers: BTreeMap<_, _> = response
+                .headers()
+                .iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .to_str()
+                        .ok()
+                        .map(|value| (name.as_str().to_owned(), value.to_owned()))
+                })
+                .collect();
+            let mut response_body = Vec::new();
+            response
+                .take((MAX_HTTP_RESPONSE_BYTES + 1) as u64)
+                .read_to_end(&mut response_body)
+                .map_err(|_| CliError::RelayUnavailable)?;
+            if response_body.len() > MAX_HTTP_RESPONSE_BYTES {
+                return Err(CliError::RelayUnavailable);
+            }
+            self.trace
+                .borrow_mut()
+                .push(String::from_utf8_lossy(&response_body).into_owned());
+            Ok(HttpResponse {
+                status,
+                final_url,
+                headers: response_headers,
+                body: response_body,
+            })
+        }
+
+        fn joined_trace(&self) -> String {
+            self.trace.borrow().join("\n")
+        }
+    }
+
+    impl HttpClient for RecordingLoopbackHttp {
+        fn get(&self, url: &str, headers: &[(&str, &str)]) -> Result<HttpResponse, CliError> {
+            self.send(reqwest::Method::GET, url, headers, None)
+        }
+
+        fn post_json(
+            &self,
+            url: &str,
+            headers: &[(&str, &str)],
+            body: &Value,
+        ) -> Result<HttpResponse, CliError> {
+            self.send(reqwest::Method::POST, url, headers, Some(body))
+        }
+
+        fn patch_json(
+            &self,
+            url: &str,
+            headers: &[(&str, &str)],
+            body: &Value,
+        ) -> Result<HttpResponse, CliError> {
+            self.send(reqwest::Method::PATCH, url, headers, Some(body))
+        }
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct RelayFixtureInfo {
+        base_url: String,
+        ws_url: String,
+        temp_dir: PathBuf,
+    }
+
+    struct RelayFixture {
+        child: Option<Child>,
+        stdout: BufReader<ChildStdout>,
+        info: RelayFixtureInfo,
+    }
+
+    impl RelayFixture {
+        fn start(forbidden: &str) -> Self {
+            let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/real-relay-fixture.ts");
+            let mut command = Command::new("node");
+            command
+                .arg("--import")
+                .arg("tsx")
+                .arg(fixture)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::inherit());
+            let mut child = command.spawn().expect("start real relay fixture");
+            child
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(format!("{}\n", serde_json::to_string(forbidden).unwrap()).as_bytes())
+                .unwrap();
+            let mut stdout = BufReader::new(child.stdout.take().unwrap());
+            let mut line = String::new();
+            stdout
+                .read_line(&mut line)
+                .expect("read real relay fixture address");
+            let info = serde_json::from_str(&line).expect("decode real relay fixture address");
+            Self {
+                child: Some(child),
+                stdout,
+                info,
+            }
+        }
+
+        fn restart(&mut self) {
+            let child = self.child.as_mut().unwrap();
+            child
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(b"restart\n")
+                .unwrap();
+            let mut line = String::new();
+            self.stdout.read_line(&mut line).unwrap();
+            assert_eq!(line.trim(), r#"{"restarted":true}"#);
+        }
+
+        fn stop(&mut self) {
+            if let Some(mut child) = self.child.take() {
+                child.stdin.take().unwrap().write_all(b"stop\n").unwrap();
+                assert!(child.wait().unwrap().success());
+            }
+        }
+    }
+
+    impl Drop for RelayFixture {
+        fn drop(&mut self) {
+            self.stop();
+        }
+    }
+
+    struct JourneyDirectory(PathBuf);
+
+    impl JourneyDirectory {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "multaiplayer-cli-room-journey-{}",
+                uuid::Uuid::new_v4()
+            ));
+            fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for JourneyDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn create_debug_session(http: &RecordingLoopbackHttp, origin: &str) -> String {
+        let response = http
+            .post_json(
+                &endpoint(origin, "/debug/auth-session").unwrap(),
+                &[],
+                &json!({
+                    "id": "github:maddiedreese",
+                    "login": "maddiedreese",
+                    "name": "Maddie"
+                }),
+            )
+            .unwrap();
+        assert_eq!(response.status, 201);
+        response
+            .headers
+            .get("set-cookie")
+            .and_then(|value| value.split(';').next())
+            .and_then(|value| value.strip_prefix("multaiplayer_session="))
+            .unwrap()
+            .to_owned()
+    }
+
+    fn register_identity(
+        http: &RecordingLoopbackHttp,
+        origin: &str,
+        relay_session: &str,
+        identity: &DeviceIdentity,
+    ) {
+        let response = http
+            .post_json(
+                &endpoint(origin, "/devices").unwrap(),
+                &[("cookie", &format!("multaiplayer_session={relay_session}"))],
+                &json!({
+                    "deviceId": identity.public.device_id,
+                    "signaturePublicKey": identity.public.signature_public_key,
+                    "signatureKeyFingerprint": identity.public.signature_key_fingerprint,
+                    "hpkePublicKey": identity.public.hpke_public_key,
+                    "hpkeKeyFingerprint": identity.public.hpke_key_fingerprint
+                }),
+            )
+            .unwrap();
+        assert!(matches!(response.status, 200 | 201));
+    }
+
+    fn assert_tree_excludes(root: &Path, forbidden: &[u8]) {
+        for entry in fs::read_dir(root).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                assert_tree_excludes(&path, forbidden);
+            } else {
+                let bytes = fs::read(&path).unwrap();
+                assert!(
+                    !bytes
+                        .windows(forbidden.len())
+                        .any(|value| value == forbidden),
+                    "relay persistence unexpectedly contained the local project path in {}",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn production_room_create_open_and_restart_journey_keeps_project_path_local() {
+        let journey = JourneyDirectory::new();
+        let project = journey.0.join("project");
+        fs::create_dir(&project).unwrap();
+        let canonical_project = fs::canonicalize(&project).unwrap();
+        let canonical_text = canonical_project.to_str().unwrap();
+        let mls_path = journey.0.join("mls.sqlite");
+        let store = MemoryCredentialStore::default();
+        let identity = load_or_create_identity(&store, "github:maddiedreese", "Maddie").unwrap();
+        let mut relay = RelayFixture::start(canonical_text);
+        let original_origin = relay.info.base_url.clone();
+        let restored = RestoredSession {
+            user: SignedInUser {
+                id: "github:maddiedreese".into(),
+                login: "maddiedreese".into(),
+                name: Some("Maddie".into()),
+                avatar_url: None,
+            },
+            relay_origin: original_origin.clone(),
+        };
+        let relay_temp_dir = relay.info.temp_dir.clone();
+        let first_http = RecordingLoopbackHttp::new().require_mls_before_host_patch(&mls_path);
+        let relay_session = create_debug_session(&first_http, &original_origin);
+        register_identity(&first_http, &original_origin, &relay_session, &identity);
+
+        let mut first_mls = MlsClientService::open(&store, &identity, &mls_path).unwrap();
+        let mut first_backend = RelayRoomBackend::new_for_loopback_test(
+            &store,
+            &first_http,
+            &original_origin,
+            &relay.info.ws_url,
+            &relay_session,
+            &restored,
+            &identity,
+        )
+        .unwrap();
+        let created = RoomService::new(
+            &store,
+            &mut first_backend,
+            &mut first_mls,
+            &restored.user.id,
+            &identity.public.device_id,
+            &original_origin,
+        )
+        .create(&CreateRoomRequest {
+            team: Some("team-core".into()),
+            name: "CLI production restart journey".into(),
+            project: project.to_string_lossy().into_owned(),
+        })
+        .unwrap();
+
+        assert_eq!(created.room.team_id, "team-core");
+        assert_eq!(
+            created.room.host_user_id.as_deref(),
+            Some(restored.user.id.as_str())
+        );
+        assert_eq!(
+            created.room.active_host_device_id.as_deref(),
+            Some(identity.public.device_id.as_str())
+        );
+        assert_eq!(created.room.host_status, HostStatus::Active);
+        assert_eq!(created.room.accepted_mls_epoch, Some(0));
+        assert_eq!(created.room.approval_policy, ApprovalPolicy::AskEveryTurn);
+        assert_eq!(
+            MlsClientService::open_group(&mut first_mls, &created.room.id),
+            Ok(0)
+        );
+        let association = store
+            .values
+            .borrow()
+            .get(ROOM_STATE_ACCOUNT)
+            .unwrap()
+            .clone();
+        assert!(association.contains(canonical_text));
+        assert!(!first_http.joined_trace().contains(canonical_text));
+        assert!(!opened_room_message(&created).contains(canonical_text));
+
+        drop(first_backend);
+        drop(first_mls);
+        relay.restart();
+        assert_eq!(relay.info.base_url, original_origin);
+        let restarted_http = RecordingLoopbackHttp::new();
+        let mut restarted_mls = MlsClientService::open(&store, &identity, &mls_path).unwrap();
+        let mut restarted_backend = RelayRoomBackend::new_for_loopback_test(
+            &store,
+            &restarted_http,
+            &relay.info.base_url,
+            &relay.info.ws_url,
+            &relay_session,
+            &restored,
+            &identity,
+        )
+        .unwrap();
+        let opened = RoomService::new(
+            &store,
+            &mut restarted_backend,
+            &mut restarted_mls,
+            &restored.user.id,
+            &identity.public.device_id,
+            &original_origin,
+        )
+        .open(&created.room.id)
+        .unwrap();
+        assert_eq!(opened.room, created.room);
+        assert!(opened.is_active_host);
+        assert!(!restarted_http.joined_trace().contains(canonical_text));
+        assert!(!opened_room_message(&opened).contains(canonical_text));
+
+        drop(restarted_backend);
+        drop(restarted_mls);
+        relay.stop();
+        assert_tree_excludes(&relay_temp_dir, canonical_text.as_bytes());
+        fs::remove_dir_all(&relay_temp_dir).unwrap();
     }
 }

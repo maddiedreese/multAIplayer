@@ -4,7 +4,7 @@ use multaiplayer_cli::{
     mls::MlsClientService,
     platform::{KeychainStore, MacOsUrlOpener, ReqwestHttpClient},
     relay::WorkspaceClient,
-    room::{CreateRoomRequest, RelayRoomBackend, RoomService},
+    room::{opened_room_message, CreateRoomRequest, RelayRoomBackend, RoomService},
     GITHUB_CLIENT_ID, RELAY_HTTP_ORIGIN,
 };
 use std::{path::PathBuf, process::ExitCode, thread};
@@ -221,11 +221,7 @@ fn run_room(command: Command) -> ExitCode {
     };
     match result {
         Ok(opened) => {
-            println!(
-                "Opened {} ({}). Local project association retained on this device.",
-                safe_terminal_text(&opened.room.name),
-                opened.room.id
-            );
+            println!("{}", opened_room_message(&opened));
             ExitCode::SUCCESS
         }
         Err(error) => room_error(error),

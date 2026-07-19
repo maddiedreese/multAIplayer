@@ -35,6 +35,12 @@ if (!existsSync(manifest)) {
 
 assert.equal(existsSync(lockfile), true, "apps/cli must retain its independent Cargo.lock");
 
+{
+  const result = spawnSync("npm", ["run", "build:packages"], { cwd: root, stdio: "inherit" });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, "npm run build:packages failed");
+}
+
 for (const [command, args] of [
   ["cargo", ["fmt", "--manifest-path", manifest, "--all", "--", "--check"]],
   [
@@ -53,15 +59,6 @@ for (const [command, args] of [
     ]
   ],
   ["cargo", ["test", "--locked", "--manifest-path", manifest, "--workspace", "--all-features"]]
-]) {
-  const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
-  if (result.error) throw result.error;
-  assert.equal(result.status, 0, `${command} ${args.join(" ")} failed`);
-}
-
-for (const [command, args] of [
-  ["npm", ["run", "build:packages"]],
-  ["node", ["--import", "tsx", "--test", "apps/cli/tests/room-create-restart.test.ts"]]
 ]) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
   if (result.error) throw result.error;

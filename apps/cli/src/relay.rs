@@ -69,34 +69,40 @@ impl<'a, S: CredentialStore, H: HttpClient> WorkspaceClient<'a, S, H> {
             &endpoint,
             &[(NATIVE_SESSION_HEADER, session.secret.as_str())],
         )?;
-        require_exact_response_url(&response, &endpoint)?;
-        if response.status == 401 {
-            return Err(CliError::RelayAuthenticationRequired);
-        }
-        if !(200..300).contains(&response.status) {
-            return Err(CliError::RelayUnavailable);
-        }
-        if response.body.len() > MAX_HTTP_RESPONSE_BYTES {
-            return Err(CliError::InvalidRelayResponse);
-        }
-        let body =
-            std::str::from_utf8(&response.body).map_err(|_| CliError::InvalidRelayResponse)?;
-        let decoded: WorkspaceResponse =
-            serde_json::from_str(body).map_err(|_| CliError::InvalidRelayResponse)?;
-        for team in &decoded.teams {
-            team.validate()
-                .map_err(|_| CliError::InvalidRelayResponse)?;
-        }
-        for room in &decoded.rooms {
-            room.validate()
-                .map_err(|_| CliError::InvalidRelayResponse)?;
-        }
-        validate_workspace_relationships(&decoded)?;
-        Ok(WorkspaceSnapshot {
-            teams: decoded.teams,
-            rooms: decoded.rooms,
-        })
+        decode_workspace_response(response, &endpoint)
     }
+}
+
+pub(crate) fn decode_workspace_response(
+    response: HttpResponse,
+    endpoint: &str,
+) -> Result<WorkspaceSnapshot, CliError> {
+    require_exact_response_url(&response, endpoint)?;
+    if response.status == 401 {
+        return Err(CliError::RelayAuthenticationRequired);
+    }
+    if !(200..300).contains(&response.status) {
+        return Err(CliError::RelayUnavailable);
+    }
+    if response.body.len() > MAX_HTTP_RESPONSE_BYTES {
+        return Err(CliError::InvalidRelayResponse);
+    }
+    let body = std::str::from_utf8(&response.body).map_err(|_| CliError::InvalidRelayResponse)?;
+    let decoded: WorkspaceResponse =
+        serde_json::from_str(body).map_err(|_| CliError::InvalidRelayResponse)?;
+    for team in &decoded.teams {
+        team.validate()
+            .map_err(|_| CliError::InvalidRelayResponse)?;
+    }
+    for room in &decoded.rooms {
+        room.validate()
+            .map_err(|_| CliError::InvalidRelayResponse)?;
+    }
+    validate_workspace_relationships(&decoded)?;
+    Ok(WorkspaceSnapshot {
+        teams: decoded.teams,
+        rooms: decoded.rooms,
+    })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -438,6 +444,31 @@ impl TungsteniteConnector {
         Ok(Self {
             websocket_url,
             session: session.secret,
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_loopback_test_url(
+        websocket_url: &str,
+        session: &str,
+    ) -> Result<Self, RelayTransportError> {
+        let parsed = Url::parse(websocket_url).map_err(|_| RelayTransportError::OriginMismatch)?;
+        let loopback = matches!(parsed.host_str(), Some("127.0.0.1") | Some("::1"));
+        if parsed.scheme() != "ws"
+            || !loopback
+            || parsed.port().is_none()
+            || parsed.path() != "/rooms"
+            || parsed.username() != ""
+            || parsed.password().is_some()
+            || parsed.query().is_some()
+            || parsed.fragment().is_some()
+            || session.is_empty()
+        {
+            return Err(RelayTransportError::OriginMismatch);
+        }
+        Ok(Self {
+            websocket_url: parsed.to_string(),
+            session: Zeroizing::new(session.to_owned()),
         })
     }
 
