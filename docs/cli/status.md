@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-100 reconnect, replay, history, and crash recovery
+Current phase: CLI-110 UI-independent Codex host extraction
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -16,8 +16,9 @@ Last update: 2026-07-18
 - The CLI scaffold, strict Rust protocol parity layer, GitHub authentication,
   secure device identity, authenticated relay transport/workspace reads,
   durable MLS client state/outbox, room creation with host-local project
-  association, and secure host-mediated admission are present; encrypted chat
-  and later product behavior have not been implemented.
+  association, secure host-mediated admission, encrypted chat, and durable
+  reconnect/replay/history recovery are present; Codex hosting and later product
+  behavior have not been implemented.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -106,7 +107,20 @@ Last update: 2026-07-18
   desktop wire parity, exact ancestry, repository cleanliness, and the protected
   desktop-release audit passed. No dependency, wire/schema, MLS-policy, desktop,
   governance, or release surface changed.
-- CLI-100 is the only active implementation task.
+- CLI-100 is complete and integrated. Its accepted task commit is
+  `5c3ba734e4963d6fb81e8ee8488da906f9985b6e`; integration merge
+  `e2f821a441a82fb7b7db104e202e0e53b195899e` passed the locked CLI runner with
+  101 executed tests, all 248 desktop native/shared tests including 56
+  `mls-core` tests, 27 protocol tests, 285 relay tests, 695 desktop tests, and
+  18 classification/isolation tests. Independent review verified relay restart,
+  process crash, delayed backlog, duplicate suppression, bounded encrypted local
+  history, explicit corrupt-state recovery, and distinct logout/leave/forget
+  semantics. The owner-authorized exact room deletion is transactional,
+  idempotent, fault-injected at every stage, clears in-memory authority only
+  after durable success, and preserves sibling rooms and global identity. No
+  dependency, wire contract, MLS policy, desktop behavior, or protected release
+  surface changed.
+- CLI-110 is the only active implementation task.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -132,8 +146,8 @@ Last update: 2026-07-18
 | CLI-070 | Room creation and local project association | complete | CLI-050, CLI-060, CLI-040-R1 |
 | CLI-080 | Secure invite codes and host-mediated admission | complete | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | complete | CLI-050, CLI-060, CLI-080 |
-| CLI-100 | Reconnect, replay, history, and crash recovery | active | CLI-090 |
-| CLI-110 | UI-independent Codex host extraction | waiting_for_orchestrator_approval | CLI-020 |
+| CLI-100 | Reconnect, replay, history, and crash recovery | complete | CLI-090 |
+| CLI-110 | UI-independent Codex host extraction | active | CLI-020 |
 | CLI-120 | Codex proposals, context, and hosted turns | waiting_for_orchestrator_approval | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | waiting_for_orchestrator_approval | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | waiting_for_orchestrator_approval | CLI-100, CLI-130 |
