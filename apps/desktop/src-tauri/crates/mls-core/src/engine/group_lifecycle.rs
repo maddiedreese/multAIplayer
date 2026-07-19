@@ -41,9 +41,29 @@ impl MlsEngine {
                 EngineErrorCategory::Storage,
                 "delete_corrupt_group",
             ))?;
+        self.clear_room_cache(room_id);
+        Ok(())
+    }
+
+    /// Atomically and idempotently deletes all durable state scoped to one
+    /// validated room. Global identity material and sibling rooms are outside
+    /// the storage transaction. In-memory authority is cleared only after the
+    /// durable transaction succeeds.
+    pub fn forget_group(&mut self, room_id: &str) -> Result<(), EngineError> {
+        valid_room(room_id)?;
+        self.group_storage
+            .delete_room_records(room_id)
+            .map_err(engine_failure(
+                EngineErrorCategory::Storage,
+                "delete_room_records",
+            ))?;
+        self.clear_room_cache(room_id);
+        Ok(())
+    }
+
+    fn clear_room_cache(&mut self, room_id: &str) {
         self.groups.remove(room_id);
         self.hosts.remove(room_id);
         self.pending_hosts.remove(room_id);
-        Ok(())
     }
 }

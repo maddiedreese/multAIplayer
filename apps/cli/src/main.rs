@@ -1,13 +1,13 @@
 use multaiplayer_cli::{
     auth::{AuthClient, DevicePollResult},
-    chat::{ChatRoomSession, RenderMode, TerminalRenderer},
+    chat::{RecoveringChatRoomSession, RenderMode, TerminalRenderer},
     identity::load_or_create_identity,
     invite::{parse_invite_code, InviteError, InviteService, RelayInviteBackend},
     mls::MlsClientService,
     platform::{KeychainStore, MacOsUrlOpener, ReqwestHttpClient},
     relay::{
-        connect_with_retries, ReconnectPolicy, RelayConnection, ThreadSleeper,
-        TungsteniteConnector, WorkspaceClient, WorkspaceSnapshot,
+        ReconnectPolicy, RelayConnector, RetrySleeper, ThreadSleeper, TungsteniteConnector,
+        WorkspaceClient, WorkspaceSnapshot,
     },
     room::{opened_room_message, CreateRoomRequest, RelayRoomBackend, RoomService},
     GITHUB_CLIENT_ID, RELAY_HTTP_ORIGIN,
@@ -43,6 +43,8 @@ const HELP: &str = concat!(
     "                  Create and host a room with a local project\n",
     "  open <ROOM> [--plain]\n",
     "                  Open a locally associated room and enter encrypted chat\n\n",
+    "  leave <ROOM>    Leave locally while retaining encrypted room data\n",
+    "  forget <ROOM>   Destructively forget local association and history\n",
     "  invite <ROOM>   Create and display a secret invite code\n",
     "  join            Read a secret invite code from stdin and wait for its host\n",
     "  finish <REQUEST-ID>\n",
@@ -67,6 +69,8 @@ enum Command {
     RoomList,
     RoomCreate(CreateRoomRequest),
     RoomOpen { selector: String, plain: bool },
+    RoomLeave { selector: String },
+    RoomForget { selector: String },
     RoomInvite { selector: String },
     RoomJoin,
     RoomFinish { request_id: String },
@@ -115,6 +119,16 @@ where
             Ok(Command::RoomOpen {
                 selector: selector.as_ref().to_owned(),
                 plain: true,
+            })
+        }
+        [room, leave, selector] if room.as_ref() == "room" && leave.as_ref() == "leave" => {
+            Ok(Command::RoomLeave {
+                selector: selector.as_ref().to_owned(),
+            })
+        }
+        [room, forget, selector] if room.as_ref() == "room" && forget.as_ref() == "forget" => {
+            Ok(Command::RoomForget {
+                selector: selector.as_ref().to_owned(),
             })
         }
         [room, invite, selector] if room.as_ref() == "room" && invite.as_ref() == "invite" => {
@@ -211,9 +225,13 @@ fn main() -> ExitCode {
         Ok(command @ (Command::AuthLogin { .. } | Command::AuthStatus | Command::AuthLogout)) => {
             run_auth(command)
         }
-        Ok(command @ (Command::RoomList | Command::RoomCreate(_) | Command::RoomOpen { .. })) => {
-            run_room(command)
-        }
+        Ok(
+            command @ (Command::RoomList
+            | Command::RoomCreate(_)
+            | Command::RoomOpen { .. }
+            | Command::RoomLeave { .. }
+            | Command::RoomForget { .. }),
+        ) => run_room(command),
         Ok(
             command @ (Command::RoomInvite { .. }
             | Command::RoomJoin
@@ -230,6 +248,8 @@ fn main() -> ExitCode {
 
 enum RoomLoopDirective {
     Idle,
+    Wait,
+    Disconnect,
     Send(String),
     Quit,
 }
@@ -243,13 +263,13 @@ trait RoomLoopAdapter {
     fn complete(&self, projected_chat_count: usize) -> Result<bool, ()>;
 }
 
-fn drive_room_loop<S: multaiplayer_cli::relay::RelaySocket>(
-    chat: &mut ChatRoomSession<'_, S>,
-    device_session: &str,
+fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
+    chat: &mut RecoveringChatRoomSession<'_, C, R>,
     adapter: &mut impl RoomLoopAdapter,
 ) -> Result<(), ()> {
     let mut projected_chat_count = 0;
-    let joined = chat.join(device_session).map_err(|_| {
+    let joined_at = utc_timestamp().map_err(|_| ())?;
+    let joined = chat.join(&joined_at).map_err(|_| {
         eprintln!("room loop: join failed safely");
     })?;
     for event in joined {
@@ -266,7 +286,10 @@ fn drive_room_loop<S: multaiplayer_cli::relay::RelaySocket>(
             eprintln!("room loop: input adapter failed safely");
         })?;
         let events = match directive {
-            RoomLoopDirective::Quit => return Ok(()),
+            RoomLoopDirective::Quit => {
+                chat.leave();
+                return Ok(());
+            }
             RoomLoopDirective::Send(body) => {
                 if body.is_empty() {
                     Vec::new()
@@ -280,9 +303,21 @@ fn drive_room_loop<S: multaiplayer_cli::relay::RelaySocket>(
                         })?
                 }
             }
-            RoomLoopDirective::Idle => chat.poll(Duration::from_millis(100)).map_err(|_| {
-                eprintln!("room loop: relay projection failed safely");
-            })?,
+            RoomLoopDirective::Wait => {
+                thread::sleep(Duration::from_millis(10));
+                Vec::new()
+            }
+            RoomLoopDirective::Disconnect => {
+                chat.leave();
+                Vec::new()
+            }
+            RoomLoopDirective::Idle => {
+                let polled_at = utc_timestamp().map_err(|_| ())?;
+                chat.poll(Duration::from_millis(100), &polled_at)
+                    .map_err(|_| {
+                        eprintln!("room loop: relay projection failed safely");
+                    })?
+            }
         };
         for event in events {
             if matches!(event, multaiplayer_cli::chat::ProjectedEvent::Chat(_)) {
@@ -293,6 +328,7 @@ fn drive_room_loop<S: multaiplayer_cli::relay::RelaySocket>(
         if adapter.complete(projected_chat_count).map_err(|()| {
             eprintln!("room loop: completion check failed safely");
         })? {
+            chat.leave();
             return Ok(());
         }
     }
@@ -336,6 +372,11 @@ struct DebugChatJourneyConfig {
     display_name: String,
     role: u8,
     coordination_dir: PathBuf,
+    start_gate: PathBuf,
+    #[serde(default)]
+    delay_reconnect_until: Option<PathBuf>,
+    #[serde(default)]
+    crash_after_chat_count: Option<usize>,
 }
 
 #[cfg(debug_assertions)]
@@ -345,6 +386,10 @@ struct DebugJourneyRoomLoop {
     renderer: TerminalRenderer,
     bodies: Vec<String>,
     sent: bool,
+    disconnected: bool,
+    start_gate: PathBuf,
+    delay_reconnect_until: Option<PathBuf>,
+    crash_after_chat_count: Option<usize>,
     deadline: Instant,
 }
 
@@ -376,6 +421,18 @@ impl RoomLoopAdapter for DebugJourneyRoomLoop {
         if Instant::now() >= self.deadline {
             return Err(());
         }
+        if !self.start_gate.is_file() {
+            return Ok(RoomLoopDirective::Wait);
+        }
+        if !self.disconnected {
+            if let Some(path) = &self.delay_reconnect_until {
+                if !path.is_file() {
+                    return Ok(RoomLoopDirective::Wait);
+                }
+                self.disconnected = true;
+                return Ok(RoomLoopDirective::Disconnect);
+            }
+        }
         let should_send = !self.sent
             && match self.role {
                 0 => projected_chat_count == 0,
@@ -402,6 +459,21 @@ impl RoomLoopAdapter for DebugJourneyRoomLoop {
     fn emit(&mut self, event: &multaiplayer_cli::chat::ProjectedEvent) {
         if let multaiplayer_cli::chat::ProjectedEvent::Chat(chat) = event {
             self.bodies.push(chat.body.clone());
+            let own_body = match self.role {
+                0 => "FIRST-PROCESS-PLAINTEXT-MUST-STAY-ENCRYPTED",
+                1 => "SECOND-PROCESS-CHAT",
+                2 => "THIRD-PROCESS-CHAT",
+                _ => "",
+            };
+            if chat.body == own_body {
+                let _ = std::fs::write(
+                    self.coordination_dir.join(format!("sent-{}", self.role)),
+                    b"sent",
+                );
+            }
+            if self.crash_after_chat_count == Some(self.bodies.len()) {
+                std::process::exit(86);
+            }
         }
         println!("{}", self.renderer.render(event));
     }
@@ -458,7 +530,7 @@ fn run_debug_chat_journey(path: &std::path::Path) -> ExitCode {
         eprintln!("debug journey: MLS room unavailable");
         return ExitCode::from(1);
     }
-    let mut connector = match TungsteniteConnector::from_loopback_test_url(
+    let connector = match TungsteniteConnector::from_loopback_test_url(
         &config.websocket_url,
         &config.relay_session,
     ) {
@@ -468,25 +540,17 @@ fn run_debug_chat_journey(path: &std::path::Path) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let socket = match connect_with_retries(
-        &mut connector,
+    let mut chat = match RecoveringChatRoomSession::connect(
+        connector,
+        ThreadSleeper,
         ReconnectPolicy::default(),
-        &mut ThreadSleeper,
-    ) {
-        Ok(socket) => socket,
-        Err(_) => {
-            eprintln!("debug journey: relay connection unavailable");
-            return ExitCode::from(1);
-        }
-    };
-    let mut chat = match ChatRoomSession::new(
-        RelayConnection::new(socket),
         &mut mls,
         config.room,
         &config.user_id,
         &identity.public.device_id,
         &config.display_name,
         &identity.public.signature_key_fingerprint,
+        &config.device_session,
     ) {
         Ok(chat) => chat,
         Err(_) => {
@@ -500,9 +564,13 @@ fn run_debug_chat_journey(path: &std::path::Path) -> ExitCode {
         renderer: TerminalRenderer::new(RenderMode::Plain),
         bodies: Vec::new(),
         sent: false,
-        deadline: Instant::now() + Duration::from_secs(15),
+        disconnected: false,
+        start_gate: config.start_gate,
+        delay_reconnect_until: config.delay_reconnect_until,
+        crash_after_chat_count: config.crash_after_chat_count,
+        deadline: Instant::now() + Duration::from_secs(30),
     };
-    match drive_room_loop(&mut chat, &config.device_session, &mut adapter) {
+    match drive_room_loop(&mut chat, &mut adapter) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => {
             eprintln!("debug journey: shared room loop failed safely");
@@ -585,6 +653,11 @@ fn run_room(command: Command) -> ExitCode {
         ),
         _ => None,
     };
+    enum Outcome {
+        Opened(multaiplayer_cli::room::OpenedRoom),
+        Left(RoomRecord),
+        Forgotten(String),
+    }
     let result = {
         let mut service = RoomService::new(
             &store,
@@ -595,13 +668,15 @@ fn run_room(command: Command) -> ExitCode {
             RELAY_HTTP_ORIGIN,
         );
         match command {
-            Command::RoomCreate(request) => service.create(&request),
-            Command::RoomOpen { selector, .. } => service.open(&selector),
+            Command::RoomCreate(request) => service.create(&request).map(Outcome::Opened),
+            Command::RoomOpen { selector, .. } => service.open(&selector).map(Outcome::Opened),
+            Command::RoomLeave { selector } => service.leave(&selector).map(Outcome::Left),
+            Command::RoomForget { selector } => service.forget(&selector).map(Outcome::Forgotten),
             _ => unreachable!("room runner received non-room command"),
         }
     };
     match result {
-        Ok(opened) => {
+        Ok(Outcome::Opened(opened)) => {
             println!("{}", opened_room_message(&opened));
             match chat_mode {
                 Some(mode) => run_opened_room_chat(
@@ -617,6 +692,18 @@ fn run_room(command: Command) -> ExitCode {
                 ),
                 None => ExitCode::SUCCESS,
             }
+        }
+        Ok(Outcome::Left(room)) => {
+            println!(
+                "Left {} ({}) locally. Encrypted room data is retained until forget.",
+                safe_terminal_text(&room.name),
+                room.id
+            );
+            ExitCode::SUCCESS
+        }
+        Ok(Outcome::Forgotten(room_id)) => {
+            println!("Forgot {room_id} on this device.");
+            ExitCode::SUCCESS
         }
         Err(error) => room_error(error),
     }
@@ -642,32 +729,24 @@ where
         Ok(session) => session,
         Err(error) => return room_error(error),
     };
-    let mut connector = match TungsteniteConnector::from_store(store, RELAY_HTTP_ORIGIN) {
+    let connector = match TungsteniteConnector::from_store(store, RELAY_HTTP_ORIGIN) {
         Ok(connector) => connector,
         Err(error) => {
             eprintln!("error: {error}");
             return ExitCode::from(1);
         }
     };
-    let socket = match connect_with_retries(
-        &mut connector,
+    let mut chat = match RecoveringChatRoomSession::connect(
+        connector,
+        ThreadSleeper,
         ReconnectPolicy::default(),
-        &mut ThreadSleeper,
-    ) {
-        Ok(socket) => socket,
-        Err(error) => {
-            eprintln!("error: {error}");
-            return ExitCode::from(1);
-        }
-    };
-    let mut chat = match ChatRoomSession::new(
-        RelayConnection::new(socket),
         mls,
         room.clone(),
         user_id,
         device_id,
         display_name,
         public_key_fingerprint,
+        device_session.as_str(),
     ) {
         Ok(chat) => chat,
         Err(error) => {
@@ -688,7 +767,7 @@ where
         receiver,
         renderer: TerminalRenderer::new(mode),
     };
-    match drive_room_loop(&mut chat, device_session.as_str(), &mut adapter) {
+    match drive_room_loop(&mut chat, &mut adapter) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => {
             eprintln!("error: The encrypted room loop failed safely.");
@@ -1100,6 +1179,8 @@ fn run_auth(command: Command) -> ExitCode {
         | Command::RoomList
         | Command::RoomCreate(_)
         | Command::RoomOpen { .. }
+        | Command::RoomLeave { .. }
+        | Command::RoomForget { .. }
         | Command::RoomInvite { .. }
         | Command::RoomJoin
         | Command::RoomFinish { .. }
@@ -1498,6 +1579,18 @@ mod tests {
             Ok(Command::RoomOpen {
                 selector: "room-core".into(),
                 plain: true
+            })
+        );
+        assert_eq!(
+            parse_args(["room", "leave", "room-core"]),
+            Ok(Command::RoomLeave {
+                selector: "room-core".into()
+            })
+        );
+        assert_eq!(
+            parse_args(["room", "forget", "room-core"]),
+            Ok(Command::RoomForget {
+                selector: "room-core".into()
             })
         );
         assert_eq!(

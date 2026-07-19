@@ -861,6 +861,70 @@ impl MlsClientService {
             .collect())
     }
 
+    /// Stores one opaque CLI client-core snapshot in the same SQLCipher
+    /// database as the room's MLS state. The application-store insert is a
+    /// single transaction, so a crash exposes either the previous complete
+    /// snapshot or the next complete snapshot.
+    pub fn save_room_client_state(
+        &self,
+        room_id: &str,
+        payload: &[u8],
+    ) -> Result<(), MlsClientError> {
+        self.store
+            .put_room_config(room_id, payload)
+            .map_err(map_store_error)
+    }
+
+    pub fn load_room_client_state(&self, room_id: &str) -> Result<Option<Vec<u8>>, MlsClientError> {
+        self.store.room_config(room_id).map_err(map_store_error)
+    }
+
+    pub fn delete_room_client_state(&self, room_id: &str) -> Result<(), MlsClientError> {
+        self.store
+            .delete_room_config(room_id)
+            .map_err(map_store_error)
+    }
+
+    /// Destructively removes every durable record owned by one exact room while
+    /// preserving the device identity, storage wrapping key, and sibling rooms.
+    /// The caller persists a hidden retry tombstone before invoking this method;
+    /// the shared core performs the exact deletion in one SQLCipher transaction.
+    pub fn forget_room_local_state(&mut self, room_id: &str) -> Result<(), MlsClientError> {
+        self.engine
+            .forget_group(room_id)
+            .map_err(map_engine_error)?;
+        self.requires_rejoin.remove(room_id);
+        Ok(())
+    }
+
+    /// Replays only application records through the normal durable outbox
+    /// publication path. Invite and membership Commits retain their dedicated
+    /// recovery owners and are never reinterpreted by the chat loop.
+    pub fn drain_room_application_outbox(
+        &mut self,
+        route: &OutboxRoute,
+        publisher: &mut impl MlsPublisher,
+    ) -> Result<DrainReport, MlsClientError> {
+        if route.room_id.is_empty() {
+            return Err(MlsClientError::InvalidOutbox);
+        }
+        let mut items = self.store.pending_outbox().map_err(map_store_error)?;
+        items.retain(|item| item.room_id == route.room_id && item.kind == "application");
+        items.sort_by(|left, right| {
+            left.epoch
+                .cmp(&right.epoch)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        drain_items(
+            &mut self.engine,
+            items,
+            route,
+            self.user_id.as_str(),
+            self.device_id.as_str(),
+            publisher,
+        )
+    }
+
     pub fn drain_room_outbox(
         &mut self,
         route: &OutboxRoute,
@@ -1673,6 +1737,92 @@ mod tests {
         );
         assert!(reopened.pending_outbox_room_ids().unwrap().is_empty());
         assert_eq!(offline.messages, online.messages);
+    }
+
+    #[test]
+    fn destructive_forget_removes_only_the_exact_room_and_survives_restart() {
+        let directory = TestDirectory::new();
+        let path = directory.database();
+        let store = MemoryCredentialStore::default();
+        let identity = load_or_create_identity(&store, "github:42", "Maddie").unwrap();
+        let mut service = MlsClientService::open(&store, &identity, &path).unwrap();
+        service.create_group_idempotent("room-forgotten").unwrap();
+        service.create_group_idempotent("room-sibling").unwrap();
+        for (room_id, message_id) in [
+            ("room-forgotten", "message-forgotten"),
+            ("room-sibling", "message-sibling"),
+        ] {
+            service
+                .queue_application(
+                    room_id,
+                    message_id,
+                    format!("payload for {room_id}").as_bytes(),
+                    ApplicationAuthenticatedDataInput {
+                        version: 1,
+                        message_id: message_id.into(),
+                        team_id: "team-1".into(),
+                        room_id: room_id.into(),
+                        kind: "chat.message".into(),
+                        sender_user_id: identity.public.user_id.clone(),
+                        sender_device_id: identity.public.device_id.clone(),
+                        created_at: "2026-07-18T12:00:00.000Z".into(),
+                    },
+                )
+                .unwrap();
+        }
+        service
+            .save_room_client_state("room-forgotten", b"forgotten recovery")
+            .unwrap();
+        let sibling_state = b"sibling recovery remains byte-for-byte".to_vec();
+        service
+            .save_room_client_state("room-sibling", &sibling_state)
+            .unwrap();
+        let sibling_outbox = service
+            .store
+            .pending_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|item| item.room_id == "room-sibling")
+            .unwrap();
+        let credentials_before = store.values.borrow().clone();
+
+        service.forget_room_local_state("room-forgotten").unwrap();
+        service.forget_room_local_state("room-forgotten").unwrap();
+        assert_eq!(
+            service.open_group("room-forgotten"),
+            Err(MlsClientError::GroupNotFound)
+        );
+        assert_eq!(&*store.values.borrow(), &credentials_before);
+        assert_eq!(
+            service.load_room_client_state("room-forgotten").unwrap(),
+            None
+        );
+        assert_eq!(
+            service.load_room_client_state("room-sibling").unwrap(),
+            Some(sibling_state.clone())
+        );
+        assert_eq!(
+            service.store.pending_outbox().unwrap(),
+            vec![sibling_outbox.clone()]
+        );
+        drop(service);
+
+        let same_identity = load_or_create_identity(&store, "github:42", "Maddie").unwrap();
+        let mut restarted = MlsClientService::open(&store, &same_identity, &path).unwrap();
+        assert_eq!(
+            restarted.open_group("room-forgotten"),
+            Err(MlsClientError::GroupNotFound)
+        );
+        assert_eq!(restarted.open_group("room-sibling"), Ok(0));
+        assert_eq!(
+            restarted.load_room_client_state("room-sibling").unwrap(),
+            Some(sibling_state)
+        );
+        assert_eq!(
+            restarted.store.pending_outbox().unwrap(),
+            vec![sibling_outbox]
+        );
+        assert_eq!(&*store.values.borrow(), &credentials_before);
     }
 
     #[test]

@@ -96,6 +96,7 @@ pub trait RoomBackend {
 pub trait RoomMls {
     fn create_group_idempotent(&mut self, room_id: &str) -> Result<u64, RoomError>;
     fn open_group(&mut self, room_id: &str) -> Result<u64, RoomError>;
+    fn forget_room_local_state(&mut self, room_id: &str) -> Result<(), RoomError>;
 }
 
 impl RoomMls for MlsClientService {
@@ -105,6 +106,10 @@ impl RoomMls for MlsClientService {
 
     fn open_group(&mut self, room_id: &str) -> Result<u64, RoomError> {
         MlsClientService::open_group(self, room_id).map_err(map_mls_error)
+    }
+
+    fn forget_room_local_state(&mut self, room_id: &str) -> Result<(), RoomError> {
+        MlsClientService::forget_room_local_state(self, room_id).map_err(map_mls_error)
     }
 }
 
@@ -434,6 +439,10 @@ struct StoredAssociation {
     room_name: String,
     project_path: String,
     complete: bool,
+    #[serde(default)]
+    left: bool,
+    #[serde(default)]
+    forget_pending: bool,
 }
 
 pub struct RoomService<'a, S, B, M> {
@@ -486,7 +495,16 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
                 && association.project_path == project_path
         });
         let index = match existing_index {
-            Some(index) => index,
+            Some(index) => {
+                if state.associations[index].forget_pending {
+                    return Err(RoomError::LocalStateUnavailable);
+                }
+                if state.associations[index].left {
+                    state.associations[index].left = false;
+                    self.save_state(&state)?;
+                }
+                index
+            }
             None => {
                 if state.associations.len() >= MAX_LOCAL_ROOM_ASSOCIATIONS {
                     return Err(RoomError::LocalStateUnavailable);
@@ -497,6 +515,8 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
                     room_name: request.name.clone(),
                     project_path,
                     complete: false,
+                    left: false,
+                    forget_pending: false,
                 });
                 self.save_state(&state)?;
                 state.associations.len() - 1
@@ -591,7 +611,7 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             .iter()
             .find(|association| association.room_id.as_deref() == Some(room.id.as_str()))
             .ok_or(RoomError::SelectionUnavailable)?;
-        if !association.complete {
+        if !association.complete || association.left || association.forget_pending {
             return Err(RoomError::CreationPending);
         }
         canonical_stored_project(&association.project_path)?;
@@ -606,6 +626,55 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             is_active_host: room.host_status == HostStatus::Active,
             room,
         })
+    }
+
+    pub fn leave(&mut self, selector: &str) -> Result<RoomRecord, RoomError> {
+        let workspace = self.backend.workspace()?;
+        let room = select_room(&workspace, selector)?;
+        let mut state = self.load_state()?;
+        let association = state
+            .associations
+            .iter_mut()
+            .find(|association| association.room_id.as_deref() == Some(room.id.as_str()))
+            .ok_or(RoomError::SelectionUnavailable)?;
+        if !association.complete || association.forget_pending {
+            return Err(RoomError::CreationPending);
+        }
+        association.left = true;
+        self.save_state(&state)?;
+        Ok(room)
+    }
+
+    pub fn forget(&mut self, selector: &str) -> Result<String, RoomError> {
+        let mut state = self.load_state()?;
+        let matches: Vec<_> = state
+            .associations
+            .iter()
+            .enumerate()
+            .filter(|(_, association)| {
+                association.room_id.as_deref() == Some(selector)
+                    || association.room_name == selector
+            })
+            .map(|(index, _)| index)
+            .collect();
+        let [index] = matches.as_slice() else {
+            return Err(RoomError::SelectionUnavailable);
+        };
+        let room_id = state.associations[*index]
+            .room_id
+            .clone()
+            .ok_or(RoomError::CreationPending)?;
+
+        // Hide the association first. A crash or storage failure can leave an
+        // encrypted orphan, but never a visible association whose local data
+        // has been only partly removed. Retrying resumes the tombstoned delete.
+        state.associations[*index].left = true;
+        state.associations[*index].forget_pending = true;
+        self.save_state(&state)?;
+        self.mls.forget_room_local_state(&room_id)?;
+        state.associations.remove(*index);
+        self.save_state(&state)?;
+        Ok(room_id)
     }
 
     fn load_state(&self) -> Result<StoredRoomState, RoomError> {
@@ -899,7 +968,9 @@ mod tests {
     struct FakeMls {
         creates: usize,
         opens: usize,
+        deletes: usize,
         fail_create: bool,
+        fail_delete: bool,
     }
 
     impl RoomMls for FakeMls {
@@ -916,6 +987,15 @@ mod tests {
             self.opens += 1;
             Ok(0)
         }
+
+        fn forget_room_local_state(&mut self, _: &str) -> Result<(), RoomError> {
+            self.deletes += 1;
+            if self.fail_delete {
+                Err(RoomError::CreationPending)
+            } else {
+                Ok(())
+            }
+        }
     }
 
     fn workspace(rooms: Vec<RoomRecord>) -> WorkspaceSnapshot {
@@ -931,6 +1011,88 @@ mod tests {
             name: "Compiler work".into(),
             project: project.to_string_lossy().into_owned(),
         }
+    }
+
+    #[test]
+    fn leave_retains_local_data_while_forget_uses_a_destructive_tombstone() {
+        let store = MemoryCredentialStore::default();
+        let mut creator = FakeBackend::new(vec![workspace(vec![])]);
+        let mut creator_mls = FakeMls::default();
+        let created =
+            RoomService::new(&store, &mut creator, &mut creator_mls, USER, DEVICE, ORIGIN)
+                .create(&request(&std::env::temp_dir()))
+                .unwrap();
+
+        let mut leave_backend = FakeBackend::new(vec![workspace(vec![created.room.clone()])]);
+        let mut lifecycle_mls = FakeMls::default();
+        RoomService::new(
+            &store,
+            &mut leave_backend,
+            &mut lifecycle_mls,
+            USER,
+            DEVICE,
+            ORIGIN,
+        )
+        .leave(&created.room.id)
+        .unwrap();
+        assert_eq!(lifecycle_mls.deletes, 0);
+        assert!(store
+            .get(ROOM_STATE_ACCOUNT)
+            .unwrap()
+            .unwrap()
+            .contains(&created.room.id));
+
+        let mut open_backend = FakeBackend::new(vec![workspace(vec![created.room.clone()])]);
+        assert_eq!(
+            RoomService::new(
+                &store,
+                &mut open_backend,
+                &mut lifecycle_mls,
+                USER,
+                DEVICE,
+                ORIGIN,
+            )
+            .open(&created.room.id),
+            Err(RoomError::CreationPending)
+        );
+
+        let mut forget_backend = FakeBackend::new(vec![]);
+        lifecycle_mls.fail_delete = true;
+        assert_eq!(
+            RoomService::new(
+                &store,
+                &mut forget_backend,
+                &mut lifecycle_mls,
+                USER,
+                DEVICE,
+                ORIGIN,
+            )
+            .forget(&created.room.id),
+            Err(RoomError::CreationPending)
+        );
+        let tombstone = store.get(ROOM_STATE_ACCOUNT).unwrap().unwrap();
+        assert!(tombstone.contains(&created.room.id));
+        assert!(tombstone.contains("\"forgetPending\":true"));
+
+        lifecycle_mls.fail_delete = false;
+        assert_eq!(
+            RoomService::new(
+                &store,
+                &mut forget_backend,
+                &mut lifecycle_mls,
+                USER,
+                DEVICE,
+                ORIGIN,
+            )
+            .forget(&created.room.id),
+            Ok(created.room.id.clone())
+        );
+        assert_eq!(lifecycle_mls.deletes, 2);
+        assert!(!store
+            .get(ROOM_STATE_ACCOUNT)
+            .unwrap()
+            .unwrap()
+            .contains(&created.room.id));
     }
 
     #[test]
@@ -1123,6 +1285,8 @@ mod tests {
                     .to_string_lossy()
                     .into_owned(),
                 complete: false,
+                left: false,
+                forget_pending: false,
             }],
         };
         store
