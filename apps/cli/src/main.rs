@@ -1,6 +1,6 @@
 use multaiplayer_cli::{
     auth::{AuthClient, DevicePollResult},
-    chat::{RecoveringChatRoomSession, RenderMode, TerminalRenderer},
+    chat::{safe_untrusted_text, RecoveringChatRoomSession, RenderMode, TerminalRenderer},
     codex::{
         build_bounded_context, cancellation_flag, hosted_turn_interaction, probe_codex_process,
         proposal_expiry_from_rfc3339, resolve_turn_settings, run_hosted_turn_with_interaction,
@@ -1801,17 +1801,7 @@ fn cli_mls_path() -> Result<PathBuf, ()> {
 }
 
 fn safe_terminal_text(value: &str) -> String {
-    value
-        .chars()
-        .take(120)
-        .map(|character| {
-            if character.is_control() {
-                '�'
-            } else {
-                character
-            }
-        })
-        .collect()
+    safe_untrusted_text(value, 120)
 }
 
 fn room_error(error: multaiplayer_cli::room::RoomError) -> ExitCode {
@@ -2388,7 +2378,7 @@ mod tests {
                 sealed_request: "sealed".into(),
                 created_at: "2026-07-18T12:34:56.000Z".into(),
             },
-            requester_display_name: "github:guest\u{1b}[2J".into(),
+            requester_display_name: "github:guest\u{1b}[2J\u{202e}\u{200b}".into(),
             requester_device_fingerprint: format!("sha256:{}", vec!["abcd"; 16].join(":")),
             opened: OpenedInviteRequest {
                 capability_handle: "secret-handle".into(),
@@ -2413,6 +2403,8 @@ mod tests {
         assert!(output.contains("GitHub identity: github:guest�[2J"));
         assert!(output.contains(&request.requester_device_fingerprint));
         assert!(!output.contains('\u{1b}'));
+        assert!(!output.contains('\u{202e}'));
+        assert!(!output.contains('\u{200b}'));
         assert!(!output.contains("secret-handle"));
         assert!(!output.contains("secret-key-package"));
         assert!(!output.contains("secret-mac"));

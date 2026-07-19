@@ -1,5 +1,6 @@
 use crate::{
     auth::{endpoint, load_relay_transport_session, RestoredSession},
+    chat::safe_untrusted_text,
     identity::DeviceIdentity,
     mls::{MlsClientError, MlsClientService},
     platform::{CredentialStore, HttpClient},
@@ -836,17 +837,7 @@ fn validate_room_name(name: &str) -> Result<(), RoomError> {
 }
 
 fn safe_terminal_text(value: &str) -> String {
-    value
-        .chars()
-        .take(120)
-        .map(|character| {
-            if character.is_control() {
-                '�'
-            } else {
-                character
-            }
-        })
-        .collect()
+    safe_untrusted_text(value, 120)
 }
 
 fn canonical_project(project: &str) -> Result<String, RoomError> {
@@ -1302,6 +1293,20 @@ mod tests {
         );
         assert!(!rendered.contains(private));
         assert!(rendered.contains("[local project]"));
+    }
+
+    #[test]
+    fn room_output_neutralizes_directional_and_zero_width_spoofing() {
+        let mut room = active_room();
+        room.name = "trusted\u{202e}tpmorp\u{200b}\u{1b}[2J".into();
+        let rendered = opened_room_message(&OpenedRoom {
+            room,
+            is_active_host: true,
+        });
+        assert!(!rendered.contains('\u{202e}'));
+        assert!(!rendered.contains('\u{200b}'));
+        assert!(!rendered.contains('\u{1b}'));
+        assert!(rendered.contains("trusted�tpmorp��[2J"));
     }
 
     #[test]
