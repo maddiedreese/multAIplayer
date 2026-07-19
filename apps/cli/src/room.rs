@@ -142,6 +142,10 @@ impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
         })
     }
 
+    pub fn establish_device_session_for_invites(&mut self) -> Result<Zeroizing<String>, RoomError> {
+        <Self as RoomBackend>::establish_device_session(self)
+    }
+
     #[cfg(test)]
     pub(crate) fn new_for_loopback_test(
         store: &'a S,

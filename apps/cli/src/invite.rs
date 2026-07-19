@@ -3,7 +3,7 @@ use crate::{
     identity::DeviceIdentity,
     mls::{
         InviteDecision, MlsClientError, MlsClientService, OpenedInviteRequest, OutboxRoute,
-        PreparedInviteRequest, RelayMlsPublisher,
+        PendingInviteAdmission, PreparedInviteRequest, RelayMlsPublisher,
     },
     platform::{CredentialStore, HttpClient, HttpResponse},
     relay::{
@@ -20,7 +20,11 @@ use multaiplayer_protocol::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::{fmt, time::Duration};
+use std::{
+    fmt,
+    io::{BufRead, Write},
+    time::Duration,
+};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -54,8 +58,12 @@ pub enum InviteError {
     IdentityMismatch,
     #[error("The invite operation could not be completed safely.")]
     RelayUnavailable,
+    #[error("The host has not decided this admission request yet.")]
+    Pending,
     #[error("The invite requires explicit recovery before it can continue.")]
     RecoveryRequired,
+    #[error("The trusted admission prompt could not obtain an explicit decision.")]
+    TrustedPromptUnavailable,
 }
 
 impl From<InviteCodeError> for InviteError {
@@ -342,8 +350,41 @@ pub fn admission_prompt(request: &AdmissionRequest) -> String {
         "GitHub identity: {}\nDevice fingerprint: {}\nRequest: {}",
         safe_prompt_text(&request.requester_display_name),
         request.requester_device_fingerprint,
-        request.record.request_id
+        safe_prompt_text(&request.record.request_id)
     )
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AdmissionPromptDecision {
+    Approve,
+    Deny,
+    Skip,
+}
+
+pub fn read_trusted_admission_decision<R: BufRead, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    request: &AdmissionRequest,
+) -> Result<AdmissionPromptDecision, InviteError> {
+    writeln!(output, "=== multAIplayer trusted admission prompt ===")
+        .map_err(|_| InviteError::TrustedPromptUnavailable)?;
+    writeln!(output, "{}", admission_prompt(request))
+        .map_err(|_| InviteError::TrustedPromptUnavailable)?;
+    write!(output, "Decision [approve/deny/skip]: ")
+        .map_err(|_| InviteError::TrustedPromptUnavailable)?;
+    output
+        .flush()
+        .map_err(|_| InviteError::TrustedPromptUnavailable)?;
+    let mut response = zeroize::Zeroizing::new(String::new());
+    std::io::Read::take(input, 32)
+        .read_line(&mut response)
+        .map_err(|_| InviteError::TrustedPromptUnavailable)?;
+    match response.trim() {
+        "approve" => Ok(AdmissionPromptDecision::Approve),
+        "deny" => Ok(AdmissionPromptDecision::Deny),
+        "skip" => Ok(AdmissionPromptDecision::Skip),
+        _ => Err(InviteError::TrustedPromptUnavailable),
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -643,6 +684,35 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
         Ok(decision)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn decide_from_trusted_prompt(
+        &mut self,
+        request: &AdmissionRequest,
+        room: &RoomRecord,
+        identity: &DeviceIdentity,
+        device_session: &str,
+        decided_at: &str,
+        mls: &mut MlsClientService,
+        input: &mut impl BufRead,
+        output: &mut impl Write,
+    ) -> Result<Option<InviteDecision>, InviteError> {
+        let approve = match read_trusted_admission_decision(input, output, request)? {
+            AdmissionPromptDecision::Approve => true,
+            AdmissionPromptDecision::Deny => false,
+            AdmissionPromptDecision::Skip => return Ok(None),
+        };
+        self.decide(
+            request,
+            room,
+            identity,
+            device_session,
+            approve,
+            decided_at,
+            mls,
+        )
+        .map(Some)
+    }
+
     pub fn finish_admission(
         &mut self,
         request: &PreparedInviteRequest,
@@ -656,7 +726,7 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
             device_session,
         )?
         else {
-            return Err(InviteError::Unavailable);
+            return Err(InviteError::Pending);
         };
         let epoch = mls.accept_invite_response(
             &request.request_id,
@@ -685,6 +755,60 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
             &request.binding.room_id,
             epoch.is_some(),
         )?;
+        Ok(epoch)
+    }
+
+    pub fn finish_admission_at(
+        &mut self,
+        request: &PreparedInviteRequest,
+        device_session: &str,
+        now: &str,
+        mls: &mut MlsClientService,
+    ) -> Result<Option<u64>, InviteError> {
+        ensure_not_expired(&request.binding.expires_at, now)?;
+        self.finish_admission(request, device_session, mls)
+    }
+
+    pub fn finish_pending_admission(
+        &mut self,
+        pending: &PendingInviteAdmission,
+        device_session: &str,
+        now: &str,
+        mls: &mut MlsClientService,
+    ) -> Result<Option<u64>, InviteError> {
+        ensure_not_expired(&pending.expires_at, now)?;
+        let Some(response) = self.backend.load_response(
+            &pending.invite_id,
+            &pending.request_id,
+            &pending.requester_device_id,
+            device_session,
+        )?
+        else {
+            return Err(InviteError::Pending);
+        };
+        let epoch = mls.accept_invite_response(
+            &pending.request_id,
+            response.response_binding,
+            &response.response_mac,
+            response.welcome.as_deref(),
+        )?;
+        if epoch.is_some() {
+            let lookup = self.backend.lookup_invite(&pending.invite_id)?;
+            self.backend.complete_admission(
+                &lookup,
+                &pending.request_id,
+                &pending.requester_user_id,
+                &pending.requester_device_id,
+                device_session,
+            )?;
+        }
+        self.backend.acknowledge_response(
+            &pending.invite_id,
+            &pending.request_id,
+            &pending.requester_device_id,
+            device_session,
+        )?;
+        mls.complete_invite_response(&pending.request_id, &pending.room_id, epoch.is_some())?;
         Ok(epoch)
     }
 }
@@ -1852,7 +1976,7 @@ mod tests {
     }
 
     #[test]
-    fn production_two_device_deny_expire_revoke_approve_and_replay_journey() {
+    fn headless_cli_prompt_and_production_two_device_admission_journey() {
         let journey = JourneyDirectory::new();
         let project = journey.0.join("project");
         fs::create_dir(&project).unwrap();
@@ -2028,17 +2152,26 @@ mod tests {
             assert!(!debug.contains(&denied_secret.capability_url_value));
             assert!(!debug.contains(&requests[0].opened.mac));
             assert!(!debug.contains(&requests[0].opened.key_package));
+            let mut trusted_output = Vec::new();
             let decision = service
-                .decide(
+                .decide_from_trusted_prompt(
                     &requests[0],
                     &room,
                     &host_identity,
                     host_device_session.as_str(),
-                    false,
                     valid_now,
                     &mut host_mls,
+                    &mut std::io::Cursor::new("deny\n"),
+                    &mut trusted_output,
                 )
+                .unwrap()
                 .unwrap();
+            let trusted_output = String::from_utf8(trusted_output).unwrap();
+            assert!(trusted_output.starts_with("=== multAIplayer trusted admission prompt ==="));
+            assert!(trusted_output.contains("GitHub identity: github:guest"));
+            assert!(trusted_output.contains(&guest_identity.public.signature_key_fingerprint));
+            assert!(!trusted_output.contains(&denied_secret.capability_handle));
+            assert!(!trusted_output.contains(&denied_secret.capability_url_value));
             assert_eq!(decision.status, "denied");
             let replay = service
                 .decide(
@@ -2231,17 +2364,24 @@ mod tests {
                     &host_mls,
                 )
                 .unwrap();
+            let mut trusted_output = Vec::new();
             let decision = service
-                .decide(
+                .decide_from_trusted_prompt(
                     &requests[0],
                     &room,
                     &host_identity,
                     host_device_session.as_str(),
-                    true,
                     valid_now,
                     &mut host_mls,
+                    &mut std::io::Cursor::new("approve\n"),
+                    &mut trusted_output,
                 )
+                .unwrap()
                 .unwrap();
+            let trusted_output = String::from_utf8(trusted_output).unwrap();
+            assert!(trusted_output.starts_with("=== multAIplayer trusted admission prompt ==="));
+            assert!(trusted_output.contains("GitHub identity: github:guest"));
+            assert!(trusted_output.contains(&guest_identity.public.signature_key_fingerprint));
             assert_eq!(decision.status, "approved");
             let replay = service
                 .decide(
@@ -2273,6 +2413,12 @@ mod tests {
             );
         }
         {
+            let pending = guest_mls
+                .pending_invite_admission(&approved.request_id)
+                .unwrap()
+                .unwrap();
+            assert_eq!(pending.invite_id, approved.invite_id);
+            assert_eq!(pending.requester_user_id, guest_identity.public.user_id);
             let mut backend = RelayInviteBackend::new_for_loopback_test(
                 &guest_store,
                 &http,
@@ -2285,7 +2431,12 @@ mod tests {
             .unwrap();
             assert_eq!(
                 InviteService::new(&guest_store, &mut backend)
-                    .finish_admission(&approved, guest_device_session.as_str(), &mut guest_mls,)
+                    .finish_pending_admission(
+                        &pending,
+                        guest_device_session.as_str(),
+                        valid_now,
+                        &mut guest_mls,
+                    )
                     .unwrap(),
                 Some(1)
             );

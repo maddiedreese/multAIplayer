@@ -96,6 +96,16 @@ pub struct PreparedInviteRequest {
     pub binding: CapabilityBinding,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingInviteAdmission {
+    pub invite_id: String,
+    pub request_id: String,
+    pub requester_user_id: String,
+    pub requester_device_id: String,
+    pub room_id: String,
+    pub expires_at: String,
+}
+
 impl std::fmt::Debug for PreparedInviteRequest {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -753,6 +763,32 @@ impl MlsClientService {
                 .map_err(map_engine_error)?;
         }
         Ok(())
+    }
+
+    pub fn pending_invite_admission(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<PendingInviteAdmission>, MlsClientError> {
+        let pending = self
+            .store
+            .pending_invite_request(request_id)
+            .map_err(map_store_error)?;
+        let Some(pending) = pending else {
+            return Ok(None);
+        };
+        if pending.original_binding.request_id != request_id
+            || pending.original_binding.requester_device_id != self.device_id
+        {
+            return Err(MlsClientError::InvalidInvite);
+        }
+        Ok(Some(PendingInviteAdmission {
+            invite_id: pending.original_binding.invite_id,
+            request_id: pending.original_binding.request_id,
+            requester_user_id: pending.original_binding.requester_user_id,
+            requester_device_id: self.device_id.clone(),
+            room_id: pending.original_binding.room_id,
+            expires_at: pending.original_binding.expires_at,
+        }))
     }
 
     fn outbox_payload(&self, id: &str) -> Result<Vec<u8>, MlsClientError> {
