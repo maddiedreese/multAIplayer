@@ -248,6 +248,10 @@ impl<S: RelaySocket> RelayConnection<S> {
         self.socket
     }
 
+    pub fn close(&mut self) {
+        self.socket.close(1000, "Room session closed");
+    }
+
     pub fn send(&mut self, message: &RelayClientMessage) -> Result<(), RelayTransportError> {
         let encoded = to_json(message).map_err(|_| RelayTransportError::InvalidClientMessage)?;
         self.socket.send_text(&encoded)

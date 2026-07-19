@@ -1011,10 +1011,22 @@ mod tests {
         let values = store.values.borrow();
         assert!(!values.contains_key(GITHUB_TOKEN_ACCOUNT));
         assert!(!values.contains_key(RELAY_SESSION_ACCOUNT));
-        assert!(values.contains_key(SIGNING_IDENTITY_ACCOUNT));
-        assert!(values.contains_key(HPKE_IDENTITY_ACCOUNT));
-        assert!(values.contains_key("mls-group-state:v1"));
-        assert!(values.contains_key("room-state-wrap:v1"));
+        assert_eq!(
+            values.get(SIGNING_IDENTITY_ACCOUNT).map(String::as_str),
+            Some("signing-private-material")
+        );
+        assert_eq!(
+            values.get(HPKE_IDENTITY_ACCOUNT).map(String::as_str),
+            Some("hpke-private-material")
+        );
+        assert_eq!(
+            values.get("mls-group-state:v1").map(String::as_str),
+            Some("mls-key-material")
+        );
+        assert_eq!(
+            values.get("room-state-wrap:v1").map(String::as_str),
+            Some("room-key-material")
+        );
         let request = http.requests.borrow().last().unwrap().clone();
         assert_eq!(request.method, "POST");
         assert_eq!(request.url, format!("{RELAY}/auth/logout"));

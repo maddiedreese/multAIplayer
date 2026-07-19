@@ -1543,7 +1543,8 @@ mod tests {
         os::unix::fs::PermissionsExt,
         path::{Path, PathBuf},
         process::{Child, ChildStdout, Command, Stdio},
-        time::Duration,
+        thread,
+        time::{Duration, Instant},
     };
     use zeroize::Zeroizing;
 
@@ -1689,7 +1690,7 @@ mod tests {
 
     struct RelayFixture {
         child: Option<Child>,
-        _stdout: BufReader<ChildStdout>,
+        stdout: BufReader<ChildStdout>,
         info: RelayFixtureInfo,
     }
 
@@ -1722,9 +1723,25 @@ mod tests {
             let info = serde_json::from_str(&line).unwrap();
             Self {
                 child: Some(child),
-                _stdout: stdout,
+                stdout,
                 info,
             }
+        }
+
+        fn restart(&mut self) {
+            let child = self.child.as_mut().expect("relay fixture is running");
+            child
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(b"restart\n")
+                .unwrap();
+            let mut line = String::new();
+            self.stdout.read_line(&mut line).unwrap();
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(&line).unwrap(),
+                json!({ "restarted": true })
+            );
         }
 
         fn stop_and_assert(&mut self) {
@@ -2394,6 +2411,8 @@ mod tests {
             .unwrap()
             .success());
         let binary = manifest_dir.join("target/debug/multAIplayer");
+        let start_gate = coordination_dir.join("relay-restarted");
+        let delayed_reconnect_gate = coordination_dir.join("sent-1");
         let mut children = Vec::new();
         for (role, (credential_path, mls_path, relay_session, device_session, user_id, name)) in
             configurations.into_iter().enumerate()
@@ -2412,6 +2431,9 @@ mod tests {
                     "displayName": name,
                     "role": role,
                     "coordinationDir": coordination_dir,
+                    "startGate": start_gate,
+                    "delayReconnectUntil": (role == 2).then_some(&delayed_reconnect_gate),
+                    "crashAfterChatCount": (role == 2).then_some(2),
                 }))
                 .unwrap(),
             )
@@ -2427,6 +2449,42 @@ mod tests {
                     .unwrap(),
             );
         }
+        let ready_deadline = Instant::now() + Duration::from_secs(10);
+        while (0..3).any(|role| !coordination_dir.join(format!("ready-{role}")).is_file()) {
+            assert!(
+                Instant::now() < ready_deadline,
+                "chat processes did not become ready"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+        relay.restart();
+        fs::write(&start_gate, b"restarted").unwrap();
+
+        let crashed = children.pop().unwrap().wait_with_output().unwrap();
+        assert_eq!(
+            crashed.status.code(),
+            Some(86),
+            "client crash journey did not crash at the durable boundary"
+        );
+        let role_two_config = journey.0.join("process-2.json");
+        let mut resumed_config: serde_json::Value =
+            serde_json::from_slice(&fs::read(&role_two_config).unwrap()).unwrap();
+        resumed_config["crashAfterChatCount"] = serde_json::Value::Null;
+        fs::write(
+            &role_two_config,
+            serde_json::to_vec(&resumed_config).unwrap(),
+        )
+        .unwrap();
+        fs::set_permissions(&role_two_config, fs::Permissions::from_mode(0o600)).unwrap();
+        children.push(
+            Command::new(&binary)
+                .arg("__chat-journey")
+                .arg(&role_two_config)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
         let expected_chat = [
             "[chat] <Maddie> FIRST-PROCESS-PLAINTEXT-MUST-STAY-ENCRYPTED",
             "[chat] <First Guest> SECOND-PROCESS-CHAT",

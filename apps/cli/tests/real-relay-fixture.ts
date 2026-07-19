@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline";
 import { createServer, request } from "node:http";
-import { connect } from "node:net";
+import { connect, type Socket } from "node:net";
 import { fileURLToPath } from "node:url";
 import { defaultWorkspaceFixture, startRelayWithWorkspace } from "../../relay/test/support/relay.js";
 
@@ -9,8 +9,7 @@ const commands = input[Symbol.asyncIterator]();
 const configuration = await commands.next();
 if (configuration.done) throw new Error("CLI relay fixture configuration was unavailable");
 const parsedConfiguration = JSON.parse(configuration.value) as
-  | string
-  | { forbidden: string; activeHostDeviceId: string };
+  string | { forbidden: string; activeHostDeviceId: string };
 const forbidden = Buffer.from(
   typeof parsedConfiguration === "string" ? parsedConfiguration : parsedConfiguration.forbidden
 );
@@ -26,9 +25,7 @@ function scanStream() {
   };
 }
 
-const validator = fileURLToPath(
-  new URL("../../relay/test/fixtures/mock-keypackage-validator.mjs", import.meta.url)
-);
+const validator = fileURLToPath(new URL("../../relay/test/fixtures/mock-keypackage-validator.mjs", import.meta.url));
 const storedState = defaultWorkspaceFixture();
 if (typeof parsedConfiguration !== "string") {
   storedState.rooms[0]!.activeHostDeviceId = parsedConfiguration.activeHostDeviceId;
@@ -53,6 +50,11 @@ const proxy = createServer((incoming, response) => {
   );
   forwarded.on("error", () => response.destroy());
   incoming.pipe(forwarded);
+});
+const proxySockets = new Set<Socket>();
+proxy.on("connection", (socket) => {
+  proxySockets.add(socket);
+  socket.once("close", () => proxySockets.delete(socket));
 });
 
 proxy.on("upgrade", (incoming, client, head) => {
@@ -106,5 +108,10 @@ while (true) {
   break;
 }
 await relay.close({ preserveData: true });
-await new Promise<void>((resolve, reject) => proxy.close((error) => (error === undefined ? resolve() : reject(error))));
+const proxyClosed = new Promise<void>((resolve, reject) =>
+  proxy.close((error) => (error === undefined ? resolve() : reject(error)))
+);
+proxy.closeAllConnections();
+for (const socket of proxySockets) socket.destroy();
+await proxyClosed;
 if (leaked) throw new Error("Relay traffic exposed the host-local project path");
