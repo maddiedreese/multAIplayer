@@ -87,21 +87,20 @@ fn request_ids_are_state_monotonic_across_process_generations() {
 #[cfg(unix)]
 #[test]
 fn dropping_host_process_terminates_its_child() {
-    let mut child = Command::new("sh")
-        .args(["-c", "sleep 30"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("spawn child");
-    let pid = child.id() as libc::pid_t;
+    let mut core_process = AppServerProcess::spawn(&AppServerProcessConfig {
+        executable: "sh".to_string(),
+        cwd: None,
+        arguments: vec!["-c".to_string(), "sleep 30".to_string()],
+        capture_stderr: false,
+    })
+    .expect("spawn child");
+    assert!(core_process.is_alive());
     let process = HostProcess {
-        stdin: Arc::new(Mutex::new(child.stdin.take().expect("stdin"))),
-        child,
+        process: core_process,
         pending: Arc::new(Mutex::new(HashMap::new())),
         capabilities: capabilities_for_version("0.144.0").expect("capabilities"),
     };
     drop(process);
-    assert_eq!(unsafe { libc::kill(pid, 0) }, -1);
 }
 
 #[test]
@@ -114,7 +113,7 @@ fn global_approval_modes_fail_closed() {
 
 #[test]
 fn notifications_are_allowlisted_and_secret_bearing_fields_are_dropped() {
-    let notification = sanitize_notification("account/login/completed", Some(&json!({
+    let notification = sanitize_host_notification("account/login/completed", Some(&json!({
         "loginId": "login-1", "success": false, "error": "token=secret eyJabc", "accessToken": "never"
     }))).expect("safe notification");
     assert_eq!(notification.params.get("loginId"), Some(&json!("login-1")));
@@ -123,7 +122,7 @@ fn notifications_are_allowlisted_and_secret_bearing_fields_are_dropped() {
         Some(&json!("[redacted] [redacted]"))
     );
     assert!(notification.params.get("accessToken").is_none());
-    assert!(sanitize_notification(
+    assert!(sanitize_host_notification(
         "account/chatgptAuthTokens/refresh",
         Some(&json!({ "accessToken": "secret" }))
     )

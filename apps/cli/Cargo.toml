@@ -17,6 +17,7 @@ resolver = "2"
 
 [dependencies]
 base64 = "=0.22.1"
+codex-host-core = { package = "codex-activity-projection", path = "../desktop/src-tauri/crates/codex-activity-projection" }
 keyring = "=4.1.5"
 mls-core = { path = "../desktop/src-tauri/crates/mls-core" }
 multaiplayer-protocol = { path = "crates/protocol" }
