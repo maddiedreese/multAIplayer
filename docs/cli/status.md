@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-090 encrypted chat, presence, and safe rendering
+Current phase: CLI-100 reconnect, replay, history, and crash recovery
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -92,7 +92,21 @@ Last update: 2026-07-18
   trusted explicit prompt, and expiry/revocation/replay/single-use behavior
   remains bound to the existing MLS capability model. No dependency, shared
   contract, desktop runtime, or protected release path changed.
-- CLI-090 is the only active implementation task.
+- CLI-090 is complete and integrated. Its accepted task commit is
+  `27932fa64f329d05997d27e3758ab81768293d81`; integration merge
+  `da7f86a1ed2fdc7b6d0d38fee9a11f4d528e67d9` passed the locked CLI runner with
+  95 executed tests, including three independent CLI processes reopening
+  durable identity and MLS state, using the same room-loop driver as normal
+  `room open`, and exchanging the same encrypted chat sequence in exact relay
+  order. The journey also verified participant and authenticated active-host
+  presence and rejected any relay-observed forbidden plaintext. Independent
+  review passed all 52 `mls-core` tests, 27 protocol tests, 285 relay tests, 695
+  desktop tests, and 18 classification/isolation tests. Terminal-control
+  properties, color/plain golden rendering, bounded unsupported events,
+  desktop wire parity, exact ancestry, repository cleanliness, and the protected
+  desktop-release audit passed. No dependency, wire/schema, MLS-policy, desktop,
+  governance, or release surface changed.
+- CLI-100 is the only active implementation task.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -117,8 +131,8 @@ Last update: 2026-07-18
 | CLI-060 | MLS client state, storage, and outbox | complete | CLI-030, CLI-040 |
 | CLI-070 | Room creation and local project association | complete | CLI-050, CLI-060, CLI-040-R1 |
 | CLI-080 | Secure invite codes and host-mediated admission | complete | CLI-070 |
-| CLI-090 | Encrypted chat, presence, and safe rendering | active | CLI-050, CLI-060, CLI-080 |
-| CLI-100 | Reconnect, replay, history, and crash recovery | waiting_for_orchestrator_approval | CLI-090 |
+| CLI-090 | Encrypted chat, presence, and safe rendering | complete | CLI-050, CLI-060, CLI-080 |
+| CLI-100 | Reconnect, replay, history, and crash recovery | active | CLI-090 |
 | CLI-110 | UI-independent Codex host extraction | waiting_for_orchestrator_approval | CLI-020 |
 | CLI-120 | Codex proposals, context, and hosted turns | waiting_for_orchestrator_approval | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | waiting_for_orchestrator_approval | CLI-120 |
