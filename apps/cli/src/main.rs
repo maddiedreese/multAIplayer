@@ -1,6 +1,12 @@
 use multaiplayer_cli::{
     auth::{AuthClient, DevicePollResult},
     chat::{RecoveringChatRoomSession, RenderMode, TerminalRenderer},
+    codex::{
+        build_bounded_context, cancellation_flag, probe_codex_process,
+        proposal_expiry_from_rfc3339, resolve_turn_settings, run_hosted_turn, CodexProposal,
+        CodexTurnSettings, HostPreview, HostedTurnRequest, HostedTurnResult, ProposalError,
+        ProposalMachine,
+    },
     identity::load_or_create_identity,
     invite::{parse_invite_code, InviteError, InviteService, RelayInviteBackend},
     mls::MlsClientService,
@@ -12,12 +18,20 @@ use multaiplayer_cli::{
     room::{opened_room_message, CreateRoomRequest, RelayRoomBackend, RoomService},
     GITHUB_CLIENT_ID, RELAY_HTTP_ORIGIN,
 };
-use multaiplayer_protocol::RoomRecord;
+use multaiplayer_protocol::{
+    ChatPlaintextPayload, CodexEventPlaintextPayload, CodexQueueAction, CodexQueuePlaintextPayload,
+    CodexTurnStatus, RoomRecord,
+};
 use std::{
+    collections::BTreeSet,
     io::{BufRead, IsTerminal, Read, Write},
     path::PathBuf,
     process::ExitCode,
-    sync::mpsc::{self, TryRecvError},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, TryRecvError},
+        Arc,
+    },
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -43,6 +57,7 @@ const HELP: &str = concat!(
     "                  Create and host a room with a local project\n",
     "  open <ROOM> [--plain]\n",
     "                  Open a locally associated room and enter encrypted chat\n\n",
+    "                  In-room: @codex <TASK>, /approve <ID>, /deny <ID>, /quit\n\n",
     "  leave <ROOM>    Leave locally while retaining encrypted room data\n",
     "  forget <ROOM>   Destructively forget local association and history\n",
     "  invite <ROOM>   Create and display a secret invite code\n",
@@ -251,6 +266,9 @@ enum RoomLoopDirective {
     Wait,
     Disconnect,
     Send(String),
+    Propose(String),
+    Approve(String),
+    Deny(String),
     Quit,
 }
 
@@ -260,12 +278,14 @@ trait RoomLoopAdapter {
     }
     fn directive(&mut self, projected_chat_count: usize) -> Result<RoomLoopDirective, ()>;
     fn emit(&mut self, event: &multaiplayer_cli::chat::ProjectedEvent);
+    fn trusted_codex_preview(&mut self, _preview: &HostPreview) {}
     fn complete(&self, projected_chat_count: usize) -> Result<bool, ()>;
 }
 
 fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
     chat: &mut RecoveringChatRoomSession<'_, C, R>,
     adapter: &mut impl RoomLoopAdapter,
+    mut codex: Option<&mut CodexRoomController>,
 ) -> Result<(), ()> {
     let mut projected_chat_count = 0;
     let joined_at = utc_timestamp().map_err(|_| ())?;
@@ -276,7 +296,7 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
         if matches!(event, multaiplayer_cli::chat::ProjectedEvent::Chat(_)) {
             projected_chat_count += 1;
         }
-        adapter.emit(&event);
+        emit_room_event(chat, adapter, codex.as_deref_mut(), event)?;
     }
     adapter.start().map_err(|()| {
         eprintln!("room loop: adapter start failed safely");
@@ -285,6 +305,13 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
         let directive = adapter.directive(projected_chat_count).map_err(|()| {
             eprintln!("room loop: input adapter failed safely");
         })?;
+        let poll_after_directive = matches!(
+            &directive,
+            RoomLoopDirective::Send(_)
+                | RoomLoopDirective::Propose(_)
+                | RoomLoopDirective::Approve(_)
+                | RoomLoopDirective::Deny(_)
+        );
         let events = match directive {
             RoomLoopDirective::Quit => {
                 chat.leave();
@@ -303,6 +330,39 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
                         })?
                 }
             }
+            RoomLoopDirective::Propose(task) => {
+                if task.trim().is_empty() {
+                    Vec::new()
+                } else if codex
+                    .as_deref()
+                    .is_none_or(|controller| !controller.can_propose())
+                {
+                    eprintln!("room loop: this room already has a pending proposal or active turn");
+                    Vec::new()
+                } else {
+                    let created_at = utc_timestamp().map_err(|_| ())?;
+                    let proposal_id = format!("proposal-{}", uuid::Uuid::new_v4());
+                    let envelope_id = format!("queue-{}", uuid::Uuid::new_v4());
+                    chat.send_codex_proposal(&envelope_id, &proposal_id, task.trim(), &created_at)
+                        .map_err(|_| {
+                            eprintln!("room loop: encrypted proposal failed safely");
+                        })?
+                }
+            }
+            RoomLoopDirective::Approve(proposal_id) => codex
+                .as_deref_mut()
+                .ok_or(())?
+                .approve(chat, &proposal_id, unix_now())
+                .map_err(|_| {
+                    eprintln!("room loop: proposal approval failed safely");
+                })?,
+            RoomLoopDirective::Deny(proposal_id) => codex
+                .as_deref_mut()
+                .ok_or(())?
+                .deny(chat, &proposal_id, unix_now())
+                .map_err(|_| {
+                    eprintln!("room loop: proposal denial failed safely");
+                })?,
             RoomLoopDirective::Wait => {
                 thread::sleep(Duration::from_millis(10));
                 Vec::new()
@@ -323,7 +383,29 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
             if matches!(event, multaiplayer_cli::chat::ProjectedEvent::Chat(_)) {
                 projected_chat_count += 1;
             }
-            adapter.emit(&event);
+            emit_room_event(chat, adapter, codex.as_deref_mut(), event)?;
+        }
+        if poll_after_directive {
+            let polled_at = utc_timestamp().map_err(|_| ())?;
+            for event in chat
+                .poll(Duration::from_millis(1), &polled_at)
+                .map_err(|_| {
+                    eprintln!("room loop: relay projection failed safely");
+                })?
+            {
+                if matches!(event, multaiplayer_cli::chat::ProjectedEvent::Chat(_)) {
+                    projected_chat_count += 1;
+                }
+                emit_room_event(chat, adapter, codex.as_deref_mut(), event)?;
+            }
+        }
+        if let Some(controller) = codex.as_deref_mut() {
+            let events = controller.tick(chat).map_err(|_| {
+                eprintln!("room loop: hosted Codex turn failed safely");
+            })?;
+            for event in events {
+                emit_room_event(chat, adapter, Some(controller), event)?;
+            }
         }
         if adapter.complete(projected_chat_count).map_err(|()| {
             eprintln!("room loop: completion check failed safely");
@@ -332,6 +414,21 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
             return Ok(());
         }
     }
+}
+
+fn emit_room_event<C: RelayConnector, R: RetrySleeper>(
+    chat: &RecoveringChatRoomSession<'_, C, R>,
+    adapter: &mut impl RoomLoopAdapter,
+    codex: Option<&mut CodexRoomController>,
+    event: multaiplayer_cli::chat::ProjectedEvent,
+) -> Result<(), ()> {
+    if let Some(controller) = codex {
+        if let Some(preview) = controller.observe(&event, unix_now(), chat.is_active_host())? {
+            adapter.trusted_codex_preview(&preview);
+        }
+    }
+    adapter.emit(&event);
+    Ok(())
 }
 
 struct InteractiveRoomLoop {
@@ -343,6 +440,15 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
     fn directive(&mut self, _projected_chat_count: usize) -> Result<RoomLoopDirective, ()> {
         match self.receiver.try_recv() {
             Ok(Ok(line)) if line == "/quit" => Ok(RoomLoopDirective::Quit),
+            Ok(Ok(line)) if line.to_ascii_lowercase().starts_with("@codex ") => {
+                Ok(RoomLoopDirective::Propose(line[7..].to_owned()))
+            }
+            Ok(Ok(line)) if line.starts_with("/approve ") => {
+                Ok(RoomLoopDirective::Approve(line[9..].trim().to_owned()))
+            }
+            Ok(Ok(line)) if line.starts_with("/deny ") => {
+                Ok(RoomLoopDirective::Deny(line[6..].trim().to_owned()))
+            }
             Ok(Ok(line)) => Ok(RoomLoopDirective::Send(line)),
             Ok(Err(_)) | Err(TryRecvError::Disconnected) => Ok(RoomLoopDirective::Quit),
             Err(TryRecvError::Empty) => Ok(RoomLoopDirective::Idle),
@@ -353,8 +459,381 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
         println!("{}", self.renderer.render(event));
     }
 
+    fn trusted_codex_preview(&mut self, preview: &HostPreview) {
+        eprintln!("{}", self.renderer.trusted_prompt(&preview.trusted_text()));
+    }
+
     fn complete(&self, _projected_chat_count: usize) -> Result<bool, ()> {
         Ok(false)
+    }
+}
+
+struct ActiveHostedTurn {
+    proposal_id: String,
+    cancelled: Arc<AtomicBool>,
+    receiver: mpsc::Receiver<Result<HostedTurnResult, multaiplayer_cli::codex::HostedTurnError>>,
+    authority_lost: bool,
+}
+
+struct CodexRoomController {
+    room_id: String,
+    room_name: String,
+    project_path: PathBuf,
+    host_name: String,
+    host_user_id: String,
+    settings: CodexTurnSettings,
+    settings_resolved: bool,
+    machine: ProposalMachine,
+    current_wire_proposal: Option<CodexQueuePlaintextPayload>,
+    previewed_proposal_id: Option<String>,
+    history: Vec<ChatPlaintextPayload>,
+    participants: BTreeSet<String>,
+    previous_thread_id: Option<String>,
+    active: Option<ActiveHostedTurn>,
+}
+
+impl CodexRoomController {
+    fn new(
+        room: &RoomRecord,
+        project_path: PathBuf,
+        host_name: &str,
+        host_user_id: &str,
+        previous_thread_id: Option<String>,
+    ) -> Result<Self, ()> {
+        let mut participants = BTreeSet::new();
+        participants.insert(host_name.to_owned());
+        Ok(Self {
+            room_id: room.id.clone(),
+            room_name: room.name.clone(),
+            project_path,
+            host_name: host_name.to_owned(),
+            host_user_id: host_user_id.to_owned(),
+            settings: CodexTurnSettings::default(),
+            settings_resolved: false,
+            machine: ProposalMachine::new(&room.id).map_err(|_| ())?,
+            current_wire_proposal: None,
+            previewed_proposal_id: None,
+            history: Vec::new(),
+            participants,
+            previous_thread_id,
+            active: None,
+        })
+    }
+
+    fn observe(
+        &mut self,
+        event: &multaiplayer_cli::chat::ProjectedEvent,
+        now_unix: i64,
+        active_host: bool,
+    ) -> Result<Option<HostPreview>, ()> {
+        match event {
+            multaiplayer_cli::chat::ProjectedEvent::Chat(chat) => {
+                self.participants.insert(chat.author.clone());
+                self.history.push(chat.clone());
+                if self.history.len() > 100 {
+                    self.history.remove(0);
+                }
+                Ok(None)
+            }
+            multaiplayer_cli::chat::ProjectedEvent::Presence { display_name, .. } => {
+                self.participants.insert(display_name.clone());
+                Ok(None)
+            }
+            multaiplayer_cli::chat::ProjectedEvent::CodexProposal(wire)
+                if wire.action == CodexQueueAction::Queued =>
+            {
+                let Ok(expires_at_unix) = proposal_expiry_from_rfc3339(&wire.created_at, now_unix)
+                else {
+                    return Ok(None);
+                };
+                let proposal = CodexProposal {
+                    room_id: self.room_id.clone(),
+                    proposal_id: wire.turn_id.clone(),
+                    proposer: wire.requested_by.clone(),
+                    proposer_user_id: wire.requested_by_user_id.clone(),
+                    task: wire.reason.clone().ok_or(())?,
+                    created_at: wire.created_at.clone(),
+                    expires_at_unix,
+                };
+                let is_new = match self.machine.observe(proposal, now_unix) {
+                    Ok(is_new) => is_new,
+                    Err(ProposalError::Expired | ProposalError::Busy) => return Ok(None),
+                    Err(_) => return Err(()),
+                };
+                if is_new {
+                    self.current_wire_proposal = Some(wire.clone());
+                }
+                let needs_preview = active_host
+                    && self.machine.pending().is_some_and(|pending| {
+                        pending.proposal_id == wire.turn_id
+                            && self.previewed_proposal_id.as_deref()
+                                != Some(pending.proposal_id.as_str())
+                    });
+                if needs_preview {
+                    if !self.settings_resolved {
+                        let process = probe_codex_process("codex").map_err(|_| ())?;
+                        let cancelled = AtomicBool::new(false);
+                        self.settings = resolve_turn_settings(&process, &self.settings, &cancelled)
+                            .map_err(|_| ())?;
+                        self.settings_resolved = true;
+                    }
+                    self.previewed_proposal_id = Some(wire.turn_id.clone());
+                    self.preview().map(Some)
+                } else {
+                    Ok(None)
+                }
+            }
+            multaiplayer_cli::chat::ProjectedEvent::CodexProposal(wire)
+                if wire.action == CodexQueueAction::Cancelled =>
+            {
+                if self
+                    .machine
+                    .pending()
+                    .is_some_and(|proposal| proposal.proposal_id == wire.turn_id)
+                {
+                    let _ = self.machine.cancel(&self.room_id, &wire.turn_id);
+                }
+                self.current_wire_proposal = None;
+                self.previewed_proposal_id = None;
+                Ok(None)
+            }
+            multaiplayer_cli::chat::ProjectedEvent::CodexTurn(turn)
+                if turn.status == CodexTurnStatus::Started =>
+            {
+                self.machine
+                    .observe_started(&self.room_id, &turn.turn_id)
+                    .map_err(|_| ())?;
+                Ok(None)
+            }
+            multaiplayer_cli::chat::ProjectedEvent::CodexTurn(turn)
+                if turn.status == CodexTurnStatus::Completed =>
+            {
+                self.history.clear();
+                Ok(None)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn can_propose(&self) -> bool {
+        self.machine.pending().is_none() && self.active.is_none()
+    }
+
+    fn preview(&self) -> Result<HostPreview, ()> {
+        let proposal = self.machine.pending().ok_or(())?;
+        let context = build_bounded_context(
+            proposal,
+            &self.history,
+            &self.participants.iter().cloned().collect::<Vec<_>>(),
+            "auto",
+        )
+        .map_err(|_| ())?;
+        Ok(HostPreview {
+            proposal_id: proposal.proposal_id.clone(),
+            proposer: proposal.proposer.clone(),
+            task: proposal.task.clone(),
+            room_name: self.room_name.clone(),
+            project_association: "associated on this host device".to_owned(),
+            context_extent: context.extent,
+            effective_model: self.settings.model.clone(),
+            service_tier: self.settings.service_tier().to_owned(),
+            reasoning_effort: self.settings.reasoning_label().to_owned(),
+            sandbox: self.settings.sandbox_label().to_owned(),
+        })
+    }
+
+    fn approve<C: RelayConnector, R: RetrySleeper>(
+        &mut self,
+        chat: &mut RecoveringChatRoomSession<'_, C, R>,
+        proposal_id: &str,
+        now_unix: i64,
+    ) -> Result<Vec<multaiplayer_cli::chat::ProjectedEvent>, ()> {
+        let active_host = chat.is_active_host();
+        let approved = self
+            .machine
+            .approve(&self.room_id, proposal_id, now_unix, active_host)
+            .map_err(|_| ())?;
+        if !approved {
+            return Ok(Vec::new());
+        }
+        let proposal = self.machine.pending().cloned().ok_or(())?;
+        let context = build_bounded_context(
+            &proposal,
+            &self.history,
+            &self.participants.iter().cloned().collect::<Vec<_>>(),
+            "auto",
+        )
+        .map_err(|_| ())?;
+        self.machine
+            .start(&self.room_id, proposal_id, chat.is_active_host())
+            .map_err(|_| ())?;
+
+        let created_at = utc_timestamp().map_err(|_| ())?;
+        let started = CodexEventPlaintextPayload {
+            event_type: "codex.turn".to_owned(),
+            turn_id: proposal_id.to_owned(),
+            status: CodexTurnStatus::Started,
+            message: "Host approved and started the Codex turn.".to_owned(),
+            model: self.settings.model.clone(),
+            thread_id: self.previous_thread_id.clone(),
+            event_name: Some("hosted_turn_started".to_owned()),
+            consumed_message_ids: None,
+            risk_flags: None,
+            host: self.host_name.clone(),
+            host_user_id: self.host_user_id.clone(),
+            created_at: created_at.clone(),
+        };
+        let mut projected = chat
+            .send_codex_turn(&format!("turn-start-{}", uuid::Uuid::new_v4()), started)
+            .map_err(|_| ())?;
+
+        let (sender, receiver) = mpsc::channel();
+        let cancelled = cancellation_flag();
+        let worker_cancelled = cancelled.clone();
+        let request = HostedTurnRequest {
+            project_path: self.project_path.clone(),
+            input: context.input,
+            settings: self.settings.clone(),
+            previous_thread_id: self.previous_thread_id.clone(),
+            timeout: Duration::from_secs(30 * 60),
+        };
+        thread::spawn(move || {
+            let result = probe_codex_process("codex")
+                .and_then(|config| run_hosted_turn(&config, &request, &worker_cancelled));
+            let _ = sender.send(result);
+        });
+        self.active = Some(ActiveHostedTurn {
+            proposal_id: proposal_id.to_owned(),
+            cancelled,
+            receiver,
+            authority_lost: false,
+        });
+        projected.shrink_to_fit();
+        Ok(projected)
+    }
+
+    fn deny<C: RelayConnector, R: RetrySleeper>(
+        &mut self,
+        chat: &mut RecoveringChatRoomSession<'_, C, R>,
+        proposal_id: &str,
+        _now_unix: i64,
+    ) -> Result<Vec<multaiplayer_cli::chat::ProjectedEvent>, ()> {
+        if !chat.is_active_host() {
+            return Err(());
+        }
+        let wire = self.current_wire_proposal.clone().ok_or(())?;
+        if wire.turn_id != proposal_id {
+            return Err(());
+        }
+        self.machine
+            .cancel(&self.room_id, proposal_id)
+            .map_err(|_| ())?;
+        self.current_wire_proposal = None;
+        self.previewed_proposal_id = None;
+        let created_at = utc_timestamp().map_err(|_| ())?;
+        chat.send_codex_cancelled(
+            &format!("queue-cancel-{}", uuid::Uuid::new_v4()),
+            &wire,
+            "The active host denied this proposal.",
+            &created_at,
+        )
+        .map_err(|_| ())
+    }
+
+    fn tick<C: RelayConnector, R: RetrySleeper>(
+        &mut self,
+        chat: &mut RecoveringChatRoomSession<'_, C, R>,
+    ) -> Result<Vec<multaiplayer_cli::chat::ProjectedEvent>, ()> {
+        let Some(active) = self.active.as_mut() else {
+            return Ok(Vec::new());
+        };
+        if !chat.is_active_host() {
+            active.authority_lost = true;
+            active.cancelled.store(true, Ordering::Release);
+        }
+        let result = match active.receiver.try_recv() {
+            Ok(result) => result,
+            Err(TryRecvError::Empty) => return Ok(Vec::new()),
+            Err(TryRecvError::Disconnected) => {
+                Err(multaiplayer_cli::codex::HostedTurnError::Failed)
+            }
+        };
+        let active = self.active.take().ok_or(())?;
+        if active.authority_lost || !chat.is_active_host() {
+            let _ = self.machine.cancel(&self.room_id, &active.proposal_id);
+            return Ok(Vec::new());
+        }
+        let created_at = utc_timestamp().map_err(|_| ())?;
+        let display_time = created_at.get(11..16).unwrap_or("--:--");
+        match result {
+            Ok(result) => {
+                let mut projected = chat
+                    .send_assistant_message(
+                        &format!("assistant-{}", uuid::Uuid::new_v4()),
+                        &result.assistant_message,
+                        &created_at,
+                        display_time,
+                    )
+                    .map_err(|_| ())?;
+                if !chat.is_active_host() {
+                    let _ = self.machine.cancel(&self.room_id, &active.proposal_id);
+                    return Ok(projected);
+                }
+                chat.save_codex_thread_id(&result.thread_id)
+                    .map_err(|_| ())?;
+                let completed = CodexEventPlaintextPayload {
+                    event_type: "codex.turn".to_owned(),
+                    turn_id: active.proposal_id.clone(),
+                    status: CodexTurnStatus::Completed,
+                    message: "Codex turn completed.".to_owned(),
+                    model: self.settings.model.clone(),
+                    thread_id: Some(result.thread_id.clone()),
+                    event_name: Some("hosted_turn_completed".to_owned()),
+                    consumed_message_ids: None,
+                    risk_flags: None,
+                    host: self.host_name.clone(),
+                    host_user_id: self.host_user_id.clone(),
+                    created_at: created_at.clone(),
+                };
+                projected.extend(
+                    chat.send_codex_turn(
+                        &format!("turn-complete-{}", uuid::Uuid::new_v4()),
+                        completed,
+                    )
+                    .map_err(|_| ())?,
+                );
+                self.machine
+                    .complete(&self.room_id, &active.proposal_id, chat.is_active_host())
+                    .map_err(|_| ())?;
+                self.previous_thread_id = Some(result.thread_id);
+                self.current_wire_proposal = None;
+                self.previewed_proposal_id = None;
+                Ok(projected)
+            }
+            Err(error) => {
+                self.machine
+                    .fail(&self.room_id, &active.proposal_id)
+                    .map_err(|_| ())?;
+                self.current_wire_proposal = None;
+                self.previewed_proposal_id = None;
+                let failed = CodexEventPlaintextPayload {
+                    event_type: "codex.turn".to_owned(),
+                    turn_id: active.proposal_id,
+                    status: CodexTurnStatus::Failed,
+                    message: error.to_string(),
+                    model: self.settings.model.clone(),
+                    thread_id: self.previous_thread_id.clone(),
+                    event_name: Some("hosted_turn_failed".to_owned()),
+                    consumed_message_ids: None,
+                    risk_flags: None,
+                    host: self.host_name.clone(),
+                    host_user_id: self.host_user_id.clone(),
+                    created_at,
+                };
+                chat.send_codex_turn(&format!("turn-failed-{}", uuid::Uuid::new_v4()), failed)
+                    .map_err(|_| ())
+            }
+        }
     }
 }
 
@@ -570,7 +1049,7 @@ fn run_debug_chat_journey(path: &std::path::Path) -> ExitCode {
         crash_after_chat_count: config.crash_after_chat_count,
         deadline: Instant::now() + Duration::from_secs(30),
     };
-    match drive_room_loop(&mut chat, &mut adapter) {
+    match drive_room_loop(&mut chat, &mut adapter, None) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => {
             eprintln!("debug journey: shared room loop failed safely");
@@ -654,7 +1133,7 @@ fn run_room(command: Command) -> ExitCode {
         _ => None,
     };
     enum Outcome {
-        Opened(multaiplayer_cli::room::OpenedRoom),
+        Opened(multaiplayer_cli::room::OpenedRoom, PathBuf),
         Left(RoomRecord),
         Forgotten(String),
     }
@@ -668,15 +1147,21 @@ fn run_room(command: Command) -> ExitCode {
             RELAY_HTTP_ORIGIN,
         );
         match command {
-            Command::RoomCreate(request) => service.create(&request).map(Outcome::Opened),
-            Command::RoomOpen { selector, .. } => service.open(&selector).map(Outcome::Opened),
+            Command::RoomCreate(request) => service.create(&request).and_then(|opened| {
+                let project = service.local_project_path(&opened.room.id)?;
+                Ok(Outcome::Opened(opened, project))
+            }),
+            Command::RoomOpen { selector, .. } => service.open(&selector).and_then(|opened| {
+                let project = service.local_project_path(&opened.room.id)?;
+                Ok(Outcome::Opened(opened, project))
+            }),
             Command::RoomLeave { selector } => service.leave(&selector).map(Outcome::Left),
             Command::RoomForget { selector } => service.forget(&selector).map(Outcome::Forgotten),
             _ => unreachable!("room runner received non-room command"),
         }
     };
     match result {
-        Ok(Outcome::Opened(opened)) => {
+        Ok(Outcome::Opened(opened, project_path)) => {
             println!("{}", opened_room_message(&opened));
             match chat_mode {
                 Some(mode) => run_opened_room_chat(
@@ -688,6 +1173,7 @@ fn run_room(command: Command) -> ExitCode {
                     &identity.public.device_id,
                     display_name,
                     &identity.public.signature_key_fingerprint,
+                    project_path,
                     mode,
                 ),
                 None => ExitCode::SUCCESS,
@@ -719,6 +1205,7 @@ fn run_opened_room_chat<S, H>(
     device_id: &str,
     display_name: &str,
     public_key_fingerprint: &str,
+    project_path: PathBuf,
     mode: RenderMode,
 ) -> ExitCode
 where
@@ -767,7 +1254,27 @@ where
         receiver,
         renderer: TerminalRenderer::new(mode),
     };
-    match drive_room_loop(&mut chat, &mut adapter) {
+    let previous_thread_id = chat.codex_thread_id();
+    let mut codex = match CodexRoomController::new(
+        room,
+        project_path,
+        display_name,
+        user_id,
+        previous_thread_id,
+    ) {
+        Ok(controller) => controller,
+        Err(()) => {
+            eprintln!("error: The Codex room controller could not start safely.");
+            return ExitCode::from(1);
+        }
+    };
+    for event in chat.persisted_history() {
+        if codex.observe(&event, unix_now(), false).is_err() {
+            eprintln!("error: The persisted Codex room state is invalid.");
+            return ExitCode::from(1);
+        }
+    }
+    match drive_room_loop(&mut chat, &mut adapter, Some(&mut codex)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => {
             eprintln!("error: The encrypted room loop failed safely.");
@@ -1087,6 +1594,14 @@ fn utc_timestamp() -> Result<String, InviteCliError> {
         (second_of_day % 3_600) / 60,
         second_of_day % 60
     ))
+}
+
+fn unix_now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_secs()).ok())
+        .unwrap_or(i64::MAX)
 }
 
 fn civil_date(days_since_epoch: i64) -> (i64, i64, i64) {
@@ -1727,6 +2242,107 @@ mod tests {
     fn utc_calendar_conversion_is_stable_without_a_dependency() {
         assert_eq!(civil_date(0), (1970, 1, 1));
         assert_eq!(civil_date(20_454), (2026, 1, 1));
+    }
+
+    #[test]
+    fn only_active_host_receives_exact_trusted_codex_preview_and_duplicates_are_idempotent() {
+        let room: RoomRecord = multaiplayer_protocol::from_json(
+            r#"{"id":"room-codex","teamId":"team-codex","acceptedMlsEpoch":0,"name":"Codex room","host":"Host","hostUserId":"github:host","activeHostDeviceId":"device-host","hostStatus":"active","approvalPolicy":"ask_every_turn"}"#,
+        )
+        .unwrap();
+        let proposal =
+            multaiplayer_cli::chat::ProjectedEvent::CodexProposal(CodexQueuePlaintextPayload {
+                event_type: "codex.queue".into(),
+                queue_event_id: "queue-1".into(),
+                turn_id: "proposal-1".into(),
+                action: CodexQueueAction::Queued,
+                requested_by: "Guest".into(),
+                requested_by_user_id: "github:guest".into(),
+                trigger_message_id: None,
+                reason: Some("Review the implementation".into()),
+                queue_position: Some(1),
+                queue_size: 1,
+                created_at: "2026-07-19T12:00:00.000Z".into(),
+            });
+        let mut participant =
+            CodexRoomController::new(&room, std::env::temp_dir(), "Guest", "github:guest", None)
+                .unwrap();
+        assert_eq!(
+            participant
+                .observe(&proposal, 1_784_462_400, false)
+                .unwrap(),
+            None
+        );
+
+        let mut host =
+            CodexRoomController::new(&room, std::env::temp_dir(), "Host", "github:host", None)
+                .unwrap();
+        host.settings_resolved = true;
+        let preview = host
+            .observe(&proposal, 1_784_462_400, true)
+            .unwrap()
+            .unwrap();
+        let trusted = preview.trusted_text();
+        for required in [
+            "proposal-1",
+            "Guest",
+            "Review the implementation",
+            "Context:",
+            "gpt-5.6-sol",
+            "default",
+            "medium",
+            "workspace_write",
+        ] {
+            assert!(trusted.contains(required));
+        }
+        assert_eq!(host.observe(&proposal, 1_784_462_400, true).unwrap(), None);
+    }
+
+    #[test]
+    fn future_and_stale_proposal_timestamps_never_hold_the_pending_slot() {
+        let room: RoomRecord = multaiplayer_protocol::from_json(
+            r#"{"id":"room-codex","teamId":"team-codex","acceptedMlsEpoch":0,"name":"Codex room","host":"Host","hostUserId":"github:host","activeHostDeviceId":"device-host","hostStatus":"active","approvalPolicy":"ask_every_turn"}"#,
+        )
+        .unwrap();
+        let proposal_at = |id: &str, created_at: &str| {
+            multaiplayer_cli::chat::ProjectedEvent::CodexProposal(CodexQueuePlaintextPayload {
+                event_type: "codex.queue".into(),
+                queue_event_id: format!("queue-{id}"),
+                turn_id: id.into(),
+                action: CodexQueueAction::Queued,
+                requested_by: "Authenticated member".into(),
+                requested_by_user_id: "github:member".into(),
+                trigger_message_id: None,
+                reason: Some("Review timestamp bounds".into()),
+                queue_position: Some(1),
+                queue_size: 1,
+                created_at: created_at.into(),
+            })
+        };
+        let now = 1_784_462_400;
+        let future = proposal_at("future", "2099-01-01T00:00:00.000Z");
+        let stale = proposal_at("stale", "2026-07-19T11:45:00.000Z");
+        let current = proposal_at("current", "2026-07-19T12:00:00.000Z");
+
+        let mut controller =
+            CodexRoomController::new(&room, std::env::temp_dir(), "Member", "github:member", None)
+                .unwrap();
+        assert_eq!(controller.observe(&future, now, false).unwrap(), None);
+        assert!(controller.can_propose());
+        assert_eq!(controller.observe(&stale, now, false).unwrap(), None);
+        assert!(controller.can_propose());
+        assert_eq!(controller.observe(&current, now, false).unwrap(), None);
+        assert!(!controller.can_propose());
+        assert_eq!(
+            controller.machine.pending().unwrap().expires_at_unix,
+            now + multaiplayer_cli::codex::PROPOSAL_TTL_SECONDS
+        );
+
+        let mut restarted =
+            CodexRoomController::new(&room, std::env::temp_dir(), "Member", "github:member", None)
+                .unwrap();
+        assert_eq!(restarted.observe(&future, now + 60, false).unwrap(), None);
+        assert!(restarted.can_propose());
     }
 
     #[test]

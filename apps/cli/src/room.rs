@@ -14,7 +14,11 @@ pub use multaiplayer_protocol::HostStatus;
 use multaiplayer_protocol::{ApprovalPolicy, RelayClientMessage, RoomRecord, Validate};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{fmt, fs, path::Path, time::Duration};
+use std::{
+    fmt, fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -626,6 +630,20 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             is_active_host: room.host_status == HostStatus::Active,
             room,
         })
+    }
+
+    pub fn local_project_path(&self, room_id: &str) -> Result<PathBuf, RoomError> {
+        let state = self.load_state()?;
+        let association = state
+            .associations
+            .iter()
+            .find(|association| association.room_id.as_deref() == Some(room_id))
+            .filter(|association| {
+                association.complete && !association.left && !association.forget_pending
+            })
+            .ok_or(RoomError::LocalStateUnavailable)?;
+        let canonical = canonical_stored_project(&association.project_path)?;
+        Ok(PathBuf::from(canonical))
     }
 
     pub fn leave(&mut self, selector: &str) -> Result<RoomRecord, RoomError> {

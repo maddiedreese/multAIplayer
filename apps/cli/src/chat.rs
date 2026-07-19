@@ -8,7 +8,8 @@ use crate::{
 use base64::{engine::general_purpose::STANDARD, Engine};
 use mls_core::ApplicationAuthenticatedDataInput;
 use multaiplayer_protocol::{
-    ChatPlaintextPayload, ChatRole, MlsMessageType, MlsRelayMessage, PresenceStatus,
+    ChatPlaintextPayload, ChatRole, CodexEventPlaintextPayload, CodexQueueAction,
+    CodexQueuePlaintextPayload, MlsMessageType, MlsRelayMessage, PresenceStatus,
     RelayClientMessage, RelayServerMessage, RoomEvent, RoomRecord, Validate,
 };
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,8 @@ use thiserror::Error;
 use zeroize::Zeroizing;
 
 const CHAT_KIND: &str = "chat.message";
+const CODEX_QUEUE_KIND: &str = "codex.queue";
+const CODEX_TURN_KIND: &str = "codex.turn";
 const MAX_RENDERED_TEXT_CHARS: usize = 4_096;
 const RECOVERY_VERSION: u8 = 1;
 const MAX_HISTORY_EVENTS: usize = 100;
@@ -35,6 +38,8 @@ pub enum RenderMode {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ProjectedEvent {
     Chat(ChatPlaintextPayload),
+    CodexProposal(CodexQueuePlaintextPayload),
+    CodexTurn(CodexEventPlaintextPayload),
     Presence {
         display_name: String,
         device_id: String,
@@ -73,6 +78,8 @@ struct RoomRecoveryState {
     processed_envelope_ids: Vec<String>,
     history: Vec<ProjectedEvent>,
     pending_envelope_id: Option<String>,
+    #[serde(default)]
+    codex_thread_id: Option<String>,
 }
 
 impl RoomRecoveryState {
@@ -86,6 +93,7 @@ impl RoomRecoveryState {
             processed_envelope_ids: Vec::new(),
             history: Vec::new(),
             pending_envelope_id: None,
+            codex_thread_id: None,
         }
     }
 
@@ -105,6 +113,9 @@ impl RoomRecoveryState {
                 .pending_envelope_id
                 .as_deref()
                 .is_some_and(|id| !valid_envelope_id(id))
+            || self.codex_thread_id.as_deref().is_some_and(|id| {
+                id.is_empty() || id.chars().count() > 512 || id.chars().any(char::is_control)
+            })
         {
             return Err(ChatError::InvalidRecoveryState);
         }
@@ -136,7 +147,10 @@ impl RoomRecoveryState {
     fn remember_history(&mut self, event: &ProjectedEvent) {
         if !matches!(
             event,
-            ProjectedEvent::Chat(_) | ProjectedEvent::Unsupported { .. }
+            ProjectedEvent::Chat(_)
+                | ProjectedEvent::CodexProposal(_)
+                | ProjectedEvent::CodexTurn(_)
+                | ProjectedEvent::Unsupported { .. }
         ) {
             return;
         }
@@ -161,9 +175,43 @@ impl TerminalRenderer {
             ProjectedEvent::Chat(chat) => {
                 let author = safe_untrusted_text(&chat.author, 120);
                 let body = safe_untrusted_text(&chat.body, MAX_RENDERED_TEXT_CHARS);
+                let label = match chat.role {
+                    ChatRole::Human => "chat",
+                    ChatRole::Codex => "assistant",
+                    ChatRole::System => "system",
+                };
                 match self.mode {
-                    RenderMode::Color => format!("\u{1b}[36m[chat]\u{1b}[0m <{author}> {body}"),
-                    RenderMode::Plain => format!("[chat] <{author}> {body}"),
+                    RenderMode::Color => {
+                        format!("\u{1b}[36m[{label}]\u{1b}[0m <{author}> {body}")
+                    }
+                    RenderMode::Plain => format!("[{label}] <{author}> {body}"),
+                }
+            }
+            ProjectedEvent::CodexProposal(proposal) => {
+                let proposer = safe_untrusted_text(&proposal.requested_by, 120);
+                let task = safe_untrusted_text(proposal.reason.as_deref().unwrap_or(""), 4_096);
+                let id = safe_untrusted_text(&proposal.turn_id, 160);
+                match self.mode {
+                    RenderMode::Color => {
+                        format!("\u{1b}[34m[proposal]\u{1b}[0m <{proposer}> {task} (id: {id})")
+                    }
+                    RenderMode::Plain => format!("[proposal] <{proposer}> {task} (id: {id})"),
+                }
+            }
+            ProjectedEvent::CodexTurn(turn) => {
+                let id = safe_untrusted_text(&turn.turn_id, 160);
+                let message = safe_untrusted_text(&turn.message, MAX_RENDERED_TEXT_CHARS);
+                let status = match turn.status {
+                    multaiplayer_protocol::CodexTurnStatus::Started => "started",
+                    multaiplayer_protocol::CodexTurnStatus::Event => "event",
+                    multaiplayer_protocol::CodexTurnStatus::Completed => "completed",
+                    multaiplayer_protocol::CodexTurnStatus::Failed => "failed",
+                };
+                match self.mode {
+                    RenderMode::Color => {
+                        format!("\u{1b}[32m[codex]\u{1b}[0m {id} {status}: {message}")
+                    }
+                    RenderMode::Plain => format!("[codex] {id} {status}: {message}"),
                 }
             }
             ProjectedEvent::Presence {
@@ -201,7 +249,7 @@ impl TerminalRenderer {
     /// Trusted prompts use a fixed delimiter that is never accepted from room
     /// content. Untrusted details are sanitized before insertion.
     pub fn trusted_prompt(&self, prompt: &str) -> String {
-        let prompt = safe_untrusted_text(prompt, 512);
+        let prompt = safe_untrusted_text(prompt, 4_096);
         match self.mode {
             RenderMode::Color => format!(
                 "\u{1b}[1;32m=== multAIplayer trusted prompt ===\u{1b}[0m\n{prompt}\n\u{1b}[1;32m=== end trusted prompt ===\u{1b}[0m"
@@ -303,6 +351,27 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
         self.recovery.history.clone()
     }
 
+    pub fn is_active_host(&self) -> bool {
+        self.room.host_user_id.as_deref() == Some(self.user_id.as_str())
+            && self.room.active_host_device_id.as_deref() == Some(self.device_id.as_str())
+            && self.room.host_status == multaiplayer_protocol::HostStatus::Active
+    }
+
+    pub fn codex_thread_id(&self) -> Option<String> {
+        self.recovery.codex_thread_id.clone()
+    }
+
+    pub fn save_codex_thread_id(&mut self, thread_id: &str) -> Result<(), ChatError> {
+        if thread_id.is_empty()
+            || thread_id.chars().count() > 512
+            || thread_id.chars().any(char::is_control)
+        {
+            return Err(ChatError::InvalidRecoveryState);
+        }
+        self.recovery.codex_thread_id = Some(thread_id.to_owned());
+        self.persist_recovery()
+    }
+
     pub fn leave(&mut self) {
         self.connection.close();
     }
@@ -361,6 +430,143 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
         Ok(projected)
     }
 
+    pub fn send_codex_proposal(
+        &mut self,
+        envelope_id: &str,
+        proposal_id: &str,
+        task: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        let proposal = CodexQueuePlaintextPayload {
+            event_type: CODEX_QUEUE_KIND.to_owned(),
+            queue_event_id: envelope_id.to_owned(),
+            turn_id: proposal_id.to_owned(),
+            action: CodexQueueAction::Queued,
+            requested_by: self.display_name.clone(),
+            requested_by_user_id: self.user_id.clone(),
+            trigger_message_id: None,
+            reason: Some(task.to_owned()),
+            queue_position: Some(1),
+            queue_size: 1,
+            created_at: created_at.to_owned(),
+        };
+        let event = ProjectedEvent::CodexProposal(proposal.clone());
+        self.queue_projected_event(envelope_id, CODEX_QUEUE_KIND, &proposal, &event, created_at)?;
+        let mut projected = vec![event];
+        projected.extend(self.publish_queued_application(envelope_id, created_at)?);
+        Ok(projected)
+    }
+
+    pub fn send_codex_turn(
+        &mut self,
+        envelope_id: &str,
+        turn: CodexEventPlaintextPayload,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        if !self.is_active_host() || turn.turn_id.is_empty() {
+            return Err(ChatError::InvalidMessage);
+        }
+        let created_at = turn.created_at.clone();
+        let event = ProjectedEvent::CodexTurn(turn.clone());
+        self.queue_projected_event(envelope_id, CODEX_TURN_KIND, &turn, &event, &created_at)?;
+        let mut projected = vec![event];
+        projected.extend(self.publish_queued_application(envelope_id, &created_at)?);
+        Ok(projected)
+    }
+
+    pub fn send_codex_cancelled(
+        &mut self,
+        envelope_id: &str,
+        proposal: &CodexQueuePlaintextPayload,
+        reason: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        if !self.is_active_host() || proposal.action != CodexQueueAction::Queued {
+            return Err(ChatError::InvalidMessage);
+        }
+        let cancelled = CodexQueuePlaintextPayload {
+            event_type: CODEX_QUEUE_KIND.to_owned(),
+            queue_event_id: envelope_id.to_owned(),
+            turn_id: proposal.turn_id.clone(),
+            action: CodexQueueAction::Cancelled,
+            requested_by: proposal.requested_by.clone(),
+            requested_by_user_id: proposal.requested_by_user_id.clone(),
+            trigger_message_id: proposal.trigger_message_id.clone(),
+            reason: Some(reason.to_owned()),
+            queue_position: None,
+            queue_size: 0,
+            created_at: created_at.to_owned(),
+        };
+        let event = ProjectedEvent::CodexProposal(cancelled.clone());
+        self.queue_projected_event(
+            envelope_id,
+            CODEX_QUEUE_KIND,
+            &cancelled,
+            &event,
+            created_at,
+        )?;
+        let mut projected = vec![event];
+        projected.extend(self.publish_queued_application(envelope_id, created_at)?);
+        Ok(projected)
+    }
+
+    pub fn send_assistant_message(
+        &mut self,
+        message_id: &str,
+        body: &str,
+        created_at: &str,
+        display_time: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        if !self.is_active_host() {
+            return Err(ChatError::InvalidMessage);
+        }
+        let chat = ChatPlaintextPayload {
+            id: message_id.to_owned(),
+            author: "Codex".to_owned(),
+            author_user_id: self.user_id.clone(),
+            role: ChatRole::Codex,
+            body: body.to_owned(),
+            time: display_time.to_owned(),
+            created_at: Some(created_at.to_owned()),
+            reply_to: None,
+            attachments: None,
+        };
+        let event = ProjectedEvent::Chat(chat.clone());
+        self.queue_projected_event(message_id, CHAT_KIND, &chat, &event, created_at)?;
+        let mut projected = vec![event];
+        projected.extend(self.publish_queued_application(message_id, created_at)?);
+        Ok(projected)
+    }
+
+    fn queue_projected_event<T: Serialize + Validate>(
+        &mut self,
+        message_id: &str,
+        kind: &str,
+        payload: &T,
+        event: &ProjectedEvent,
+        created_at: &str,
+    ) -> Result<(), ChatError> {
+        payload.validate().map_err(|_| ChatError::InvalidMessage)?;
+        let payload = serde_json::to_vec(payload).map_err(|_| ChatError::InvalidMessage)?;
+        self.mls.queue_application(
+            &self.room.id,
+            message_id,
+            &payload,
+            ApplicationAuthenticatedDataInput {
+                version: 1,
+                message_id: message_id.to_owned(),
+                team_id: self.room.team_id.clone(),
+                room_id: self.room.id.clone(),
+                kind: kind.to_owned(),
+                sender_user_id: self.user_id.clone(),
+                sender_device_id: self.device_id.clone(),
+                created_at: created_at.to_owned(),
+            },
+        )?;
+        self.recovery.remember_processed(message_id);
+        self.recovery.remember_history(event);
+        self.persist_recovery()
+    }
+
     fn queue_chat(
         &mut self,
         message_id: &str,
@@ -379,28 +585,11 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
             reply_to: None,
             attachments: None,
         };
-        chat.validate().map_err(|_| ChatError::InvalidMessage)?;
-        let payload = serde_json::to_vec(&chat).map_err(|_| ChatError::InvalidMessage)?;
-        self.mls.queue_application(
-            &self.room.id,
-            message_id,
-            &payload,
-            ApplicationAuthenticatedDataInput {
-                version: 1,
-                message_id: message_id.to_owned(),
-                team_id: self.room.team_id.clone(),
-                room_id: self.room.id.clone(),
-                kind: CHAT_KIND.to_owned(),
-                sender_user_id: self.user_id.clone(),
-                sender_device_id: self.device_id.clone(),
-                created_at: created_at.to_owned(),
-            },
-        )?;
-
         let local = ProjectedEvent::Chat(chat);
-        self.recovery.remember_processed(message_id);
-        self.recovery.remember_history(&local);
-        self.persist_recovery()?;
+        let ProjectedEvent::Chat(payload) = &local else {
+            unreachable!()
+        };
+        self.queue_projected_event(message_id, CHAT_KIND, payload, &local, created_at)?;
         Ok(local)
     }
 
@@ -569,11 +758,28 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
             .map_err(|_| ChatError::InvalidEncryptedMessage)?
         {
             RoomEvent::ChatMessage(chat)
-                if chat.id == aad.message_id && chat.author_user_id == aad.sender_user_id =>
+                if chat.id == aad.message_id
+                    && chat.author_user_id == aad.sender_user_id
+                    && (chat.role == ChatRole::Human
+                        || self.envelope_from_active_host(envelope)) =>
             {
                 Some(ProjectedEvent::Chat(chat))
             }
             RoomEvent::ChatMessage(_) => return Err(ChatError::InvalidEncryptedMessage),
+            RoomEvent::CodexQueue(proposal)
+                if proposal.queue_event_id == aad.message_id
+                    && ((proposal.action == CodexQueueAction::Queued
+                        && proposal.requested_by_user_id == aad.sender_user_id)
+                        || (proposal.action != CodexQueueAction::Queued
+                            && self.envelope_from_active_host(envelope))) =>
+            {
+                Some(ProjectedEvent::CodexProposal(proposal))
+            }
+            RoomEvent::CodexQueue(_) => return Err(ChatError::InvalidEncryptedMessage),
+            RoomEvent::CodexEvent(turn) if self.envelope_from_active_host(envelope) => {
+                Some(ProjectedEvent::CodexTurn(turn))
+            }
+            RoomEvent::CodexEvent(_) => return Err(ChatError::InvalidEncryptedMessage),
             RoomEvent::Unsupported { kind } => Some(ProjectedEvent::Unsupported { kind }),
             _ => Some(ProjectedEvent::Unsupported {
                 kind: aad.kind.clone(),
@@ -581,6 +787,13 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
         };
         self.finish_incoming(&envelope.id, projected.as_ref())?;
         Ok(projected)
+    }
+
+    fn envelope_from_active_host(&self, envelope: &MlsRelayMessage) -> bool {
+        self.room.host_user_id.as_deref() == Some(envelope.sender_user_id.as_str())
+            && self.room.active_host_device_id.as_deref()
+                == Some(envelope.sender_device_id.as_str())
+            && self.room.host_status == multaiplayer_protocol::HostStatus::Active
     }
 
     fn begin_incoming(&mut self, envelope_id: &str) -> Result<(), ChatError> {
@@ -714,6 +927,86 @@ where
         }
     }
 
+    pub fn send_codex_proposal(
+        &mut self,
+        envelope_id: &str,
+        proposal_id: &str,
+        task: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        let local = self
+            .inner
+            .send_codex_proposal(envelope_id, proposal_id, task, created_at);
+        match local {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(created_at),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn send_codex_turn(
+        &mut self,
+        envelope_id: &str,
+        turn: CodexEventPlaintextPayload,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        let created_at = turn.created_at.clone();
+        match self.inner.send_codex_turn(envelope_id, turn) {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(&created_at),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn send_codex_cancelled(
+        &mut self,
+        envelope_id: &str,
+        proposal: &CodexQueuePlaintextPayload,
+        reason: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        match self
+            .inner
+            .send_codex_cancelled(envelope_id, proposal, reason, created_at)
+        {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(created_at),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn send_assistant_message(
+        &mut self,
+        message_id: &str,
+        body: &str,
+        created_at: &str,
+        display_time: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        match self
+            .inner
+            .send_assistant_message(message_id, body, created_at, display_time)
+        {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(created_at),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn is_active_host(&self) -> bool {
+        self.inner.is_active_host()
+    }
+
+    pub fn persisted_history(&self) -> Vec<ProjectedEvent> {
+        self.inner.persisted_history()
+    }
+
+    pub fn codex_thread_id(&self) -> Option<String> {
+        self.inner.codex_thread_id()
+    }
+
+    pub fn save_codex_thread_id(&mut self, thread_id: &str) -> Result<(), ChatError> {
+        self.inner.save_codex_thread_id(thread_id)
+    }
+
     pub fn poll(
         &mut self,
         timeout: Duration,
@@ -770,6 +1063,8 @@ fn valid_envelope_id(value: &str) -> bool {
 fn valid_history_event(event: &ProjectedEvent) -> bool {
     match event {
         ProjectedEvent::Chat(chat) => chat.validate().is_ok(),
+        ProjectedEvent::CodexProposal(proposal) => proposal.validate().is_ok(),
+        ProjectedEvent::CodexTurn(turn) => turn.validate().is_ok(),
         ProjectedEvent::Unsupported { kind } => {
             !kind.is_empty() && kind.chars().count() <= 128 && !kind.chars().any(char::is_control)
         }
@@ -985,6 +1280,61 @@ mod tests {
     }
 
     #[test]
+    fn codex_thread_continuity_is_durable_bounded_and_backward_compatible() {
+        let directory = TestDirectory::new();
+        let store = MemoryCredentialStore::default();
+        let identity = load_or_create_identity(&store, "github:maddie", "Maddie").unwrap();
+        let mut mls =
+            MlsClientService::open(&store, &identity, &directory.0.join("mls.db")).unwrap();
+        let room = recovery_room();
+        mls.create_group_idempotent(&room.id).unwrap();
+
+        {
+            let mut session = ChatRoomSession::new(
+                RelayConnection::new(NoopSocket),
+                &mut mls,
+                room.clone(),
+                &identity.public.user_id,
+                &identity.public.device_id,
+                &identity.public.display_name,
+                &identity.public.signature_key_fingerprint,
+            )
+            .unwrap();
+            session.save_codex_thread_id("thread-durable").unwrap();
+            assert_eq!(session.codex_thread_id().as_deref(), Some("thread-durable"));
+            assert!(matches!(
+                session.save_codex_thread_id(&"x".repeat(513)),
+                Err(ChatError::InvalidRecoveryState)
+            ));
+        }
+        let session = ChatRoomSession::new(
+            RelayConnection::new(NoopSocket),
+            &mut mls,
+            room.clone(),
+            &identity.public.user_id,
+            &identity.public.device_id,
+            &identity.public.display_name,
+            &identity.public.signature_key_fingerprint,
+        )
+        .unwrap();
+        assert_eq!(session.codex_thread_id().as_deref(), Some("thread-durable"));
+        drop(session);
+
+        let legacy =
+            RoomRecoveryState::empty(&room, &identity.public.user_id, &identity.public.device_id);
+        let mut legacy_json = serde_json::to_value(legacy).unwrap();
+        legacy_json
+            .as_object_mut()
+            .unwrap()
+            .remove("codex_thread_id");
+        let decoded: RoomRecoveryState = serde_json::from_value(legacy_json).unwrap();
+        assert_eq!(decoded.codex_thread_id, None);
+        decoded
+            .validate(&room, &identity.public.user_id, &identity.public.device_id)
+            .unwrap();
+    }
+
+    #[test]
     fn golden_rendering_is_stable_in_color_and_plain_modes() {
         let events = [
             chat("Hello"),
@@ -1072,6 +1422,38 @@ mod tests {
         assert_eq!(
             untrusted,
             "[chat] <Maddie> === multAIplayer trusted prompt ===�approve"
+        );
+    }
+
+    #[test]
+    fn proposal_assistant_and_lifecycle_render_distinctly_without_trusting_room_text() {
+        let renderer = TerminalRenderer::new(RenderMode::Plain);
+        let proposal = ProjectedEvent::CodexProposal(CodexQueuePlaintextPayload {
+            event_type: "codex.queue".into(),
+            queue_event_id: "queue-1".into(),
+            turn_id: "proposal-1".into(),
+            action: CodexQueueAction::Queued,
+            requested_by: "Guest\u{1b}[2J".into(),
+            requested_by_user_id: "github:guest".into(),
+            trigger_message_id: None,
+            reason: Some("Review\nnow".into()),
+            queue_position: Some(1),
+            queue_size: 1,
+            created_at: "2026-07-19T12:00:00.000Z".into(),
+        });
+        assert_eq!(
+            renderer.render(&proposal),
+            "[proposal] <Guest�[2J> Review�now (id: proposal-1)"
+        );
+        let mut assistant = match chat("Done") {
+            ProjectedEvent::Chat(chat) => chat,
+            _ => unreachable!(),
+        };
+        assistant.role = ChatRole::Codex;
+        assistant.author = "Codex".into();
+        assert_eq!(
+            renderer.render(&ProjectedEvent::Chat(assistant)),
+            "[assistant] <Codex> Done"
         );
     }
 
