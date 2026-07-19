@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-070 room creation and local project association
+Current phase: CLI-080 secure invite codes and host-mediated admission
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -14,9 +14,10 @@ Last update: 2026-07-18
 - Codex project: `MultAIplayer-cli`.
 - Governance branch: `codex/cli-governance`.
 - The CLI scaffold, strict Rust protocol parity layer, GitHub authentication,
-  secure device identity, authenticated relay transport/workspace reads, and
-  durable MLS client state/outbox are present; room creation and later product
-  behavior have not been implemented.
+  secure device identity, authenticated relay transport/workspace reads,
+  durable MLS client state/outbox, and room creation with host-local project
+  association are present; secure admission and later product behavior have not
+  been implemented.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -69,9 +70,17 @@ Last update: 2026-07-18
   244 desktop native tests, relay/protocol compatibility, and dependency audits.
   The correction left-pads minimally encoded valid P-256 scalars without retry,
   entropy replacement, public-key change, contract change, or dependency change.
-- CLI-070 is the only active implementation task and may incorporate the
-  integrated corrective baseline through a merge without rewriting its original
-  baseline ancestry, then resume its full verification.
+- CLI-070 is complete and integrated. Its accepted corrected task head is
+  `1485adc99ebea9987c601c82065223dd396a38ef`; integration merge
+  `51ac49197762c0a31def280a58b6e084b4398048` passed the locked CLI runner with
+  76 executed tests, including a genuine production `RoomService` →
+  `RelayRoomBackend` → `MlsClientService` create/open/restart journey against a
+  real relay fixture, plus 18 classification/isolation tests. Independent review
+  also passed all 52 `mls-core` tests, 27 protocol tests, 285 relay tests, and 695
+  desktop tests. The accepted diff is CLI-only, preserves the original CLI-070
+  ancestry and CLI-040-R1 correction, keeps canonical project paths in zeroized
+  local credential state, and leaves desktop/release surfaces unchanged.
+- CLI-080 is the only active implementation task.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -94,8 +103,8 @@ Last update: 2026-07-18
 | CLI-040-R1 | Device identity reliability correction | complete | CLI-040 |
 | CLI-050 | Relay transport and workspace reads | complete | CLI-030, CLI-040 |
 | CLI-060 | MLS client state, storage, and outbox | complete | CLI-030, CLI-040 |
-| CLI-070 | Room creation and local project association | active | CLI-050, CLI-060, CLI-040-R1 |
-| CLI-080 | Secure invite codes and host-mediated admission | waiting_for_orchestrator_approval | CLI-070 |
+| CLI-070 | Room creation and local project association | complete | CLI-050, CLI-060, CLI-040-R1 |
+| CLI-080 | Secure invite codes and host-mediated admission | active | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | waiting_for_orchestrator_approval | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | waiting_for_orchestrator_approval | CLI-090 |
 | CLI-110 | UI-independent Codex host extraction | waiting_for_orchestrator_approval | CLI-020 |
