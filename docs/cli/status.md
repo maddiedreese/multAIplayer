@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-010-R1 journey CI toolchain reliability correction
+Current phase: CLI-110 UI-independent Codex host extraction
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -127,11 +127,23 @@ Last update: 2026-07-18
   successfully, then failed its metrics upload with `ETIMEDOUT`; the native fuzz
   job did not execute because pinned `cargo-fuzz 0.12.0` failed to compile with
   moving nightly `1.99.0-nightly` through `rustix 0.36.5`.
-- The owner authorized CLI-010-R1 as the sole active corrective task to pin a
-  compatible nightly/`cargo-fuzz` pair without weakening any gate and to prove
-  the complete journey workflow twice. CLI-110 remains paused until that
-  correction is integrated and may then incorporate it without rewriting its
-  original ancestry.
+- CLI-010-R1 is complete and integrated. Its accepted task commit is
+  `219cfd77fc88df1f10360c45b558f12bdfcb6715`; integration merge
+  `129e6158086a4f66b39d662783878ac831084ed4` pins
+  `nightly-2026-07-18` with `cargo-fuzz 0.13.2 --locked` and changes only the
+  two authorized fuzz toolchain selectors. Complete Product journeys runs
+  `29680873838` and `29681119913` both passed on the exact task head: both
+  unchanged 120-second native fuzz targets executed, the real two-client native
+  MLS journey passed, every required job and aggregation passed, and all five
+  required artifact classes uploaded in each run. Integration also passed all
+  18 classification/release-isolation tests and the protected release audit.
+  No target, argument, timeout, failure behavior, corpus, artifact requirement,
+  product source, dependency, lockfile, desktop behavior, or release surface
+  changed.
+- CLI-110 is again the sole active implementation task. It may incorporate the
+  accepted CLI-010-R1 integration commit without rewriting its original task
+  ancestry, then must rerun its complete verification on the resulting exact
+  head before integration review.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -148,7 +160,7 @@ Last update: 2026-07-18
 | --- | --- | --- | --- |
 | CLI-000 | Program orchestration and governance | active_orchestrator | — |
 | CLI-010 | Desktop release isolation and CI classification | complete | CLI-000 |
-| CLI-010-R1 | Journey CI toolchain reliability correction | active | CLI-010 |
+| CLI-010-R1 | Journey CI toolchain reliability correction | complete | CLI-010 |
 | CLI-020 | Inert Rust CLI scaffold | complete | CLI-010 |
 | CLI-030 | Rust protocol types and golden fixtures | complete | CLI-020 |
 | CLI-040 | GitHub authentication and secure device identity | complete | CLI-030 |
@@ -159,7 +171,7 @@ Last update: 2026-07-18
 | CLI-080 | Secure invite codes and host-mediated admission | complete | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | complete | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | complete | CLI-090 |
-| CLI-110 | UI-independent Codex host extraction | paused_for_CLI-010-R1 | CLI-020 |
+| CLI-110 | UI-independent Codex host extraction | active | CLI-020 |
 | CLI-120 | Codex proposals, context, and hosted turns | waiting_for_orchestrator_approval | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | waiting_for_orchestrator_approval | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | waiting_for_orchestrator_approval | CLI-100, CLI-130 |
