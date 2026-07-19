@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-150 security hardening and threat-model update
+Current phase: CLI-160 signed CLI packaging and release isolation
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -18,8 +18,9 @@ Last update: 2026-07-19
   durable MLS client state/outbox, room creation with host-local project
   association, secure host-mediated admission, encrypted chat, durable
   reconnect/replay/history recovery, and approved host-local Codex turns are
-  present; privileged request approvals and bounded shared activity are present,
-  while mixed desktop/CLI interoperability journeys and later hardening remain.
+  present; privileged request approvals, bounded shared activity, mixed
+  desktop/CLI interoperability, and security hardening are complete, while
+  signed CLI packaging and external-alpha readiness remain.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -222,9 +223,28 @@ Last update: 2026-07-19
   RustSec audits, license checks, and protected-path review. No manifest,
   lockfile, dependency, wire contract, MLS policy, or protected release surface
   changed.
-- CLI-150 is the sole active implementation task for its documented security
-  hardening, executed evidence, and threat-model scope. Owner review remains
-  mandatory before its threat-model acceptance criterion can be closed.
+- CLI-150 is complete and integrated. Its owner-approved task commit is
+  `35c633cfde60d54a9695eda45e68fd83e97f33b9`; integration merge
+  `8a791873ceaa90eeda011548cbb8cd8667030bd4` changes only three CLI rendering
+  paths and `docs/threat-model.md`. The hardening routes room output and the
+  native admission prompt through the existing bounded Unicode terminal
+  sanitizer, closing bidi-override and zero-width prompt-spoofing gaps without
+  changing authority or protocol semantics. The owner approved the documented
+  CLI threat-model claims and residual risks for the exact task head.
+  Independent task and integration verification passed 109 CLI library tests,
+  10 binary tests, 2 host-boundary tests, the real desktop/CLI matrix, 9 Rust
+  protocol tests, and all 18 classification/release-isolation tests. Task
+  evidence additionally passed both locked 120-second native fuzz targets
+  (4,435,031 and 10,276,660 executions), 320,000 relay property executions,
+  adversarial process-security journeys, 695 desktop frontend tests, 285 relay
+  tests, 250 native Rust tests, 27 TypeScript protocol tests, 16 UI contracts,
+  npm/RustSec/Cargo-deny/license audits, full-history Gitleaks, optimized-binary
+  secret scanning, exact ancestry, cleanliness, and protected-path review. No
+  manifest, lockfile, dependency, wire contract, MLS policy, desktop behavior,
+  or protected release surface changed.
+- CLI-160 is the sole active implementation task for its documented signed CLI
+  packaging, checksums, notices, release-manifest, documentation, smoke-test,
+  and desktop release-isolation scope. CLI publication remains owner-controlled.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -257,8 +277,8 @@ Last update: 2026-07-19
 | CLI-120 | Codex proposals, context, and hosted turns | complete | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | complete | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | complete | CLI-100, CLI-130 |
-| CLI-150 | Security hardening and threat-model update | active | CLI-140 |
-| CLI-160 | Signed CLI packaging and release isolation | waiting_for_orchestrator_approval | CLI-150 |
+| CLI-150 | Security hardening and threat-model update | complete | CLI-140 |
+| CLI-160 | Signed CLI packaging and release isolation | active | CLI-150 |
 | CLI-170 | External-alpha readiness review | waiting_for_orchestrator_approval | CLI-160 |
 
 ## Release safety snapshot
