@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-160 signed CLI packaging and release isolation
+Current phase: CLI-170 external-alpha readiness review
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -242,9 +242,30 @@ Last update: 2026-07-19
   secret scanning, exact ancestry, cleanliness, and protected-path review. No
   manifest, lockfile, dependency, wire contract, MLS policy, desktop behavior,
   or protected release surface changed.
-- CLI-160 is the sole active implementation task for its documented signed CLI
-  packaging, checksums, notices, release-manifest, documentation, smoke-test,
-  and desktop release-isolation scope. CLI publication remains owner-controlled.
+- CLI-160 is complete and integrated. Its accepted corrected task head is
+  `1f03c2b0fa5621c4c08fa1cc2361209132fc6e1f`; integration merge
+  `2af4b5018c917b70d98c421146d6a8ca466af24c` changes only the 11 reviewed CLI
+  version, lockfile, packaging, release-documentation, and CLI-check paths.
+  Independent review returned three packaging-policy gaps for correction, then
+  verified fail-closed dependency-license review, canonical output containment,
+  and actual-versus-claimed code-signature metadata. The final Apple-silicon
+  archive is for `multAIplayer 0.1.0-alpha.1`; its archive, manifest, and binary
+  SHA-256 values are respectively
+  `e130f372f86732ea542bc258865809d8e56dc66fd961c06b19c9bb6ff6c3f7bf`,
+  `57674edb628901b82bb871286f4f1d216cbb25e5b830a3de8ed590fa37fe4665`,
+  and `37a3c43867d4feba4a9afabb91b906c9fa8f4dbe72b52ded607713aeaa910727`.
+  Task and integration verification passed 7 packaging-policy tests, 109 CLI
+  library tests, 10 binary tests, 2 host-boundary tests, the mixed-client matrix,
+  9 Rust protocol tests, and all 18 classification/release-isolation tests.
+  Task evidence also passed the clean-environment install and exact artifact
+  verifier, 21 desktop release-tool tests, documentation/version/license checks,
+  npm and Rust dependency audits, exact ancestry, cleanliness, and protected-path
+  review. Desktop updater, notarization, signing, versions, release workflows,
+  Cargo.lock, and asset manifests remain unchanged. Developer ID signing and CLI
+  publication remain owner-controlled and were not performed.
+- CLI-170 is the sole active task for its read-first external-alpha readiness
+  audit. Any implementation fix requires a separately approved follow-up task;
+  publication remains owner-controlled.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -278,8 +299,8 @@ Last update: 2026-07-19
 | CLI-130 | Privileged approvals and shared activity | complete | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | complete | CLI-100, CLI-130 |
 | CLI-150 | Security hardening and threat-model update | complete | CLI-140 |
-| CLI-160 | Signed CLI packaging and release isolation | active | CLI-150 |
-| CLI-170 | External-alpha readiness review | waiting_for_orchestrator_approval | CLI-160 |
+| CLI-160 | Signed CLI packaging and release isolation | complete | CLI-150 |
+| CLI-170 | External-alpha readiness review | active | CLI-160 |
 
 ## Release safety snapshot
 
