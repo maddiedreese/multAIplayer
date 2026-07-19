@@ -71,6 +71,18 @@ pub trait HttpClient {
     ) -> Result<HttpResponse, CliError> {
         Err(CliError::RelayUnavailable)
     }
+    fn post_json_bytes(
+        &self,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &[u8],
+    ) -> Result<HttpResponse, CliError> {
+        let value = serde_json::from_slice(body).map_err(|_| CliError::RelayUnavailable)?;
+        self.post_json(url, headers, &value)
+    }
+    fn delete(&self, _url: &str, _headers: &[(&str, &str)]) -> Result<HttpResponse, CliError> {
+        Err(CliError::RelayUnavailable)
+    }
 }
 
 pub struct ReqwestHttpClient {
@@ -162,6 +174,27 @@ impl HttpClient for ReqwestHttpClient {
         Self::collect(response)
     }
 
+    fn post_json_bytes(
+        &self,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &[u8],
+    ) -> Result<HttpResponse, CliError> {
+        let mut request_headers = Self::headers(headers)?;
+        request_headers.insert(
+            reqwest::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let response = self
+            .client
+            .post(url)
+            .headers(request_headers)
+            .body(body.to_vec())
+            .send()
+            .map_err(|_| CliError::RelayUnavailable)?;
+        Self::collect(response)
+    }
+
     fn patch_json(
         &self,
         url: &str,
@@ -173,6 +206,16 @@ impl HttpClient for ReqwestHttpClient {
             .patch(url)
             .headers(Self::headers(headers)?)
             .json(body)
+            .send()
+            .map_err(|_| CliError::RelayUnavailable)?;
+        Self::collect(response)
+    }
+
+    fn delete(&self, url: &str, headers: &[(&str, &str)]) -> Result<HttpResponse, CliError> {
+        let response = self
+            .client
+            .delete(url)
+            .headers(Self::headers(headers)?)
             .send()
             .map_err(|_| CliError::RelayUnavailable)?;
         Self::collect(response)

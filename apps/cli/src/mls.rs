@@ -4,16 +4,24 @@ use crate::{
     relay::{RelayConnection, RelaySocket, RelayTransportError},
     CliError,
 };
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+    Engine,
+};
 use mls_core::{
-    generate_device_signing_secret, ApplicationAuthenticatedData, BasicAppCredential,
-    EncryptedStore, EngineError, MlsEngine, OutboxItem, OutboxMetadata, StoreError,
+    derive_capability_verifier, encode_capability_binding, generate_device_signing_secret,
+    issue_capability, mac_binding, mac_response_binding, open, seal, validate_key_package_upload,
+    verify_request_binding, verify_response_binding, ApplicationAuthenticatedData,
+    BasicAppCredential, CapabilityBinding, EncryptedStore, EngineError, JoinAdmissionMetadata,
+    KeyPackageUpload, MlsEngine, OutboxItem, OutboxMetadata, PendingInviteRequest, SealedPayload,
+    StoreError, WelcomeRetryMetadata,
 };
 use multaiplayer_protocol::{
     MlsMessageType, MlsRelayMessage, RelayClientMessage, RelayErrorCode, RelayServerMessage,
     Validate,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
     fs,
@@ -21,6 +29,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
+use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 pub const MLS_STORAGE_KEY_ACCOUNT: &str = "mls-store-wrap:v1";
@@ -37,6 +46,8 @@ pub enum MlsClientError {
     GroupNotFound,
     #[error("The durable MLS outbox contains an invalid or unsupported record.")]
     InvalidOutbox,
+    #[error("The invite capability, binding, or response is invalid.")]
+    InvalidInvite,
     #[error("The relay operation failed.")]
     Relay(#[source] RelayTransportError),
 }
@@ -53,6 +64,139 @@ pub struct OutboxRoute {
 pub struct DrainReport {
     pub published: Vec<String>,
     pub expired_applications: Vec<String>,
+}
+
+const INVITE_CAPABILITY_ACCOUNT_PREFIX: &str = "invite-capability:v1:";
+
+#[derive(Clone, Eq, PartialEq, Zeroize, ZeroizeOnDrop)]
+pub struct IssuedInviteCapability {
+    pub handle: String,
+    pub url_value: String,
+}
+
+impl std::fmt::Debug for IssuedInviteCapability {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("IssuedInviteCapability")
+            .field("handle", &"[redacted]")
+            .field("url_value", &"[redacted]")
+            .finish()
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct PreparedInviteRequest {
+    pub invite_id: String,
+    pub request_id: String,
+    pub requester_device_id: String,
+    pub key_package_id: String,
+    pub key_package: String,
+    pub key_package_hash: String,
+    pub sealed_request: String,
+    pub binding: CapabilityBinding,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingInviteAdmission {
+    pub invite_id: String,
+    pub request_id: String,
+    pub requester_user_id: String,
+    pub requester_device_id: String,
+    pub room_id: String,
+    pub expires_at: String,
+}
+
+impl std::fmt::Debug for PreparedInviteRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PreparedInviteRequest")
+            .field("invite_id", &self.invite_id)
+            .field("request_id", &self.request_id)
+            .field("requester_device_id", &self.requester_device_id)
+            .field("key_package_id", &self.key_package_id)
+            .field("key_package", &"[redacted key package]")
+            .field("key_package_hash", &self.key_package_hash)
+            .field("sealed_request", &"[redacted sealed request]")
+            .field("binding", &self.binding)
+            .finish()
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct OpenedInviteRequest {
+    pub capability_handle: String,
+    pub binding: CapabilityBinding,
+    pub key_package: String,
+    pub key_package_id: String,
+    pub mac: String,
+    pub requester_signature_public_key: String,
+    pub requester_signature_key_fingerprint: String,
+}
+
+impl std::fmt::Debug for OpenedInviteRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("OpenedInviteRequest")
+            .field("capability_handle", &"[redacted]")
+            .field("binding", &self.binding)
+            .field("key_package", &"[redacted key package]")
+            .field("key_package_id", &self.key_package_id)
+            .field("mac", &"[redacted]")
+            .field(
+                "requester_signature_key_fingerprint",
+                &self.requester_signature_key_fingerprint,
+            )
+            .finish()
+    }
+}
+
+impl Zeroize for OpenedInviteRequest {
+    fn zeroize(&mut self) {
+        self.capability_handle.zeroize();
+        self.key_package.zeroize();
+        self.mac.zeroize();
+    }
+}
+
+impl Drop for OpenedInviteRequest {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InviteDecision {
+    pub status: String,
+    pub response_binding: CapabilityBinding,
+    pub response_mac: String,
+    pub commit_outbox_id: Option<String>,
+    pub response_outbox_id: String,
+    pub welcome: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DirectedInviteRequestEnvelope<'a> {
+    version: u8,
+    binding: &'a CapabilityBinding,
+    sealed_payload: &'a SealedPayload,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DirectedInviteRequestEnvelopeOwned {
+    version: u8,
+    binding: CapabilityBinding,
+    sealed_payload: SealedPayload,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct InviteRequestPayload {
+    capability_handle: String,
+    binding: CapabilityBinding,
+    key_package: String,
+    mac: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -229,6 +373,434 @@ impl MlsClientService {
         }
     }
 
+    pub fn issue_invite_capability(
+        credential_store: &impl CredentialStore,
+    ) -> Result<IssuedInviteCapability, MlsClientError> {
+        let mut issued = issue_capability();
+        let raw = Zeroizing::new(issued.take_url_value());
+        let handle = Uuid::new_v4().to_string();
+        let encoded_verifier = Zeroizing::new(STANDARD.encode(issued.verifier()));
+        credential_store
+            .set(
+                &format!("{INVITE_CAPABILITY_ACCOUNT_PREFIX}{handle}"),
+                encoded_verifier.as_str(),
+            )
+            .map_err(|_| MlsClientError::StorageUnavailable)?;
+        Ok(IssuedInviteCapability {
+            handle,
+            url_value: URL_SAFE_NO_PAD.encode(raw.as_slice()),
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_invite_request(
+        &self,
+        host_hpke_public_key: &str,
+        capability_handle: &str,
+        capability_url_value: &str,
+        invite_id: &str,
+        team_id: &str,
+        room_id: &str,
+        key_epoch: u64,
+        host_user_id: &str,
+        host_device_id: &str,
+        expires_at: &str,
+    ) -> Result<PreparedInviteRequest, MlsClientError> {
+        if !valid_capability_handle(capability_handle) {
+            return Err(MlsClientError::InvalidInvite);
+        }
+        let capability = decode_url_key(capability_url_value)?;
+        let host_hpke = STANDARD
+            .decode(host_hpke_public_key)
+            .map_err(|_| MlsClientError::InvalidInvite)?;
+        let key_package = self
+            .engine
+            .generate_key_package()
+            .map_err(map_engine_error)?;
+        let key_package_encoded = STANDARD.encode(&key_package);
+        let key_package_hash = format!("sha256:{:x}", Sha256::digest(&key_package));
+        let key_package_id = Uuid::new_v4().to_string();
+        let request_id = Uuid::new_v4().to_string();
+        let nonce = Zeroizing::new(generate_device_signing_secret().map_err(map_invite_error)?);
+        let binding = CapabilityBinding {
+            version: 3,
+            phase: "request".into(),
+            invite_id: invite_id.into(),
+            team_id: team_id.into(),
+            room_id: room_id.into(),
+            key_epoch,
+            key_package_hash: key_package_hash.clone(),
+            request_id: request_id.clone(),
+            request_nonce: URL_SAFE_NO_PAD.encode(nonce),
+            requester_user_id: self.user_id.clone(),
+            requester_device_id: self.device_id.clone(),
+            host_user_id: host_user_id.into(),
+            host_device_id: host_device_id.into(),
+            expires_at: expires_at.into(),
+            status: None,
+            decided_at: None,
+        };
+        let request_mac =
+            Zeroizing::new(mac_binding(&capability, &binding).map_err(map_invite_error)?);
+        let mut payload = InviteRequestPayload {
+            capability_handle: capability_handle.into(),
+            binding: binding.clone(),
+            key_package: key_package_encoded.clone(),
+            mac: STANDARD.encode(request_mac.as_slice()),
+        };
+        let aad = encode_capability_binding(&binding).map_err(map_invite_error)?;
+        let serialized_payload = Zeroizing::new(
+            serde_json::to_vec(&payload).map_err(|_| MlsClientError::InvalidInvite)?,
+        );
+        payload.capability_handle.zeroize();
+        payload.key_package.zeroize();
+        payload.mac.zeroize();
+        let sealed_payload = seal(
+            &host_hpke,
+            b"multaiplayer:invite-request:v3",
+            &aad,
+            serialized_payload.as_slice(),
+        )
+        .map_err(map_invite_error)?;
+        let sealed_request = serde_json::to_string(&DirectedInviteRequestEnvelope {
+            version: 3,
+            binding: &binding,
+            sealed_payload: &sealed_payload,
+        })
+        .map_err(|_| MlsClientError::InvalidInvite)?;
+        let mut pending = PendingInviteRequest {
+            capability_url_value: capability_url_value.into(),
+            original_binding: binding.clone(),
+            key_package_id: key_package_id.clone(),
+            sealed_request: sealed_request.clone(),
+        };
+        let stored = self
+            .store
+            .put_pending_invite_request(&pending)
+            .map_err(map_store_error);
+        pending.capability_url_value.zeroize();
+        stored?;
+        Ok(PreparedInviteRequest {
+            invite_id: invite_id.into(),
+            request_id,
+            requester_device_id: self.device_id.clone(),
+            key_package_id,
+            key_package: key_package_encoded,
+            key_package_hash,
+            sealed_request,
+            binding,
+        })
+    }
+
+    pub fn open_invite_request(
+        &self,
+        identity: &DeviceIdentity,
+        key_package_id: &str,
+        sealed_request: &str,
+    ) -> Result<OpenedInviteRequest, MlsClientError> {
+        let envelope: DirectedInviteRequestEnvelopeOwned =
+            serde_json::from_str(sealed_request).map_err(|_| MlsClientError::InvalidInvite)?;
+        if envelope.version != 3 || envelope.binding.phase != "request" {
+            return Err(MlsClientError::InvalidInvite);
+        }
+        let aad = encode_capability_binding(&envelope.binding).map_err(map_invite_error)?;
+        let plaintext = Zeroizing::new(
+            open(
+                &identity.hpke,
+                b"multaiplayer:invite-request:v3",
+                &aad,
+                &envelope.sealed_payload,
+            )
+            .map_err(map_invite_error)?,
+        );
+        let mut payload: InviteRequestPayload =
+            serde_json::from_slice(&plaintext).map_err(|_| MlsClientError::InvalidInvite)?;
+        if payload.binding != envelope.binding
+            || !valid_capability_handle(&payload.capability_handle)
+        {
+            return Err(MlsClientError::InvalidInvite);
+        }
+        let key_package = STANDARD
+            .decode(&payload.key_package)
+            .map_err(|_| MlsClientError::InvalidInvite)?;
+        if format!("sha256:{:x}", Sha256::digest(&key_package)) != envelope.binding.key_package_hash
+        {
+            return Err(MlsClientError::InvalidInvite);
+        }
+        let validated = validate_key_package_upload(&KeyPackageUpload {
+            key_package: payload.key_package.clone(),
+            uploader_github_user_id: envelope.binding.requester_user_id.clone(),
+            uploader_device_id: envelope.binding.requester_device_id.clone(),
+        })
+        .map_err(|_| MlsClientError::InvalidInvite)?;
+        Ok(OpenedInviteRequest {
+            capability_handle: std::mem::take(&mut payload.capability_handle),
+            binding: envelope.binding,
+            key_package: std::mem::take(&mut payload.key_package),
+            key_package_id: key_package_id.into(),
+            mac: std::mem::take(&mut payload.mac),
+            requester_signature_public_key: validated.signature_public_key,
+            requester_signature_key_fingerprint: validated.signature_key_fingerprint,
+        })
+    }
+
+    pub fn decide_invite(
+        &mut self,
+        credential_store: &impl CredentialStore,
+        request: &OpenedInviteRequest,
+        approve: bool,
+        decided_at: &str,
+    ) -> Result<InviteDecision, MlsClientError> {
+        let binding_hash = format!(
+            "{:x}",
+            Sha256::digest(encode_capability_binding(&request.binding).map_err(map_invite_error)?)
+        );
+        if let Some(receipt) = self
+            .engine
+            .invite_receipt(&request.capability_handle)
+            .map_err(map_engine_error)?
+        {
+            if !approve
+                || receipt.binding_hash != binding_hash
+                || receipt.key_package_hash != request.binding.key_package_hash
+            {
+                return Err(MlsClientError::InvalidInvite);
+            }
+            let welcome = self.outbox_payload(&receipt.welcome_outbox_id)?;
+            return Ok(InviteDecision {
+                status: "approved".into(),
+                response_binding: receipt.response_binding,
+                response_mac: receipt.response_mac,
+                commit_outbox_id: Some(receipt.commit_outbox_id),
+                response_outbox_id: receipt.welcome_outbox_id,
+                welcome: Some(STANDARD.encode(welcome)),
+            });
+        }
+        if let Some((receipt, response_binding, response_mac)) = self
+            .engine
+            .denied_invite_response(&request.capability_handle)
+            .map_err(map_engine_error)?
+        {
+            if approve
+                || receipt.binding_hash != binding_hash
+                || receipt.key_package_hash != request.binding.key_package_hash
+            {
+                return Err(MlsClientError::InvalidInvite);
+            }
+            return Ok(InviteDecision {
+                status: "denied".into(),
+                response_binding,
+                response_mac,
+                commit_outbox_id: None,
+                response_outbox_id: receipt.response_outbox_id,
+                welcome: None,
+            });
+        }
+        let verifier = load_invite_verifier(credential_store, &request.capability_handle)?;
+        let mac = decode_standard_key(&request.mac)?;
+        verify_request_binding(&verifier, &request.binding, &mac).map_err(map_invite_error)?;
+        let mut response_binding = request.binding.clone();
+        response_binding.phase = "response".into();
+        response_binding.status = Some(if approve { "approved" } else { "denied" }.into());
+        response_binding.decided_at = Some(decided_at.into());
+        let response_mac_bytes = Zeroizing::new(
+            mac_response_binding(&verifier, &response_binding).map_err(map_invite_error)?,
+        );
+        let response_mac = STANDARD.encode(response_mac_bytes.as_slice());
+        let decision = if approve {
+            let key_package = STANDARD
+                .decode(&request.key_package)
+                .map_err(|_| MlsClientError::InvalidInvite)?;
+            let output = self
+                .engine
+                .add_member_for_invite(
+                    &request.binding.room_id,
+                    &key_package,
+                    WelcomeRetryMetadata {
+                        invite_id: request.binding.invite_id.clone(),
+                        request_id: request.binding.request_id.clone(),
+                        requester_user_id: request.binding.requester_user_id.clone(),
+                        requester_device_id: request.binding.requester_device_id.clone(),
+                        key_package_id: request.key_package_id.clone(),
+                        key_package_hash: request.binding.key_package_hash.clone(),
+                        response_binding: response_binding.clone(),
+                        response_mac: response_mac.clone(),
+                    },
+                    request.capability_handle.clone(),
+                    binding_hash,
+                )
+                .map_err(map_engine_error)?;
+            InviteDecision {
+                status: "approved".into(),
+                response_binding,
+                response_mac,
+                commit_outbox_id: Some(output.commit_outbox_id),
+                response_outbox_id: output.welcome_outbox_id,
+                welcome: Some(STANDARD.encode(output.welcome)),
+            }
+        } else {
+            let outbox_id = self
+                .engine
+                .deny_invite(
+                    request.capability_handle.clone(),
+                    binding_hash,
+                    request.binding.key_package_hash.clone(),
+                    response_binding.clone(),
+                    response_mac.clone(),
+                )
+                .map_err(map_engine_error)?;
+            InviteDecision {
+                status: "denied".into(),
+                response_binding,
+                response_mac,
+                commit_outbox_id: None,
+                response_outbox_id: outbox_id,
+                welcome: None,
+            }
+        };
+        credential_store
+            .delete(&format!(
+                "{INVITE_CAPABILITY_ACCOUNT_PREFIX}{}",
+                request.capability_handle
+            ))
+            .map_err(|_| MlsClientError::StorageUnavailable)?;
+        Ok(decision)
+    }
+
+    pub fn has_invite_decision(&self, capability_handle: &str) -> Result<bool, MlsClientError> {
+        Ok(self
+            .engine
+            .invite_receipt(capability_handle)
+            .map_err(map_engine_error)?
+            .is_some()
+            || self
+                .engine
+                .denied_invite_response(capability_handle)
+                .map_err(map_engine_error)?
+                .is_some())
+    }
+
+    pub fn accept_invite_response(
+        &mut self,
+        request_id: &str,
+        response_binding: CapabilityBinding,
+        response_mac: &str,
+        welcome: Option<&str>,
+    ) -> Result<Option<u64>, MlsClientError> {
+        let mut pending = self
+            .store
+            .pending_invite_request(request_id)
+            .map_err(map_store_error)?
+            .ok_or(MlsClientError::InvalidInvite)?;
+        let capability_url_value =
+            Zeroizing::new(std::mem::take(&mut pending.capability_url_value));
+        validate_response_pair(&pending.original_binding, &response_binding)?;
+        let capability = decode_url_key(capability_url_value.as_str())?;
+        let response_mac_bytes = decode_standard_key(response_mac)?;
+        let response_verifier = Zeroizing::new(derive_capability_verifier(&capability));
+        verify_response_binding(&response_verifier, &response_binding, &response_mac_bytes)
+            .map_err(map_invite_error)?;
+        let epoch = match response_binding.status.as_deref() {
+            Some("approved") => {
+                let welcome = Zeroizing::new(
+                    STANDARD
+                        .decode(welcome.ok_or(MlsClientError::InvalidInvite)?)
+                        .map_err(|_| MlsClientError::InvalidInvite)?,
+                );
+                let response_hash = format!(
+                    "{:x}",
+                    Sha256::digest(
+                        serde_json::to_vec(&(
+                            &pending.original_binding,
+                            &response_binding,
+                            response_mac,
+                            welcome.as_slice(),
+                        ))
+                        .map_err(|_| MlsClientError::InvalidInvite)?
+                    )
+                );
+                Some(
+                    self.engine
+                        .join_welcome_for_invite(
+                            &welcome,
+                            JoinAdmissionMetadata {
+                                invite_id: pending.original_binding.invite_id.clone(),
+                                team_id: pending.original_binding.team_id.clone(),
+                                room_id: pending.original_binding.room_id.clone(),
+                                request_id: pending.original_binding.request_id.clone(),
+                                requester_user_id: pending
+                                    .original_binding
+                                    .requester_user_id
+                                    .clone(),
+                                requester_device_id: pending
+                                    .original_binding
+                                    .requester_device_id
+                                    .clone(),
+                            },
+                            response_hash,
+                        )
+                        .map_err(map_engine_error)?,
+                )
+            }
+            Some("denied") if welcome.is_none() => None,
+            _ => return Err(MlsClientError::InvalidInvite),
+        };
+        Ok(epoch)
+    }
+
+    pub fn complete_invite_response(
+        &self,
+        request_id: &str,
+        room_id: &str,
+        approved: bool,
+    ) -> Result<(), MlsClientError> {
+        self.store
+            .delete_pending_invite_request(request_id)
+            .map_err(map_store_error)?;
+        if approved {
+            self.engine
+                .complete_join_admission(room_id, request_id)
+                .map_err(map_engine_error)?;
+        }
+        Ok(())
+    }
+
+    pub fn pending_invite_admission(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<PendingInviteAdmission>, MlsClientError> {
+        let pending = self
+            .store
+            .pending_invite_request(request_id)
+            .map_err(map_store_error)?;
+        let Some(pending) = pending else {
+            return Ok(None);
+        };
+        if pending.original_binding.request_id != request_id
+            || pending.original_binding.requester_device_id != self.device_id
+        {
+            return Err(MlsClientError::InvalidInvite);
+        }
+        Ok(Some(PendingInviteAdmission {
+            invite_id: pending.original_binding.invite_id,
+            request_id: pending.original_binding.request_id,
+            requester_user_id: pending.original_binding.requester_user_id,
+            requester_device_id: self.device_id.clone(),
+            room_id: pending.original_binding.room_id,
+            expires_at: pending.original_binding.expires_at,
+        }))
+    }
+
+    fn outbox_payload(&self, id: &str) -> Result<Vec<u8>, MlsClientError> {
+        self.store
+            .pending_outbox()
+            .map_err(map_store_error)?
+            .into_iter()
+            .find(|item| item.id == id)
+            .map(|item| item.payload)
+            .ok_or(MlsClientError::InvalidInvite)
+    }
+
     pub fn room_requires_rejoin(&self, room_id: &str) -> bool {
         self.requires_rejoin.contains(room_id)
     }
@@ -272,6 +844,34 @@ impl MlsClientService {
             self.requires_rejoin.insert(route.room_id.clone());
         }
         result
+    }
+
+    pub fn publish_invite_commit(
+        &mut self,
+        route: &OutboxRoute,
+        expected_id: &str,
+        publisher: &mut impl MlsPublisher,
+    ) -> Result<(), MlsClientError> {
+        let item = self
+            .store
+            .pending_outbox()
+            .map_err(map_store_error)?
+            .into_iter()
+            .find(|item| {
+                item.id == expected_id && item.room_id == route.room_id && item.kind == "add"
+            })
+            .ok_or(MlsClientError::InvalidInvite)?;
+        let message =
+            relay_message_for_item(&item, route, self.user_id.as_str(), self.device_id.as_str())?;
+        publisher
+            .publish(&RelayClientMessage::Publish {
+                message: Box::new(message),
+            })
+            .map_err(MlsClientError::Relay)?;
+        self.engine
+            .publish_succeeded(&route.room_id, expected_id)
+            .map(|_| ())
+            .map_err(map_engine_error)
     }
 }
 
@@ -544,6 +1144,91 @@ fn map_store_error(error: StoreError) -> MlsClientError {
         StoreError::CorruptValue | StoreError::InvalidValue => MlsClientError::RequiresRejoin,
         StoreError::Sqlite(_) => MlsClientError::StorageUnavailable,
     }
+}
+
+fn map_invite_error<T>(_error: T) -> MlsClientError {
+    MlsClientError::InvalidInvite
+}
+
+fn valid_capability_handle(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 160
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
+fn decode_url_key(value: &str) -> Result<Zeroizing<[u8; 32]>, MlsClientError> {
+    let bytes = Zeroizing::new(
+        URL_SAFE_NO_PAD
+            .decode(value)
+            .map_err(|_| MlsClientError::InvalidInvite)?,
+    );
+    bytes
+        .as_slice()
+        .try_into()
+        .map(Zeroizing::new)
+        .map_err(|_| MlsClientError::InvalidInvite)
+}
+
+fn decode_standard_key(value: &str) -> Result<Zeroizing<[u8; 32]>, MlsClientError> {
+    let bytes = Zeroizing::new(
+        STANDARD
+            .decode(value)
+            .map_err(|_| MlsClientError::InvalidInvite)?,
+    );
+    bytes
+        .as_slice()
+        .try_into()
+        .map(Zeroizing::new)
+        .map_err(|_| MlsClientError::InvalidInvite)
+}
+
+fn load_invite_verifier(
+    store: &impl CredentialStore,
+    handle: &str,
+) -> Result<Zeroizing<[u8; 32]>, MlsClientError> {
+    if !valid_capability_handle(handle) {
+        return Err(MlsClientError::InvalidInvite);
+    }
+    let encoded = Zeroizing::new(
+        store
+            .get(&format!("{INVITE_CAPABILITY_ACCOUNT_PREFIX}{handle}"))
+            .map_err(|_| MlsClientError::StorageUnavailable)?
+            .ok_or(MlsClientError::InvalidInvite)?,
+    );
+    decode_standard_key(encoded.as_str())
+}
+
+fn validate_response_pair(
+    original: &CapabilityBinding,
+    response: &CapabilityBinding,
+) -> Result<(), MlsClientError> {
+    if original.version != 3
+        || original.phase != "request"
+        || original.status.is_some()
+        || original.decided_at.is_some()
+        || response.version != 3
+        || response.phase != "response"
+        || response.status.is_none()
+        || response.decided_at.is_none()
+        || original.invite_id != response.invite_id
+        || original.team_id != response.team_id
+        || original.room_id != response.room_id
+        || original.key_epoch != response.key_epoch
+        || original.key_package_hash != response.key_package_hash
+        || original.request_id != response.request_id
+        || original.request_nonce != response.request_nonce
+        || original.requester_user_id != response.requester_user_id
+        || original.requester_device_id != response.requester_device_id
+        || original.host_user_id != response.host_user_id
+        || original.host_device_id != response.host_device_id
+        || original.expires_at != response.expires_at
+    {
+        return Err(MlsClientError::InvalidInvite);
+    }
+    encode_capability_binding(response).map_err(map_invite_error)?;
+    Ok(())
 }
 
 fn map_engine_error(error: EngineError) -> MlsClientError {
