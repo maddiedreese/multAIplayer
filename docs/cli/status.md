@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-110 UI-independent Codex host extraction
+Current phase: CLI-120 Codex proposals, context, and hosted turns
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -166,6 +166,19 @@ Last update: 2026-07-19
   protected-release audits. CLI-110 may now incorporate this correction with a
   normal merge that preserves its original ancestry and rerun its complete
   final verification.
+- CLI-110 is complete and integrated. Its accepted final task head is
+  `562613f75e395f4552d09b4294554cf4e77e475a`; integration merge
+  `7249551941bcdaae9c1591e8337cf55dd3bd322f` preserves the original task
+  ancestry and changes exactly the 12 reviewed Codex-host/adapter paths. Local
+  verification passed 250 desktop native/shared tests, 11 host-core/projection
+  tests, 103 locked CLI tests, 27 protocol tests, 285 relay tests, 695 desktop
+  frontend tests, 16 UI contract journeys, and 18 classification/release
+  isolation tests, plus formatting, warnings-denied Clippy, locked fuzz
+  advisories/sources, exact-path, dependency, ancestry, cleanliness, and
+  protected-release audits. Product Journeys run `29694076930` targeted the
+  exact accepted head and passed all eight selected jobs, both unchanged
+  120-second native fuzz targets, the real two-client native MLS journeys,
+  required evidence uploads, macOS package/smoke checks, and aggregation.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -193,9 +206,9 @@ Last update: 2026-07-19
 | CLI-080 | Secure invite codes and host-mediated admission | complete | CLI-070 |
 | CLI-090 | Encrypted chat, presence, and safe rendering | complete | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | complete | CLI-090 |
-| CLI-110 | UI-independent Codex host extraction | active | CLI-020 |
+| CLI-110 | UI-independent Codex host extraction | complete | CLI-020 |
 | CLI-110-R1 | Shared MLS fuzz lockfile reconciliation | complete | CLI-010-R1 |
-| CLI-120 | Codex proposals, context, and hosted turns | waiting_for_orchestrator_approval | CLI-090, CLI-110 |
+| CLI-120 | Codex proposals, context, and hosted turns | active | CLI-090, CLI-110 |
 | CLI-130 | Privileged approvals and shared activity | waiting_for_orchestrator_approval | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | waiting_for_orchestrator_approval | CLI-100, CLI-130 |
 | CLI-150 | Security hardening and threat-model update | waiting_for_orchestrator_approval | CLI-140 |
