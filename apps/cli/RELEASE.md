@@ -31,8 +31,9 @@ verifier. It emits:
 
 The archive contains only the executable, build metadata, installation guide,
 Apache-2.0 license, and generated notices for the locked Cargo graph. Packaging
-fails if a dependency omits license metadata or introduces a license expression
-outside the checked-in reviewed allowlist.
+fails if a dependency omits an SPDX license expression, supplies only an
+unreviewed license file, or introduces an expression outside the checked-in
+reviewed allowlist.
 
 Local ad-hoc inspection signatures explicitly disable timestamps so repeated
 local verification does not depend on a signing service. Developer ID

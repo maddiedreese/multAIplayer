@@ -66,11 +66,11 @@ export function validateSignatureMetadata(signature) {
 }
 
 export function validateDependencyLicenses(packages, allowedExpressions) {
-  const missing = packages.filter((pkg) => !pkg.license && !pkg.license_file);
+  const missingExpression = packages.filter((pkg) => !pkg.license);
   assert.deepEqual(
-    missing.map((pkg) => `${pkg.name}@${pkg.version}`),
+    missingExpression.map((pkg) => `${pkg.name}@${pkg.version}`),
     [],
-    "every dependency must declare a license"
+    "every dependency must declare an explicitly reviewed SPDX license expression"
   );
   const allowed = new Set(allowedExpressions);
   const unreviewed = packages.filter((pkg) => pkg.license && !allowed.has(pkg.license));

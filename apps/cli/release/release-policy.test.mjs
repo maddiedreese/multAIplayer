@@ -93,6 +93,12 @@ test("dependency license expressions are fail-closed against the reviewed releas
   assert.throws(() =>
     validateDependencyLicenses([{ name: "missing", version: "1.0.0" }], config.allowedLicenseExpressions)
   );
+  assert.throws(() =>
+    validateDependencyLicenses(
+      [{ name: "license-file-only", version: "1.0.0", license_file: "LICENSE.txt" }],
+      config.allowedLicenseExpressions
+    )
+  );
 });
 
 test("desktop release contracts contain no CLI package reference", () => {
