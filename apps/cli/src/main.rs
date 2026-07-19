@@ -2,9 +2,10 @@ use multaiplayer_cli::{
     auth::{AuthClient, DevicePollResult},
     chat::{RecoveringChatRoomSession, RenderMode, TerminalRenderer},
     codex::{
-        build_bounded_context, cancellation_flag, probe_codex_process, resolve_turn_settings,
-        run_hosted_turn, unix_seconds_from_rfc3339, CodexProposal, CodexTurnSettings, HostPreview,
-        HostedTurnRequest, HostedTurnResult, ProposalError, ProposalMachine, PROPOSAL_TTL_SECONDS,
+        build_bounded_context, cancellation_flag, probe_codex_process,
+        proposal_expiry_from_rfc3339, resolve_turn_settings, run_hosted_turn, CodexProposal,
+        CodexTurnSettings, HostPreview, HostedTurnRequest, HostedTurnResult, ProposalError,
+        ProposalMachine,
     },
     identity::load_or_create_identity,
     invite::{parse_invite_code, InviteError, InviteService, RelayInviteBackend},
@@ -541,7 +542,10 @@ impl CodexRoomController {
             multaiplayer_cli::chat::ProjectedEvent::CodexProposal(wire)
                 if wire.action == CodexQueueAction::Queued =>
             {
-                let created = unix_seconds_from_rfc3339(&wire.created_at).ok_or(())?;
+                let Ok(expires_at_unix) = proposal_expiry_from_rfc3339(&wire.created_at, now_unix)
+                else {
+                    return Ok(None);
+                };
                 let proposal = CodexProposal {
                     room_id: self.room_id.clone(),
                     proposal_id: wire.turn_id.clone(),
@@ -549,7 +553,7 @@ impl CodexRoomController {
                     proposer_user_id: wire.requested_by_user_id.clone(),
                     task: wire.reason.clone().ok_or(())?,
                     created_at: wire.created_at.clone(),
-                    expires_at_unix: created.saturating_add(PROPOSAL_TTL_SECONDS),
+                    expires_at_unix,
                 };
                 let is_new = match self.machine.observe(proposal, now_unix) {
                     Ok(is_new) => is_new,
@@ -2292,6 +2296,53 @@ mod tests {
             assert!(trusted.contains(required));
         }
         assert_eq!(host.observe(&proposal, 1_784_462_400, true).unwrap(), None);
+    }
+
+    #[test]
+    fn future_and_stale_proposal_timestamps_never_hold_the_pending_slot() {
+        let room: RoomRecord = multaiplayer_protocol::from_json(
+            r#"{"id":"room-codex","teamId":"team-codex","acceptedMlsEpoch":0,"name":"Codex room","host":"Host","hostUserId":"github:host","activeHostDeviceId":"device-host","hostStatus":"active","approvalPolicy":"ask_every_turn"}"#,
+        )
+        .unwrap();
+        let proposal_at = |id: &str, created_at: &str| {
+            multaiplayer_cli::chat::ProjectedEvent::CodexProposal(CodexQueuePlaintextPayload {
+                event_type: "codex.queue".into(),
+                queue_event_id: format!("queue-{id}"),
+                turn_id: id.into(),
+                action: CodexQueueAction::Queued,
+                requested_by: "Authenticated member".into(),
+                requested_by_user_id: "github:member".into(),
+                trigger_message_id: None,
+                reason: Some("Review timestamp bounds".into()),
+                queue_position: Some(1),
+                queue_size: 1,
+                created_at: created_at.into(),
+            })
+        };
+        let now = 1_784_462_400;
+        let future = proposal_at("future", "2099-01-01T00:00:00.000Z");
+        let stale = proposal_at("stale", "2026-07-19T11:45:00.000Z");
+        let current = proposal_at("current", "2026-07-19T12:00:00.000Z");
+
+        let mut controller =
+            CodexRoomController::new(&room, std::env::temp_dir(), "Member", "github:member", None)
+                .unwrap();
+        assert_eq!(controller.observe(&future, now, false).unwrap(), None);
+        assert!(controller.can_propose());
+        assert_eq!(controller.observe(&stale, now, false).unwrap(), None);
+        assert!(controller.can_propose());
+        assert_eq!(controller.observe(&current, now, false).unwrap(), None);
+        assert!(!controller.can_propose());
+        assert_eq!(
+            controller.machine.pending().unwrap().expires_at_unix,
+            now + multaiplayer_cli::codex::PROPOSAL_TTL_SECONDS
+        );
+
+        let mut restarted =
+            CodexRoomController::new(&room, std::env::temp_dir(), "Member", "github:member", None)
+                .unwrap();
+        assert_eq!(restarted.observe(&future, now + 60, false).unwrap(), None);
+        assert!(restarted.can_propose());
     }
 
     #[test]

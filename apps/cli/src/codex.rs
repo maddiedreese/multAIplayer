@@ -1066,6 +1066,20 @@ pub fn unix_seconds_from_rfc3339(value: &str) -> Option<i64> {
         .checked_add(i64::from(hour) * 3_600 + i64::from(minute) * 60 + i64::from(second))
 }
 
+pub fn proposal_expiry_from_rfc3339(created_at: &str, now_unix: i64) -> Result<i64, ProposalError> {
+    let created_unix = unix_seconds_from_rfc3339(created_at).ok_or(ProposalError::Invalid)?;
+    if created_unix > now_unix {
+        return Err(ProposalError::Invalid);
+    }
+    let expires_at = created_unix
+        .checked_add(PROPOSAL_TTL_SECONDS)
+        .ok_or(ProposalError::Invalid)?;
+    if expires_at <= now_unix {
+        return Err(ProposalError::Expired);
+    }
+    Ok(expires_at)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1185,6 +1199,16 @@ mod tests {
             .observe(
                 CodexProposal {
                     proposal_id: "proposal-2".into(),
+                    ..proposal()
+                },
+                1_000,
+            )
+            .unwrap());
+        assert!(machine.cancel("room-1", "proposal-2").unwrap());
+        assert!(machine
+            .observe(
+                CodexProposal {
+                    proposal_id: "proposal-3".into(),
                     ..proposal()
                 },
                 1_000,
@@ -1348,6 +1372,24 @@ mod tests {
         );
         assert_eq!(unix_seconds_from_rfc3339("2026-02-30T00:00:00Z"), None);
         assert_eq!(unix_seconds_from_rfc3339("2026-07-19 12:00:00Z"), None);
+
+        let now = 1_784_462_400;
+        assert_eq!(
+            proposal_expiry_from_rfc3339("2026-07-19T12:00:00.000Z", now),
+            Ok(now + PROPOSAL_TTL_SECONDS)
+        );
+        assert_eq!(
+            proposal_expiry_from_rfc3339("2026-07-19T12:00:01.000Z", now),
+            Err(ProposalError::Invalid)
+        );
+        assert_eq!(
+            proposal_expiry_from_rfc3339("2026-07-19T11:45:00.000Z", now),
+            Err(ProposalError::Expired)
+        );
+        assert_eq!(
+            proposal_expiry_from_rfc3339("malformed", now),
+            Err(ProposalError::Invalid)
+        );
     }
 
     #[cfg(unix)]
