@@ -14,6 +14,9 @@ export function readReleaseConfig() {
   assert.equal(config.platform, "darwin-arm64");
   assert.equal(config.archivePrefix, "multAIplayer-cli");
   assert.equal(config.publication, "manual-owner-approval-required");
+  assert.ok(Array.isArray(config.allowedLicenseExpressions));
+  assert.ok(config.allowedLicenseExpressions.length > 0);
+  assert.equal(new Set(config.allowedLicenseExpressions).size, config.allowedLicenseExpressions.length);
   return config;
 }
 
@@ -60,4 +63,20 @@ export function validateSignatureMetadata(signature) {
   assert.match(signature.authority, /^Developer ID Application:/);
   assert.match(signature.teamIdentifier, /^[A-Z0-9]{10}$/);
   assert.ok(typeof signature.timestamp === "string" && signature.timestamp.length > 0);
+}
+
+export function validateDependencyLicenses(packages, allowedExpressions) {
+  const missing = packages.filter((pkg) => !pkg.license && !pkg.license_file);
+  assert.deepEqual(
+    missing.map((pkg) => `${pkg.name}@${pkg.version}`),
+    [],
+    "every dependency must declare a license"
+  );
+  const allowed = new Set(allowedExpressions);
+  const unreviewed = packages.filter((pkg) => pkg.license && !allowed.has(pkg.license));
+  assert.deepEqual(
+    unreviewed.map((pkg) => `${pkg.name}@${pkg.version}:${pkg.license}`),
+    [],
+    "every dependency license expression must be explicitly reviewed"
+  );
 }

@@ -12,6 +12,7 @@ import {
   readReleaseConfig,
   sha256File,
   signingArguments,
+  validateDependencyLicenses,
   validateSignatureMetadata
 } from "./release-lib.mjs";
 
@@ -149,24 +150,7 @@ function dependencyNotices() {
   const packages = [...metadata.packages]
     .filter((pkg) => pkg.name !== "multaiplayer-cli")
     .sort((left, right) => left.name.localeCompare(right.name) || left.version.localeCompare(right.version));
-  const missing = packages.filter((pkg) => !pkg.license && !pkg.license_file);
-  assert.deepEqual(
-    missing.map((pkg) => `${pkg.name}@${pkg.version}`),
-    [],
-    "every dependency must declare a license"
-  );
-  const denied = packages.filter(
-    (pkg) =>
-      pkg.license &&
-      pkg.license
-        .split(/\s+OR\s+/i)
-        .every((alternative) => /\b(?:AGPL|GPL|LGPL|SSPL|BUSL|Elastic)\b/i.test(alternative))
-  );
-  assert.deepEqual(
-    denied.map((pkg) => `${pkg.name}@${pkg.version}:${pkg.license}`),
-    [],
-    "denied dependency license"
-  );
+  validateDependencyLicenses(packages, config.allowedLicenseExpressions);
   const lines = [
     "# multAIplayer CLI third-party notices",
     "",

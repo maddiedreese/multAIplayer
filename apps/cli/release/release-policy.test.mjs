@@ -7,6 +7,7 @@ import {
   parseCargoPackageVersion,
   readReleaseConfig,
   signingArguments,
+  validateDependencyLicenses,
   validateSignatureMetadata
 } from "./release-lib.mjs";
 
@@ -78,6 +79,20 @@ test("ad-hoc and Developer ID signing modes are explicit and cannot be confused"
   assert.doesNotThrow(() => validateSignatureMetadata(developerId));
   assert.throws(() => validateSignatureMetadata({ ...adhoc, mode: developerId.mode }));
   assert.throws(() => validateSignatureMetadata({ ...developerId, secureTimestamp: false }));
+});
+
+test("dependency license expressions are fail-closed against the reviewed release allowlist", () => {
+  const reviewed = [{ name: "reviewed", version: "1.0.0", license: config.allowedLicenseExpressions[0] }];
+  assert.doesNotThrow(() => validateDependencyLicenses(reviewed, config.allowedLicenseExpressions));
+  assert.throws(() =>
+    validateDependencyLicenses(
+      [{ name: "unknown", version: "1.0.0", license: "LicenseRef-Unreviewed" }],
+      config.allowedLicenseExpressions
+    )
+  );
+  assert.throws(() =>
+    validateDependencyLicenses([{ name: "missing", version: "1.0.0" }], config.allowedLicenseExpressions)
+  );
 });
 
 test("desktop release contracts contain no CLI package reference", () => {
