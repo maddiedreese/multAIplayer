@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-130 privileged approvals and shared activity
+Current phase: CLI-140 desktop/CLI interoperability journeys
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -18,7 +18,8 @@ Last update: 2026-07-19
   durable MLS client state/outbox, room creation with host-local project
   association, secure host-mediated admission, encrypted chat, durable
   reconnect/replay/history recovery, and approved host-local Codex turns are
-  present; privileged request approvals and later product behavior remain.
+  present; privileged request approvals and bounded shared activity are present,
+  while mixed desktop/CLI interoperability journeys and later hardening remain.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -192,9 +193,22 @@ Last update: 2026-07-19
   redaction, exact-path, cleanliness, and protected-release checks. No
   dependency, wire contract, MLS policy, desktop behavior, or protected release
   surface changed.
-- CLI-130 is the sole active implementation task. It is approved from accepted
-  integration baseline `2987c8b7ba7eee20758ed181d38e2798a3fa9fe9` for only
-  its documented privileged-approval adapter and bounded shared-activity scope.
+- CLI-130 is complete and integrated. Its accepted task commit is
+  `ab8883211d81cc23ecf8796f709d503a0a6773e4`; integration merge
+  `b4c125839950c9d62ccc949e217974411095cf8c` changes only the three authorized
+  CLI source files. Independent review verified the complete privileged-request
+  matrix, exact host/room/session/request/method binding, expiry, cancellation,
+  shutdown, authority-loss, sandbox rechecks, bounded redaction, normalized
+  activity projection, and terminal-spoof rejection. The task and integration
+  branch passed 107 locked CLI library tests, 10 binary tests, 2 host-boundary
+  tests, 9 Rust protocol fixture/property tests, and all 18
+  classification/release-isolation tests. The owner-authorized public npm audit
+  reported 0 vulnerabilities; RustSec, dependency source, and license audits
+  also passed. Manifests, lockfiles, dependency files, shared contracts, desktop
+  behavior, and protected release paths remain unchanged.
+- CLI-140 is the sole active implementation task, approved from accepted
+  integration baseline `b4c125839950c9d62ccc949e217974411095cf8c` for only
+  its documented mixed desktop/CLI interoperability journey scope.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -225,8 +239,8 @@ Last update: 2026-07-19
 | CLI-110 | UI-independent Codex host extraction | complete | CLI-020 |
 | CLI-110-R1 | Shared MLS fuzz lockfile reconciliation | complete | CLI-010-R1 |
 | CLI-120 | Codex proposals, context, and hosted turns | complete | CLI-090, CLI-110 |
-| CLI-130 | Privileged approvals and shared activity | active | CLI-120 |
-| CLI-140 | Desktop/CLI interoperability journeys | waiting_for_orchestrator_approval | CLI-100, CLI-130 |
+| CLI-130 | Privileged approvals and shared activity | complete | CLI-120 |
+| CLI-140 | Desktop/CLI interoperability journeys | active | CLI-100, CLI-130 |
 | CLI-150 | Security hardening and threat-model update | waiting_for_orchestrator_approval | CLI-140 |
 | CLI-160 | Signed CLI packaging and release isolation | waiting_for_orchestrator_approval | CLI-150 |
 | CLI-170 | External-alpha readiness review | waiting_for_orchestrator_approval | CLI-160 |
