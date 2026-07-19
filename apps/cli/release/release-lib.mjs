@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 export const releaseRoot = new URL("./", import.meta.url);
 
@@ -37,8 +38,18 @@ export function parseCargoPackageVersion(source) {
 }
 
 export function assertSafeOutputDirectory(allowedRoot, output) {
-  assert.notEqual(output, allowedRoot, "package output must not replace the CLI workspace");
-  assert.ok(output.startsWith(`${allowedRoot}/`), "package output must be inside the CLI workspace");
+  const expectedOutput = resolve(allowedRoot, "dist");
+  assert.equal(output, expectedOutput, "package output must be exactly apps/cli/dist");
+  assert.equal(
+    realpathSync(dirname(output)),
+    realpathSync(allowedRoot),
+    "package output parent must canonically be the CLI workspace"
+  );
+  if (existsSync(output)) {
+    const outputStat = lstatSync(output);
+    assert.equal(outputStat.isSymbolicLink(), false, "apps/cli/dist must not be a symbolic link");
+    assert.equal(outputStat.isDirectory(), true, "apps/cli/dist must be a directory when it exists");
+  }
 }
 
 export function signingArguments(identity, binary) {

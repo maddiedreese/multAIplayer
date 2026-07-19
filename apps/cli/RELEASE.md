@@ -19,7 +19,8 @@ MULTAIPLAYER_CLI_SIGNING_IDENTITY='Developer ID Application: Example (TEAMID)' \
   node apps/cli/release/package-cli.mjs --output apps/cli/dist
 ```
 
-The packager requires a clean Git tree, uses the exact `HEAD` revision and
+The packager accepts only the direct, non-symlinked `apps/cli/dist` output
+directory. It requires a clean Git tree, uses the exact `HEAD` revision and
 commit timestamp, builds the locked `aarch64-apple-darwin` target, signs only a
 staged copy of `multAIplayer`, and immediately runs the independent package
 verifier. It emits:

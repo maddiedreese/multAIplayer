@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
   artifactStem,
+  assertSafeOutputDirectory,
   parseCargoPackageVersion,
   readReleaseConfig,
   signingArguments,
@@ -41,6 +43,29 @@ test("CLI packaging is local-only and cannot publish or mutate desktop release i
   }
   assert.match(sources, /manual-owner-approval-required/);
   assert.match(sources, /desktopReleaseContract/);
+});
+
+test("package output rejects symlink escapes before external mutation", () => {
+  const fixture = mkdtempSync(resolve(tmpdir(), "multaiplayer-cli-output-safety-"));
+  const workspace = resolve(fixture, "workspace");
+  const external = resolve(fixture, "external");
+  const sentinel = resolve(external, "sentinel.txt");
+  try {
+    mkdirSync(workspace);
+    mkdirSync(external);
+    writeFileSync(sentinel, "preserve me\n");
+
+    symlinkSync(external, resolve(workspace, "link"));
+    assert.throws(() => assertSafeOutputDirectory(workspace, resolve(workspace, "link/package")));
+    assert.equal(readFileSync(sentinel, "utf8"), "preserve me\n");
+
+    symlinkSync(external, resolve(workspace, "dist"));
+    assert.throws(() => assertSafeOutputDirectory(workspace, resolve(workspace, "dist")));
+    assert.equal(readFileSync(sentinel, "utf8"), "preserve me\n");
+    assert.equal(existsSync(sentinel), true);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });
 
 test("ad-hoc and Developer ID signing modes are explicit and cannot be confused", () => {
