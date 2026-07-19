@@ -3,6 +3,7 @@ pub mod identity;
 pub mod mls;
 pub mod platform;
 pub mod relay;
+pub mod room;
 
 use thiserror::Error;
 

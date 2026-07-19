@@ -218,6 +218,17 @@ impl MlsClientService {
         }
     }
 
+    /// Establishes epoch zero durably, or reopens the exact existing group on retry.
+    pub fn create_group_idempotent(&mut self, room_id: &str) -> Result<u64, MlsClientError> {
+        match self.open_group(room_id) {
+            Ok(epoch) => Ok(epoch),
+            Err(MlsClientError::GroupNotFound) => {
+                self.engine.create_group(room_id).map_err(map_engine_error)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     pub fn room_requires_rejoin(&self, room_id: &str) -> bool {
         self.requires_rejoin.contains(room_id)
     }
