@@ -31,7 +31,7 @@ export function sha256File(path) {
 }
 
 export function parseCargoPackageVersion(source) {
-  const packageSection = source.match(/^\[package\]\s*$([\s\S]*?)(?=^\[|\z)/m)?.[1];
+  const packageSection = source.match(/^\[package\]\s*$([\s\S]*?)(?=^\[|(?![\s\S]))/m)?.[1];
   assert.ok(packageSection, "CLI Cargo.toml must contain a [package] section");
   const version = packageSection.match(/^version\s*=\s*"([^"]+)"\s*$/m)?.[1];
   assert.ok(version, "CLI Cargo.toml must declare a package version");
