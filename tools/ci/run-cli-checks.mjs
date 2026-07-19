@@ -35,6 +35,12 @@ if (!existsSync(manifest)) {
 
 assert.equal(existsSync(lockfile), true, "apps/cli must retain its independent Cargo.lock");
 
+{
+  const result = spawnSync("npm", ["run", "build:packages"], { cwd: root, stdio: "inherit" });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, "npm run build:packages failed");
+}
+
 for (const [command, args] of [
   ["cargo", ["fmt", "--manifest-path", manifest, "--all", "--", "--check"]],
   [

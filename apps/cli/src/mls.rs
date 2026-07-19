@@ -218,6 +218,17 @@ impl MlsClientService {
         }
     }
 
+    /// Establishes epoch zero durably, or reopens the exact existing group on retry.
+    pub fn create_group_idempotent(&mut self, room_id: &str) -> Result<u64, MlsClientError> {
+        match self.open_group(room_id) {
+            Ok(epoch) => Ok(epoch),
+            Err(MlsClientError::GroupNotFound) => {
+                self.engine.create_group(room_id).map_err(map_engine_error)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     pub fn room_requires_rejoin(&self, room_id: &str) -> bool {
         self.requires_rejoin.contains(room_id)
     }
@@ -802,6 +813,23 @@ mod tests {
             MlsClientService::open(&store, &other, &path),
             Err(MlsClientError::IdentityScopeMismatch)
         ));
+    }
+
+    #[test]
+    fn idempotent_group_creation_reopens_the_same_durable_epoch_zero_state() {
+        let directory = TestDirectory::new();
+        let path = directory.database();
+        let store = MemoryCredentialStore::default();
+        let identity = load_or_create_identity(&store, "github:42", "Maddie").unwrap();
+        let mut first = MlsClientService::open(&store, &identity, &path).unwrap();
+        assert_eq!(first.create_group_idempotent("room-create"), Ok(0));
+        assert_eq!(first.create_group_idempotent("room-create"), Ok(0));
+        drop(first);
+
+        let same_identity = load_or_create_identity(&store, "github:42", "Maddie").unwrap();
+        let mut restarted = MlsClientService::open(&store, &same_identity, &path).unwrap();
+        assert_eq!(restarted.create_group_idempotent("room-create"), Ok(0));
+        assert_eq!(restarted.open_group("room-create"), Ok(0));
     }
 
     #[test]
