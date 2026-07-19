@@ -816,6 +816,23 @@ mod tests {
     }
 
     #[test]
+    fn idempotent_group_creation_reopens_the_same_durable_epoch_zero_state() {
+        let directory = TestDirectory::new();
+        let path = directory.database();
+        let store = MemoryCredentialStore::default();
+        let identity = load_or_create_identity(&store, "github:42", "Maddie").unwrap();
+        let mut first = MlsClientService::open(&store, &identity, &path).unwrap();
+        assert_eq!(first.create_group_idempotent("room-create"), Ok(0));
+        assert_eq!(first.create_group_idempotent("room-create"), Ok(0));
+        drop(first);
+
+        let same_identity = load_or_create_identity(&store, "github:42", "Maddie").unwrap();
+        let mut restarted = MlsClientService::open(&store, &same_identity, &path).unwrap();
+        assert_eq!(restarted.create_group_idempotent("room-create"), Ok(0));
+        assert_eq!(restarted.open_group("room-create"), Ok(0));
+    }
+
+    #[test]
     fn wrong_stored_key_does_not_modify_existing_state() {
         let directory = TestDirectory::new();
         let path = directory.database();

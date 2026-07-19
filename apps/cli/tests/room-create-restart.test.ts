@@ -9,7 +9,7 @@ import {
   onceOpen,
   startRelayWithWorkspace,
   waitForJoined
-} from "../../apps/relay/test/support/relay.js";
+} from "../../relay/test/support/relay.js";
 
 test("CLI room create, host bootstrap, open, and relay restart keep the project path local", async () => {
   const userId = "github:maddiedreese";

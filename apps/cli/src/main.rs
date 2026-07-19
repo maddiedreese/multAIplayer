@@ -171,12 +171,11 @@ fn run_room(command: Command) -> ExitCode {
                     .into_iter()
                     .filter(|room| room.deleted_at.is_none())
                 {
-                    println!(
-                        "{}\t{}\t{:?}",
-                        room.id,
-                        safe_terminal_text(&room.name),
-                        room.host_status
-                    );
+                    let status = match room.host_status {
+                        multaiplayer_cli::room::HostStatus::Active => "active",
+                        multaiplayer_cli::room::HostStatus::Offline => "offline",
+                    };
+                    println!("{}\t{}\t{status}", room.id, safe_terminal_text(&room.name));
                 }
                 ExitCode::SUCCESS
             }

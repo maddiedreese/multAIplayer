@@ -10,10 +10,11 @@ use crate::{
     CliError,
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
-use multaiplayer_protocol::{ApprovalPolicy, HostStatus, RelayClientMessage, RoomRecord, Validate};
+pub use multaiplayer_protocol::HostStatus;
+use multaiplayer_protocol::{ApprovalPolicy, RelayClientMessage, RoomRecord, Validate};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{fs, path::Path, time::Duration};
+use std::{fmt, fs, path::Path, time::Duration};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -21,6 +22,7 @@ pub const ROOM_STATE_ACCOUNT: &str = "room-associations:v1";
 const NATIVE_SESSION_HEADER: &str = "x-multaiplayer-session";
 const DEVICE_SESSION_HEADER: &str = "x-device-session";
 const ROOM_OPERATION_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_LOCAL_ROOM_ASSOCIATIONS: usize = 500;
 
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum RoomError {
@@ -44,11 +46,22 @@ pub enum RoomError {
     RelayUnavailable,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct CreateRoomRequest {
     pub team: Option<String>,
     pub name: String,
     pub project: String,
+}
+
+impl fmt::Debug for CreateRoomRequest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CreateRoomRequest")
+            .field("team", &self.team)
+            .field("name", &self.name)
+            .field("project", &"[local project]")
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -188,7 +201,10 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
                 &json!({}),
             )
             .map_err(map_cli_error)?;
-        if response.final_url != challenge_url || response.status != 200 {
+        if response.final_url != challenge_url
+            || response.status != 200
+            || response.body.len() > MAX_HTTP_RESPONSE_BYTES
+        {
             return Err(RoomError::RelayUnavailable);
         }
         #[derive(Deserialize)]
@@ -223,7 +239,10 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
                 }),
             )
             .map_err(map_cli_error)?;
-        if response.final_url != session_url || response.status != 200 {
+        if response.final_url != session_url
+            || response.status != 200
+            || response.body.len() > MAX_HTTP_RESPONSE_BYTES
+        {
             return Err(RoomError::RelayUnavailable);
         }
         #[derive(Deserialize)]
@@ -378,13 +397,17 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
         let workspace = self.backend.workspace()?;
         let team_id = select_team(&workspace, request.team.as_deref())?;
         let mut state = self.load_state()?;
-        let index = match state.associations.iter().position(|association| {
+        let existing_index = state.associations.iter().position(|association| {
             association.team_id == team_id
                 && association.room_name == request.name
                 && association.project_path == project_path
-        }) {
+        });
+        let index = match existing_index {
             Some(index) => index,
             None => {
+                if state.associations.len() >= MAX_LOCAL_ROOM_ASSOCIATIONS {
+                    return Err(RoomError::LocalStateUnavailable);
+                }
                 state.associations.push(StoredAssociation {
                     team_id: team_id.clone(),
                     room_id: None,
@@ -405,23 +428,27 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
                 .cloned()
                 .ok_or(RoomError::CreationPending)?
         } else {
-            let candidates: Vec<_> = workspace
-                .rooms
-                .iter()
-                .filter(|room| {
-                    room.team_id == team_id
-                        && room.name == request.name
-                        && room.host_user_id.as_deref() == Some(self.user_id)
-                        && room.host_status == HostStatus::Offline
-                        && room.accepted_mls_epoch.is_none()
-                        && room.active_host_device_id.is_none()
-                })
-                .cloned()
-                .collect();
-            let created = match candidates.as_slice() {
-                [] => self.backend.create_room(&team_id, &request.name)?,
-                [room] => room.clone(),
-                _ => return Err(RoomError::CreationPending),
+            let created = if existing_index.is_none() {
+                self.backend.create_room(&team_id, &request.name)?
+            } else {
+                let candidates: Vec<_> = workspace
+                    .rooms
+                    .iter()
+                    .filter(|room| {
+                        room.team_id == team_id
+                            && room.name == request.name
+                            && room.host_user_id.as_deref() == Some(self.user_id)
+                            && room.host_status == HostStatus::Offline
+                            && room.accepted_mls_epoch.is_none()
+                            && room.active_host_device_id.is_none()
+                    })
+                    .cloned()
+                    .collect();
+                match candidates.as_slice() {
+                    [] => self.backend.create_room(&team_id, &request.name)?,
+                    [room] => room.clone(),
+                    _ => return Err(RoomError::CreationPending),
+                }
             };
             validate_created_room(&created, &team_id, &request.name, self.user_id)?;
             state.associations[index].room_id = Some(created.id.clone());
@@ -429,6 +456,7 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             created
         };
 
+        canonical_stored_project(&state.associations[index].project_path)?;
         self.mls.create_group_idempotent(&room.id)?;
         if room.host_status == HostStatus::Active {
             if room.host_user_id.as_deref() != Some(self.user_id)
@@ -462,6 +490,7 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             }
         }
         validate_active_host(&room, self.user_id, self.device_id)?;
+        canonical_stored_project(&state.associations[index].project_path)?;
         state.associations[index].complete = true;
         self.save_state(&state)?;
         Ok(OpenedRoom {
@@ -479,6 +508,9 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             .iter()
             .find(|association| association.room_id.as_deref() == Some(room.id.as_str()))
             .ok_or(RoomError::SelectionUnavailable)?;
+        if !association.complete {
+            return Err(RoomError::CreationPending);
+        }
         canonical_stored_project(&association.project_path)?;
         self.mls.open_group(&room.id)?;
         if room.host_status == HostStatus::Active
@@ -513,6 +545,7 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             || state.user_id != self.user_id
             || state.device_id != self.device_id
             || state.relay_origin != self.relay_origin
+            || state.associations.len() > MAX_LOCAL_ROOM_ASSOCIATIONS
         {
             return Err(RoomError::LocalStateUnavailable);
         }
@@ -538,7 +571,8 @@ fn validate_room_name(name: &str) -> Result<(), RoomError> {
 }
 
 fn canonical_project(project: &str) -> Result<String, RoomError> {
-    if project.is_empty() || project.chars().any(|value| value == '\0') {
+    if project.is_empty() || project.chars().count() > 4096 || project.chars().any(char::is_control)
+    {
         return Err(RoomError::InvalidProject);
     }
     let canonical = fs::canonicalize(Path::new(project)).map_err(|_| RoomError::InvalidProject)?;
@@ -547,7 +581,11 @@ fn canonical_project(project: &str) -> Result<String, RoomError> {
 
 fn canonical_stored_project(project: &str) -> Result<String, RoomError> {
     let path = Path::new(project);
-    if !path.is_absolute() || !path.is_dir() || project.chars().count() > 4096 {
+    if !path.is_absolute()
+        || !path.is_dir()
+        || project.chars().count() > 4096
+        || project.chars().any(char::is_control)
+    {
         return Err(RoomError::InvalidProject);
     }
     let canonical = fs::canonicalize(path).map_err(|_| RoomError::InvalidProject)?;
@@ -849,6 +887,52 @@ mod tests {
         assert_eq!(result, Err(RoomError::InvalidProject));
         assert_eq!(backend.created, 0);
         assert!(!store.values.borrow().contains_key(ROOM_STATE_ACCOUNT));
+    }
+
+    #[test]
+    fn local_state_failure_rolls_back_before_room_or_mls_creation() {
+        let store = MemoryCredentialStore::default();
+        *store.fail_set_account.borrow_mut() = Some(ROOM_STATE_ACCOUNT.into());
+        let mut backend = FakeBackend::new(vec![workspace(vec![])]);
+        let mut mls = FakeMls::default();
+        let result = RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN)
+            .create(&request(&std::env::temp_dir()));
+        assert_eq!(result, Err(RoomError::LocalStateUnavailable));
+        assert_eq!(
+            (backend.created, backend.joined, backend.activated),
+            (0, 0, 0)
+        );
+        assert_eq!(mls.creates, 0);
+        assert!(!store.values.borrow().contains_key(ROOM_STATE_ACCOUNT));
+    }
+
+    #[test]
+    fn request_debug_redacts_the_local_path() {
+        let private = "/private/secret/project";
+        let rendered = format!(
+            "{:?}",
+            CreateRoomRequest {
+                team: None,
+                name: "Compiler work".into(),
+                project: private.into(),
+            }
+        );
+        assert!(!rendered.contains(private));
+        assert!(rendered.contains("[local project]"));
+    }
+
+    #[test]
+    fn first_attempt_never_adopts_an_unrelated_offline_room() {
+        let store = MemoryCredentialStore::default();
+        let mut unrelated = offline_room();
+        unrelated.id = "room-unrelated".into();
+        let mut backend = FakeBackend::new(vec![workspace(vec![unrelated])]);
+        let mut mls = FakeMls::default();
+        let result = RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN)
+            .create(&request(&std::env::temp_dir()))
+            .unwrap();
+        assert_eq!(result.room, active_room());
+        assert_eq!(backend.created, 1);
     }
 
     #[test]

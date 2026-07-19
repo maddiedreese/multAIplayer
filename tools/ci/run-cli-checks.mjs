@@ -58,3 +58,12 @@ for (const [command, args] of [
   if (result.error) throw result.error;
   assert.equal(result.status, 0, `${command} ${args.join(" ")} failed`);
 }
+
+for (const [command, args] of [
+  ["npm", ["run", "build:packages"]],
+  ["node", ["--import", "tsx", "--test", "apps/cli/tests/room-create-restart.test.ts"]]
+]) {
+  const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, `${command} ${args.join(" ")} failed`);
+}
