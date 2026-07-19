@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-170 external-alpha readiness review
+Current phase: CLI-160-R1 packaging parser correction
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -263,9 +263,14 @@ Last update: 2026-07-19
   review. Desktop updater, notarization, signing, versions, release workflows,
   Cargo.lock, and asset manifests remain unchanged. Developer ID signing and CLI
   publication remain owner-controlled and were not performed.
-- CLI-170 is the sole active task for its read-first external-alpha readiness
-  audit. Any implementation fix requires a separately approved follow-up task;
-  publication remains owner-controlled.
+- CLI-170 is paused after its locked clean install succeeded without tracked
+  dependency changes, but `npm run verify` found unsupported JavaScript regex
+  escape `\z` in the CLI Cargo package parser. No later readiness gates ran and
+  no fix was attempted in CLI-170.
+- The owner authorized CLI-160-R1 as the sole active implementation task to
+  correct only that absolute-end match and add its packaging-policy regression
+  coverage. CLI-170 may restart only after the correction is independently
+  verified and integrated. Publication remains owner-controlled.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -300,7 +305,8 @@ Last update: 2026-07-19
 | CLI-140 | Desktop/CLI interoperability journeys | complete | CLI-100, CLI-130 |
 | CLI-150 | Security hardening and threat-model update | complete | CLI-140 |
 | CLI-160 | Signed CLI packaging and release isolation | complete | CLI-150 |
-| CLI-170 | External-alpha readiness review | active | CLI-160 |
+| CLI-160-R1 | CLI Cargo package parser EOF correction | active | CLI-160 |
+| CLI-170 | External-alpha readiness review | paused_waiting_for_cli_160_r1 | CLI-160, CLI-160-R1 |
 
 ## Release safety snapshot
 

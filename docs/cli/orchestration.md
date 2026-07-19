@@ -31,6 +31,7 @@ by the approved plan, decisions, task specifications, and root `AGENTS.md`.
 | CLI-140 | `019f76ca-10df-7553-92d5-9b8a93bec411` |
 | CLI-150 | `019f76ca-1e78-7022-aeac-ae7e8e282976` |
 | CLI-160 | `019f76ca-2d51-7ec2-8673-772d2a966b8a` |
+| CLI-160-R1 | `019f76ca-2d51-7ec2-8673-772d2a966b8a` |
 | CLI-170 | `019f76ca-3609-7d71-ac15-f830671a522e` |
 
 ## Heartbeat algorithm
