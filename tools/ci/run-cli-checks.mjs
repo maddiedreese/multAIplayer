@@ -36,6 +36,15 @@ if (!existsSync(manifest)) {
 assert.equal(existsSync(lockfile), true, "apps/cli must retain its independent Cargo.lock");
 
 {
+  const result = spawnSync(process.execPath, ["--test", "apps/cli/release/release-policy.test.mjs"], {
+    cwd: root,
+    stdio: "inherit"
+  });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, "CLI release policy tests failed");
+}
+
+{
   const result = spawnSync("npm", ["run", "build:packages"], { cwd: root, stdio: "inherit" });
   if (result.error) throw result.error;
   assert.equal(result.status, 0, "npm run build:packages failed");
