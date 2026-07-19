@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod chat;
 pub mod identity;
 pub mod invite;
 pub mod mls;

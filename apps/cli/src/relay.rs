@@ -447,8 +447,8 @@ impl TungsteniteConnector {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn from_loopback_test_url(
+    #[cfg(any(test, debug_assertions))]
+    pub fn from_loopback_test_url(
         websocket_url: &str,
         session: &str,
     ) -> Result<Self, RelayTransportError> {
