@@ -12,9 +12,9 @@ use mls_core::{
     derive_capability_verifier, encode_capability_binding, generate_device_signing_secret,
     issue_capability, mac_binding, mac_response_binding, open, seal, validate_key_package_upload,
     verify_request_binding, verify_response_binding, ApplicationAuthenticatedData,
-    BasicAppCredential, CapabilityBinding, EncryptedStore, EngineError, JoinAdmissionMetadata,
-    KeyPackageUpload, MlsEngine, OutboxItem, OutboxMetadata, PendingInviteRequest, SealedPayload,
-    StoreError, WelcomeRetryMetadata,
+    ApplicationAuthenticatedDataInput, BasicAppCredential, CapabilityBinding, EncryptedStore,
+    EngineError, JoinAdmissionMetadata, KeyPackageUpload, MlsEngine, OutboxItem, OutboxMetadata,
+    PendingInviteRequest, SealedPayload, StoreError, WelcomeRetryMetadata,
 };
 use multaiplayer_protocol::{
     MlsMessageType, MlsRelayMessage, RelayClientMessage, RelayErrorCode, RelayServerMessage,
@@ -64,6 +64,12 @@ pub struct OutboxRoute {
 pub struct DrainReport {
     pub published: Vec<String>,
     pub expired_applications: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OpenedApplication {
+    pub authenticated_data: ApplicationAuthenticatedData,
+    pub payload: Vec<u8>,
 }
 
 const INVITE_CAPABILITY_ACCOUNT_PREFIX: &str = "invite-capability:v1:";
@@ -371,6 +377,46 @@ impl MlsClientService {
             }
             Err(error) => Err(error),
         }
+    }
+
+    /// Encrypts and durably queues one application record using the existing MLS
+    /// engine and authenticated-data contract. Publication remains an explicit
+    /// second step so a process failure cannot lose the outbound record.
+    pub fn queue_application(
+        &mut self,
+        room_id: &str,
+        message_id: &str,
+        payload: &[u8],
+        authenticated_data: ApplicationAuthenticatedDataInput,
+    ) -> Result<u64, MlsClientError> {
+        self.engine
+            .encrypt_application(room_id, message_id, payload, authenticated_data)
+            .map(|outbound| outbound.epoch)
+            .map_err(map_engine_error)
+    }
+
+    /// Opens an MLS application record and returns only authenticated metadata
+    /// and plaintext produced by the existing MLS engine. Commit records return
+    /// `None` after their durable group transition is applied.
+    pub fn process_incoming(
+        &mut self,
+        room_id: &str,
+        message: &[u8],
+    ) -> Result<Option<OpenedApplication>, MlsClientError> {
+        let opened = self
+            .engine
+            .process_incoming(room_id, message)
+            .map_err(map_engine_error)?;
+        opened
+            .map(|opened| {
+                let authenticated_data = serde_json::from_slice(&opened.authenticated_data)
+                    .map_err(|_| MlsClientError::InvalidOutbox)?;
+                Ok(OpenedApplication {
+                    authenticated_data,
+                    payload: opened.payload,
+                })
+            })
+            .transpose()
     }
 
     pub fn issue_invite_capability(
@@ -844,6 +890,35 @@ impl MlsClientService {
             self.requires_rejoin.insert(route.room_id.clone());
         }
         result
+    }
+
+    /// Publishes one exact queued application without consuming or interpreting
+    /// invite/commit records that may coexist in the durable room outbox.
+    pub fn publish_application(
+        &mut self,
+        route: &OutboxRoute,
+        expected_id: &str,
+        publisher: &mut impl MlsPublisher,
+    ) -> Result<DrainReport, MlsClientError> {
+        let item = self
+            .store
+            .pending_outbox()
+            .map_err(map_store_error)?
+            .into_iter()
+            .find(|item| {
+                item.id == expected_id
+                    && item.room_id == route.room_id
+                    && item.kind == "application"
+            })
+            .ok_or(MlsClientError::InvalidOutbox)?;
+        drain_items(
+            &mut self.engine,
+            vec![item],
+            route,
+            self.user_id.as_str(),
+            self.device_id.as_str(),
+            publisher,
+        )
     }
 
     pub fn publish_invite_commit(

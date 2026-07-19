@@ -1526,8 +1526,13 @@ mod tests {
     use super::*;
     use crate::{
         auth::SignedInUser,
+        chat::ChatRoomSession,
         identity::load_or_create_identity,
-        platform::tests::MemoryCredentialStore,
+        platform::{tests::MemoryCredentialStore, CredentialStore, JourneyFileStore},
+        relay::{
+            connect_with_retries, ReconnectPolicy, RelayConnection, ThreadSleeper,
+            TungsteniteConnector,
+        },
         room::{CreateRoomRequest, RelayRoomBackend, RoomBackend, RoomService},
     };
     use serde_json::Value;
@@ -1535,9 +1540,12 @@ mod tests {
         collections::BTreeMap,
         fs,
         io::{BufRead, BufReader, Read, Write},
+        os::unix::fs::PermissionsExt,
         path::{Path, PathBuf},
         process::{Child, ChildStdout, Command, Stdio},
+        time::Duration,
     };
+    use zeroize::Zeroizing;
 
     struct LoopbackHttp {
         client: reqwest::blocking::Client,
@@ -1687,6 +1695,10 @@ mod tests {
 
     impl RelayFixture {
         fn start() -> Self {
+            Self::start_with_forbidden("invite-secret-reflection-sentinel")
+        }
+
+        fn start_with_forbidden(forbidden: &str) -> Self {
             let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/real-relay-fixture.ts");
             let mut child = Command::new("node")
                 .arg("--import")
@@ -1702,7 +1714,7 @@ mod tests {
                 .stdin
                 .as_mut()
                 .unwrap()
-                .write_all(b"\"invite-secret-reflection-sentinel\"\n")
+                .write_all(format!("{}\n", serde_json::to_string(forbidden).unwrap()).as_bytes())
                 .unwrap();
             let mut stdout = BufReader::new(child.stdout.take().unwrap());
             let mut line = String::new();
@@ -1712,6 +1724,16 @@ mod tests {
                 child: Some(child),
                 _stdout: stdout,
                 info,
+            }
+        }
+
+        fn stop_and_assert(&mut self) {
+            if let Some(mut child) = self.child.take() {
+                child.stdin.take().unwrap().write_all(b"stop\n").unwrap();
+                assert!(
+                    child.wait().unwrap().success(),
+                    "relay detected plaintext leakage"
+                );
             }
         }
     }
@@ -1806,6 +1828,150 @@ mod tests {
             },
             relay_origin: origin.into(),
         }
+    }
+
+    fn device_session<S: CredentialStore>(
+        store: &S,
+        http: &LoopbackHttp,
+        relay: &RelayFixtureInfo,
+        relay_session: &str,
+        session: &RestoredSession,
+        identity: &DeviceIdentity,
+    ) -> Zeroizing<String> {
+        RelayRoomBackend::new_for_loopback_test(
+            store,
+            http,
+            &relay.base_url,
+            &relay.ws_url,
+            relay_session,
+            session,
+            identity,
+        )
+        .unwrap()
+        .establish_device_session()
+        .unwrap()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn admit_for_chat<HS: CredentialStore, GS: CredentialStore>(
+        host_store: &HS,
+        guest_store: &GS,
+        http: &LoopbackHttp,
+        relay: &RelayFixtureInfo,
+        host_relay_session: &str,
+        guest_relay_session: &str,
+        host_session: &RestoredSession,
+        guest_session: &RestoredSession,
+        host_identity: &DeviceIdentity,
+        guest_identity: &DeviceIdentity,
+        room: &RoomRecord,
+        host_device_session: &str,
+        guest_device_session: &str,
+        host_mls: &mut MlsClientService,
+        guest_mls: &mut MlsClientService,
+    ) {
+        let now = "2000-01-01T00:00:00.000Z";
+        let code = {
+            let mut backend = RelayInviteBackend::new_for_loopback_test(
+                host_store,
+                http,
+                &relay.base_url,
+                &relay.ws_url,
+                host_relay_session,
+                host_session,
+                host_identity,
+            )
+            .unwrap();
+            InviteService::new(host_store, &mut backend)
+                .issue(room, host_identity)
+                .unwrap()
+        };
+        let pending = {
+            let mut backend = RelayInviteBackend::new_for_loopback_test(
+                guest_store,
+                http,
+                &relay.base_url,
+                &relay.ws_url,
+                guest_relay_session,
+                guest_session,
+                guest_identity,
+            )
+            .unwrap();
+            InviteService::new(guest_store, &mut backend)
+                .request_admission(&code, guest_identity, guest_device_session, now, guest_mls)
+                .unwrap()
+        };
+        {
+            let invite_id = parse_invite_code(&code).unwrap().invite_id;
+            let mut backend = RelayInviteBackend::new_for_loopback_test(
+                host_store,
+                http,
+                &relay.base_url,
+                &relay.ws_url,
+                host_relay_session,
+                host_session,
+                host_identity,
+            )
+            .unwrap();
+            let mut service = InviteService::new(host_store, &mut backend);
+            let requests = service
+                .review_requests(
+                    &invite_id,
+                    room,
+                    host_identity,
+                    host_device_session,
+                    now,
+                    host_mls,
+                )
+                .unwrap();
+            assert_eq!(requests.len(), 1);
+            service
+                .decide(
+                    &requests[0],
+                    room,
+                    host_identity,
+                    host_device_session,
+                    true,
+                    now,
+                    host_mls,
+                )
+                .unwrap();
+        }
+        {
+            let pending = guest_mls
+                .pending_invite_admission(&pending.request_id)
+                .unwrap()
+                .unwrap();
+            let mut backend = RelayInviteBackend::new_for_loopback_test(
+                guest_store,
+                http,
+                &relay.base_url,
+                &relay.ws_url,
+                guest_relay_session,
+                guest_session,
+                guest_identity,
+            )
+            .unwrap();
+            InviteService::new(guest_store, &mut backend)
+                .finish_pending_admission(&pending, guest_device_session, now, guest_mls)
+                .unwrap()
+                .unwrap();
+        }
+    }
+
+    fn chat_connection(
+        relay: &RelayFixtureInfo,
+        relay_session: &str,
+    ) -> RelayConnection<crate::relay::TungsteniteSocket> {
+        let mut connector =
+            TungsteniteConnector::from_loopback_test_url(&relay.ws_url, relay_session).unwrap();
+        let socket = connect_with_retries(
+            &mut connector,
+            ReconnectPolicy::default(),
+            &mut ThreadSleeper,
+        )
+        .unwrap();
+        RelayConnection::new(socket)
     }
 
     fn assert_tree_excludes(root: &Path, forbidden: &[u8]) {
@@ -1973,6 +2139,328 @@ mod tests {
             assert!(parse_invite_code(&candidate).is_err());
         }
         assert!(parse_invite_code(&"a".repeat(MAX_CODE_CHARS + 1)).is_err());
+    }
+
+    #[test]
+    fn three_cli_processes_exchange_encrypted_chat_in_exact_relay_order() {
+        let journey = JourneyDirectory::new();
+        let project = journey.0.join("chat-project");
+        fs::create_dir(&project).unwrap();
+        let forbidden_plaintext = "FIRST-PROCESS-PLAINTEXT-MUST-STAY-ENCRYPTED";
+        let mut relay = RelayFixture::start_with_forbidden(forbidden_plaintext);
+        let http = LoopbackHttp::new();
+        let host_credential_path = journey.0.join("host-credentials.json");
+        let first_credential_path = journey.0.join("first-credentials.json");
+        let second_credential_path = journey.0.join("second-credentials.json");
+        let host_store = JourneyFileStore::new(&host_credential_path).unwrap();
+        let first_store = JourneyFileStore::new(&first_credential_path).unwrap();
+        let second_store = JourneyFileStore::new(&second_credential_path).unwrap();
+        let host_identity =
+            load_or_create_identity(&host_store, "github:maddiedreese", "Maddie").unwrap();
+        let first_identity =
+            load_or_create_identity(&first_store, "github:first", "First Guest").unwrap();
+        let second_identity =
+            load_or_create_identity(&second_store, "github:second", "Second Guest").unwrap();
+
+        let host_relay_session = debug_session(
+            &http,
+            &relay.info.base_url,
+            "github:maddiedreese",
+            "maddiedreese",
+            "Maddie",
+        );
+        let first_relay_session = debug_session(
+            &http,
+            &relay.info.base_url,
+            "github:first",
+            "first",
+            "First Guest",
+        );
+        let second_relay_session = debug_session(
+            &http,
+            &relay.info.base_url,
+            "github:second",
+            "second",
+            "Second Guest",
+        );
+        for (session, identity) in [
+            (&host_relay_session, &host_identity),
+            (&first_relay_session, &first_identity),
+            (&second_relay_session, &second_identity),
+        ] {
+            register_identity(&http, &relay.info.base_url, session, identity);
+        }
+        let host_session = restored(
+            "github:maddiedreese",
+            "maddiedreese",
+            "Maddie",
+            &relay.info.base_url,
+        );
+        let first_session = restored("github:first", "first", "First Guest", &relay.info.base_url);
+        let second_session = restored(
+            "github:second",
+            "second",
+            "Second Guest",
+            &relay.info.base_url,
+        );
+        let first_device_session = device_session(
+            &first_store,
+            &http,
+            &relay.info,
+            &first_relay_session,
+            &first_session,
+            &first_identity,
+        );
+        let second_device_session = device_session(
+            &second_store,
+            &http,
+            &relay.info,
+            &second_relay_session,
+            &second_session,
+            &second_identity,
+        );
+        let host_mls_path = journey.0.join("chat-host.sqlite");
+        let first_mls_path = journey.0.join("chat-first.sqlite");
+        let second_mls_path = journey.0.join("chat-second.sqlite");
+        let mut host_mls =
+            MlsClientService::open(&host_store, &host_identity, &host_mls_path).unwrap();
+        let mut first_mls =
+            MlsClientService::open(&first_store, &first_identity, &first_mls_path).unwrap();
+        let mut second_mls =
+            MlsClientService::open(&second_store, &second_identity, &second_mls_path).unwrap();
+
+        let mut room = {
+            let mut backend = RelayRoomBackend::new_for_loopback_test(
+                &host_store,
+                &http,
+                &relay.info.base_url,
+                &relay.info.ws_url,
+                &host_relay_session,
+                &host_session,
+                &host_identity,
+            )
+            .unwrap();
+            RoomService::new(
+                &host_store,
+                &mut backend,
+                &mut host_mls,
+                &host_identity.public.user_id,
+                &host_identity.public.device_id,
+                &relay.info.base_url,
+            )
+            .create(&CreateRoomRequest {
+                team: Some("team-core".into()),
+                name: "Three client encrypted chat".into(),
+                project: project.to_string_lossy().into_owned(),
+            })
+            .unwrap()
+            .room
+        };
+        let host_device_session = device_session(
+            &host_store,
+            &http,
+            &relay.info,
+            &host_relay_session,
+            &host_session,
+            &host_identity,
+        );
+        admit_for_chat(
+            &host_store,
+            &first_store,
+            &http,
+            &relay.info,
+            &host_relay_session,
+            &first_relay_session,
+            &host_session,
+            &first_session,
+            &host_identity,
+            &first_identity,
+            &room,
+            host_device_session.as_str(),
+            first_device_session.as_str(),
+            &mut host_mls,
+            &mut first_mls,
+        );
+        room = {
+            let mut backend = RelayRoomBackend::new_for_loopback_test(
+                &host_store,
+                &http,
+                &relay.info.base_url,
+                &relay.info.ws_url,
+                &host_relay_session,
+                &host_session,
+                &host_identity,
+            )
+            .unwrap();
+            backend
+                .workspace()
+                .unwrap()
+                .rooms
+                .into_iter()
+                .find(|candidate| candidate.id == room.id)
+                .unwrap()
+        };
+        assert_eq!(room.accepted_mls_epoch, Some(1));
+        // Keep the existing member online while the host admits the third
+        // member so it receives and durably applies the epoch-two Commit.
+        let mut first_chat = ChatRoomSession::new(
+            chat_connection(&relay.info, &first_relay_session),
+            &mut first_mls,
+            room.clone(),
+            &first_identity.public.user_id,
+            &first_identity.public.device_id,
+            &first_identity.public.display_name,
+            &first_identity.public.signature_key_fingerprint,
+        )
+        .unwrap();
+        first_chat.join(first_device_session.as_str()).unwrap();
+        admit_for_chat(
+            &host_store,
+            &second_store,
+            &http,
+            &relay.info,
+            &host_relay_session,
+            &second_relay_session,
+            &host_session,
+            &second_session,
+            &host_identity,
+            &second_identity,
+            &room,
+            host_device_session.as_str(),
+            second_device_session.as_str(),
+            &mut host_mls,
+            &mut second_mls,
+        );
+        room = {
+            let mut backend = RelayRoomBackend::new_for_loopback_test(
+                &host_store,
+                &http,
+                &relay.info.base_url,
+                &relay.info.ws_url,
+                &host_relay_session,
+                &host_session,
+                &host_identity,
+            )
+            .unwrap();
+            backend
+                .workspace()
+                .unwrap()
+                .rooms
+                .into_iter()
+                .find(|candidate| candidate.id == room.id)
+                .unwrap()
+        };
+        assert_eq!(room.accepted_mls_epoch, Some(2));
+        for _ in 0..10 {
+            first_chat.poll(Duration::from_millis(20)).unwrap();
+        }
+        drop(first_chat);
+        drop(host_mls);
+        drop(first_mls);
+        drop(second_mls);
+
+        let coordination_dir = journey.0.join("process-coordination");
+        let configurations = [
+            (
+                &host_credential_path,
+                &host_mls_path,
+                &host_relay_session,
+                host_device_session.as_str(),
+                "github:maddiedreese",
+                "Maddie",
+            ),
+            (
+                &first_credential_path,
+                &first_mls_path,
+                &first_relay_session,
+                first_device_session.as_str(),
+                "github:first",
+                "First Guest",
+            ),
+            (
+                &second_credential_path,
+                &second_mls_path,
+                &second_relay_session,
+                second_device_session.as_str(),
+                "github:second",
+                "Second Guest",
+            ),
+        ];
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        assert!(Command::new("cargo")
+            .args(["build", "--locked", "--bin", "multAIplayer"])
+            .current_dir(manifest_dir)
+            .status()
+            .unwrap()
+            .success());
+        let binary = manifest_dir.join("target/debug/multAIplayer");
+        let mut children = Vec::new();
+        for (role, (credential_path, mls_path, relay_session, device_session, user_id, name)) in
+            configurations.into_iter().enumerate()
+        {
+            let config_path = journey.0.join(format!("process-{role}.json"));
+            fs::write(
+                &config_path,
+                serde_json::to_vec(&json!({
+                    "credentialPath": credential_path,
+                    "mlsPath": mls_path,
+                    "websocketUrl": relay.info.ws_url,
+                    "relaySession": relay_session,
+                    "deviceSession": device_session,
+                    "room": room,
+                    "userId": user_id,
+                    "displayName": name,
+                    "role": role,
+                    "coordinationDir": coordination_dir,
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            fs::set_permissions(&config_path, fs::Permissions::from_mode(0o600)).unwrap();
+            children.push(
+                Command::new(&binary)
+                    .arg("__chat-journey")
+                    .arg(config_path)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()
+                    .unwrap(),
+            );
+        }
+        let expected_chat = [
+            "[chat] <Maddie> FIRST-PROCESS-PLAINTEXT-MUST-STAY-ENCRYPTED",
+            "[chat] <First Guest> SECOND-PROCESS-CHAT",
+            "[chat] <Second Guest> THIRD-PROCESS-CHAT",
+        ];
+        let mut process_outputs = Vec::new();
+        for (role, child) in children.into_iter().enumerate() {
+            let output = child.wait_with_output().unwrap();
+            assert!(
+                output.status.success(),
+                "process {role} failed; stdout={} stderr={}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
+            process_outputs.push(String::from_utf8(output.stdout).unwrap());
+        }
+        relay.stop_and_assert();
+        for output in process_outputs {
+            let chat_lines: Vec<_> = output
+                .lines()
+                .filter(|line| line.starts_with("[chat] "))
+                .collect();
+            assert_eq!(chat_lines, expected_chat);
+            assert!(output.lines().any(|line| {
+                line.starts_with("[host] Maddie (") && line.ends_with(") is online")
+            }));
+            assert!(output.lines().any(|line| {
+                line.starts_with("[presence] First Guest (") && line.ends_with(") is online")
+            }));
+            assert!(output.lines().any(|line| {
+                line.starts_with("[presence] Second Guest (") && line.ends_with(") is online")
+            }));
+            assert!(!output.contains('\u{1b}'));
+        }
     }
 
     #[test]

@@ -7,6 +7,14 @@ use reqwest::{
 use serde_json::Value;
 use std::{collections::BTreeMap, io::Read, process::Command, time::Duration};
 
+#[cfg(any(test, debug_assertions))]
+use std::{
+    fs,
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
+
 pub const KEYCHAIN_SERVICE: &str = "com.multaiplayer.cli";
 
 pub trait CredentialStore {
@@ -45,6 +53,82 @@ impl CredentialStore for KeychainStore {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(_) => Err(CliError::CredentialStoreUnavailable),
         }
+    }
+}
+
+/// File-backed credential adapter used only by debug journey binaries. Release
+/// builds cannot select it, and the normal CLI always uses macOS Keychain.
+#[cfg(any(test, debug_assertions))]
+pub struct JourneyFileStore {
+    path: PathBuf,
+    lock: Mutex<()>,
+}
+
+#[cfg(any(test, debug_assertions))]
+impl JourneyFileStore {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, CliError> {
+        let path = path.as_ref().to_path_buf();
+        if !path.is_absolute() {
+            return Err(CliError::CredentialStoreUnavailable);
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|_| CliError::CredentialStoreUnavailable)?;
+        }
+        Ok(Self {
+            path,
+            lock: Mutex::new(()),
+        })
+    }
+
+    fn load(&self) -> Result<BTreeMap<String, String>, CliError> {
+        match fs::read(&self.path) {
+            Ok(bytes) if bytes.len() <= 1_048_576 => {
+                serde_json::from_slice(&bytes).map_err(|_| CliError::CredentialStoreUnavailable)
+            }
+            Ok(_) => Err(CliError::CredentialStoreUnavailable),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
+            Err(_) => Err(CliError::CredentialStoreUnavailable),
+        }
+    }
+
+    fn save(&self, values: &BTreeMap<String, String>) -> Result<(), CliError> {
+        let bytes = serde_json::to_vec(values).map_err(|_| CliError::CredentialStoreUnavailable)?;
+        let temporary = self.path.with_extension("tmp");
+        fs::write(&temporary, bytes).map_err(|_| CliError::CredentialStoreUnavailable)?;
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))
+            .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        fs::rename(temporary, &self.path).map_err(|_| CliError::CredentialStoreUnavailable)
+    }
+}
+
+#[cfg(any(test, debug_assertions))]
+impl CredentialStore for JourneyFileStore {
+    fn get(&self, account: &str) -> Result<Option<String>, CliError> {
+        let _guard = self
+            .lock
+            .lock()
+            .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        Ok(self.load()?.remove(account))
+    }
+
+    fn set(&self, account: &str, value: &str) -> Result<(), CliError> {
+        let _guard = self
+            .lock
+            .lock()
+            .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        let mut values = self.load()?;
+        values.insert(account.to_owned(), value.to_owned());
+        self.save(&values)
+    }
+
+    fn delete(&self, account: &str) -> Result<(), CliError> {
+        let _guard = self
+            .lock
+            .lock()
+            .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        let mut values = self.load()?;
+        values.remove(account);
+        self.save(&values)
     }
 }
 
