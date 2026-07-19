@@ -10,6 +10,7 @@ use crate::{
         connect_with_retries, ReconnectPolicy, RelayConnection, ThreadSleeper,
         TungsteniteConnector, MAX_HTTP_RESPONSE_BYTES,
     },
+    room::record_joined_room_association,
     CliError,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -719,6 +720,26 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
         device_session: &str,
         mls: &mut MlsClientService,
     ) -> Result<Option<u64>, InviteError> {
+        self.finish_admission_and_maybe_record(request, device_session, None, mls)
+    }
+
+    pub fn finish_admission_and_record(
+        &mut self,
+        request: &PreparedInviteRequest,
+        device_session: &str,
+        relay_origin: &str,
+        mls: &mut MlsClientService,
+    ) -> Result<Option<u64>, InviteError> {
+        self.finish_admission_and_maybe_record(request, device_session, Some(relay_origin), mls)
+    }
+
+    fn finish_admission_and_maybe_record(
+        &mut self,
+        request: &PreparedInviteRequest,
+        device_session: &str,
+        relay_origin: Option<&str>,
+        mls: &mut MlsClientService,
+    ) -> Result<Option<u64>, InviteError> {
         let Some(response) = self.backend.load_response(
             &request.invite_id,
             &request.request_id,
@@ -743,6 +764,15 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
                 &request.binding.requester_device_id,
                 device_session,
             )?;
+            if let Some(relay_origin) = relay_origin {
+                persist_completed_admission_association(
+                    self.store,
+                    &request.binding.requester_user_id,
+                    &request.binding.requester_device_id,
+                    relay_origin,
+                    &lookup.room,
+                )?;
+            }
         }
         self.backend.acknowledge_response(
             &request.invite_id,
@@ -769,10 +799,50 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
         self.finish_admission(request, device_session, mls)
     }
 
+    pub fn finish_admission_and_record_at(
+        &mut self,
+        request: &PreparedInviteRequest,
+        device_session: &str,
+        relay_origin: &str,
+        now: &str,
+        mls: &mut MlsClientService,
+    ) -> Result<Option<u64>, InviteError> {
+        ensure_not_expired(&request.binding.expires_at, now)?;
+        self.finish_admission_and_record(request, device_session, relay_origin, mls)
+    }
+
     pub fn finish_pending_admission(
         &mut self,
         pending: &PendingInviteAdmission,
         device_session: &str,
+        now: &str,
+        mls: &mut MlsClientService,
+    ) -> Result<Option<u64>, InviteError> {
+        self.finish_pending_admission_and_maybe_record(pending, device_session, None, now, mls)
+    }
+
+    pub fn finish_pending_admission_and_record(
+        &mut self,
+        pending: &PendingInviteAdmission,
+        device_session: &str,
+        relay_origin: &str,
+        now: &str,
+        mls: &mut MlsClientService,
+    ) -> Result<Option<u64>, InviteError> {
+        self.finish_pending_admission_and_maybe_record(
+            pending,
+            device_session,
+            Some(relay_origin),
+            now,
+            mls,
+        )
+    }
+
+    fn finish_pending_admission_and_maybe_record(
+        &mut self,
+        pending: &PendingInviteAdmission,
+        device_session: &str,
+        relay_origin: Option<&str>,
         now: &str,
         mls: &mut MlsClientService,
     ) -> Result<Option<u64>, InviteError> {
@@ -801,6 +871,15 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
                 &pending.requester_device_id,
                 device_session,
             )?;
+            if let Some(relay_origin) = relay_origin {
+                persist_completed_admission_association(
+                    self.store,
+                    &pending.requester_user_id,
+                    &pending.requester_device_id,
+                    relay_origin,
+                    &lookup.room,
+                )?;
+            }
         }
         self.backend.acknowledge_response(
             &pending.invite_id,
@@ -811,6 +890,36 @@ impl<'a, S: CredentialStore, B: InviteBackend> InviteService<'a, S, B> {
         mls.complete_invite_response(&pending.request_id, &pending.room_id, epoch.is_some())?;
         Ok(epoch)
     }
+}
+
+fn persist_completed_admission_association(
+    store: &impl CredentialStore,
+    user_id: &str,
+    device_id: &str,
+    relay_origin: &str,
+    room: &RoomRecord,
+) -> Result<(), InviteError> {
+    record_joined_room_association(store, user_id, device_id, relay_origin, room)
+        .map_err(|_| InviteError::RecoveryRequired)
+}
+
+/// Debug-only boundary for proving the same durable association step used by
+/// successful production admission completion before restart/open.
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn interoperability_persist_completed_admission_association(
+    store: &impl CredentialStore,
+    identity: &DeviceIdentity,
+    relay_origin: &str,
+    room: &RoomRecord,
+) -> Result<(), InviteError> {
+    persist_completed_admission_association(
+        store,
+        &identity.public.user_id,
+        &identity.public.device_id,
+        relay_origin,
+        room,
+    )
 }
 
 fn ensure_active_host(room: &RoomRecord, identity: &DeviceIdentity) -> Result<(), InviteError> {

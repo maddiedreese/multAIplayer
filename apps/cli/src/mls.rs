@@ -379,6 +379,65 @@ impl MlsClientService {
         }
     }
 
+    /// Test-only compatibility boundary used by the mixed desktop/CLI journey.
+    /// Release builds cannot use these raw MLS lifecycle operations; product
+    /// admission continues to flow through the capability-bound invite APIs.
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub fn interoperability_generate_key_package(&self) -> Result<Vec<u8>, MlsClientError> {
+        self.engine.generate_key_package().map_err(map_engine_error)
+    }
+
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub fn interoperability_add_member(
+        &mut self,
+        room_id: &str,
+        key_package: &[u8],
+    ) -> Result<mls_core::AddMemberOutput, MlsClientError> {
+        self.engine
+            .add_member(room_id, key_package)
+            .map_err(map_engine_error)
+    }
+
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub fn interoperability_join_welcome(
+        &mut self,
+        room_id: &str,
+        welcome: &[u8],
+    ) -> Result<u64, MlsClientError> {
+        self.engine
+            .join_welcome(room_id, welcome)
+            .map_err(map_engine_error)
+    }
+
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub fn interoperability_encrypt_application(
+        &mut self,
+        room_id: &str,
+        message_id: &str,
+        payload: &[u8],
+        authenticated_data: ApplicationAuthenticatedDataInput,
+    ) -> Result<mls_core::OutboundApplication, MlsClientError> {
+        self.engine
+            .encrypt_application(room_id, message_id, payload, authenticated_data)
+            .map_err(map_engine_error)
+    }
+
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub fn interoperability_publish_succeeded(
+        &mut self,
+        room_id: &str,
+        message_id: &str,
+    ) -> Result<u64, MlsClientError> {
+        self.engine
+            .publish_succeeded(room_id, message_id)
+            .map_err(map_engine_error)
+    }
+
     /// Encrypts and durably queues one application record using the existing MLS
     /// engine and authenticated-data contract. Publication remains an explicit
     /// second step so a process failure cannot lose the outbound record.

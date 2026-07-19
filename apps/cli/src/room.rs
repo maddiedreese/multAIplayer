@@ -441,7 +441,8 @@ struct StoredAssociation {
     team_id: String,
     room_id: Option<String>,
     room_name: String,
-    project_path: String,
+    #[serde(default)]
+    project_path: Option<String>,
     complete: bool,
     #[serde(default)]
     left: bool,
@@ -496,7 +497,7 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
         let existing_index = state.associations.iter().position(|association| {
             association.team_id == team_id
                 && association.room_name == request.name
-                && association.project_path == project_path
+                && association.project_path.as_deref() == Some(project_path.as_str())
         });
         let index = match existing_index {
             Some(index) => {
@@ -517,7 +518,7 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
                     team_id: team_id.clone(),
                     room_id: None,
                     room_name: request.name.clone(),
-                    project_path,
+                    project_path: Some(project_path),
                     complete: false,
                     left: false,
                     forget_pending: false,
@@ -563,7 +564,12 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             created
         };
 
-        canonical_stored_project(&state.associations[index].project_path)?;
+        canonical_stored_project(
+            state.associations[index]
+                .project_path
+                .as_deref()
+                .ok_or(RoomError::InvalidProject)?,
+        )?;
         self.mls.create_group_idempotent(&room.id)?;
         if room.host_status == HostStatus::Active {
             if room.host_user_id.as_deref() != Some(self.user_id)
@@ -597,7 +603,12 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
             }
         }
         validate_active_host(&room, self.user_id, self.device_id)?;
-        canonical_stored_project(&state.associations[index].project_path)?;
+        canonical_stored_project(
+            state.associations[index]
+                .project_path
+                .as_deref()
+                .ok_or(RoomError::InvalidProject)?,
+        )?;
         state.associations[index].complete = true;
         self.save_state(&state)?;
         Ok(OpenedRoom {
@@ -618,21 +629,24 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
         if !association.complete || association.left || association.forget_pending {
             return Err(RoomError::CreationPending);
         }
-        canonical_stored_project(&association.project_path)?;
+        if let Some(project_path) = association.project_path.as_deref() {
+            canonical_stored_project(project_path)?;
+        }
         self.mls.open_group(&room.id)?;
-        if room.host_status == HostStatus::Active
-            && (room.host_user_id.as_deref() != Some(self.user_id)
-                || room.active_host_device_id.as_deref() != Some(self.device_id))
-        {
-            return Err(RoomError::HostHandoffUnsupported);
+        let is_active_host = room.host_status == HostStatus::Active
+            && room.host_user_id.as_deref() == Some(self.user_id)
+            && room.active_host_device_id.as_deref() == Some(self.device_id);
+        let created_as_host = association.project_path.is_some();
+        if room.host_status == HostStatus::Active {
+            validate_cli_host_role(created_as_host, is_active_host)?;
         }
         Ok(OpenedRoom {
-            is_active_host: room.host_status == HostStatus::Active,
+            is_active_host,
             room,
         })
     }
 
-    pub fn local_project_path(&self, room_id: &str) -> Result<PathBuf, RoomError> {
+    pub fn local_project_path(&self, room_id: &str) -> Result<Option<PathBuf>, RoomError> {
         let state = self.load_state()?;
         let association = state
             .associations
@@ -642,8 +656,12 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
                 association.complete && !association.left && !association.forget_pending
             })
             .ok_or(RoomError::LocalStateUnavailable)?;
-        let canonical = canonical_stored_project(&association.project_path)?;
-        Ok(PathBuf::from(canonical))
+        association
+            .project_path
+            .as_deref()
+            .map(canonical_stored_project)
+            .transpose()
+            .map(|path| path.map(PathBuf::from))
     }
 
     pub fn leave(&mut self, selector: &str) -> Result<RoomRecord, RoomError> {
@@ -696,41 +714,117 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
     }
 
     fn load_state(&self) -> Result<StoredRoomState, RoomError> {
-        let Some(encoded) = self
-            .store
-            .get(ROOM_STATE_ACCOUNT)
-            .map_err(|_| RoomError::LocalStateUnavailable)?
-        else {
-            return Ok(StoredRoomState {
-                version: 1,
-                user_id: self.user_id.to_owned(),
-                device_id: self.device_id.to_owned(),
-                relay_origin: self.relay_origin.to_owned(),
-                associations: Vec::new(),
-            });
-        };
-        let encoded = Zeroizing::new(encoded);
-        let state: StoredRoomState =
-            serde_json::from_str(encoded.as_str()).map_err(|_| RoomError::LocalStateUnavailable)?;
-        if state.version != 1
-            || state.user_id != self.user_id
-            || state.device_id != self.device_id
-            || state.relay_origin != self.relay_origin
-            || state.associations.len() > MAX_LOCAL_ROOM_ASSOCIATIONS
-        {
-            return Err(RoomError::LocalStateUnavailable);
-        }
-        Ok(state)
+        load_stored_room_state(self.store, self.user_id, self.device_id, self.relay_origin)
     }
 
     fn save_state(&self, state: &StoredRoomState) -> Result<(), RoomError> {
-        let encoded = Zeroizing::new(
-            serde_json::to_string(state).map_err(|_| RoomError::LocalStateUnavailable)?,
-        );
-        self.store
-            .set(ROOM_STATE_ACCOUNT, encoded.as_str())
-            .map_err(|_| RoomError::LocalStateUnavailable)
+        save_stored_room_state(self.store, state)
     }
+}
+
+fn validate_cli_host_role(created_as_host: bool, is_active_host: bool) -> Result<(), RoomError> {
+    if created_as_host != is_active_host {
+        return Err(RoomError::HostHandoffUnsupported);
+    }
+    Ok(())
+}
+
+/// Debug-only adapter for the required cross-client handoff rejection journey.
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn interoperability_validate_cli_host_role(
+    created_as_host: bool,
+    is_active_host: bool,
+) -> Result<(), RoomError> {
+    validate_cli_host_role(created_as_host, is_active_host)
+}
+
+pub fn record_joined_room_association(
+    store: &impl CredentialStore,
+    user_id: &str,
+    device_id: &str,
+    relay_origin: &str,
+    room: &RoomRecord,
+) -> Result<(), RoomError> {
+    room.validate().map_err(|_| RoomError::RelayUnavailable)?;
+    if room.deleted_at.is_some()
+        || room.accepted_mls_epoch.is_none()
+        || room.host_status != HostStatus::Active
+        || room.host_user_id.as_deref() == Some(user_id)
+    {
+        return Err(RoomError::RelayUnavailable);
+    }
+    let mut state = load_stored_room_state(store, user_id, device_id, relay_origin)?;
+    if let Some(existing) = state
+        .associations
+        .iter_mut()
+        .find(|association| association.room_id.as_deref() == Some(room.id.as_str()))
+    {
+        if existing.project_path.is_some() || existing.forget_pending {
+            return Err(RoomError::HostHandoffUnsupported);
+        }
+        existing.team_id = room.team_id.clone();
+        existing.room_name = room.name.clone();
+        existing.complete = true;
+        existing.left = false;
+        return save_stored_room_state(store, &state);
+    }
+    if state.associations.len() >= MAX_LOCAL_ROOM_ASSOCIATIONS {
+        return Err(RoomError::LocalStateUnavailable);
+    }
+    state.associations.push(StoredAssociation {
+        team_id: room.team_id.clone(),
+        room_id: Some(room.id.clone()),
+        room_name: room.name.clone(),
+        project_path: None,
+        complete: true,
+        left: false,
+        forget_pending: false,
+    });
+    save_stored_room_state(store, &state)
+}
+
+fn load_stored_room_state(
+    store: &impl CredentialStore,
+    user_id: &str,
+    device_id: &str,
+    relay_origin: &str,
+) -> Result<StoredRoomState, RoomError> {
+    let Some(encoded) = store
+        .get(ROOM_STATE_ACCOUNT)
+        .map_err(|_| RoomError::LocalStateUnavailable)?
+    else {
+        return Ok(StoredRoomState {
+            version: 1,
+            user_id: user_id.to_owned(),
+            device_id: device_id.to_owned(),
+            relay_origin: relay_origin.to_owned(),
+            associations: Vec::new(),
+        });
+    };
+    let encoded = Zeroizing::new(encoded);
+    let state: StoredRoomState =
+        serde_json::from_str(encoded.as_str()).map_err(|_| RoomError::LocalStateUnavailable)?;
+    if state.version != 1
+        || state.user_id != user_id
+        || state.device_id != device_id
+        || state.relay_origin != relay_origin
+        || state.associations.len() > MAX_LOCAL_ROOM_ASSOCIATIONS
+    {
+        return Err(RoomError::LocalStateUnavailable);
+    }
+    Ok(state)
+}
+
+fn save_stored_room_state(
+    store: &impl CredentialStore,
+    state: &StoredRoomState,
+) -> Result<(), RoomError> {
+    let encoded =
+        Zeroizing::new(serde_json::to_string(state).map_err(|_| RoomError::LocalStateUnavailable)?);
+    store
+        .set(ROOM_STATE_ACCOUNT, encoded.as_str())
+        .map_err(|_| RoomError::LocalStateUnavailable)
 }
 
 fn validate_room_name(name: &str) -> Result<(), RoomError> {
@@ -1298,10 +1392,12 @@ mod tests {
                 team_id: "team-core".into(),
                 room_id: None,
                 room_name: "Compiler work".into(),
-                project_path: fs::canonicalize(std::env::temp_dir())
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned(),
+                project_path: Some(
+                    fs::canonicalize(std::env::temp_dir())
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned(),
+                ),
                 complete: false,
                 left: false,
                 forget_pending: false,
@@ -1345,6 +1441,34 @@ mod tests {
             RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN).open("room-cli");
         assert_eq!(result, Err(RoomError::HostHandoffUnsupported));
         assert_eq!(mls.opens, 1);
+    }
+
+    #[test]
+    fn joined_participant_opens_remote_host_without_a_project_and_rejects_handoff_to_cli() {
+        let store = MemoryCredentialStore::default();
+        let mut remote = active_room();
+        remote.host = "Desktop Host".into();
+        remote.host_user_id = Some("github:desktop-host".into());
+        remote.active_host_device_id = Some("device_desktop_host".into());
+        record_joined_room_association(&store, USER, DEVICE, ORIGIN, &remote).unwrap();
+
+        let mut backend = FakeBackend::new(vec![workspace(vec![remote.clone()])]);
+        let mut mls = FakeMls::default();
+        let mut service = RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN);
+        let opened = service.open("room-cli").unwrap();
+        assert!(!opened.is_active_host);
+        assert_eq!(service.local_project_path("room-cli").unwrap(), None);
+
+        let mut handed_off = remote;
+        handed_off.host = "CLI Participant".into();
+        handed_off.host_user_id = Some(USER.into());
+        handed_off.active_host_device_id = Some(DEVICE.into());
+        let mut backend = FakeBackend::new(vec![workspace(vec![handed_off])]);
+        let mut mls = FakeMls::default();
+        assert_eq!(
+            RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN).open("room-cli"),
+            Err(RoomError::HostHandoffUnsupported)
+        );
     }
 
     struct RecordingLoopbackHttp {

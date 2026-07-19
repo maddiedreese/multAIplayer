@@ -1,9 +1,6 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
-import {
-  decodeNoSecretRoomInvite,
-  encodeNoSecretRoomInvite
-} from "../../desktop/src/lib/invite/noSecretRoomInvite.ts";
+import { decodeNoSecretRoomInvite, encodeNoSecretRoomInvite } from "../../desktop/src/lib/invite/noSecretRoomInvite.ts";
 
 const invite = {
   version: 4 as const,
