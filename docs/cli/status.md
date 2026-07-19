@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-080 secure invite codes and host-mediated admission
+Current phase: CLI-090 encrypted chat, presence, and safe rendering
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-18
 
@@ -15,9 +15,9 @@ Last update: 2026-07-18
 - Governance branch: `codex/cli-governance`.
 - The CLI scaffold, strict Rust protocol parity layer, GitHub authentication,
   secure device identity, authenticated relay transport/workspace reads,
-  durable MLS client state/outbox, and room creation with host-local project
-  association are present; secure admission and later product behavior have not
-  been implemented.
+  durable MLS client state/outbox, room creation with host-local project
+  association, and secure host-mediated admission are present; encrypted chat
+  and later product behavior have not been implemented.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -80,7 +80,19 @@ Last update: 2026-07-18
   desktop tests. The accepted diff is CLI-only, preserves the original CLI-070
   ancestry and CLI-040-R1 correction, keeps canonical project paths in zeroized
   local credential state, and leaves desktop/release surfaces unchanged.
-- CLI-080 is the only active implementation task.
+- CLI-080 is complete and integrated. Its accepted corrected task head is
+  `76b1d06f763b898b7b6c77eaa8dc16f3ca3b54b7`; integration merge
+  `efdf008ec07cc0abde2b2efbc745172eeba2c381` passed the locked CLI runner with
+  88 executed tests, including literal binary invite/join/admissions/revoke and
+  durable-finish command paths against the real relay fixture, plus 18
+  classification/isolation tests. Independent review also passed all 52
+  `mls-core` tests, 27 protocol tests, 285 relay tests, and 695 desktop tests.
+  CLI-issued codes are checksummed and desktop-v4 compatible, capability
+  material is zeroized and redacted, admission is host-mediated through a
+  trusted explicit prompt, and expiry/revocation/replay/single-use behavior
+  remains bound to the existing MLS capability model. No dependency, shared
+  contract, desktop runtime, or protected release path changed.
+- CLI-090 is the only active implementation task.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -104,8 +116,8 @@ Last update: 2026-07-18
 | CLI-050 | Relay transport and workspace reads | complete | CLI-030, CLI-040 |
 | CLI-060 | MLS client state, storage, and outbox | complete | CLI-030, CLI-040 |
 | CLI-070 | Room creation and local project association | complete | CLI-050, CLI-060, CLI-040-R1 |
-| CLI-080 | Secure invite codes and host-mediated admission | active | CLI-070 |
-| CLI-090 | Encrypted chat, presence, and safe rendering | waiting_for_orchestrator_approval | CLI-050, CLI-060, CLI-080 |
+| CLI-080 | Secure invite codes and host-mediated admission | complete | CLI-070 |
+| CLI-090 | Encrypted chat, presence, and safe rendering | active | CLI-050, CLI-060, CLI-080 |
 | CLI-100 | Reconnect, replay, history, and crash recovery | waiting_for_orchestrator_approval | CLI-090 |
 | CLI-110 | UI-independent Codex host extraction | waiting_for_orchestrator_approval | CLI-020 |
 | CLI-120 | Codex proposals, context, and hosted turns | waiting_for_orchestrator_approval | CLI-090, CLI-110 |
