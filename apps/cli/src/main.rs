@@ -358,13 +358,46 @@ fn run_invite_command<R: BufRead, W: Write, P: Write>(
     let identity = load_or_create_identity(&store, &session.user.id, display_name)
         .map_err(InviteCliError::Core)?;
     let mls_path = cli_mls_path().map_err(|()| InviteCliError::State)?;
-    let mut mls = MlsClientService::open(&store, &identity, &mls_path)
+    run_authenticated_invite_command(
+        command,
+        &store,
+        &http,
+        RELAY_HTTP_ORIGIN,
+        &session,
+        &identity,
+        &mls_path,
+        input,
+        output,
+        trusted_prompt,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_authenticated_invite_command<S, H, R, W, P>(
+    command: Command,
+    store: &S,
+    http: &H,
+    relay_origin: &str,
+    session: &multaiplayer_cli::auth::RestoredSession,
+    identity: &multaiplayer_cli::identity::DeviceIdentity,
+    mls_path: &std::path::Path,
+    input: &mut R,
+    output: &mut W,
+    trusted_prompt: &mut P,
+) -> Result<(), InviteCliError>
+where
+    S: multaiplayer_cli::platform::CredentialStore,
+    H: multaiplayer_cli::platform::HttpClient,
+    R: BufRead,
+    W: Write,
+    P: Write,
+{
+    let mut mls = MlsClientService::open(store, identity, mls_path)
         .map_err(|error| InviteCliError::Invite(error.into()))?;
 
     let device_session = {
-        let mut backend =
-            RelayRoomBackend::new(&store, &http, RELAY_HTTP_ORIGIN, &session, &identity)
-                .map_err(InviteCliError::Room)?;
+        let mut backend = RelayRoomBackend::new(store, http, relay_origin, session, identity)
+            .map_err(InviteCliError::Room)?;
         backend
             .establish_device_session_for_invites()
             .map_err(InviteCliError::Room)?
@@ -373,7 +406,7 @@ fn run_invite_command<R: BufRead, W: Write, P: Write>(
         Command::RoomInvite { selector }
         | Command::RoomAdmissions { selector, .. }
         | Command::RoomRevoke { selector } => {
-            let workspace = WorkspaceClient::new(&store, &http, RELAY_HTTP_ORIGIN)
+            let workspace = WorkspaceClient::new(store, http, relay_origin)
                 .and_then(|client| client.load())
                 .map_err(InviteCliError::Core)?;
             Some(select_invite_room(&workspace, selector)?)
@@ -381,16 +414,27 @@ fn run_invite_command<R: BufRead, W: Write, P: Write>(
         Command::RoomJoin | Command::RoomFinish { .. } => None,
         _ => unreachable!("invite runner received non-invite command"),
     };
-    let mut backend =
-        RelayInviteBackend::new(&store, &http, RELAY_HTTP_ORIGIN, &session, &identity)
-            .map_err(InviteCliError::Invite)?;
-    let mut service = InviteService::new(&store, &mut backend);
+    if matches!(
+        &command,
+        Command::RoomInvite { .. } | Command::RoomAdmissions { .. }
+    ) {
+        let room = room.as_ref().ok_or(InviteCliError::RoomSelection)?;
+        let epoch = mls
+            .open_group(&room.id)
+            .map_err(|error| InviteCliError::Invite(error.into()))?;
+        if room.accepted_mls_epoch != Some(epoch) {
+            return Err(InviteCliError::Invite(InviteError::RecoveryRequired));
+        }
+    }
+    let mut backend = RelayInviteBackend::new(store, http, relay_origin, session, identity)
+        .map_err(InviteCliError::Invite)?;
+    let mut service = InviteService::new(store, &mut backend);
     match command {
         Command::RoomInvite { .. } => {
             let room = room.as_ref().ok_or(InviteCliError::RoomSelection)?;
             let code = Zeroizing::new(
                 service
-                    .issue(room, &identity)
+                    .issue(room, identity)
                     .map_err(InviteCliError::Invite)?,
             );
             let parsed = parse_invite_code(code.as_str())
@@ -407,7 +451,7 @@ fn run_invite_command<R: BufRead, W: Write, P: Write>(
         Command::RoomRevoke { .. } => {
             let room = room.as_ref().ok_or(InviteCliError::RoomSelection)?;
             let revoked = service
-                .revoke(room, &identity)
+                .revoke(room, identity)
                 .map_err(InviteCliError::Invite)?;
             writeln!(output, "Revoked {revoked} outstanding invite(s).")
                 .map_err(|_| InviteCliError::Output)?;
@@ -419,7 +463,7 @@ fn run_invite_command<R: BufRead, W: Write, P: Write>(
                 .review_requests(
                     &invite_id,
                     room,
-                    &identity,
+                    identity,
                     device_session.as_str(),
                     &now,
                     &mls,
@@ -435,7 +479,7 @@ fn run_invite_command<R: BufRead, W: Write, P: Write>(
                     .decide_from_trusted_prompt(
                         &request,
                         room,
-                        &identity,
+                        identity,
                         device_session.as_str(),
                         &decided_at,
                         &mut mls,
@@ -459,13 +503,7 @@ fn run_invite_command<R: BufRead, W: Write, P: Write>(
             let code = read_invite_code(input)?;
             let now = utc_timestamp()?;
             let request = service
-                .request_admission(
-                    code.as_str(),
-                    &identity,
-                    device_session.as_str(),
-                    &now,
-                    &mls,
-                )
+                .request_admission(code.as_str(), identity, device_session.as_str(), &now, &mls)
                 .map_err(InviteCliError::Invite)?;
             writeln!(
                 output,
@@ -704,6 +742,306 @@ fn auth_error(error: multaiplayer_cli::CliError) -> ExitCode {
 mod tests {
     use super::*;
     use multaiplayer_cli::invite::{read_trusted_admission_decision, AdmissionPromptDecision};
+    use multaiplayer_cli::platform::{CredentialStore, HttpClient, HttpResponse};
+    use serde_json::{json, Value};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        fs,
+        io::BufReader,
+        process::{Child, ChildStdout, Command as ProcessCommand, Stdio},
+        sync::{Arc, Mutex},
+    };
+
+    #[derive(Clone, Default)]
+    struct ThreadStore(Arc<Mutex<HashMap<String, String>>>);
+
+    impl CredentialStore for ThreadStore {
+        fn get(&self, account: &str) -> Result<Option<String>, multaiplayer_cli::CliError> {
+            Ok(self.0.lock().unwrap().get(account).cloned())
+        }
+
+        fn set(&self, account: &str, value: &str) -> Result<(), multaiplayer_cli::CliError> {
+            self.0
+                .lock()
+                .unwrap()
+                .insert(account.to_owned(), value.to_owned());
+            Ok(())
+        }
+
+        fn delete(&self, account: &str) -> Result<(), multaiplayer_cli::CliError> {
+            self.0.lock().unwrap().remove(account);
+            Ok(())
+        }
+    }
+
+    #[derive(Clone)]
+    struct RewritingHttp {
+        client: reqwest::blocking::Client,
+        expected_origin: String,
+        actual_origin: String,
+    }
+
+    impl RewritingHttp {
+        fn new(expected_origin: &str, actual_origin: &str) -> Self {
+            Self {
+                client: reqwest::blocking::Client::builder()
+                    .redirect(reqwest::redirect::Policy::none())
+                    .build()
+                    .unwrap(),
+                expected_origin: expected_origin.into(),
+                actual_origin: actual_origin.into(),
+            }
+        }
+
+        fn send(
+            &self,
+            method: reqwest::Method,
+            expected_url: &str,
+            headers: &[(&str, &str)],
+            body: Option<Vec<u8>>,
+        ) -> Result<HttpResponse, multaiplayer_cli::CliError> {
+            let actual_url = expected_url.replacen(&self.expected_origin, &self.actual_origin, 1);
+            let mut request = self.client.request(method, actual_url);
+            for (name, value) in headers {
+                request = request.header(*name, *value);
+            }
+            if let Some(body) = body {
+                request = request
+                    .header("content-type", "application/json")
+                    .body(body);
+            }
+            let response = request
+                .send()
+                .map_err(|_| multaiplayer_cli::CliError::RelayUnavailable)?;
+            let status = response.status().as_u16();
+            let response_headers: BTreeMap<_, _> = response
+                .headers()
+                .iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .to_str()
+                        .ok()
+                        .map(|value| (name.as_str().to_owned(), value.to_owned()))
+                })
+                .collect();
+            let mut response_body = Vec::new();
+            response
+                .take(1_048_577)
+                .read_to_end(&mut response_body)
+                .map_err(|_| multaiplayer_cli::CliError::RelayUnavailable)?;
+            if response_body.len() > 1_048_576 {
+                return Err(multaiplayer_cli::CliError::RelayUnavailable);
+            }
+            Ok(HttpResponse {
+                status,
+                final_url: expected_url.into(),
+                headers: response_headers,
+                body: response_body,
+            })
+        }
+    }
+
+    impl HttpClient for RewritingHttp {
+        fn get(
+            &self,
+            url: &str,
+            headers: &[(&str, &str)],
+        ) -> Result<HttpResponse, multaiplayer_cli::CliError> {
+            self.send(reqwest::Method::GET, url, headers, None)
+        }
+
+        fn post_json(
+            &self,
+            url: &str,
+            headers: &[(&str, &str)],
+            body: &Value,
+        ) -> Result<HttpResponse, multaiplayer_cli::CliError> {
+            self.send(
+                reqwest::Method::POST,
+                url,
+                headers,
+                Some(serde_json::to_vec(body).unwrap()),
+            )
+        }
+
+        fn post_json_bytes(
+            &self,
+            url: &str,
+            headers: &[(&str, &str)],
+            body: &[u8],
+        ) -> Result<HttpResponse, multaiplayer_cli::CliError> {
+            self.send(reqwest::Method::POST, url, headers, Some(body.to_vec()))
+        }
+
+        fn patch_json(
+            &self,
+            url: &str,
+            headers: &[(&str, &str)],
+            body: &Value,
+        ) -> Result<HttpResponse, multaiplayer_cli::CliError> {
+            self.send(
+                reqwest::Method::PATCH,
+                url,
+                headers,
+                Some(serde_json::to_vec(body).unwrap()),
+            )
+        }
+
+        fn delete(
+            &self,
+            url: &str,
+            headers: &[(&str, &str)],
+        ) -> Result<HttpResponse, multaiplayer_cli::CliError> {
+            self.send(reqwest::Method::DELETE, url, headers, None)
+        }
+    }
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct BinaryRelayInfo {
+        base_url: String,
+        temp_dir: PathBuf,
+    }
+
+    struct BinaryRelay {
+        child: Option<Child>,
+        _stdout: BufReader<ChildStdout>,
+        info: BinaryRelayInfo,
+    }
+
+    impl BinaryRelay {
+        fn start(active_host_device_id: &str) -> Self {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf();
+            let fixture =
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/real-relay-fixture.ts");
+            let mut child = ProcessCommand::new("node")
+                .arg("--import")
+                .arg("tsx")
+                .arg(fixture)
+                .current_dir(root)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .unwrap();
+            child
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(
+                    format!(
+                        "{}\n",
+                        json!({
+                            "forbidden": "binary-invite-reflection-sentinel",
+                            "activeHostDeviceId": active_host_device_id,
+                        })
+                    )
+                    .as_bytes(),
+                )
+                .unwrap();
+            let mut stdout = BufReader::new(child.stdout.take().unwrap());
+            let mut line = String::new();
+            stdout.read_line(&mut line).unwrap();
+            Self {
+                child: Some(child),
+                _stdout: stdout,
+                info: serde_json::from_str(&line).unwrap(),
+            }
+        }
+    }
+
+    impl Drop for BinaryRelay {
+        fn drop(&mut self) {
+            if let Some(mut child) = self.child.take() {
+                let _ = child.stdin.take().unwrap().write_all(b"stop\n");
+                let _ = child.wait();
+            }
+            let _ = fs::remove_dir_all(&self.info.temp_dir);
+        }
+    }
+
+    fn debug_session(relay: &BinaryRelay, user_id: &str, login: &str) -> String {
+        let response = reqwest::blocking::Client::new()
+            .post(format!("{}/debug/auth-session", relay.info.base_url))
+            .json(&json!({
+                "id": user_id,
+                "login": login,
+                "name": login,
+            }))
+            .send()
+            .unwrap();
+        assert_eq!(response.status().as_u16(), 201);
+        response
+            .headers()
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .strip_prefix("multaiplayer_session=")
+            .unwrap()
+            .to_owned()
+    }
+
+    fn prepare_binary_identity(
+        relay: &BinaryRelay,
+        store: &ThreadStore,
+        http: &RewritingHttp,
+        expected_origin: &str,
+        user_id: &str,
+        login: &str,
+    ) -> (
+        multaiplayer_cli::auth::RestoredSession,
+        multaiplayer_cli::identity::DeviceIdentity,
+    ) {
+        let relay_session = debug_session(relay, user_id, login);
+        store
+            .set(
+                multaiplayer_cli::auth::RELAY_SESSION_ACCOUNT,
+                &json!({
+                    "version": 1,
+                    "relay_origin": expected_origin,
+                    "session": relay_session,
+                })
+                .to_string(),
+            )
+            .unwrap();
+        let identity = load_or_create_identity(store, user_id, login).unwrap();
+        let response = http
+            .post_json(
+                &format!("{expected_origin}/devices"),
+                &[("cookie", &format!("multaiplayer_session={relay_session}"))],
+                &json!({
+                    "deviceId": identity.public.device_id,
+                    "displayName": identity.public.display_name,
+                    "signaturePublicKey": identity.public.signature_public_key,
+                    "signatureKeyFingerprint": identity.public.signature_key_fingerprint,
+                    "hpkePublicKey": identity.public.hpke_public_key,
+                    "hpkeKeyFingerprint": identity.public.hpke_key_fingerprint,
+                }),
+            )
+            .unwrap();
+        assert!(matches!(response.status, 200 | 201));
+        (
+            multaiplayer_cli::auth::RestoredSession {
+                user: multaiplayer_cli::auth::SignedInUser {
+                    id: user_id.into(),
+                    login: login.into(),
+                    name: Some(login.into()),
+                    avatar_url: None,
+                },
+                relay_origin: expected_origin.into(),
+            },
+            identity,
+        )
+    }
 
     #[test]
     fn accepts_only_help_and_version_forms() {
@@ -880,6 +1218,125 @@ mod tests {
     fn utc_calendar_conversion_is_stable_without_a_dependency() {
         assert_eq!(civil_date(0), (1970, 1, 1));
         assert_eq!(civil_date(20_454), (2026, 1, 1));
+    }
+
+    #[test]
+    fn headless_binary_command_journey_uses_the_real_relay_and_production_services() {
+        let host_store = ThreadStore::default();
+        let guest_store = ThreadStore::default();
+        let seeded_host_identity =
+            load_or_create_identity(&host_store, "github:maddiedreese", "binary-host").unwrap();
+        let relay = BinaryRelay::start(&seeded_host_identity.public.device_id);
+        let expected_origin = "https://relay.binary.test";
+        let http = RewritingHttp::new(expected_origin, &relay.info.base_url);
+        let (host_session, host_identity) = prepare_binary_identity(
+            &relay,
+            &host_store,
+            &http,
+            expected_origin,
+            "github:maddiedreese",
+            "binary-host",
+        );
+        let (guest_session, guest_identity) = prepare_binary_identity(
+            &relay,
+            &guest_store,
+            &http,
+            expected_origin,
+            "github:tester",
+            "binary-guest",
+        );
+        let host_mls_path = relay.info.temp_dir.join("binary-host-mls.sqlite");
+        let guest_mls_path = relay.info.temp_dir.join("binary-guest-mls.sqlite");
+        let room_id = "room-desktop".to_owned();
+        {
+            let mut mls =
+                MlsClientService::open(&host_store, &host_identity, &host_mls_path).unwrap();
+            assert_eq!(mls.create_group_idempotent(&room_id).unwrap(), 0);
+        }
+
+        let mut invite_output = Vec::new();
+        run_authenticated_invite_command(
+            Command::RoomInvite {
+                selector: room_id.clone(),
+            },
+            &host_store,
+            &http,
+            expected_origin,
+            &host_session,
+            &host_identity,
+            &host_mls_path,
+            &mut std::io::Cursor::new(Vec::<u8>::new()),
+            &mut invite_output,
+            &mut Vec::new(),
+        )
+        .unwrap();
+        let invite_output = String::from_utf8(invite_output).unwrap();
+        let invite_id = invite_output
+            .lines()
+            .find_map(|line| line.strip_prefix("Invite ID: "))
+            .unwrap()
+            .to_owned();
+        let invite_code = invite_output
+            .lines()
+            .find(|line| line.starts_with("https://open.multaiplayer.com/invite#"))
+            .unwrap()
+            .to_owned();
+
+        let guest_http = http.clone();
+        let guest_store_for_thread = guest_store.clone();
+        let guest_invite_code = invite_code.clone();
+        let guest = std::thread::spawn(move || {
+            let mut output = Vec::new();
+            let result = run_authenticated_invite_command(
+                Command::RoomJoin,
+                &guest_store_for_thread,
+                &guest_http,
+                expected_origin,
+                &guest_session,
+                &guest_identity,
+                &guest_mls_path,
+                &mut std::io::Cursor::new(format!("{guest_invite_code}\n")),
+                &mut output,
+                &mut Vec::new(),
+            );
+            (result, String::from_utf8(output).unwrap())
+        });
+
+        let mut denied = false;
+        for _ in 0..30 {
+            std::thread::sleep(Duration::from_millis(100));
+            let mut output = Vec::new();
+            let mut prompt = Vec::new();
+            run_authenticated_invite_command(
+                Command::RoomAdmissions {
+                    selector: room_id.clone(),
+                    invite_id: invite_id.clone(),
+                },
+                &host_store,
+                &http,
+                expected_origin,
+                &host_session,
+                &host_identity,
+                &host_mls_path,
+                &mut std::io::Cursor::new("deny\n"),
+                &mut output,
+                &mut prompt,
+            )
+            .unwrap();
+            let output = String::from_utf8(output).unwrap();
+            if output.contains("was denied") {
+                let prompt = String::from_utf8(prompt).unwrap();
+                assert!(prompt.contains("GitHub identity: github:tester"));
+                assert!(prompt.contains("Device fingerprint: sha256:"));
+                denied = true;
+                break;
+            }
+        }
+        assert!(denied, "binary host command never observed the request");
+        let (result, guest_output) = guest.join().unwrap();
+        assert_eq!(result, Err(InviteCliError::Denied));
+        assert!(guest_output.contains("Admission requested."));
+        assert!(!guest_output.contains(&invite_code));
     }
 
     #[test]

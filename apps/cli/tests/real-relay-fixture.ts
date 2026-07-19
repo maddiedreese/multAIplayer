@@ -2,13 +2,18 @@ import { createInterface } from "node:readline";
 import { createServer, request } from "node:http";
 import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
-import { startRelayWithWorkspace } from "../../relay/test/support/relay.js";
+import { defaultWorkspaceFixture, startRelayWithWorkspace } from "../../relay/test/support/relay.js";
 
 const input = createInterface({ input: process.stdin });
 const commands = input[Symbol.asyncIterator]();
 const configuration = await commands.next();
 if (configuration.done) throw new Error("CLI relay fixture configuration was unavailable");
-const forbidden = Buffer.from(JSON.parse(configuration.value) as string);
+const parsedConfiguration = JSON.parse(configuration.value) as
+  | string
+  | { forbidden: string; activeHostDeviceId: string };
+const forbidden = Buffer.from(
+  typeof parsedConfiguration === "string" ? parsedConfiguration : parsedConfiguration.forbidden
+);
 let leaked = false;
 
 function scanStream() {
@@ -24,7 +29,11 @@ function scanStream() {
 const validator = fileURLToPath(
   new URL("../../relay/test/fixtures/mock-keypackage-validator.mjs", import.meta.url)
 );
-let relay = await startRelayWithWorkspace({ MULTAIPLAYER_MLS_VALIDATOR_PATH: validator });
+const storedState = defaultWorkspaceFixture();
+if (typeof parsedConfiguration !== "string") {
+  storedState.rooms[0]!.activeHostDeviceId = parsedConfiguration.activeHostDeviceId;
+}
+let relay = await startRelayWithWorkspace({ MULTAIPLAYER_MLS_VALIDATOR_PATH: validator }, storedState);
 const proxy = createServer((incoming, response) => {
   incoming.on("data", scanStream());
   const target = new URL(relay.baseUrl);
