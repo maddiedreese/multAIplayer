@@ -27,6 +27,13 @@ test("CLI release identity is independent and matches its Cargo package", () => 
   assert.equal(artifactStem(config), `multAIplayer-cli-v${config.version}-darwin-arm64`);
 });
 
+test("Cargo package version parsing handles section boundaries and absolute EOF", () => {
+  assert.equal(parseCargoPackageVersion('[package]\nversion = "1.2.3"\n\n[[bin]]\nname = "example"\n'), "1.2.3");
+  assert.equal(parseCargoPackageVersion('[package]\nversion = "1.2.3"'), "1.2.3");
+  assert.throws(() => parseCargoPackageVersion('[workspace]\nversion = "1.2.3"'));
+  assert.throws(() => parseCargoPackageVersion('[package]\nname = "example"'));
+});
+
 test("CLI packaging is local-only and cannot publish or mutate desktop release inputs", () => {
   const sources = ["package-cli.mjs", "verify-package.mjs", "release-lib.mjs"]
     .map((name) => readFileSync(new URL(name, import.meta.url), "utf8"))
