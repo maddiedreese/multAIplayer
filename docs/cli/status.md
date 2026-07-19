@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-120 Codex proposals, context, and hosted turns
+Current phase: CLI-130 privileged approvals and shared activity
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -16,9 +16,9 @@ Last update: 2026-07-19
 - The CLI scaffold, strict Rust protocol parity layer, GitHub authentication,
   secure device identity, authenticated relay transport/workspace reads,
   durable MLS client state/outbox, room creation with host-local project
-  association, secure host-mediated admission, encrypted chat, and durable
-  reconnect/replay/history recovery are present; Codex hosting and later product
-  behavior have not been implemented.
+  association, secure host-mediated admission, encrypted chat, durable
+  reconnect/replay/history recovery, and approved host-local Codex turns are
+  present; privileged request approvals and later product behavior remain.
 - CLI-000 is the authorized program orchestrator.
 - CLI-010 is complete and integrated. Its accepted task commit is
   `2490d71fa71696ffdd692e9950b4c93327c959be`; integration merge
@@ -179,6 +179,22 @@ Last update: 2026-07-19
   exact accepted head and passed all eight selected jobs, both unchanged
   120-second native fuzz targets, the real two-client native MLS journeys,
   required evidence uploads, macOS package/smoke checks, and aggregation.
+- CLI-120 is complete and integrated. Its accepted corrected task head is
+  `773051b365e2a85524372168cc2019b7dc6f1bc0`; integration merge
+  `2987c8b7ba7eee20758ed181d38e2798a3fa9fe9` changes only the five authorized
+  CLI source paths. Independent review returned the original task for a
+  timestamp-bound correction, then verified that malformed, stale, and future
+  proposal timestamps fail closed without occupying the pending slot. The
+  corrected task and integration branch passed 99 locked CLI library tests, 9
+  binary tests, 2 host-boundary tests, 9 Rust protocol fixture/property tests,
+  and 18 classification/release-isolation tests, including real-compatible
+  app-server, authority-loss, cancellation, idempotency, bounded-context,
+  redaction, exact-path, cleanliness, and protected-release checks. No
+  dependency, wire contract, MLS policy, desktop behavior, or protected release
+  surface changed.
+- CLI-130 is the sole active implementation task. It is approved from accepted
+  integration baseline `2987c8b7ba7eee20758ed181d38e2798a3fa9fe9` for only
+  its documented privileged-approval adapter and bounded shared-activity scope.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -208,8 +224,8 @@ Last update: 2026-07-19
 | CLI-100 | Reconnect, replay, history, and crash recovery | complete | CLI-090 |
 | CLI-110 | UI-independent Codex host extraction | complete | CLI-020 |
 | CLI-110-R1 | Shared MLS fuzz lockfile reconciliation | complete | CLI-010-R1 |
-| CLI-120 | Codex proposals, context, and hosted turns | active | CLI-090, CLI-110 |
-| CLI-130 | Privileged approvals and shared activity | waiting_for_orchestrator_approval | CLI-120 |
+| CLI-120 | Codex proposals, context, and hosted turns | complete | CLI-090, CLI-110 |
+| CLI-130 | Privileged approvals and shared activity | active | CLI-120 |
 | CLI-140 | Desktop/CLI interoperability journeys | waiting_for_orchestrator_approval | CLI-100, CLI-130 |
 | CLI-150 | Security hardening and threat-model update | waiting_for_orchestrator_approval | CLI-140 |
 | CLI-160 | Signed CLI packaging and release isolation | waiting_for_orchestrator_approval | CLI-150 |
