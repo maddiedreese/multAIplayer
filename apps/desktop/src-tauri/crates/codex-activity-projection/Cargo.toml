@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 publish = false
-description = "Bounded projection of untrusted Codex app-server activity"
+description = "UI-independent Codex app-server hosting and bounded activity projection"
 
 [dependencies]
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }

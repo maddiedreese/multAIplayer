@@ -13,75 +13,31 @@ impl CodexServerSession {
         timeout: Duration,
         cancelled: Arc<std::sync::atomic::AtomicBool>,
     ) -> Result<Self, String> {
-        let mut child = Command::new("codex")
-            .arg("-c")
-            .arg(format!("model_reasoning_effort=\"{reasoning_effort}\""))
-            .arg("-c")
-            .arg(format!("service_tier=\"{service_tier}\""))
-            .arg("-c")
-            .arg("show_raw_agent_reasoning=true")
-            .arg("-c")
-            .arg(format!("sandbox_mode=\"{}\"", sandbox_config.sandbox_mode))
-            .arg("-c")
-            .arg(format!(
-                "approval_policy=\"{}\"",
-                sandbox_config.approval_policy
-            ))
-            .arg("-c")
-            .arg(format!(
+        let arguments = vec![
+            "-c".to_string(),
+            format!("model_reasoning_effort=\"{reasoning_effort}\""),
+            "-c".to_string(),
+            format!("service_tier=\"{service_tier}\""),
+            "-c".to_string(),
+            "show_raw_agent_reasoning=true".to_string(),
+            "-c".to_string(),
+            format!("sandbox_mode=\"{}\"", sandbox_config.sandbox_mode),
+            "-c".to_string(),
+            format!("approval_policy=\"{}\"", sandbox_config.approval_policy),
+            "-c".to_string(),
+            format!(
                 "sandbox_workspace_write.network_access={}",
                 sandbox_config.network_access
-            ))
-            .arg("app-server")
-            .current_dir(cwd)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| format!("Failed to start codex app-server: {error}"))?;
-
-        let stdin = child
-            .stdin
-            .take()
-            .map(|stdin| Arc::new(Mutex::new(stdin)))
-            .ok_or_else(|| "Could not open codex app-server stdin".to_string())
-            .inspect_err(|_| {
-                terminate_child(&mut child);
-            })?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "Could not open codex app-server stdout".to_string())
-            .inspect_err(|_| {
-                terminate_child(&mut child);
-            })?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| "Could not open codex app-server stderr".to_string())
-            .inspect_err(|_| {
-                terminate_child(&mut child);
-            })?;
-
-        let (line_tx, line_rx) = mpsc::channel::<String>();
-        thread::spawn(move || {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines().map_while(Result::ok) {
-                if line_tx.send(line).is_err() {
-                    break;
-                }
-            }
-        });
-
-        let (stderr_tx, stderr_rx) = mpsc::channel::<String>();
-        thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines().map_while(Result::ok) {
-                if stderr_tx.send(line).is_err() {
-                    break;
-                }
-            }
-        });
+            ),
+            "app-server".to_string(),
+        ];
+        let mut process = AppServerProcess::spawn(&AppServerProcessConfig::codex(
+            arguments,
+            Some(std::path::Path::new(cwd)),
+            true,
+        ))?;
+        let stdin = process.stdin();
+        let line_rx = process.take_stdout_lines()?;
 
         let session_id = allocate_rpc_session_id();
         let mut inbox = RpcInbox::new(line_rx);
@@ -99,7 +55,7 @@ impl CodexServerSession {
         };
         let mut pending_guard = PendingSessionGuard::new(rpc_state.clone(), session_id);
         cleanup_on_error(
-            &mut child,
+            &mut process,
             send_json_shared(
                 &stdin,
                 json!({
@@ -119,20 +75,19 @@ impl CodexServerSession {
             ),
         )?;
         cleanup_on_error(
-            &mut child,
+            &mut process,
             wait_for_response(&mut inbox, RpcId::Number(1.into()), &mut budget, &context),
         )?;
         cleanup_on_error(
-            &mut child,
+            &mut process,
             send_json_shared(&stdin, json!({ "method": "initialized", "params": {} })),
         )?;
         pending_guard.disarm();
 
         Ok(Self {
-            child,
+            process,
             stdin,
             inbox,
-            stderr_rx,
             next_id: 2,
             last_used: Instant::now(),
             session_id,
@@ -176,14 +131,14 @@ impl CodexServerSession {
         };
         let thread_request_id = self.allocate_id();
         cleanup_on_error(
-            &mut self.child,
+            &mut self.process,
             send_json_shared(
                 &self.stdin,
                 codex_thread_request(thread_request_id, previous_thread_id, cwd, model),
             ),
         )?;
         let thread_response = cleanup_on_error(
-            &mut self.child,
+            &mut self.process,
             wait_for_response_message(
                 &mut self.inbox,
                 RpcId::Number(thread_request_id.into()),
@@ -192,20 +147,7 @@ impl CodexServerSession {
             ),
         )?;
         let mut events = Vec::new();
-        let mut thread_id = thread_response
-            .get("result")
-            .and_then(|result| result.get("thread"))
-            .and_then(|thread| thread.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| {
-                thread_response
-                    .get("error")
-                    .map(|error| format!("thread/resume failed: {error}"))
-                    .unwrap_or_else(|| {
-                        format!("thread start/resume did not return a thread id: {thread_response}")
-                    })
-            })
+        let mut thread_id = thread_id_from_response(&thread_response, "thread start/resume")
             .or_else(|error| {
                 let Some(previous_thread_id) = previous_thread_id else {
                     return Err(error);
@@ -216,14 +158,14 @@ impl CodexServerSession {
                 ));
                 let fallback_request_id = self.allocate_id();
                 cleanup_on_error(
-                    &mut self.child,
+                    &mut self.process,
                     send_json_shared(
                         &self.stdin,
                         codex_thread_start_request(fallback_request_id, cwd, model),
                     ),
                 )?;
                 let fallback_response = cleanup_on_error(
-                    &mut self.child,
+                    &mut self.process,
                     wait_for_response(
                         &mut self.inbox,
                         RpcId::Number(fallback_request_id.into()),
@@ -231,20 +173,10 @@ impl CodexServerSession {
                         &context,
                     ),
                 )?;
-                fallback_response
-                    .get("result")
-                    .and_then(|result| result.get("thread"))
-                    .and_then(|thread| thread.get("id"))
-                    .and_then(Value::as_str)
-                    .map(str::to_string)
-                    .ok_or_else(|| {
-                        format!(
-                            "thread/start fallback did not return a thread id: {fallback_response}"
-                        )
-                    })
+                thread_id_from_response(&fallback_response, "thread/start fallback")
             })
             .inspect_err(|_| {
-                terminate_child(&mut self.child);
+                self.process.terminate();
             })?;
         if previous_thread_id == Some(thread_id.as_str()) {
             events.push(format!("thread/resume: {thread_id}"));
@@ -254,7 +186,7 @@ impl CodexServerSession {
 
         let turn_request_id = self.allocate_id();
         cleanup_on_error(
-            &mut self.child,
+            &mut self.process,
             send_json_shared(
                 &self.stdin,
                 json!({
@@ -364,7 +296,7 @@ impl CodexServerSession {
                         }
                     }
                     if method.contains("agentMessage") || method.contains("message") {
-                        if let Some(delta) = extract_text_delta(&parsed) {
+                        if let Some(delta) = core_extract_text_delta(&parsed) {
                             transcript.push_str(&delta);
                         }
                     }
@@ -396,7 +328,7 @@ impl CodexServerSession {
         drop(active_turn_guard);
 
         self.last_used = Instant::now();
-        let stderr = self.stderr_rx.try_iter().collect::<Vec<_>>().join("\n");
+        let stderr = self.process.drain_stderr().join("\n");
 
         Ok(CodexTurnResult {
             thread_id: Some(std::mem::take(&mut thread_id)),
@@ -415,6 +347,6 @@ impl CodexServerSession {
     }
 
     pub(super) fn is_alive(&mut self) -> bool {
-        matches!(self.child.try_wait(), Ok(None))
+        self.process.is_alive()
     }
 }
