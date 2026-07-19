@@ -1,6 +1,7 @@
 import { createInterface } from "node:readline";
 import { createServer, request } from "node:http";
 import { connect } from "node:net";
+import { fileURLToPath } from "node:url";
 import { startRelayWithWorkspace } from "../../relay/test/support/relay.js";
 
 const input = createInterface({ input: process.stdin });
@@ -20,7 +21,10 @@ function scanStream() {
   };
 }
 
-let relay = await startRelayWithWorkspace();
+const validator = fileURLToPath(
+  new URL("../../relay/test/fixtures/mock-keypackage-validator.mjs", import.meta.url)
+);
+let relay = await startRelayWithWorkspace({ MULTAIPLAYER_MLS_VALIDATOR_PATH: validator });
 const proxy = createServer((incoming, response) => {
   incoming.on("data", scanStream());
   const target = new URL(relay.baseUrl);
@@ -86,7 +90,7 @@ while (true) {
   if (command === "restart") {
     const dataPath = relay.dataPath;
     await relay.close({ preserveData: true });
-    relay = await startRelayWithWorkspace({}, undefined, dataPath);
+    relay = await startRelayWithWorkspace({ MULTAIPLAYER_MLS_VALIDATOR_PATH: validator }, undefined, dataPath);
     process.stdout.write('{"restarted":true}\n');
     continue;
   }

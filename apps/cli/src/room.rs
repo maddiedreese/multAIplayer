@@ -143,7 +143,7 @@ impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
     }
 
     #[cfg(test)]
-    fn new_for_loopback_test(
+    pub(crate) fn new_for_loopback_test(
         store: &'a S,
         http: &'a H,
         relay_origin: &str,

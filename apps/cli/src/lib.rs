@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod identity;
+pub mod invite;
 pub mod mls;
 pub mod platform;
 pub mod relay;
