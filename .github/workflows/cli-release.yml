@@ -4,18 +4,12 @@ on:
   push:
     tags:
       - "cli-v*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing CLI release tag, such as cli-vX.Y.Z-alpha.N"
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: cli-release-${{ inputs.tag || github.ref_name }}
+  group: cli-release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -23,7 +17,6 @@ jobs:
     name: Resolve immutable CLI release source
     runs-on: ubuntu-latest
     outputs:
-      commit: ${{ steps.release.outputs.commit }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
     steps:
@@ -34,7 +27,8 @@ jobs:
       - name: Require an exact main-reachable CLI version tag
         id: release
         env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
         run: |
           case "$RELEASE_TAG" in
             cli-v[0-9]*.[0-9]*.[0-9]*) ;;
@@ -42,12 +36,14 @@ jobs:
           esac
           git fetch origin main --tags --force
           commit="$(git rev-parse "${RELEASE_TAG}^{commit}")"
+          test "$commit" = "$RELEASE_COMMIT"
           git merge-base --is-ancestor "$commit" origin/main
           version="$(node -p "JSON.parse(require('fs').readFileSync('apps/cli/release/release-config.json')).version")"
           test "$RELEASE_TAG" = "cli-v${version}"
-          echo "commit=$commit" >> "$GITHUB_OUTPUT"
-          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$RELEASE_TAG"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
 
   verify:
     name: Locked CLI verification
@@ -57,7 +53,7 @@ jobs:
       - name: Check out exact release source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          ref: ${{ needs.resolve.outputs.commit }}
+          ref: ${{ github.sha }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Set up repository Rust toolchain
@@ -73,7 +69,7 @@ jobs:
       issues: write
     uses: ./.github/workflows/supply-chain.yml
     with:
-      commit: ${{ needs.resolve.outputs.commit }}
+      commit: ${{ github.sha }}
 
   build:
     name: Sign and notarize Apple-silicon CLI
@@ -85,7 +81,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
-          ref: ${{ needs.resolve.outputs.commit }}
+          ref: ${{ github.sha }}
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Set up repository Rust toolchain

@@ -14,6 +14,7 @@ const DESKTOP_KEYCHAIN_ACCESS_GROUP: &str = "AXP55K75AX.com.multaiplayer.desktop
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CredentialStoreError {
+    #[cfg_attr(all(not(test), not(target_os = "macos")), allow(dead_code))]
     NoEntry,
     Unavailable,
 }
