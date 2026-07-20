@@ -407,24 +407,28 @@ jobs:
           signed_entitlements="$(mktemp)"
           codesign -d --entitlements :- "$app_path" > "$signed_entitlements"
           plutil -lint "$signed_entitlements"
-          signed_application_identifier="$(plutil -extract com.apple.application-identifier raw -o - "$signed_entitlements")"
-          signed_team_identifier="$(plutil -extract com.apple.developer.team-identifier raw -o - "$signed_entitlements")"
+          signed_application_identifier="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.application-identifier' "$signed_entitlements")"
+          signed_team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.team-identifier' "$signed_entitlements")"
           if [ "$signed_application_identifier" != "AXP55K75AX.com.multaiplayer.desktop" ] || \
             [ "$signed_team_identifier" != "AXP55K75AX" ]; then
             echo "Signed application has an incorrect application or team identifier entitlement." >&2
             exit 1
           fi
-          signed_domains="$(plutil -extract com.apple.developer.associated-domains json -o - "$signed_entitlements")"
-          if [ "$signed_domains" != '["applinks:multaiplayer.com","applinks:open.multaiplayer.com"]' ]; then
+          signed_domain_0="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains:0' "$signed_entitlements")"
+          signed_domain_1="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains:1' "$signed_entitlements")"
+          if [ "$signed_domain_0" != "applinks:multaiplayer.com" ] || \
+            [ "$signed_domain_1" != "applinks:open.multaiplayer.com" ] || \
+            /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains:2' "$signed_entitlements" >/dev/null 2>&1; then
             echo "Signed application has incorrect Associated Domains entitlements." >&2
             exit 1
           fi
-          signed_keychain_groups="$(plutil -extract keychain-access-groups json -o - "$signed_entitlements")"
-          if [ "$signed_keychain_groups" != '["AXP55K75AX.com.multaiplayer.desktop"]' ]; then
+          signed_keychain_group_0="$(/usr/libexec/PlistBuddy -c 'Print :keychain-access-groups:0' "$signed_entitlements")"
+          if [ "$signed_keychain_group_0" != "AXP55K75AX.com.multaiplayer.desktop" ] || \
+            /usr/libexec/PlistBuddy -c 'Print :keychain-access-groups:1' "$signed_entitlements" >/dev/null 2>&1; then
             echo "Signed application has an incorrect Keychain access group entitlement." >&2
             exit 1
           fi
-          if plutil -extract com.apple.security.get-task-allow raw -o - "$signed_entitlements" >/dev/null 2>&1; then
+          if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.get-task-allow' "$signed_entitlements" >/dev/null 2>&1; then
             echo "Signed release application must not be debug-enabled." >&2
             exit 1
           fi
