@@ -135,6 +135,8 @@ observed_runtime="$(printf '%s\n' "$signature_details" | sed -n 's/^Runtime Vers
 
 [ "$observed_authority" = "$claimed_authority" ] || fail "the Developer ID authority does not match the release manifest."
 [ "$observed_team" = "$claimed_team" ] || fail "the Developer ID team does not match the release manifest."
+# GitHub's macOS release runner records codesign output in UTC, while codesign
+# renders the same secure timestamp in the installing Mac's configured zone.
 claimed_timestamp_epoch="$(timestamp_epoch UTC "$claimed_timestamp")" || fail "the release manifest has an invalid secure timestamp."
 observed_timestamp_epoch="$(timestamp_epoch local "$observed_timestamp")" || fail "the release signature has an invalid secure timestamp."
 [ "$observed_timestamp_epoch" = "$claimed_timestamp_epoch" ] || fail "the secure timestamp does not match the release manifest."
