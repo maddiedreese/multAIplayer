@@ -64,7 +64,7 @@ multAIplayer auth logout
 
 multAIplayer room list
 multAIplayer room create --name "Compiler work" --project /path/to/project
-multAIplayer room join <invite-code>
+multAIplayer room join  # paste the invite capability into standard input
 multAIplayer room open <room>
 multAIplayer room invite <room>
 multAIplayer room leave <room>

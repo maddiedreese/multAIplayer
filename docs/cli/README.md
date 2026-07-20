@@ -1,7 +1,9 @@
 # multAIplayer CLI program
 
-This directory is the durable source of truth for the planned `multAIplayer`
-command-line client.
+This directory is the durable governance and implementation record for the
+`multAIplayer` command-line client. User installation, quickstart,
+compatibility, and limitations are maintained in the
+[CLI guide](../../apps/cli/README.md).
 
 Read in this order:
 
@@ -16,8 +18,9 @@ The [CLI and desktop release boundaries](release-boundaries.md) describe the
 path-aware CI contract and protected desktop release surfaces.
 
 Implementation agents must also follow the repository-root `AGENTS.md`. The CLI
-is intentionally not implemented by this governance setup. Every implementation
-task begins in a waiting-for-owner-approval state.
+implementation is complete through its technical external-alpha audit. Release
+publication remains an explicit owner decision, and every follow-up task begins
+in a waiting-for-owner-approval state.
 
 ## Authority order
 
