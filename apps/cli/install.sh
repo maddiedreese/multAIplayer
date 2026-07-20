@@ -2,7 +2,7 @@
 
 set -eu
 
-version="0.1.0-alpha.11"
+version="0.1.0-alpha.12"
 repository="maddiedreese/multAIplayer"
 tag="cli-v${version}"
 stem="multAIplayer-cli-v${version}-darwin-arm64"
