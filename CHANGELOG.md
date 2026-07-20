@@ -6,6 +6,12 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.15] - 2026-07-20
+
+### Fixed
+
+- macOS signing setup now handles Developer ID certificate bundles that already include Apple's pinned intermediate while still validating the exact certificate before signing.
+
 ## [0.1.0-alpha.14] - 2026-07-20
 
 ### Fixed

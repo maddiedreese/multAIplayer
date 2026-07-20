@@ -312,6 +312,8 @@ test("macOS release workflows embed and independently verify the pinned Develope
     assert.ok(workflow.includes("https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer"));
     assert.match(workflow, new RegExp(expectedIntermediate));
     assert.match(workflow, /security import "\$developer_id_g2"/);
+    assert.match(workflow, /security find-certificate/);
+    assert.match(workflow, /keychain_g2_der/);
     assert.match(workflow, /security list-keychains -d user -s build\.keychain/);
     assert.match(workflow, /--extract-certificates=\$\{certificate_prefix\}/);
     assert.match(workflow, /test -s "\$\{certificate_prefix\}1"/);
