@@ -4,7 +4,17 @@ This page answers product questions and points to maintained sources. Security p
 
 ## What is multAIplayer?
 
-It is a macOS desktop room where trusted teammates collaborate around one locally hosted Codex session. The room combines conversation, intentionally shared project context, Codex activity, approvals, files and diffs, terminals, browser previews, Git/GitHub workflows, and explicit host handoff. It is not anonymous chat or general remote desktop software.
+It is a native macOS desktop and command-line client where trusted teammates collaborate around one locally hosted Codex session. Both clients share encrypted rooms, conversation, Codex activity, approvals, and explicit host handoff. The desktop also provides files and diffs, shared terminals, browser previews, and Git/GitHub workflows. It is not anonymous chat or general remote desktop software.
+
+## How do I install and start using the CLI?
+
+Install the signed, notarized Apple-silicon CLI without `sudo`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh
+```
+
+Then run `multAIplayer auth login --open`. GitHub opens for device authorization, the terminal confirms the authenticated account, and the CLI prints a walkthrough covering room creation or joining, encrypted chat, Codex hosting, and host handoff. Repeat it at any time with `multAIplayer walkthrough`. The [CLI guide](../apps/cli/README.md) documents the complete flow and current limitations.
 
 ## Why GitHub and ChatGPT sign-in?
 
@@ -16,7 +26,7 @@ Yes. Follow [Self-hosting](self-hosting.md); official desktop builds pin their t
 
 ## What happens if the host disconnects?
 
-Host-local Codex, terminal, browser, filesystem, and Git work becomes unavailable. Members with current room state may continue with capabilities that do not require that host. Explicit handoff can move future work to another member, but it cannot transfer live processes, credentials, or every unsaved state. Keep normal Git and project backups.
+Host-local Codex, terminal, browser, filesystem, and Git work becomes unavailable. Members with current room state may continue with capabilities that do not require that host. Explicit handoff can move future work to another member, but it cannot transfer live processes, credentials, or every unsaved state. The desktop and CLI use the same authenticated handoff boundary. The incoming host selects its own local project and uses its own credentials and Codex session; room authority does not grant filesystem access or transfer a running process. Keep normal Git and project backups.
 
 ## Why can a new installation reach a device quota?
 

@@ -36,12 +36,10 @@ multAIplayer room list
 The verified macOS release stores its GitHub and relay sessions, device
 identity, and encryption key material in multAIplayer's private Data Protection
 Keychain access group. Normal CLI use does not show Keychain permission prompts,
-and the CLI cannot read unrelated Keychain items. When upgrading from an older
-alpha, the CLI attempts a one-time legacy credential migration with Keychain UI
-disabled. An unreadable legacy login is not allowed to trigger a system prompt;
-sign in again when asked. If continuity-critical device or room keys cannot be
-migrated, encrypted state fails closed and requires a clean rejoin. A clean
-rejoin cannot restore history encrypted by the unavailable keys.
+and the CLI cannot read unrelated Keychain items. If credentials or encrypted
+room state become unreadable, the CLI fails closed instead of displaying a
+system Keychain prompt or silently replacing identity or encryption keys. Sign
+in again or cleanly rejoin the affected room when asked.
 
 After a successful login, the CLI prints a short walkthrough from sign-in to
 encrypted chat. Show it again at any time without changing local or remote
