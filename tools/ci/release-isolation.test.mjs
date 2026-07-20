@@ -33,6 +33,10 @@ test("CLI publication has an independent exact-source release workflow", () => {
     cliRelease,
     /Install locked repository dependencies[\s\S]*npm ci --ignore-scripts[\s\S]*Run the complete locked CLI gate/
   );
+  assert.match(
+    cliRelease,
+    /Set up repository Rust toolchain[\s\S]*components: rustfmt[\s\S]*Run the complete locked CLI gate/
+  );
   assert.doesNotMatch(cliRelease, /apps\/desktop|tauri|updater/);
 });
 
