@@ -17,7 +17,7 @@ fail() {
 [ "$(uname -s)" = "Darwin" ] || fail "Apple-silicon macOS is required."
 [ "$(uname -m)" = "arm64" ] || fail "Apple silicon is required."
 
-for command in curl shasum tar codesign spctl plutil install mktemp; do
+for command in curl shasum tar codesign plutil install mktemp; do
   command -v "$command" >/dev/null 2>&1 || fail "required command is unavailable: ${command}"
 done
 
@@ -63,14 +63,10 @@ case "$observed_authority" in
   *) fail "the binary is not signed with a Developer ID Application identity." ;;
 esac
 
-if ! assessment="$(spctl --assess --type execute --verbose=4 "$binary" 2>&1)"; then
-  printf '%s\n' "$assessment" >&2
-  fail "macOS Gatekeeper rejected the binary."
+if ! notarization="$(codesign -vvvv -R='notarized' --check-notarization "$binary" 2>&1)"; then
+  printf '%s\n' "$notarization" >&2
+  fail "Apple did not identify a notarized Developer ID release."
 fi
-case "$assessment" in
-  *"source=Notarized Developer ID"*) ;;
-  *) fail "Gatekeeper did not identify a notarized Developer ID release." ;;
-esac
 
 destination="${install_dir}/multAIplayer"
 if [ -d "$install_dir" ] && [ -w "$install_dir" ]; then

@@ -10,7 +10,7 @@ curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps
 ```
 
 That installer performs the checksum, Developer ID metadata, secure timestamp,
-and Gatekeeper checks below before copying the binary to `/usr/local/bin`.
+and Apple notarization checks below before copying the binary to `/usr/local/bin`.
 
 ## Manual verification and installation
 
@@ -28,7 +28,7 @@ and Gatekeeper checks below before copying the binary to `/usr/local/bin`.
    tar -xzf multAIplayer-cli-*-darwin-arm64.tar.gz
    codesign --verify --strict --verbose=2 multAIplayer-cli-*-darwin-arm64/multAIplayer
    codesign -d --verbose=4 multAIplayer-cli-*-darwin-arm64/multAIplayer
-   spctl --assess --type execute --verbose=4 multAIplayer-cli-*-darwin-arm64/multAIplayer
+   codesign -vvvv -R='notarized' --check-notarization multAIplayer-cli-*-darwin-arm64/multAIplayer
    ```
 
 4. Inspect the `sourceRevision`, signature identity, and checksums in the release
@@ -41,7 +41,7 @@ and Gatekeeper checks below before copying the binary to `/usr/local/bin`.
    ```
 
 Only Developer ID-signed artifacts with a secure signing timestamp and
-successful Gatekeeper assessment are distribution builds. Confirm
+successful Apple notarization check are distribution builds. Confirm
 that `codesign -d` reports a `Developer ID Application` authority, a 10-character
 Team Identifier, and a timestamp matching the release manifest. An ad-hoc signature produced by the local
 packaging default is timestamp-free, is labeled `adhoc-local-verification` in

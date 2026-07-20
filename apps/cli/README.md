@@ -14,7 +14,7 @@ curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps
 
 The installer downloads the current CLI release from this repository, verifies
 its checksums, requires a timestamped Developer ID Application signature, runs
-macOS Gatekeeper assessment, and installs `multAIplayer` in `/usr/local/bin`.
+Apple's notarization check, and installs `multAIplayer` in `/usr/local/bin`.
 It may ask for the Mac administrator password when that directory is not
 writable. Set `MULTAIPLAYER_CLI_INSTALL_DIR` to use another directory.
 
