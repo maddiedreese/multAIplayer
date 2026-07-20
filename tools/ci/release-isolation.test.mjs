@@ -29,6 +29,10 @@ test("CLI publication has an independent exact-source release workflow", () => {
   assert.match(cliRelease, /codesign -vvvv -R='notarized' --check-notarization/);
   assert.match(cliRelease, /CLI_APPLE_PROVISIONING_PROFILE/);
   assert.match(cliRelease, /gh release create/);
+  assert.match(
+    cliRelease,
+    /Install locked repository dependencies[\s\S]*npm ci --ignore-scripts[\s\S]*Run the complete locked CLI gate/
+  );
   assert.doesNotMatch(cliRelease, /apps\/desktop|tauri|updater/);
 });
 
