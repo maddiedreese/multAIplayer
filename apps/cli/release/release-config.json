@@ -7,7 +7,7 @@
   "teamIdentifier": "AXP55K75AX",
   "keychainAccessGroup": "AXP55K75AX.com.multaiplayer.cli",
   "profileKeychainAccessGroup": "AXP55K75AX.*",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "target": "aarch64-apple-darwin",
   "platform": "darwin-arm64",
   "archivePrefix": "multAIplayer-cli",

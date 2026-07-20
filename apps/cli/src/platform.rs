@@ -96,8 +96,27 @@ fn classify_legacy_read(
 ) -> Result<Option<String>, CliError> {
     match result {
         Ok(value) => Ok(Some(value)),
-        Err(keyring_core::Error::NoEntry | keyring_core::Error::NoStorageAccess(_)) => Ok(None),
+        Err(error) if legacy_read_is_inaccessible(&error) => Ok(None),
         Err(_) => Err(CliError::CredentialStoreUnavailable),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn legacy_read_is_inaccessible(error: &keyring_core::Error) -> bool {
+    const ERR_SEC_AUTH_FAILED: i32 = -25293;
+    const ERR_SEC_INTERACTION_NOT_ALLOWED: i32 = -25308;
+
+    match error {
+        keyring_core::Error::NoEntry | keyring_core::Error::NoStorageAccess(_) => true,
+        keyring_core::Error::PlatformFailure(source) => source
+            .downcast_ref::<security_framework::base::Error>()
+            .is_some_and(|error| {
+                matches!(
+                    error.code(),
+                    ERR_SEC_AUTH_FAILED | ERR_SEC_INTERACTION_NOT_ALLOWED
+                )
+            }),
+        _ => false,
     }
 }
 
@@ -467,6 +486,12 @@ pub(crate) mod tests {
         let denied =
             keyring_core::Error::NoStorageAccess(Box::new(std::io::Error::other("locked")));
         assert!(matches!(classify_legacy_read(Err(denied)), Ok(None)));
+        for code in [-25293, -25308] {
+            let denied = keyring_core::Error::PlatformFailure(Box::new(
+                security_framework::base::Error::from_code(code),
+            ));
+            assert!(matches!(classify_legacy_read(Err(denied)), Ok(None)));
+        }
         let corrupt =
             keyring_core::Error::PlatformFailure(Box::new(std::io::Error::other("corrupt")));
         assert!(matches!(
