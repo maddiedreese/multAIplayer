@@ -40,10 +40,14 @@ multAIplayer room open <room>
 ```
 
 To join, run the command without putting the secret invitation capability in a
-shell argument, then paste it into standard input:
+shell argument. At the fixed local prompt, paste the code and press Return:
 
 ```sh
 multAIplayer room join
+```
+
+```text
+Paste the secret invitation code, then press Return:
 ```
 
 Inside a room, use `@codex <task>` to propose work. The active host must approve

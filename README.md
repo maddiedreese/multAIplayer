@@ -27,6 +27,17 @@
 > process. Current platform and product constraints are listed in
 > [Alpha limitations](docs/alpha-limitations.md).
 
+## Command-line client
+
+Install the Apple-silicon macOS CLI with one command:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh
+```
+
+See the [CLI guide](apps/cli/README.md) for authentication, encrypted rooms,
+Codex hosting, compatibility, limitations, updates, and uninstalling.
+
 ## The product
 
 Start a private project room, invite people you trust, and work with Codex as a team. Everyone can follow the conversation, propose the next turn, inspect structured progress, review changes, and use room-scoped files, diffs, terminals, browser previews, Git, and GitHub workflows. One active host supplies the project, local tools, credentials, and Codex account; an explicit handoff can move that responsibility to another verified member.

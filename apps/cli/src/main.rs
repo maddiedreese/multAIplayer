@@ -1640,7 +1640,7 @@ where
             }
         }
         Command::RoomJoin => {
-            let code = read_invite_code(input)?;
+            let code = prompt_and_read_invite_code(input, trusted_prompt)?;
             let now = utc_timestamp()?;
             let request = service
                 .request_admission(code.as_str(), identity, device_session.as_str(), &now, &mls)
@@ -1720,11 +1720,24 @@ fn select_invite_room(
     Ok(matches[0].clone())
 }
 
-fn read_invite_code(input: &mut impl Read) -> Result<Zeroizing<String>, InviteCliError> {
+fn prompt_and_read_invite_code<R: BufRead, W: Write>(
+    input: &mut R,
+    prompt: &mut W,
+) -> Result<Zeroizing<String>, InviteCliError> {
+    write!(
+        prompt,
+        "Paste the secret invitation code, then press Return: "
+    )
+    .map_err(|_| InviteCliError::Output)?;
+    prompt.flush().map_err(|_| InviteCliError::Output)?;
+    read_invite_code(input)
+}
+
+fn read_invite_code(input: &mut impl BufRead) -> Result<Zeroizing<String>, InviteCliError> {
     let mut bytes = Zeroizing::new(Vec::new());
     input
         .take(MAX_INVITE_CODE_BYTES + 1)
-        .read_to_end(&mut bytes)
+        .read_until(b'\n', &mut bytes)
         .map_err(|_| InviteCliError::Input)?;
     if bytes.is_empty() || bytes.len() as u64 > MAX_INVITE_CODE_BYTES {
         return Err(InviteCliError::Input);
@@ -2329,9 +2342,17 @@ mod tests {
 
     #[test]
     fn invite_code_intake_is_stdin_only_bounded_and_zeroizing() {
-        let mut input = std::io::Cursor::new("https://open.multaiplayer.com/invite#code\n");
-        let code = read_invite_code(&mut input).unwrap();
+        let invite = "https://open.multaiplayer.com/invite#code";
+        let mut input = std::io::Cursor::new(format!("{invite}\nignored-after-first-line"));
+        let mut prompt = Vec::new();
+        let code = prompt_and_read_invite_code(&mut input, &mut prompt).unwrap();
         assert_eq!(code.as_str(), "https://open.multaiplayer.com/invite#code");
+        let prompt = String::from_utf8(prompt).unwrap();
+        assert_eq!(
+            prompt,
+            "Paste the secret invitation code, then press Return: "
+        );
+        assert!(!prompt.contains(invite));
         assert_eq!(
             read_invite_code(&mut std::io::Cursor::new("one two")),
             Err(InviteCliError::Input)

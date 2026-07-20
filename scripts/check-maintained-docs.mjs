@@ -49,9 +49,16 @@ if (/multAIplayer room join\s+<invite-code>/.test(cliPlan)) {
 }
 
 const cliGuide = readFileSync(new URL("../apps/cli/README.md", import.meta.url), "utf8");
+const rootReadme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+const cliInstallCommand =
+  "curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh";
+if (!rootReadme.includes(cliInstallCommand)) {
+  throw new Error("README.md must expose the maintained one-line CLI install command");
+}
 for (const required of [
-  "curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh",
+  cliInstallCommand,
   "multAIplayer room join",
+  "Paste the secret invitation code, then press Return:",
   "## Compatibility and limitations",
   "## Update and uninstall"
 ]) {
