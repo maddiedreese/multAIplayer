@@ -12,7 +12,7 @@ base64 = "=0.22.1"
 codex-activity-projection = { path = "../../codex-activity-projection" }
 libfuzzer-sys = "=0.4.13"
 mls-core = { path = ".." }
-serde_json = "=1.0.150"
+serde_json = "=1.0.151"
 
 [[bin]]
 name = "key_package_deserialization"

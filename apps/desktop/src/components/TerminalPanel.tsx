@@ -377,7 +377,11 @@ function TerminalPanelTitle({
         <button className="ghost" onClick={onCopyMarkdown} disabled={!canReadLocalWorkspace}>
           <Copy size={14} /> Markdown
         </button>
-        <button className="ghost" onClick={onRevokeExactCommandGrants} disabled={!canApproveTerminal || terminalBusy}>
+        <button
+          className="ghost terminal-revoke-button"
+          onClick={onRevokeExactCommandGrants}
+          disabled={!canApproveTerminal || terminalBusy}
+        >
           <X size={14} /> Revoke repeats
         </button>
         <button

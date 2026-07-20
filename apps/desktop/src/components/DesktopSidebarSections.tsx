@@ -193,20 +193,33 @@ export function SidebarFooter({
 export function SidebarTeamsTitle({
   searchActive,
   showArchived,
+  collapsed,
   teamCreateOpen,
+  onToggleCollapsed,
   onToggleArchived,
   onToggleTeamCreate
 }: {
   searchActive: boolean;
   showArchived: boolean;
+  collapsed: boolean;
   teamCreateOpen: boolean;
+  onToggleCollapsed: () => void;
   onToggleArchived: () => void;
   onToggleTeamCreate: () => void;
 }) {
   const label = searchActive ? "Matching teams" : showArchived ? "Archived" : "Teams";
   return (
     <div className="section-title">
-      <span>{label}</span>
+      <button
+        type="button"
+        className="section-disclosure"
+        aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
+        aria-expanded={!collapsed}
+        onClick={onToggleCollapsed}
+      >
+        {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        <span>{label}</span>
+      </button>
       {!searchActive && (
         <div className="section-title-actions">
           <button

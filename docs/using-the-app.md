@@ -41,7 +41,7 @@ The Account drawer links the [Privacy Policy](https://multaiplayer.com/privacy) 
 
 ## Teams, Rooms, And Search
 
-The left sidebar contains teams, active rooms, room creation, GitHub sign-in, theme switching, search, and an archived view for archived teams and rooms.
+The independently scrollable left sidebar contains teams, active rooms, room creation, GitHub sign-in, theme switching, search, and an archived view for archived teams and rooms. Use the Teams disclosure to fold the whole workspace list, or the disclosure beside an individual team to fold that team's rooms without leaving the current room.
 
 Teams group related project rooms. A room is the collaboration space for one active project folder at a time. Project paths and Codex model/tuning settings reach members through end-to-end encrypted room configuration rather than public relay metadata. Search covers room names, locally available project paths, room metadata, and decrypted-on-device local chat history for rooms whose local keys are available.
 
@@ -125,7 +125,7 @@ The per-file diff preview currently shows the unstaged working-tree diff, with a
 
 The Terminals panel manages room-scoped host-local terminals. The active host can open, type into, restart, close, and copy terminal output as Markdown.
 
-Non-host members can request exact terminal commands. The active host sees the requester, command, working directory, and warnings before approving or denying. The native app then presents an operating-system confirmation containing the exact command, room, and working directory immediately before execution. Starting or restarting an interactive terminal uses the same native confirmation boundary, and each subsequent input write requires native confirmation of its exact bytes; control characters such as Enter and Escape are shown in escaped form. Approved requests run from the selected project under a macOS OS sandbox profile. Filesystem writes are confined to that canonical project, while reads from the project and named system/toolchain paths, child processes, inherited environment, and network access remain available. Treat this as project-filesystem confinement, not complete host isolation.
+Non-host members can request exact terminal commands. The active host sees the requester, command, working directory, and warnings before approving or denying. The native app then presents an operating-system confirmation containing the exact command, room, and working directory immediately before execution. Selecting **New terminal** is the local user's explicit approval to create an interactive terminal in the displayed room workspace, so it does not show a second operating-system prompt. Each subsequent input write still requires native confirmation of its exact bytes; control characters such as Enter and Escape are shown in escaped form. Approved requests run from the selected project under a macOS OS sandbox profile. Filesystem writes are confined to that canonical project, while reads from the project and named system/toolchain paths, child processes, inherited environment, and network access remain available. Treat this as project-filesystem confinement, not complete host isolation.
 
 Terminal output is visible to the room when shared through terminal request results, Codex events, copied Markdown, or approved context. Secret-looking commands and output get warnings, but hosts should review carefully.
 

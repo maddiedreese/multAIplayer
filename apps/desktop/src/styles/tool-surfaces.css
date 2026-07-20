@@ -739,8 +739,16 @@
 }
 
 .terminal-panel .panel-title-actions .terminal-expand-button {
+  grid-column: 3;
+  grid-row: 1;
   width: 36px;
   padding: 0;
+}
+
+.terminal-panel .panel-title-actions .terminal-revoke-button {
+  grid-column: 1 / span 2;
+  grid-row: 2;
+  white-space: nowrap;
 }
 
 .terminal-session-actions {

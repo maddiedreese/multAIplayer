@@ -18,6 +18,7 @@ use crate::workspace::ensure_existing_dir;
 const AUTHORIZATION_LIFETIME: Duration = Duration::from_secs(120);
 const EXACT_COMMAND_GRANT_LIFETIME: Duration = Duration::from_secs(10 * 60);
 const MAX_REQUESTER_LABEL_CHARS: usize = 160;
+const INTERACTIVE_TERMINAL_COMMAND: &str = "exec zsh -f";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -251,6 +252,12 @@ pub(crate) async fn authorize_shell_execution(
     // State methods independently canonicalize before matching or storing authority. Keep the
     // original request here; rebuilding it with the same canonical path would be redundant.
     let request_for_issue = request.clone();
+    // Clicking "New terminal" is the local user's explicit authorization to create this
+    // tightly bound PTY. Keep native confirmation for every remote command and for later
+    // terminal input, where content may originate outside that direct UI gesture.
+    if !requires_native_confirmation(request_for_issue.kind) {
+        return Ok(state.issue(&request_for_issue)?);
+    }
     let review_risk = command_review_risk(&request_for_issue.command);
     if review_risk.is_none() && state.has_exact_command_grant(&request_for_issue)? {
         return Ok(state.issue(&request_for_issue)?);
@@ -328,6 +335,10 @@ pub(crate) async fn authorize_shell_execution(
     Ok(state.issue(&request_for_issue)?)
 }
 
+fn requires_native_confirmation(kind: ShellExecutionKind) -> bool {
+    matches!(kind, ShellExecutionKind::RemoteRequest)
+}
+
 #[typed_tauri_command::command]
 pub(crate) async fn clear_shell_execution_grants(
     app: AppHandle,
@@ -400,6 +411,14 @@ fn validate_authorization_request(request: &ShellAuthorizationRequest) -> Result
     ensure_room_id(&request.room_id)?;
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_command(&request.command)?;
+    if request.kind == ShellExecutionKind::InteractiveTerminal
+        && request.command != INTERACTIVE_TERMINAL_COMMAND
+    {
+        return Err(
+            "Interactive terminal authorization only permits the app's fixed shell launcher"
+                .to_string(),
+        );
+    }
     validate_requester_label(&request.requester_label)
 }
 
