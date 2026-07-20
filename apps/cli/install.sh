@@ -2,7 +2,7 @@
 
 set -eu
 
-version="0.1.0-alpha.11"
+version="0.1.0-alpha.12"
 repository="maddiedreese/multAIplayer"
 tag="cli-v${version}"
 stem="multAIplayer-cli-v${version}-darwin-arm64"
@@ -18,6 +18,16 @@ bin_dir="${MULTAIPLAYER_CLI_BIN_DIR:-${HOME}/.local/bin}"
 fail() {
   printf 'multAIplayer install: %s\n' "$1" >&2
   exit 1
+}
+
+timestamp_epoch() {
+  timestamp_zone="$1"
+  timestamp_value="$(printf '%s' "$2" | sed 's/[  ]/ /g')"
+  if [ "$timestamp_zone" = "local" ]; then
+    LC_ALL=C date -j -f '%b %e, %Y at %I:%M:%S %p' "$timestamp_value" '+%s' 2>/dev/null
+  else
+    TZ="$timestamp_zone" LC_ALL=C date -j -f '%b %e, %Y at %I:%M:%S %p' "$timestamp_value" '+%s' 2>/dev/null
+  fi
 }
 
 [ "$(uname -s)" = "Darwin" ] || fail "Apple-silicon macOS is required."
@@ -117,7 +127,7 @@ claimed_profile_uuid="$(plutil -extract provisioningProfile.uuid raw -o - "${tem
 [ "$(shasum -a 256 "$binary" | awk '{ print $1 }')" = "$claimed_binary_sha256" ] || fail "the executable checksum does not match the release manifest."
 
 codesign --verify --strict --verbose=2 "$bundle"
-signature_details="$(codesign -d --verbose=4 "$bundle" 2>&1)"
+signature_details="$(LC_ALL=C codesign -d --verbose=4 "$bundle" 2>&1)"
 observed_authority="$(printf '%s\n' "$signature_details" | sed -n 's/^Authority=//p' | head -n 1)"
 observed_team="$(printf '%s\n' "$signature_details" | sed -n 's/^TeamIdentifier=//p' | head -n 1)"
 observed_timestamp="$(printf '%s\n' "$signature_details" | sed -n 's/^Timestamp=//p' | head -n 1)"
@@ -125,7 +135,11 @@ observed_runtime="$(printf '%s\n' "$signature_details" | sed -n 's/^Runtime Vers
 
 [ "$observed_authority" = "$claimed_authority" ] || fail "the Developer ID authority does not match the release manifest."
 [ "$observed_team" = "$claimed_team" ] || fail "the Developer ID team does not match the release manifest."
-[ "$observed_timestamp" = "$claimed_timestamp" ] || fail "the secure timestamp does not match the release manifest."
+# GitHub's macOS release runner records codesign output in UTC, while codesign
+# renders the same secure timestamp in the installing Mac's configured zone.
+claimed_timestamp_epoch="$(timestamp_epoch UTC "$claimed_timestamp")" || fail "the release manifest has an invalid secure timestamp."
+observed_timestamp_epoch="$(timestamp_epoch local "$observed_timestamp")" || fail "the release signature has an invalid secure timestamp."
+[ "$observed_timestamp_epoch" = "$claimed_timestamp_epoch" ] || fail "the secure timestamp does not match the release manifest."
 [ -n "$observed_runtime" ] || fail "the release signature does not enable hardened runtime."
 case "$observed_authority" in
   "Developer ID Application:"*) ;;

@@ -96,7 +96,7 @@ fn classify_legacy_read(
 ) -> Result<Option<String>, CliError> {
     match result {
         Ok(value) => Ok(Some(value)),
-        Err(keyring_core::Error::NoEntry) => Ok(None),
+        Err(keyring_core::Error::NoEntry | keyring_core::Error::NoStorageAccess(_)) => Ok(None),
         Err(_) => Err(CliError::CredentialStoreUnavailable),
     }
 }
@@ -459,15 +459,18 @@ pub(crate) mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn legacy_access_denial_is_not_misclassified_as_missing_key_material() {
+    fn inaccessible_legacy_items_do_not_block_the_protected_store() {
         assert!(matches!(
             classify_legacy_read(Err(keyring_core::Error::NoEntry)),
             Ok(None)
         ));
         let denied =
             keyring_core::Error::NoStorageAccess(Box::new(std::io::Error::other("locked")));
+        assert!(matches!(classify_legacy_read(Err(denied)), Ok(None)));
+        let corrupt =
+            keyring_core::Error::PlatformFailure(Box::new(std::io::Error::other("corrupt")));
         assert!(matches!(
-            classify_legacy_read(Err(denied)),
+            classify_legacy_read(Err(corrupt)),
             Err(CliError::CredentialStoreUnavailable)
         ));
     }
