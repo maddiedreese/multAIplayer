@@ -246,7 +246,13 @@ export function inspectSigningCertificate(bundle) {
     if (result.error) throw result.error;
     assert.equal(result.status, 0, "the signing certificate chain could not be extracted");
     const leafPath = `${prefix}0`;
+    const intermediatePath = `${prefix}1`;
     assert.equal(existsSync(leafPath), true, "the Developer ID signature has no leaf signing certificate");
+    assert.equal(
+      existsSync(intermediatePath),
+      true,
+      "the Developer ID signature has no embedded intermediate certificate"
+    );
     const der = readFileSync(leafPath);
     assert.ok(der.length > 0, "the Developer ID leaf signing certificate is empty");
     return {

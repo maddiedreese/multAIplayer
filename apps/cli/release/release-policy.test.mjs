@@ -305,6 +305,24 @@ test("desktop release contracts contain no CLI package reference", () => {
   }
 });
 
+test("macOS release workflows embed and independently verify the pinned Developer ID chain", () => {
+  const expectedIntermediate = "f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a";
+  for (const path of [".github/workflows/release.yml", ".github/workflows/cli-release.yml"]) {
+    const workflow = readFileSync(resolve(root, path), "utf8");
+    assert.ok(workflow.includes("https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer"));
+    assert.match(workflow, new RegExp(expectedIntermediate));
+    assert.match(workflow, /security import "\$developer_id_g2"/);
+    assert.match(workflow, /security list-keychains -d user -s build\.keychain/);
+    assert.match(workflow, /--extract-certificates=\$\{certificate_prefix\}/);
+    assert.match(workflow, /test -s "\$\{certificate_prefix\}1"/);
+    assert.match(workflow, /temporary-verification-only/);
+    assert.match(workflow, /codesign --keychain "\$verification_keychain" --verify --deep --strict/);
+  }
+
+  const releaseLibrary = readFileSync(new URL("release-lib.mjs", import.meta.url), "utf8");
+  assert.match(releaseLibrary, /the Developer ID signature has no embedded intermediate certificate/);
+});
+
 test("public installer is version-bound and fails closed on Apple release trust", () => {
   const installerPath = resolve(root, "apps/cli/install.sh");
   const installer = readFileSync(installerPath, "utf8");

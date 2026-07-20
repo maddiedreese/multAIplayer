@@ -195,6 +195,18 @@ jobs:
             -P "$APPLE_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign \
             -T /usr/bin/security
+          developer_id_g2="$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          curl --fail --silent --show-error --location \
+            https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer \
+            --output "$developer_id_g2"
+          printf '%s  %s\n' \
+            f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a \
+            "$developer_id_g2" | shasum -a 256 -c -
+          security import "$developer_id_g2" \
+            -k build.keychain \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security list-keychains -d user -s build.keychain
           security set-key-partition-list \
             -S apple-tool:,apple:,codesign: \
             -s \
@@ -385,6 +397,20 @@ jobs:
             exit 1
           fi
           codesign --verify --deep --strict --verbose=2 "$app_path"
+          certificate_prefix="$RUNNER_TEMP/desktop-signing-certificate-"
+          codesign -d "--extract-certificates=${certificate_prefix}" "$app_path"
+          test -s "${certificate_prefix}0" || { echo "Desktop signature has no embedded leaf certificate." >&2; exit 1; }
+          test -s "${certificate_prefix}1" || { echo "Desktop signature has no embedded intermediate certificate." >&2; exit 1; }
+          cmp -s "$RUNNER_TEMP/profile-certificate.der" "${certificate_prefix}0" || {
+            echo "Desktop signature leaf does not match the validated provisioning profile." >&2
+            exit 1
+          }
+          printf '%s  %s\n' \
+            f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a \
+            "${certificate_prefix}1" | shasum -a 256 -c -
+          verification_keychain="$RUNNER_TEMP/desktop-release-verification.keychain"
+          security create-keychain -p temporary-verification-only "$verification_keychain"
+          codesign --keychain "$verification_keychain" --verify --deep --strict --verbose=2 "$app_path"
           xcrun stapler validate "$app_path"
           xcrun stapler validate "$dmg_path"
           spctl -a -vvv -t install "$app_path"
@@ -458,6 +484,7 @@ jobs:
             exit 1
           fi
           codesign --verify --deep --strict --verbose=2 "$dmg_app"
+          codesign --keychain "$verification_keychain" --verify --deep --strict --verbose=2 "$dmg_app"
           hdiutil detach "$mount_dir" >/dev/null
           trap - EXIT
 

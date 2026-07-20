@@ -1,7 +1,7 @@
 {
   "name": "@multaiplayer/desktop",
   "private": true,
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.14",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -19,7 +19,7 @@
     "tauri:build:native-e2e": "tauri build --debug --bundles app --features native-e2e --config src-tauri/tauri.native-e2e.conf.json"
   },
   "dependencies": {
-    "@multaiplayer/protocol": "0.1.0-alpha.13",
+    "@multaiplayer/protocol": "0.1.0-alpha.14",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.1",
     "@tauri-apps/plugin-notification": "2.3.3",
