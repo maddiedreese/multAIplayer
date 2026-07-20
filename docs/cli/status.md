@@ -3,7 +3,7 @@
 Plan version: 1.1
 Decision set: 1.1
 Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: CLI-170 external-alpha readiness review
+Current phase: Owner-controlled external-alpha publication decision
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -282,9 +282,32 @@ Last update: 2026-07-19
   `76804b48932609d13c70b99a4c44469e73e681c39fd4aea409336087455ae6f3`,
   and `37a3c43867d4feba4a9afabb91b906c9fa8f4dbe72b52ded607713aeaa910727`.
   No manifest, lockfile, dependency, desktop, or protected release path changed.
-- CLI-170 is again the sole active task and must restart its complete readiness
-  audit from the first gate on the corrected integration baseline. Publication
-  remains owner-controlled.
+- CLI-170 completed its technical readiness audit on exact integration baseline
+  `35678fd72594c29c193c25265e86b26f3c0094e4` with no implementation or
+  documentation changes. Full repository verification passed 695 desktop, 285
+  relay, 27 protocol, and 250 native/shared tests; CLI isolation passed 23 CI,
+  8 packaging-policy, and 131 CLI/protocol/mixed-client tests; all 16 UI
+  contracts passed. Relay fuzz passed 7 targets at 100,000 iterations, the
+  32-client/four-restart chaos soak passed after 305.8 seconds, and the SQLite
+  backup/restore drill passed. Pinned `cargo-fuzz 0.13.2 --locked` executed both
+  unchanged native targets for 121 seconds: 7,738,220 KeyPackage inputs and
+  14,450,572 Codex-projection inputs, with generated corpus files removed and
+  tracked seeds unchanged. Package, checksum, signature-metadata, notices,
+  license, clean-install, updater-contract, release Gitleaks, and optimized
+  binary sentinel verification passed; the final ad-hoc archive SHA-256 is
+  `030e9e5bbf00cac6445747788bdfeeb76047f5b8dba1dca286717eaf290d9664`.
+  Exact-head Supply-chain security run `29708898058` passed relay-container
+  build/minimal-runtime/Trivy HIGH/CRITICAL scanning, npm/license, RustSec/source
+  policy, full-history Gitleaks, exception expiry, signed-updater, and latest
+  app-server compatibility jobs. Every technical plan criterion has executed
+  evidence, no open critical/high security or state-durability finding remains,
+  the worktree and ancestry are clean, and the protected desktop-release diff is
+  empty. Known platform, feature, host-availability, local-compromise,
+  state-loss, Codex-version, MLS-audit, and time-bounded advisory limitations
+  remain user-visible. The audit recommendation is technically ready but
+  **NO-GO for publication** until the owner authorizes a Developer ID-signed
+  public artifact and publication. CLI-170 therefore awaits the owner-controlled
+  final decision; no implementation task is active.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -320,7 +343,7 @@ Last update: 2026-07-19
 | CLI-150 | Security hardening and threat-model update | complete | CLI-140 |
 | CLI-160 | Signed CLI packaging and release isolation | complete | CLI-150 |
 | CLI-160-R1 | CLI Cargo package parser EOF correction | complete | CLI-160 |
-| CLI-170 | External-alpha readiness review | active | CLI-160, CLI-160-R1 |
+| CLI-170 | External-alpha readiness review | awaiting_owner_publication_decision | CLI-160, CLI-160-R1 |
 
 ## Release safety snapshot
 
