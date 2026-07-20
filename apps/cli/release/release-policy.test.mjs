@@ -191,7 +191,7 @@ test("public installer is version-bound and fails closed on Apple release trust"
   assert.match(installer, /Developer ID Application:/);
   assert.match(installer, /observed_team.*claimed_team/s);
   assert.match(installer, /observed_timestamp.*claimed_timestamp/s);
-  assert.match(installer, /spctl --assess --type execute/);
-  assert.match(installer, /source=Notarized Developer ID/);
+  assert.match(installer, /codesign -vvvv -R='notarized' --check-notarization/);
+  assert.doesNotMatch(installer, /spctl --assess/);
   assert.doesNotMatch(installer, /--sign|-k |notarytool|gh release|git push/);
 });

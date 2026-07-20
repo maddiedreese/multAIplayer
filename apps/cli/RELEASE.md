@@ -46,10 +46,10 @@ to exactly match both manifests. The modes cannot be relabeled.
 
 Packaging never tags, uploads, publishes, or changes a GitHub Release. A release
 maintainer must submit the exact signed binary to Apple's notarization service
-separately and require a successful Gatekeeper
-assessment before publication. The standalone executable is assessed through
-Apple's online notarization record rather than a stapled ticket, so assessment
-may require network access. Notarization must not enter the desktop release
+separately and require `codesign -R='notarized' --check-notarization` to succeed
+before publication. The standalone executable is checked through Apple's online
+notarization record rather than a stapled ticket, so verification may require
+network access. Notarization must not enter the desktop release
 workflow or change the already verified CLI binary. External distribution is
 not performed by the isolated packaging command.
 
