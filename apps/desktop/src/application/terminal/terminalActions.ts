@@ -181,7 +181,15 @@ export function createTerminalActions({
     }
     const { selectedTerminal } = currentTerminalState(selectedRoom);
     const isSelectedRoomLocked = currentRoomLock(selectedRoom);
-    if (!canControlRoomTerminal(selectedRoom, currentContext()!.localUser, selectedTerminal, isSelectedRoomLocked)) {
+    if (
+      !canControlRoomTerminal(
+        selectedRoom,
+        currentContext()!.localUser,
+        currentContext()!.deviceId,
+        selectedTerminal,
+        isSelectedRoomLocked
+      )
+    ) {
       setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
       return;
     }
@@ -226,7 +234,15 @@ export function createTerminalActions({
     }
     const { selectedTerminal } = currentTerminalState(selectedRoom);
     const isSelectedRoomLocked = currentRoomLock(selectedRoom);
-    if (!canControlRoomTerminal(selectedRoom, currentContext()!.localUser, selectedTerminal, isSelectedRoomLocked)) {
+    if (
+      !canControlRoomTerminal(
+        selectedRoom,
+        currentContext()!.localUser,
+        currentContext()!.deviceId,
+        selectedTerminal,
+        isSelectedRoomLocked
+      )
+    ) {
       setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
       return;
     }
@@ -295,7 +311,15 @@ export function createTerminalActions({
     }
     const { selectedTerminal } = currentTerminalState(selectedRoom);
     const isSelectedRoomLocked = currentRoomLock(selectedRoom);
-    if (!canControlRoomTerminal(selectedRoom, currentContext()!.localUser, selectedTerminal, isSelectedRoomLocked)) {
+    if (
+      !canControlRoomTerminal(
+        selectedRoom,
+        currentContext()!.localUser,
+        currentContext()!.deviceId,
+        selectedTerminal,
+        isSelectedRoomLocked
+      )
+    ) {
       setSelectedTerminalError(roomTerminalControlMessage(selectedRoom, selectedTerminal, isSelectedRoomLocked));
       return;
     }

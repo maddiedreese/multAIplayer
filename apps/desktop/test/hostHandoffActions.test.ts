@@ -402,6 +402,8 @@ test("handoff publication records the package and encrypted relay message", asyn
   await act(() => result.current.publishHostHandoff(room));
 
   assert.equal(appendedHandoffs.at(-1)?.status, "available");
+  assert.equal(appendedHandoffs.at(-1)?.fromUserId, "github:candidate");
+  assert.equal(appendedHandoffs.at(-1)?.fromDeviceId, "device-candidate");
   assert.equal(nativeCommands.includes("mls_encrypt_application"), true);
   assert.equal(publishes, 1);
 });

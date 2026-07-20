@@ -1028,8 +1028,7 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
             .map_err(|_| ChatError::InvalidEncryptedMessage)?
         {
             RoomEvent::ChatMessage(chat)
-                if chat.id == aad.message_id
-                    && chat.author_user_id == aad.sender_user_id
+                if chat.author_user_id == aad.sender_user_id
                     && (chat.role == ChatRole::Human
                         || self.envelope_from_active_host(envelope)) =>
             {
@@ -1675,6 +1674,104 @@ mod tests {
         );
         assert!(matches!(result, Err(ChatError::RecoveryInterrupted)));
         assert_eq!(mls.load_room_client_state(&room.id).unwrap(), Some(encoded));
+    }
+
+    #[test]
+    fn desktop_chat_inner_id_may_differ_from_authenticated_envelope_id() {
+        let directory = TestDirectory::new();
+        let host_store = MemoryCredentialStore::default();
+        let desktop_store = MemoryCredentialStore::default();
+        let host_identity =
+            load_or_create_identity(&host_store, "github:host", "CLI host").unwrap();
+        let desktop_identity =
+            load_or_create_identity(&desktop_store, "github:desktop", "Desktop guest").unwrap();
+        let mut host_mls = MlsClientService::open(
+            &host_store,
+            &host_identity,
+            &directory.0.join("host-desktop-chat.db"),
+        )
+        .unwrap();
+        let mut desktop_mls = MlsClientService::open(
+            &desktop_store,
+            &desktop_identity,
+            &directory.0.join("desktop-chat.db"),
+        )
+        .unwrap();
+        let mut room = recovery_room();
+        room.host_user_id = Some(host_identity.public.user_id.clone());
+        room.active_host_device_id = Some(host_identity.public.device_id.clone());
+        host_mls.create_group_idempotent(&room.id).unwrap();
+        let key_package = desktop_mls.interoperability_generate_key_package().unwrap();
+        let admission = host_mls
+            .interoperability_add_member(&room.id, &key_package)
+            .unwrap();
+        host_mls
+            .interoperability_publish_succeeded(&room.id, &admission.commit_outbox_id)
+            .unwrap();
+        desktop_mls
+            .interoperability_join_welcome(&room.id, &admission.welcome)
+            .unwrap();
+
+        let created_at = "2026-07-20T00:00:00.000Z";
+        let chat = ChatPlaintextPayload {
+            id: "desktop-inner-chat-id".into(),
+            author: desktop_identity.public.display_name.clone(),
+            author_user_id: desktop_identity.public.user_id.clone(),
+            role: ChatRole::Human,
+            body: "Desktop message".into(),
+            time: "12:00".into(),
+            created_at: Some(created_at.into()),
+            reply_to: None,
+            attachments: None,
+        };
+        let envelope_id = "desktop-mls-envelope-id";
+        let encrypted = desktop_mls
+            .interoperability_encrypt_application(
+                &room.id,
+                envelope_id,
+                &serde_json::to_vec(&chat).unwrap(),
+                ApplicationAuthenticatedDataInput {
+                    version: 1,
+                    message_id: envelope_id.into(),
+                    team_id: room.team_id.clone(),
+                    room_id: room.id.clone(),
+                    kind: CHAT_KIND.into(),
+                    sender_user_id: desktop_identity.public.user_id.clone(),
+                    sender_device_id: desktop_identity.public.device_id.clone(),
+                    created_at: created_at.into(),
+                },
+            )
+            .unwrap();
+        let envelope = MlsRelayMessage {
+            id: envelope_id.into(),
+            team_id: room.team_id.clone(),
+            room_id: room.id.clone(),
+            sender_device_id: desktop_identity.public.device_id.clone(),
+            sender_user_id: desktop_identity.public.user_id.clone(),
+            created_at: created_at.into(),
+            message_type: MlsMessageType::Application,
+            epoch_hint: encrypted.epoch,
+            mls_message: STANDARD.encode(encrypted.message),
+            commit_effect: None,
+            next_host_user_id: None,
+            next_host_device_id: None,
+            host_transfer_authorization: None,
+        };
+
+        let mut session = ChatRoomSession::new(
+            RelayConnection::new(NoopSocket),
+            &mut host_mls,
+            room,
+            &host_identity.public.user_id,
+            &host_identity.public.device_id,
+            &host_identity.public.display_name,
+            &host_identity.public.signature_key_fingerprint,
+        )
+        .unwrap();
+        let projected = session.open_room_event(&envelope).unwrap().unwrap();
+        assert_eq!(projected, ProjectedEvent::Chat(chat));
+        assert!(session.recovery.processed(envelope_id));
+        assert_eq!(session.recovery.pending_envelope_id, None);
     }
 
     #[test]

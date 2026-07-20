@@ -72,6 +72,7 @@ export function useAppRelaySync({
   const { refreshTeamMembers } = useTeamMembersRefresh({ selectedTeam });
   const handleCodexBrowserOpenCommand = createCodexBrowserOpenCommand({
     localUser: localIdentity.localUser,
+    deviceId: localIdentity.deviceId,
     selectedRoomIdRef: appRefs.selectedRoomIdRef,
     forgottenRoomIds,
     revokedRoomIds,

@@ -106,11 +106,12 @@ pub(super) fn load_or_create_signing_identity(
     github_user_id: &str,
     device_id: &str,
 ) -> Result<SigningIdentityMaterial, SigningSecretLoadError> {
-    let entry = keyring::Entry::new(MLS_KEYCHAIN_SERVICE, MLS_IDENTITY_ACCOUNT)
-        .map_err(|_| SigningSecretLoadError::Internal)?;
+    let entry =
+        crate::credential_store::credential_entry(MLS_KEYCHAIN_SERVICE, MLS_IDENTITY_ACCOUNT)
+            .map_err(|_| SigningSecretLoadError::Internal)?;
     match entry.get_password() {
         Ok(value) => decode_stored_signing_identity(&value, github_user_id),
-        Err(keyring::Error::NoEntry) => {
+        Err(crate::credential_store::CredentialStoreError::NoEntry) => {
             let secret =
                 generate_device_signing_secret().map_err(|_| SigningSecretLoadError::Internal)?;
             let stored = StoredMlsIdentity {
@@ -160,11 +161,12 @@ pub(super) fn decode_stored_signing_identity(
     })
 }
 pub(super) fn load_or_create_store_wrapping_key() -> Result<[u8; 32], String> {
-    let entry = keyring::Entry::new(MLS_KEYCHAIN_SERVICE, "mls-store-wrap:v1")
-        .map_err(|_| "Failed to open MLS store key".to_string())?;
+    let entry =
+        crate::credential_store::credential_entry(MLS_KEYCHAIN_SERVICE, "mls-store-wrap:v1")
+            .map_err(|_| "Failed to open MLS store key".to_string())?;
     match entry.get_password() {
         Ok(value) => fixed32(&value),
-        Err(keyring::Error::NoEntry) => {
+        Err(crate::credential_store::CredentialStoreError::NoEntry) => {
             let bytes = generate_device_signing_secret().map_err(display_error)?;
             let key: [u8; 32] = bytes
                 .try_into()
@@ -179,7 +181,7 @@ pub(super) fn load_or_create_store_wrapping_key() -> Result<[u8; 32], String> {
 }
 
 pub(super) fn load_or_create_hpke_key_pair() -> Result<HpkeKeyPair, String> {
-    let entry = keyring::Entry::new(MLS_KEYCHAIN_SERVICE, MLS_HPKE_ACCOUNT)
+    let entry = crate::credential_store::credential_entry(MLS_KEYCHAIN_SERVICE, MLS_HPKE_ACCOUNT)
         .map_err(|_| "Failed to open HPKE identity".to_string())?;
     match entry.get_password() {
         Ok(value) => {
@@ -197,7 +199,7 @@ pub(super) fn load_or_create_hpke_key_pair() -> Result<HpkeKeyPair, String> {
             )
             .map_err(display_error)
         }
-        Err(keyring::Error::NoEntry) => {
+        Err(crate::credential_store::CredentialStoreError::NoEntry) => {
             let pair = generate_hpke_key_pair();
             entry
                 .set_password(&format!(

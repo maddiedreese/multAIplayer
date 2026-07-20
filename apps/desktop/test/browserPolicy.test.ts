@@ -19,6 +19,7 @@ const room: ClientRoomRecord = {
   projectPath: "/Users/maddie/project",
   host: "Maddie",
   hostUserId: "github:maddiedreese",
+  activeHostDeviceId: "device-host",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
@@ -31,13 +32,18 @@ test("browser access requests require an unlocked room", () => {
 });
 
 test("browser host actions require active host access", () => {
-  assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }), true);
-  assert.equal(canHostBrowserAction(room, { id: "github:peer", name: "Peer" }), false);
+  assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }, "device-host"), true);
+  assert.equal(canHostBrowserAction(room, { id: "github:peer", name: "Peer" }, "device-host"), false);
+  assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }, "device-peer"), false);
   assert.equal(
-    canHostBrowserAction({ ...room, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }),
+    canHostBrowserAction(
+      { ...room, hostStatus: "offline" },
+      { id: "github:maddiedreese", name: "Maddie" },
+      "device-host"
+    ),
     false
   );
-  assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }, true), false);
+  assert.equal(canHostBrowserAction(room, { id: "github:maddiedreese", name: "Maddie" }, "device-host", true), false);
 });
 
 test("browser access gate messages explain missing browser access", () => {

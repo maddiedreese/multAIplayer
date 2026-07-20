@@ -17,6 +17,7 @@ const activeRoom: ClientRoomRecord = {
   projectPath: "/Users/maddie/project",
   host: "Maddie",
   hostUserId: "github:maddiedreese",
+  activeHostDeviceId: "device-host",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
@@ -25,37 +26,85 @@ const activeRoom: ClientRoomRecord = {
 
 test("isLocalUserActiveHostForRoom prefers stable host user id", () => {
   assert.equal(
-    isLocalUserActiveHostForRoom(activeRoom, { id: "github:maddiedreese", name: "Different Display Name" }),
+    isLocalUserActiveHostForRoom(
+      activeRoom,
+      { id: "github:maddiedreese", name: "Different Display Name" },
+      "device-host"
+    ),
     true
   );
-  assert.equal(isLocalUserActiveHostForRoom(activeRoom, { id: "github:someone-else", name: "Maddie" }), false);
+  assert.equal(
+    isLocalUserActiveHostForRoom(activeRoom, { id: "github:someone-else", name: "Maddie" }, "device-host"),
+    false
+  );
+  assert.equal(
+    isLocalUserActiveHostForRoom(activeRoom, { id: "github:maddiedreese", name: "Maddie" }, "device-peer"),
+    false
+  );
 });
 
 test("isLocalUserActiveHostForRoom rejects active rooms without a stable host identity", () => {
   const invalidRoom = { ...activeRoom, hostUserId: undefined };
-  assert.equal(isLocalUserActiveHostForRoom(invalidRoom, { id: "github:someone", name: "Maddie" }), false);
-  assert.equal(isLocalUserActiveHostForRoom(invalidRoom, { id: "github:maddiedreese", name: "Maddie" }), false);
+  assert.equal(
+    isLocalUserActiveHostForRoom(invalidRoom, { id: "github:someone", name: "Maddie" }, "device-host"),
+    false
+  );
+  assert.equal(
+    isLocalUserActiveHostForRoom(invalidRoom, { id: "github:maddiedreese", name: "Maddie" }, "device-host"),
+    false
+  );
+  assert.equal(
+    isLocalUserActiveHostForRoom(
+      { ...activeRoom, activeHostDeviceId: undefined },
+      { id: "github:maddiedreese", name: "Maddie" },
+      "device-host"
+    ),
+    false
+  );
 });
 
 test("isLocalUserActiveHostForRoom rejects inactive host states", () => {
   assert.equal(
     isLocalUserActiveHostForRoom(
       { ...activeRoom, hostStatus: "offline" },
-      { id: "github:maddiedreese", name: "Maddie" }
+      { id: "github:maddiedreese", name: "Maddie" },
+      "device-host"
     ),
     false
   );
 });
 
 test("room host envelopes must come from stable active host identity", () => {
-  assert.equal(isEnvelopeFromActiveRoomHost(activeRoom, { senderUserId: "github:maddiedreese" }), true);
-  assert.equal(isEnvelopeFromActiveRoomHost(activeRoom, { senderUserId: "github:member" }), false);
   assert.equal(
-    isEnvelopeFromActiveRoomHost({ ...activeRoom, hostUserId: undefined }, { senderUserId: "github:maddiedreese" }),
+    isEnvelopeFromActiveRoomHost(activeRoom, {
+      senderUserId: "github:maddiedreese",
+      senderDeviceId: "device-host"
+    }),
+    true
+  );
+  assert.equal(
+    isEnvelopeFromActiveRoomHost(activeRoom, { senderUserId: "github:member", senderDeviceId: "device-host" }),
     false
   );
   assert.equal(
-    isEnvelopeFromActiveRoomHost({ ...activeRoom, hostStatus: "offline" }, { senderUserId: "github:maddiedreese" }),
+    isEnvelopeFromActiveRoomHost(activeRoom, {
+      senderUserId: "github:maddiedreese",
+      senderDeviceId: "device-peer"
+    }),
+    false
+  );
+  assert.equal(
+    isEnvelopeFromActiveRoomHost(
+      { ...activeRoom, hostUserId: undefined },
+      { senderUserId: "github:maddiedreese", senderDeviceId: "device-host" }
+    ),
+    false
+  );
+  assert.equal(
+    isEnvelopeFromActiveRoomHost(
+      { ...activeRoom, hostStatus: "offline" },
+      { senderUserId: "github:maddiedreese", senderDeviceId: "device-host" }
+    ),
     false
   );
 });

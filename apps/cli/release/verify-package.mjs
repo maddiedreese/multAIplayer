@@ -8,10 +8,16 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   artifactStem,
+  assertNoProtectedEntitlements,
   assertSignatureMetadataMatchesObserved,
+  bindProvisioningProfileToSigningCertificate,
+  inspectProvisioningProfile,
   inspectCodeSignature,
+  inspectSignedEntitlements,
+  inspectSigningCertificate,
   readReleaseConfig,
   sha256File,
+  validateProtectedEntitlements,
   validateSignatureMetadata
 } from "./release-lib.mjs";
 
@@ -30,6 +36,8 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 assert.equal(manifest.schema, "multaiplayer-cli-release-manifest-v1");
 assert.equal(manifest.product, config.product);
 assert.equal(manifest.binary, config.binary);
+assert.equal(manifest.bundle, config.bundle);
+assert.equal(manifest.bundleIdentifier, config.bundleIdentifier);
 assert.equal(manifest.version, config.version);
 assert.equal(manifest.target, config.target);
 assert.equal(manifest.platform, config.platform);
@@ -50,7 +58,16 @@ const expectedEntries = [
   `${stem}/INSTALL.md`,
   `${stem}/LICENSE`,
   `${stem}/THIRD_PARTY_NOTICES.md`,
-  `${stem}/${config.binary}`
+  `${stem}/${config.bundle}/`,
+  `${stem}/${config.bundle}/Contents/`,
+  `${stem}/${config.bundle}/Contents/Info.plist`,
+  `${stem}/${config.bundle}/Contents/MacOS/`,
+  `${stem}/${config.bundle}/Contents/MacOS/${config.binary}`,
+  `${stem}/${config.bundle}/Contents/_CodeSignature/`,
+  `${stem}/${config.bundle}/Contents/_CodeSignature/CodeResources`,
+  ...(manifest.signature.mode === "developer-id-distribution"
+    ? [`${stem}/${config.bundle}/Contents/embedded.provisionprofile`]
+    : [])
 ];
 assert.deepEqual([...entries].sort(), expectedEntries.sort(), "archive contents must be exact and bounded");
 assert.equal(
@@ -58,15 +75,57 @@ assert.equal(
   false,
   "archive paths must be relative"
 );
+const verboseEntries = execFileSync("tar", ["-tvzf", archive], { encoding: "utf8" }).trim().split("\n");
+assert.equal(verboseEntries.length, entries.length, "archive type listing must cover every entry");
+for (let index = 0; index < entries.length; index += 1) {
+  const expectedType = entries[index].endsWith("/") ? "d" : "-";
+  assert.equal(
+    verboseEntries[index][0],
+    expectedType,
+    `archive entry must be a regular ${expectedType === "d" ? "directory" : "file"}: ${entries[index]}`
+  );
+}
 
 const temporary = mkdtempSync(resolve(tmpdir(), "multaiplayer-cli-package-"));
 try {
   run("tar", ["-xzf", archive, "-C", temporary]);
   const packageRoot = resolve(temporary, stem);
-  const binary = resolve(packageRoot, config.binary);
-  run("codesign", ["--verify", "--strict", "--verbose=2", binary]);
-  const observedSignature = inspectCodeSignature(binary);
+  const bundle = resolve(packageRoot, config.bundle);
+  const binary = resolve(bundle, "Contents", "MacOS", config.binary);
+  run("codesign", ["--verify", "--strict", "--verbose=2", bundle]);
+  const observedSignature = inspectCodeSignature(bundle);
   assertSignatureMetadataMatchesObserved(observedSignature, manifest.signature);
+  const bundleIdentifier = execFileSync(
+    "plutil",
+    ["-extract", "CFBundleIdentifier", "raw", "-o", "-", resolve(bundle, "Contents", "Info.plist")],
+    { encoding: "utf8" }
+  ).trim();
+  assert.equal(bundleIdentifier, config.bundleIdentifier);
+  const bundleReleaseVersion = execFileSync(
+    "plutil",
+    ["-extract", "MultAIplayerCLIVersion", "raw", "-o", "-", resolve(bundle, "Contents", "Info.plist")],
+    { encoding: "utf8" }
+  ).trim();
+  assert.equal(bundleReleaseVersion, config.version, "Info.plist must bind the exact CLI release version");
+
+  if (manifest.signature.mode === "developer-id-distribution") {
+    assert.equal(observedSignature.teamIdentifier, config.teamIdentifier);
+    const entitlements = inspectSignedEntitlements(bundle);
+    validateProtectedEntitlements(entitlements, config);
+    assert.deepEqual(entitlements, manifest.signedEntitlements);
+    const profile = inspectProvisioningProfile(resolve(bundle, "Contents", "embedded.provisionprofile"), config);
+    const signingCertificate = inspectSigningCertificate(bundle);
+    const signingCertificateSha256 = bindProvisioningProfileToSigningCertificate(profile.decoded, signingCertificate);
+    assert.deepEqual(
+      { ...profile.metadata, signingCertificateSha256 },
+      manifest.provisioningProfile,
+      "the embedded profile must contain the exact observed leaf signing certificate"
+    );
+  } else {
+    assert.equal(manifest.provisioningProfile, null);
+    assert.deepEqual(manifest.signedEntitlements, {});
+    assertNoProtectedEntitlements(manifest.signedEntitlements, config);
+  }
   const architectures = execFileSync("lipo", ["-archs", binary], { encoding: "utf8" }).trim().split(/\s+/);
   assert.deepEqual(architectures, ["arm64"], "package must contain only an Apple-silicon executable");
   assert.equal(execFileSync(binary, ["--version"], { encoding: "utf8" }), `${config.binary} ${config.version}\n`);
@@ -78,6 +137,8 @@ try {
   assert.equal(build.binarySha256, manifest.binarySha256);
   assert.equal(sha256File(binary), manifest.binarySha256);
   assert.deepEqual(build.signature, manifest.signature);
+  assert.deepEqual(build.signedEntitlements, manifest.signedEntitlements);
+  assert.deepEqual(build.provisioningProfile, manifest.provisioningProfile);
   assert.match(readFileSync(resolve(packageRoot, "LICENSE"), "utf8"), /Apache License/);
   assert.match(readFileSync(resolve(packageRoot, "THIRD_PARTY_NOTICES.md"), "utf8"), /locked Cargo dependency graph/);
   assert.match(readFileSync(resolve(packageRoot, "INSTALL.md"), "utf8"), /codesign --verify/);

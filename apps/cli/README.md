@@ -14,9 +14,11 @@ curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps
 
 The installer downloads the current CLI release from this repository, verifies
 its checksums, requires a timestamped Developer ID Application signature, runs
-Apple's notarization check, and installs `multAIplayer` in `/usr/local/bin`.
-It may ask for the Mac administrator password when that directory is not
-writable. Set `MULTAIPLAYER_CLI_INSTALL_DIR` to use another directory.
+Apple's notarization check, installs a versioned app bundle under
+`~/Library/Application Support/multAIplayer/cli`, and links the command at
+`~/.local/bin/multAIplayer`. It does not use `sudo` or ask for an administrator
+password. Set `MULTAIPLAYER_CLI_DATA_DIR` or `MULTAIPLAYER_CLI_BIN_DIR` to move
+those user-local locations.
 
 Homebrew, Intel macOS, Linux, and Windows packages are not available in the
 first alpha.
@@ -30,6 +32,14 @@ multAIplayer auth login --open
 multAIplayer auth status
 multAIplayer room list
 ```
+
+The verified macOS release stores its GitHub and relay sessions, device
+identity, and encryption key material in multAIplayer's private Data Protection
+Keychain access group. Normal CLI use does not show Keychain permission prompts,
+and the CLI cannot read unrelated Keychain items. When upgrading from an older
+alpha, the CLI attempts a one-time legacy credential migration with Keychain UI
+disabled. A legacy item that cannot be read silently produces a storage error;
+the CLI does not replace device or room encryption keys.
 
 After a successful login, the CLI prints a short walkthrough from sign-in to
 encrypted chat. Show it again at any time without changing local or remote
@@ -146,16 +156,18 @@ Rerun the installation command to install the version selected by the maintained
 installer. The CLI has no background updater and does not use the desktop
 updater.
 
-To remove only the executable:
+To remove the command and installed CLI versions:
 
 ```sh
-sudo rm /usr/local/bin/multAIplayer
+rm "$HOME/.local/bin/multAIplayer"
+rm -R "$HOME/Library/Application Support/multAIplayer/cli"
 ```
 
-Uninstalling the executable does not delete Keychain credentials or encrypted
-room state. Use `multAIplayer auth logout` before uninstalling to clear the
-GitHub and relay credentials. Use `multAIplayer room forget <room>` only when
-you intentionally want to destroy that room's local association and history.
+Removing the command does not delete Keychain credentials. Removing the CLI
+data directory also removes encrypted room state. Use `multAIplayer auth logout`
+before uninstalling to clear the GitHub and relay credentials. Use
+`multAIplayer room forget <room>` only when you intentionally want to destroy
+that room's local association and history.
 
 ## Build and package locally
 

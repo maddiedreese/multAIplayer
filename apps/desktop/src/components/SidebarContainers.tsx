@@ -270,6 +270,7 @@ export function AppSidebarDrawerContainer({ sources }: { sources: SidebarSources
     hasSelectedRoom,
     selectedRoom,
     localUser,
+    deviceId,
     forgottenRoomIds,
     revokedRoomIds,
     revokedTeamIds,

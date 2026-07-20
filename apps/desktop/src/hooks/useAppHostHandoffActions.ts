@@ -91,7 +91,9 @@ export function useAppHostHandoffActions({
       return {
         selectedRoomId: state.selectedRoomId,
         room,
-        isActiveHost: room ? isLocalUserActiveHostForRoom(room, localIdentity.localUser) : false,
+        isActiveHost: room
+          ? isLocalUserActiveHostForRoom(room, localIdentity.localUser, localIdentity.deviceId)
+          : false,
         hostHandoffs: room ? (state.codexRuntimeByRoom[room.id]?.hostHandoffs ?? []) : []
       };
     }

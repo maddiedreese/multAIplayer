@@ -323,6 +323,7 @@ export function createHostHandoffActions(
       id: crypto.randomUUID(),
       fromHost: localUser.name,
       fromUserId: localUser.id,
+      fromDeviceId: deviceId,
       reason,
       projectPath: room.projectPath,
       ...handoffGitFields(git),

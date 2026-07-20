@@ -1,7 +1,12 @@
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { isLocalUserActiveHostForRoom, type LocalHostUser } from "../access/roomHost";
 
-export function canCreateRoomInvite(room: ClientRoomRecord, user: LocalHostUser, locked = false): boolean {
+export function canCreateRoomInvite(
+  room: ClientRoomRecord,
+  user: LocalHostUser,
+  deviceId: string,
+  locked = false
+): boolean {
   if (locked) return false;
-  return isLocalUserActiveHostForRoom(room, user);
+  return isLocalUserActiveHostForRoom(room, user, deviceId);
 }

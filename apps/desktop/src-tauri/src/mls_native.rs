@@ -35,13 +35,13 @@ const MLS_IDENTITY_ACCOUNT: &str = "mls-identity:v1";
 const MLS_HPKE_ACCOUNT: &str = "mls-hpke:v1";
 
 fn delete_invite_verifier(capability_handle: &str) -> Result<(), String> {
-    let entry = keyring::Entry::new(
+    let entry = crate::credential_store::credential_entry(
         MLS_KEYCHAIN_SERVICE,
         &format!("mls-invite-capability:{capability_handle}"),
     )
     .map_err(|_| "Failed to open invite verifier for cleanup".to_string())?;
     match entry.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Ok(()) | Err(crate::credential_store::CredentialStoreError::NoEntry) => Ok(()),
         Err(_) => Err("Failed to remove consumed invite verifier".to_string()),
     }
 }

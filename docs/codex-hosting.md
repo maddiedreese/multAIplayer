@@ -63,7 +63,7 @@ The relay does see operational metadata needed to route the room:
 - plaintext attachment routing and descriptive metadata such as filename, MIME type, declared size, room id, epoch, and expiry; attachment contents remain exporter-encrypted;
 - authenticated GitHub identity and relay-session metadata when sign-in is enabled.
 
-GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes a token only during verify-then-discard identity bootstrap; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are encoded for room members as RFC 9420 MLS snapshots via `mls-rs`; the threat model owns the security and audit claims for that path.
+GitHub access tokens are stored in the operating-system credential store behind the native Rust boundary. The relay observes the identity token only during verify-then-discard bootstrap at initial sign-in or CLI relay-session re-establishment; native code calls GitHub directly for draft PR creation and Actions reads. Host-local project paths and Codex model/tuning configuration are encoded for room members as RFC 9420 MLS snapshots via `mls-rs`; the threat model owns the security and audit claims for that path.
 
 ## Host Handoff
 

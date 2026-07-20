@@ -94,6 +94,7 @@ export function ActiveRoomInspector({
     hasSelectedRoom,
     selectedRoom,
     localUser,
+    deviceId,
     forgottenRoomIds,
     revokedRoomIds,
     revokedTeamIds,
@@ -359,6 +360,7 @@ export function ActiveRoomInspector({
         selectedTerminalCanControl: canControlRoomTerminal(
           selectedRoom,
           localUser,
+          deviceId,
           selectedTerminal,
           access.isSelectedRoomLocked
         ),

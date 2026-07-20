@@ -14,6 +14,7 @@ interface LocalUser {
 
 interface CreateCodexBrowserOpenCommandOptions {
   localUser: LocalUser;
+  deviceId: string;
   selectedRoomIdRef: MutableRefObject<string | null>;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
@@ -31,6 +32,7 @@ export type HandleCodexBrowserOpenCommand = (
 
 export function createCodexBrowserOpenCommand({
   localUser,
+  deviceId,
   selectedRoomIdRef,
   forgottenRoomIds,
   revokedRoomIds,
@@ -43,7 +45,7 @@ export function createCodexBrowserOpenCommand({
 
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
-    if (!canHostBrowserAction(room, localUser, roomLocked)) {
+    if (!canHostBrowserAction(room, localUser, deviceId, roomLocked)) {
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, room.id)) {
         useAppStore.getState().setBrowserMessageForRoom(room.id, "Only the active host can open the in-room browser.");
       }

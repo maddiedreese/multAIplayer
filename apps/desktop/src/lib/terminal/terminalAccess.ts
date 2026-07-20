@@ -5,10 +5,11 @@ import { isLocalUserActiveHostForRoom, type LocalHostUser } from "../access/room
 export function canControlRoomTerminal(
   room: ClientRoomRecord,
   user: LocalHostUser,
+  deviceId: string,
   terminal: Pick<TerminalSnapshot, "roomId"> | null | undefined,
   locked = false
 ): boolean {
-  return !locked && isLocalUserActiveHostForRoom(room, user) && terminal?.roomId === room.id;
+  return !locked && isLocalUserActiveHostForRoom(room, user, deviceId) && terminal?.roomId === room.id;
 }
 
 export function roomTerminalControlMessage(

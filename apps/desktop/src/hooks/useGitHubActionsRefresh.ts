@@ -28,6 +28,7 @@ interface UseGitHubActionsRefreshOptions {
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
   localUser: LocalUser;
+  deviceId: string;
   authConfig: GitHubAuthConfig | null;
   currentUser: SignedInUser | null;
   setActionsBusyForRoom: (roomId: string, busy: boolean) => void;
@@ -46,6 +47,7 @@ export function useGitHubActionsRefresh({
   revokedRoomIds,
   revokedTeamIds,
   localUser,
+  deviceId,
   authConfig,
   currentUser,
   setActionsBusyForRoom,
@@ -66,7 +68,7 @@ export function useGitHubActionsRefresh({
     }
     const roomRevoked = revokedRoomIds.has(room.id) || revokedTeamIds.has(room.teamId);
     const roomLocked = forgottenRoomIds.has(room.id) || roomRevoked;
-    const gateMessage = githubActionsRoomGateMessage(room, roomsRef.current, localUser, roomLocked);
+    const gateMessage = githubActionsRoomGateMessage(room, roomsRef.current, localUser, deviceId, roomLocked);
     if (gateMessage) {
       setActionsMessageForRoom(roomId, gateMessage);
       return;
@@ -132,12 +134,13 @@ function githubActionsRoomGateMessage(
   room: ClientRoomRecord,
   rooms: ClientRoomRecord[],
   localUser: LocalUser,
+  deviceId: string,
   roomLocked: boolean
 ) {
   if (!rooms.some((item) => item.id === room.id)) {
     return "This room is no longer available for GitHub Actions refresh.";
   }
-  if (!isLocalUserActiveHostForRoom(room, localUser)) {
+  if (!isLocalUserActiveHostForRoom(room, localUser, deviceId)) {
     return room.hostStatus === "active"
       ? `Only ${room.host} can refresh GitHub Actions in this room.`
       : "Claim host before refreshing GitHub Actions in this room.";

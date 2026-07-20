@@ -14,6 +14,7 @@ const room: ClientRoomRecord = {
   projectPath: "/tmp/store-helpers",
   host: "Maddie",
   hostUserId: "github:maddie",
+  activeHostDeviceId: "device-host",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
@@ -45,6 +46,7 @@ test("room notice dismissals resolve store actions when invoked", () => {
 test("local host Codex browser commands open directly", () => {
   const handleCommand = createCodexBrowserOpenCommand({
     localUser: { id: "github:maddie", name: "Maddie" },
+    deviceId: "device-host",
     selectedRoomIdRef: { current: room.id },
     forgottenRoomIds: new Set(),
     revokedRoomIds: new Set(),
@@ -77,6 +79,7 @@ test("local host Codex browser commands open directly", () => {
 test("incoming room Codex browser commands stay pending without navigation", () => {
   const handleCommand = createCodexBrowserOpenCommand({
     localUser: { id: "github:maddie", name: "Maddie" },
+    deviceId: "device-host",
     selectedRoomIdRef: { current: room.id },
     forgottenRoomIds: new Set(),
     revokedRoomIds: new Set(),

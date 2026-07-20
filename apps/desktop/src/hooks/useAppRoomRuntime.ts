@@ -129,6 +129,7 @@ export function useAppRoomRuntime({
     codexActions: {
       turn: {
         localUser: localIdentity.localUser,
+        deviceId: localIdentity.deviceId,
         maxTerminalActivityLines,
         replaceRoom: workspaceRecords.replaceRoom,
         publishCodexEvent: relaySync.publishCodexEvent,
@@ -175,6 +176,7 @@ export function useAppRoomRuntime({
         revokedRoomIds,
         revokedTeamIds,
         localUser: localIdentity.localUser,
+        deviceId: localIdentity.deviceId,
         authConfig: githubAuth.authConfig,
         currentUser: githubAuth.currentUser,
         setActionsBusyForRoom,

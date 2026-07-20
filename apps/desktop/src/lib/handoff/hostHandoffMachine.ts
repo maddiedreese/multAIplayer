@@ -52,22 +52,84 @@ export function committedTransferMatchesOffer(
   return Boolean(
     authorization &&
     offer &&
-    envelope.messageType === "commit" &&
-    envelope.commitEffect === "host_handoff" &&
-    group.epoch === envelope.epochHint + 1 &&
-    group.hostTransferId === authorization.transferId &&
-    group.hostLeaf === authorization.nextHostLeaf &&
-    group.hostDeviceId === authorization.nextHostDeviceId &&
-    offer.id === authorization.transferId &&
-    offer.fromUserId === authorization.outgoingHostUserId &&
-    offer.candidateUserId === authorization.nextHostUserId &&
-    offer.candidateDeviceId === authorization.nextHostDeviceId &&
-    offer.candidateLeaf === authorization.nextHostLeaf
+    commitEnvelopeMatchesAuthorization(envelope, authorization) &&
+    committedGroupMatchesAuthorization(group, envelope, authorization) &&
+    requestedOfferMatchesAuthorization(offer, authorization)
+  );
+}
+
+export function acceptedHandoffMatchesOffer(
+  sender: Pick<MlsRelayMessage, "senderUserId" | "senderDeviceId">,
+  accepted: {
+    hostUserId: string;
+    hostDeviceId: string;
+    hostLeaf: number;
+  },
+  offer: HostHandoffRecord | undefined
+): offer is HostHandoffRecord {
+  return Boolean(
+    offer &&
+    offer.status === "requested" &&
+    offer.fromUserId === sender.senderUserId &&
+    offer.fromDeviceId === sender.senderDeviceId &&
+    offer.candidateUserId === accepted.hostUserId &&
+    offer.candidateDeviceId === accepted.hostDeviceId &&
+    offer.candidateLeaf === accepted.hostLeaf
   );
 }
 
 function candidateKey(candidate: HostCandidateBinding): string {
   return `${candidate.candidateUserId}\0${candidate.candidateDeviceId}\0${candidate.candidateLeaf}`;
+}
+
+type HostTransferAuthorization = NonNullable<MlsRelayMessage["hostTransferAuthorization"]>;
+
+function commitEnvelopeMatchesAuthorization(
+  envelope: MlsRelayMessage,
+  authorization: HostTransferAuthorization
+): boolean {
+  return (
+    envelope.messageType === "commit" &&
+    envelope.commitEffect === "host_handoff" &&
+    authorization.roomId === envelope.roomId &&
+    authorization.commitMessageId === envelope.id &&
+    authorization.parentEpoch === envelope.epochHint &&
+    authorization.outgoingHostUserId === envelope.senderUserId &&
+    authorization.outgoingHostDeviceId === envelope.senderDeviceId &&
+    authorization.nextHostUserId === envelope.nextHostUserId &&
+    authorization.nextHostDeviceId === envelope.nextHostDeviceId
+  );
+}
+
+function committedGroupMatchesAuthorization(
+  group: MlsGroupState,
+  envelope: MlsRelayMessage,
+  authorization: HostTransferAuthorization
+): boolean {
+  const committedHost = group.roster.find((member) => member.leaf === authorization.nextHostLeaf);
+  return (
+    group.epoch === envelope.epochHint + 1 &&
+    group.hostTransferId === authorization.transferId &&
+    group.hostLeaf === authorization.nextHostLeaf &&
+    group.hostDeviceId === authorization.nextHostDeviceId &&
+    committedHost?.githubUserId === authorization.nextHostUserId &&
+    committedHost.deviceId === authorization.nextHostDeviceId
+  );
+}
+
+function requestedOfferMatchesAuthorization(
+  offer: HostHandoffRecord,
+  authorization: HostTransferAuthorization
+): boolean {
+  return (
+    offer.status === "requested" &&
+    offer.id === authorization.transferId &&
+    offer.fromUserId === authorization.outgoingHostUserId &&
+    offer.fromDeviceId === authorization.outgoingHostDeviceId &&
+    offer.candidateUserId === authorization.nextHostUserId &&
+    offer.candidateDeviceId === authorization.nextHostDeviceId &&
+    offer.candidateLeaf === authorization.nextHostLeaf
+  );
 }
 
 function candidateBinding(handoff: HostHandoffRecord): HostCandidateBinding | null {

@@ -1,18 +1,32 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
   artifactStem,
+  assertNoProtectedEntitlements,
   assertSignatureMetadataMatchesObserved,
   assertSafeOutputDirectory,
+  bindProvisioningProfileToSigningCertificate,
   parseCodeSignatureDetails,
   parseCargoPackageVersion,
   readReleaseConfig,
   signingArguments,
   validateDependencyLicenses,
+  validateProtectedEntitlements,
+  validateProvisioningProfile,
   validateSignatureMetadata
 } from "./release-lib.mjs";
 
@@ -25,6 +39,10 @@ test("CLI release identity is independent and matches its Cargo package", () => 
   assert.equal(parseCargoPackageVersion(cargo), config.version);
   assert.notEqual(config.version, desktop.version);
   assert.equal(config.binary, "multAIplayer");
+  assert.equal(config.bundle, "multAIplayer.app");
+  assert.equal(config.bundleIdentifier, "com.multaiplayer.cli");
+  assert.equal(config.teamIdentifier, "AXP55K75AX");
+  assert.equal(config.keychainAccessGroup, "AXP55K75AX.com.multaiplayer.cli");
   assert.equal(artifactStem(config), `multAIplayer-cli-v${config.version}-darwin-arm64`);
 });
 
@@ -55,6 +73,45 @@ test("CLI packaging is local-only and cannot publish or mutate desktop release i
   assert.match(sources, /desktopReleaseContract/);
 });
 
+test("public CLI packaging requires the explicit stable app and provisioning boundary", () => {
+  const packager = readFileSync(new URL("package-cli.mjs", import.meta.url), "utf8");
+  const verifier = readFileSync(new URL("verify-package.mjs", import.meta.url), "utf8");
+  assert.match(packager, /MULTAIPLAYER_CLI_PROVISIONING_PROFILE/);
+  assert.match(packager, /--provisioning-profile/);
+  assert.match(packager, /inspectProvisioningProfile/);
+  assert.match(packager, /inspectSigningCertificate/);
+  assert.match(packager, /inspectSignedEntitlements/);
+  assert.match(packager, /assertNoProtectedEntitlements/);
+  assert.match(packager, /embedded\.provisionprofile/);
+  assert.match(packager, /cli\.entitlements\.plist/);
+  assert.match(verifier, /validateProtectedEntitlements/);
+  assert.match(verifier, /assertNoProtectedEntitlements/);
+  assert.match(verifier, /bindProvisioningProfileToSigningCertificate/);
+});
+
+test("profile authorization binds the exact leaf fingerprint, never a duplicate common name", () => {
+  const authorizedDer = Buffer.from("authorized signing certificate DER fixture");
+  const otherDer = Buffer.from("different certificate with the same common-name fixture");
+  const authorizedSha256 = createHash("sha256").update(authorizedDer).digest("hex");
+  const signer = { sha256: authorizedSha256, commonName: "Developer ID Application: duplicate name" };
+  const profile = {
+    DeveloperCertificates: [otherDer.toString("base64"), authorizedDer.toString("base64")]
+  };
+  assert.equal(bindProvisioningProfileToSigningCertificate(profile, signer), authorizedSha256);
+  assert.throws(() =>
+    bindProvisioningProfileToSigningCertificate({ DeveloperCertificates: [otherDer.toString("base64")] }, signer)
+  );
+  assert.throws(() =>
+    bindProvisioningProfileToSigningCertificate(
+      { DeveloperCertificates: [authorizedDer.toString("base64"), authorizedDer.toString("base64")] },
+      signer
+    )
+  );
+  assert.throws(() =>
+    bindProvisioningProfileToSigningCertificate({ DeveloperCertificates: ["not certificate data"] }, signer)
+  );
+});
+
 test("package output rejects symlink escapes before external mutation", () => {
   const fixture = mkdtempSync(resolve(tmpdir(), "multaiplayer-cli-output-safety-"));
   const workspace = resolve(fixture, "workspace");
@@ -78,23 +135,32 @@ test("package output rejects symlink escapes before external mutation", () => {
   }
 });
 
-test("ad-hoc and Developer ID signing modes are explicit and cannot be confused", () => {
-  assert.deepEqual(signingArguments("-", "/tmp/multAIplayer"), [
+test("ad-hoc and Developer ID bundle signing modes are explicit and cannot be confused", () => {
+  assert.deepEqual(signingArguments("-", "/tmp/multAIplayer.app"), [
     "--force",
     "--sign",
     "-",
     "--timestamp=none",
-    "/tmp/multAIplayer"
+    "/tmp/multAIplayer.app"
   ]);
-  assert.deepEqual(signingArguments("Developer ID Application: Example (ABCDEFGHIJ)", "/tmp/multAIplayer"), [
-    "--force",
-    "--sign",
-    "Developer ID Application: Example (ABCDEFGHIJ)",
-    "--options",
-    "runtime",
-    "--timestamp",
-    "/tmp/multAIplayer"
-  ]);
+  assert.deepEqual(
+    signingArguments(
+      "Developer ID Application: Example (AXP55K75AX)",
+      "/tmp/multAIplayer.app",
+      "/tmp/cli.entitlements.plist"
+    ),
+    [
+      "--force",
+      "--sign",
+      "Developer ID Application: Example (AXP55K75AX)",
+      "--options",
+      "runtime",
+      "--timestamp",
+      "--entitlements",
+      "/tmp/cli.entitlements.plist",
+      "/tmp/multAIplayer.app"
+    ]
+  );
 
   const adhoc = {
     mode: "adhoc-local-verification",
@@ -118,6 +184,46 @@ test("ad-hoc and Developer ID signing modes are explicit and cannot be confused"
   assert.doesNotThrow(() => validateSignatureMetadata(developerId));
   assert.throws(() => validateSignatureMetadata({ ...adhoc, mode: developerId.mode }));
   assert.throws(() => validateSignatureMetadata({ ...developerId, secureTimestamp: false }));
+});
+
+test("Developer ID profile and signed entitlements bind the stable non-interactive Keychain identity", () => {
+  const protectedEntitlements = {
+    "com.apple.application-identifier": config.keychainAccessGroup,
+    "com.apple.developer.team-identifier": config.teamIdentifier,
+    "keychain-access-groups": [config.keychainAccessGroup]
+  };
+  assert.doesNotThrow(() => validateProtectedEntitlements(protectedEntitlements, config));
+  assert.throws(() => validateProtectedEntitlements({ ...protectedEntitlements, "get-task-allow": true }, config));
+  assert.throws(() =>
+    validateProtectedEntitlements(
+      { ...protectedEntitlements, "keychain-access-groups": [config.keychainAccessGroup, "unexpected.group"] },
+      config
+    )
+  );
+
+  const profile = {
+    UUID: "00000000-0000-0000-0000-000000000000",
+    Name: "multAIplayer CLI Developer ID",
+    TeamIdentifier: [config.teamIdentifier],
+    ApplicationIdentifierPrefix: [config.teamIdentifier],
+    ProvisionsAllDevices: true,
+    ExpirationDate: "2099-01-01T00:00:00.000Z",
+    Entitlements: protectedEntitlements
+  };
+  assert.deepEqual(validateProvisioningProfile(profile, config, new Date("2026-07-20T00:00:00.000Z")), {
+    uuid: profile.UUID,
+    name: profile.Name,
+    expiration: profile.ExpirationDate,
+    teamIdentifier: config.teamIdentifier,
+    applicationIdentifier: config.keychainAccessGroup,
+    keychainAccessGroups: [config.keychainAccessGroup]
+  });
+  assert.throws(() => validateProvisioningProfile({ ...profile, ProvisionsAllDevices: false }, config));
+  assert.throws(() => validateProvisioningProfile({ ...profile, ProvisionedDevices: ["device"] }, config));
+  assert.throws(() => validateProvisioningProfile({ ...profile, ExpirationDate: "2020-01-01T00:00:00.000Z" }, config));
+
+  assert.doesNotThrow(() => assertNoProtectedEntitlements({}, config));
+  assert.throws(() => assertNoProtectedEntitlements(protectedEntitlements, config));
 });
 
 test("observed codesign metadata rejects forged Developer ID and mode claims", () => {
@@ -183,11 +289,34 @@ test("public installer is version-bound and fails closed on Apple release trust"
   const installer = readFileSync(installerPath, "utf8");
   const syntax = spawnSync("sh", ["-n", installerPath], { encoding: "utf8" });
   assert.equal(syntax.status, 0, syntax.stderr);
+  assert.notEqual(statSync(installerPath).mode & 0o111, 0, "installer must remain executable");
   assert.match(installer, new RegExp(`version="${config.version.replaceAll(".", "\\.")}"`));
   assert.match(installer, /tag="cli-v\$\{version\}"/);
   assert.match(installer, /github\.com\/\$\{repository\}\/releases\/download\/\$\{tag\}/);
   assert.match(installer, /shasum -a 256 -c/);
   assert.match(installer, /signature_mode.*developer-id-distribution/s);
+  assert.match(installer, /bundle_id="com\.multaiplayer\.cli"/);
+  assert.match(installer, /team_id="AXP55K75AX"/);
+  assert.match(installer, /keychain_group="AXP55K75AX\.com\.multaiplayer\.cli"/);
+  assert.match(installer, /embedded\.provisionprofile/);
+  assert.match(installer, /codesign -d --entitlements/);
+  assert.match(installer, /security cms -D -i/);
+  assert.match(installer, /--extract-certificates=/);
+  assert.match(installer, /DeveloperCertificates/);
+  assert.match(installer, /profile_signer_matches.*-eq 1/s);
+  assert.match(installer, /tar -tvzf/);
+  assert.match(installer, /unexpected or missing entries/);
+  assert.match(installer, /link, device, or unexpected entry type/);
+  assert.ok(
+    installer.indexOf("typed_entries=") < installer.indexOf('tar -xzf "${temporary}/${archive}"'),
+    "archive entry names and types must be validated before extraction"
+  );
+  assert.match(installer, /binarySha256/);
+  assert.match(installer, /MultAIplayerCLIVersion/);
+  assert.match(installer, /expected_version_output="multAIplayer \$\{version\}"/);
+  assert.match(installer, /Library\/Application Support\/multAIplayer\/cli/);
+  assert.match(installer, /\.local\/bin/);
+  assert.doesNotMatch(installer, /sudo/);
   assert.match(installer, /Developer ID Application:/);
   assert.match(installer, /observed_team.*claimed_team/s);
   assert.match(installer, /observed_timestamp.*claimed_timestamp/s);

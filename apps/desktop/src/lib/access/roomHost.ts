@@ -5,8 +5,14 @@ export interface LocalHostUser {
   name: string;
 }
 
-export function isLocalUserActiveHostForRoom(room: ClientRoomRecord, user: LocalHostUser): boolean {
-  return room.hostStatus === "active" && Boolean(room.hostUserId) && room.hostUserId === user.id;
+export function isLocalUserActiveHostForRoom(room: ClientRoomRecord, user: LocalHostUser, deviceId: string): boolean {
+  return (
+    room.hostStatus === "active" &&
+    Boolean(room.hostUserId) &&
+    Boolean(room.activeHostDeviceId) &&
+    room.hostUserId === user.id &&
+    room.activeHostDeviceId === deviceId
+  );
 }
 
 export function findEnvelopeRoom(rooms: ClientRoomRecord[], roomId: string): ClientRoomRecord | null {
@@ -15,9 +21,15 @@ export function findEnvelopeRoom(rooms: ClientRoomRecord[], roomId: string): Cli
 
 export function isEnvelopeFromActiveRoomHost(
   room: ClientRoomRecord | null,
-  envelope: Pick<MlsRelayMessage, "senderUserId">
+  envelope: Pick<MlsRelayMessage, "senderUserId" | "senderDeviceId">
 ): boolean {
-  return Boolean(room?.hostStatus === "active" && room.hostUserId && room.hostUserId === envelope.senderUserId);
+  return Boolean(
+    room?.hostStatus === "active" &&
+    room.hostUserId &&
+    room.activeHostDeviceId &&
+    room.hostUserId === envelope.senderUserId &&
+    room.activeHostDeviceId === envelope.senderDeviceId
+  );
 }
 
 export function roomHostEnvelopeRejectionMessage(room: ClientRoomRecord | null, eventLabel: string): string {

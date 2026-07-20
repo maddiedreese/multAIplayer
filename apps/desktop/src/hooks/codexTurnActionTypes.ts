@@ -3,6 +3,7 @@ import type { ChatMessage, HostHandoffRecord } from "../types";
 
 export interface UseCodexTurnActionsOptions {
   localUser: { id: string; name: string };
+  deviceId: string;
   maxTerminalActivityLines: number;
   replaceRoom: (room: ClientRoomRecord) => void;
   publishCodexEvent: (

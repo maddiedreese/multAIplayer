@@ -7,13 +7,19 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   artifactStem,
+  assertNoProtectedEntitlements,
   assertSafeOutputDirectory,
+  bindProvisioningProfileToSigningCertificate,
   inspectCodeSignature,
+  inspectProvisioningProfile,
+  inspectSigningCertificate,
+  inspectSignedEntitlements,
   parseCargoPackageVersion,
   readReleaseConfig,
   sha256File,
   signingArguments,
   validateDependencyLicenses,
+  validateProtectedEntitlements,
   validateSignatureMetadata
 } from "./release-lib.mjs";
 
@@ -25,9 +31,27 @@ const output = resolve(outputFlag === -1 ? resolve(cliRoot, "dist") : process.ar
 const signingFlag = process.argv.indexOf("--signing-identity");
 const signingIdentity =
   signingFlag === -1 ? process.env.MULTAIPLAYER_CLI_SIGNING_IDENTITY || "-" : process.argv[signingFlag + 1];
+const profileFlag = process.argv.indexOf("--provisioning-profile");
+const profileArgument = profileFlag === -1 ? null : process.argv[profileFlag + 1];
+const provisioningProfile =
+  profileFlag === -1
+    ? process.env.MULTAIPLAYER_CLI_PROVISIONING_PROFILE
+      ? resolve(process.env.MULTAIPLAYER_CLI_PROVISIONING_PROFILE)
+      : null
+    : profileArgument
+      ? resolve(profileArgument)
+      : null;
 
 assert.ok(outputFlag === -1 || process.argv[outputFlag + 1], "--output requires a directory");
 assert.ok(signingFlag === -1 || process.argv[signingFlag + 1], "--signing-identity requires an identity");
+assert.ok(profileFlag === -1 || process.argv[profileFlag + 1], "--provisioning-profile requires a file");
+assert.equal(
+  signingIdentity === "-" ? provisioningProfile === null : provisioningProfile !== null,
+  true,
+  signingIdentity === "-"
+    ? "ad-hoc inspection mode must not embed a distribution provisioning profile"
+    : "Developer ID mode requires --provisioning-profile or MULTAIPLAYER_CLI_PROVISIONING_PROFILE"
+);
 assertSafeOutputDirectory(cliRoot, output);
 assert.equal(process.platform, "darwin", "CLI release packaging requires macOS");
 assert.equal(process.arch, "arm64", "CLI release packaging requires Apple silicon");
@@ -72,25 +96,54 @@ const sumsPath = resolve(output, "SHA256SUMS.txt");
 
 rmSync(output, { recursive: true, force: true });
 mkdirSync(packageRoot, { recursive: true, mode: 0o755 });
-cpSync(builtBinary, resolve(packageRoot, config.binary));
-chmodSync(resolve(packageRoot, config.binary), 0o755);
+const bundle = resolve(packageRoot, config.bundle);
+const contents = resolve(bundle, "Contents");
+const macos = resolve(contents, "MacOS");
+mkdirSync(macos, { recursive: true, mode: 0o755 });
+const packagedBinary = resolve(macos, config.binary);
+cpSync(builtBinary, packagedBinary);
+chmodSync(packagedBinary, 0o755);
+writeFileSync(resolve(contents, "Info.plist"), infoPlist(config));
 cpSync(resolve(root, "LICENSE"), resolve(packageRoot, "LICENSE"));
 cpSync(resolve(releaseDir, "INSTALL.md"), resolve(packageRoot, "INSTALL.md"));
 
 const notices = dependencyNotices();
 writeFileSync(resolve(packageRoot, "THIRD_PARTY_NOTICES.md"), notices);
 
-run("codesign", signingArguments(signingIdentity, resolve(packageRoot, config.binary)));
-run("codesign", ["--verify", "--strict", "--verbose=2", resolve(packageRoot, config.binary)]);
+let profileMetadata = null;
+let decodedProfile = null;
+if (provisioningProfile !== null) {
+  const inspectedProfile = inspectProvisioningProfile(provisioningProfile, config);
+  profileMetadata = inspectedProfile.metadata;
+  decodedProfile = inspectedProfile.decoded;
+  cpSync(provisioningProfile, resolve(contents, "embedded.provisionprofile"));
+}
 
-const binarySha256 = sha256File(resolve(packageRoot, config.binary));
-const signature = inspectCodeSignature(resolve(packageRoot, config.binary));
+const entitlementsPath = resolve(releaseDir, "cli.entitlements.plist");
+run("codesign", signingArguments(signingIdentity, bundle, entitlementsPath));
+run("codesign", ["--verify", "--strict", "--verbose=2", bundle]);
+
+const binarySha256 = sha256File(packagedBinary);
+const signature = inspectCodeSignature(bundle);
 assert.equal(
   signature.mode,
   signingIdentity === "-" ? "adhoc-local-verification" : "developer-id-distribution",
   "observed signing mode must match the selected signing identity"
 );
 validateSignatureMetadata(signature);
+let signedEntitlements = {};
+if (signature.mode === "developer-id-distribution") {
+  signedEntitlements = inspectSignedEntitlements(bundle);
+  validateProtectedEntitlements(signedEntitlements, config);
+  assert.equal(signature.teamIdentifier, config.teamIdentifier, "Developer ID signature must use the CLI release team");
+  const signingCertificate = inspectSigningCertificate(bundle);
+  profileMetadata.signingCertificateSha256 = bindProvisioningProfileToSigningCertificate(
+    decodedProfile,
+    signingCertificate
+  );
+} else {
+  assertNoProtectedEntitlements(signedEntitlements, config);
+}
 const buildMetadata = {
   schema: "multaiplayer-cli-build-v1",
   product: config.product,
@@ -101,7 +154,10 @@ const buildMetadata = {
   sourceRevision,
   sourceDateEpoch,
   binarySha256,
-  signature
+  bundleIdentifier: config.bundleIdentifier,
+  signature,
+  signedEntitlements,
+  provisioningProfile: profileMetadata
 };
 writeFileSync(resolve(packageRoot, "BUILD-METADATA.json"), `${JSON.stringify(buildMetadata, null, 2)}\n`);
 
@@ -119,7 +175,11 @@ const releaseManifest = {
   archive: `${stem}.tar.gz`,
   archiveSha256: sha256File(archive),
   binarySha256,
+  bundle: config.bundle,
+  bundleIdentifier: config.bundleIdentifier,
   signature,
+  signedEntitlements,
+  provisioningProfile: profileMetadata,
   publication: config.publication,
   desktopReleaseContract: false
 };
@@ -178,4 +238,32 @@ function dependencyNotices() {
 
 function escapeCell(value) {
   return String(value).replaceAll("|", "\\|");
+}
+
+function infoPlist(release) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleDisplayName</key><string>multAIplayer CLI</string>
+  <key>CFBundleExecutable</key><string>${release.binary}</string>
+  <key>CFBundleIdentifier</key><string>${release.bundleIdentifier}</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>multAIplayer</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>MultAIplayerCLIVersion</key><string>${release.version}</string>
+  <key>CFBundleShortVersionString</key><string>${release.version.split("-")[0]}</string>
+  <key>CFBundleVersion</key><string>${bundleBuildVersion(release.version)}</string>
+  <key>LSBackgroundOnly</key><true/>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+</dict>
+</plist>
+`;
+}
+
+function bundleBuildVersion(version) {
+  const numbers = version.match(/\d+/g);
+  assert.ok(numbers && numbers.length > 0, "release version must contain numeric bundle version components");
+  return numbers.join(".");
 }
