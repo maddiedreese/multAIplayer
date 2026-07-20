@@ -1,3 +1,5 @@
+#[cfg(all(not(test), not(target_os = "macos")))]
+use keyring::Entry;
 #[cfg(all(not(test), target_os = "macos"))]
 use keyring_core::{api::CredentialStoreApi, Entry};
 #[cfg(all(not(test), not(debug_assertions), target_os = "macos"))]
@@ -20,7 +22,7 @@ pub(crate) enum CredentialStoreError {
 }
 
 pub(crate) struct CredentialEntry {
-    #[cfg(all(not(test), target_os = "macos"))]
+    #[cfg(not(test))]
     inner: Entry,
     #[cfg(any(test, target_os = "macos"))]
     service: String,
@@ -39,7 +41,7 @@ impl CredentialEntry {
         }
         #[cfg(all(not(test), not(target_os = "macos")))]
         {
-            Err(CredentialStoreError::Unavailable)
+            self.inner.get_password().map_err(map_non_macos_error)
         }
         #[cfg(test)]
         {
@@ -88,8 +90,7 @@ impl CredentialEntry {
         }
         #[cfg(all(not(test), not(target_os = "macos")))]
         {
-            let _ = value;
-            Err(CredentialStoreError::Unavailable)
+            self.inner.set_password(value).map_err(map_non_macos_error)
         }
         #[cfg(test)]
         {
@@ -111,7 +112,7 @@ impl CredentialEntry {
         }
         #[cfg(all(not(test), not(target_os = "macos")))]
         {
-            Err(CredentialStoreError::Unavailable)
+            self.inner.delete_credential().map_err(map_non_macos_error)
         }
         #[cfg(test)]
         {
@@ -144,7 +145,8 @@ pub(crate) fn credential_entry(
     }
     #[cfg(all(not(test), not(target_os = "macos")))]
     {
-        Err(CredentialStoreError::Unavailable)
+        let inner = Entry::new(service, account).map_err(|_| CredentialStoreError::Unavailable)?;
+        Ok(CredentialEntry { inner })
     }
     #[cfg(test)]
     {
@@ -177,6 +179,14 @@ fn protected_store(
 fn map_error(error: keyring_core::Error) -> CredentialStoreError {
     match error {
         keyring_core::Error::NoEntry => CredentialStoreError::NoEntry,
+        _ => CredentialStoreError::Unavailable,
+    }
+}
+
+#[cfg(all(not(test), not(target_os = "macos")))]
+fn map_non_macos_error(error: keyring::Error) -> CredentialStoreError {
+    match error {
+        keyring::Error::NoEntry => CredentialStoreError::NoEntry,
         _ => CredentialStoreError::Unavailable,
     }
 }

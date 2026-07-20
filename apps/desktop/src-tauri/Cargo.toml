@@ -53,6 +53,9 @@ apple-native-keyring-store = { version = "=1.0.1", features = ["keychain", "prot
 keyring-core = "=1.0.0"
 security-framework = "=3.7.0"
 
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+keyring = "=4.1.5"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"] }
 
