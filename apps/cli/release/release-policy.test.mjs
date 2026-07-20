@@ -90,6 +90,8 @@ test("ad-hoc and Developer ID signing modes are explicit and cannot be confused"
     "--force",
     "--sign",
     "Developer ID Application: Example (ABCDEFGHIJ)",
+    "--options",
+    "runtime",
     "--timestamp",
     "/tmp/multAIplayer"
   ]);
@@ -100,7 +102,8 @@ test("ad-hoc and Developer ID signing modes are explicit and cannot be confused"
     secureTimestamp: false,
     authority: null,
     teamIdentifier: null,
-    timestamp: null
+    timestamp: null,
+    hardenedRuntime: false
   };
   const developerId = {
     mode: "developer-id-distribution",
@@ -108,7 +111,8 @@ test("ad-hoc and Developer ID signing modes are explicit and cannot be confused"
     secureTimestamp: true,
     authority: "Developer ID Application: Example (ABCDEFGHIJ)",
     teamIdentifier: "ABCDEFGHIJ",
-    timestamp: "Jul 19, 2026 at 12:00:00 PM"
+    timestamp: "Jul 19, 2026 at 12:00:00 PM",
+    hardenedRuntime: true
   };
   assert.doesNotThrow(() => validateSignatureMetadata(adhoc));
   assert.doesNotThrow(() => validateSignatureMetadata(developerId));
@@ -126,12 +130,13 @@ test("observed codesign metadata rejects forged Developer ID and mode claims", (
     secureTimestamp: true,
     authority: "Developer ID Application: Forged (ABCDEFGHIJ)",
     teamIdentifier: "ABCDEFGHIJ",
-    timestamp: "Jul 19, 2026 at 12:00:00 PM"
+    timestamp: "Jul 19, 2026 at 12:00:00 PM",
+    hardenedRuntime: true
   };
   assert.throws(() => assertSignatureMetadataMatchesObserved(observedAdhoc, forgedDeveloperId));
 
   const observedDeveloperId = parseCodeSignatureDetails(
-    "Executable=/tmp/multAIplayer\nAuthority=Developer ID Application: Example (ABCDEFGHIJ)\nTeamIdentifier=ABCDEFGHIJ\nTimestamp=Jul 19, 2026 at 12:00:00 PM\n"
+    "Executable=/tmp/multAIplayer\nAuthority=Developer ID Application: Example (ABCDEFGHIJ)\nTeamIdentifier=ABCDEFGHIJ\nTimestamp=Jul 19, 2026 at 12:00:00 PM\nRuntime Version=15.6.0\n"
   );
   assert.throws(() => assertSignatureMetadataMatchesObserved(observedDeveloperId, observedAdhoc));
   assert.doesNotThrow(() =>

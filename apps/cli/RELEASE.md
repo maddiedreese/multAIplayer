@@ -38,10 +38,10 @@ reviewed allowlist.
 
 Local ad-hoc inspection signatures explicitly disable timestamps so repeated
 local verification does not depend on a signing service. Developer ID
-distribution signatures instead require Apple's secure timestamp and the
-verifier requires Developer ID authority, Team ID, and timestamp evidence in
-the manifest. Verification independently inspects the extracted executable with
-`codesign -d` and requires its observed mode, authority, Team ID, and timestamp
+distribution signatures instead require Apple's secure timestamp and hardened
+runtime. The verifier requires Developer ID authority, Team ID, timestamp, and
+hardened-runtime evidence in the manifest. Verification independently inspects
+the extracted executable with `codesign -d` and requires its observed metadata
 to exactly match both manifests. The modes cannot be relabeled.
 
 Packaging never tags, uploads, publishes, or changes a GitHub Release. A release
