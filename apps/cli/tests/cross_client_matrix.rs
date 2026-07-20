@@ -25,7 +25,7 @@ fn required_desktop_cli_interoperability_matrix_executes() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        String::from_utf8_lossy(&output.stdout).contains("CLI-140 mixed-client matrix passed"),
+        String::from_utf8_lossy(&output.stdout).contains("Mixed-client matrix passed"),
         "cross-client matrix did not report complete evidence"
     );
 }

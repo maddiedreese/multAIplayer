@@ -23,7 +23,7 @@
 > [!IMPORTANT]
 > multAIplayer is a free, open-source macOS alpha. Use only Developer ID-signed,
 > notarized builds published from this repository. Desktop builds use the tagged
-> release workflow; CLI builds use the isolated, owner-approved CLI release
+> release workflow; CLI builds use the isolated CLI release
 > process. Current platform and product constraints are listed in
 > [Alpha limitations](docs/alpha-limitations.md).
 

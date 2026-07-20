@@ -3,7 +3,7 @@
 The CLI archive is independent from the multAIplayer desktop application and
 does not use the desktop updater.
 
-For an owner-published release, the supported installation command is:
+The supported installation command is:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh
@@ -15,7 +15,7 @@ and Gatekeeper checks below before copying the binary to `/usr/local/bin`.
 ## Manual verification and installation
 
 1. Download the `multAIplayer-cli-*-darwin-arm64.tar.gz` archive, its matching
-   `.manifest.json`, and `SHA256SUMS.txt` from the same owner-approved release.
+   `.manifest.json`, and `SHA256SUMS.txt` from the same published release.
 2. Verify both files from their download directory:
 
    ```sh
@@ -40,8 +40,8 @@ and Gatekeeper checks below before copying the binary to `/usr/local/bin`.
    multAIplayer --version
    ```
 
-Only owner-published Developer ID-signed artifacts with a secure signing
-timestamp and successful Gatekeeper assessment are distribution builds. Confirm
+Only Developer ID-signed artifacts with a secure signing timestamp and
+successful Gatekeeper assessment are distribution builds. Confirm
 that `codesign -d` reports a `Developer ID Application` authority, a 10-character
 Team Identifier, and a timestamp matching the release manifest. An ad-hoc signature produced by the local
 packaging default is timestamp-free, is labeled `adhoc-local-verification` in

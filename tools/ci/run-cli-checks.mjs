@@ -24,7 +24,7 @@ for (const path of [
   "tools/release/sync-release-metadata.mjs"
 ]) {
   const source = readFileSync(resolve(root, path), "utf8");
-  assert.equal(source.includes("apps/cli"), false, `${path} must not include unfinished CLI packaging`);
+  assert.equal(source.includes("apps/cli"), false, `${path} must not include CLI packaging`);
 }
 
 if (!existsSync(manifest)) {

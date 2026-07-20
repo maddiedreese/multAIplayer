@@ -43,8 +43,8 @@ if (cliIndex.includes("intentionally not implemented")) {
   throw new Error("docs/cli/README.md still describes the implemented CLI as unimplemented");
 }
 
-const cliPlan = readFileSync(new URL("../docs/cli/development-plan.md", import.meta.url), "utf8");
-if (/multAIplayer room join\s+<invite-code>/.test(cliPlan)) {
+const cliArchitecture = readFileSync(new URL("../docs/cli/architecture.md", import.meta.url), "utf8");
+if (/multAIplayer room join\s+<invite-code>/.test(cliArchitecture)) {
   throw new Error("CLI documentation must not place an invitation capability in a shell argument");
 }
 

@@ -6,7 +6,7 @@ room creation and admission, encrypted chat, and human-approved Codex turns.
 
 ## Install
 
-After an owner-published CLI release is available:
+Install the current published CLI release:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh
@@ -56,17 +56,17 @@ and admission command.
 
 ## Compatibility and limitations
 
-| Capability | CLI alpha | Desktop alpha interoperability |
-| --- | --- | --- |
-| Apple-silicon macOS | Supported | Supported |
-| GitHub identity and device binding | Supported | Same hosted identity boundary |
-| Encrypted rooms and chat | Supported | Same relay protocol and MLS groups |
-| Room create/join/invite/admission | Supported | Rooms may be created by either client |
-| Codex proposals and hosted turns | Supported | Either supported client may host |
-| Reconnect, replay, and encrypted history | Supported | Mixed-client journeys verified |
-| Host handoff involving the CLI | Not supported | Fails explicitly |
-| Browser, shared terminal, editor, attachments, GitHub panels, goals, and rich diffs | Not supported | Desktop-only records render safely |
-| Intel macOS, Linux, Windows, Homebrew | Not supported | Deferred |
+| Capability                                                                          | CLI alpha     | Desktop alpha interoperability        |
+| ----------------------------------------------------------------------------------- | ------------- | ------------------------------------- |
+| Apple-silicon macOS                                                                 | Supported     | Supported                             |
+| GitHub identity and device binding                                                  | Supported     | Same hosted identity boundary         |
+| Encrypted rooms and chat                                                            | Supported     | Same relay protocol and MLS groups    |
+| Room create/join/invite/admission                                                   | Supported     | Rooms may be created by either client |
+| Codex proposals and hosted turns                                                    | Supported     | Either supported client may host      |
+| Reconnect, replay, and encrypted history                                            | Supported     | Mixed-client journeys verified        |
+| Host handoff involving the CLI                                                      | Not supported | Fails explicitly                      |
+| Browser, shared terminal, editor, attachments, GitHub panels, goals, and rich diffs | Not supported | Desktop-only records render safely    |
+| Intel macOS, Linux, Windows, Homebrew                                               | Not supported | Deferred                              |
 
 The host must remain online to admit a participant and to run Codex. Codex uses
 the host's local account, project, credentials, sandbox, and network policy.

@@ -59,6 +59,7 @@ Run commands from the repository root.
 | Shared package                                         | package `check` and focused test                           | package test suite                                                                 |
 | Native Tauri/Rust                                      | `npm run fmt:rust:check`; focused Cargo test               | `npm run test:native`                                                              |
 | Native packaging, Keychain, terminal, or Codex process | native checks above                                        | `npm run tauri:build -w @multaiplayer/desktop` on macOS, or CI                     |
+| CLI command, storage, rendering, or packaging          | focused `cargo test --manifest-path apps/cli/Cargo.toml`   | `node tools/ci/run-cli-checks.mjs`                                                 |
 | Cross-cutting TypeScript or workspace configuration    | affected workspace checks                                  | `npm run lint`; `npm run format:check`                                             |
 
 Use `npm run format` to apply the repository baseline. The relay fuzz suite
@@ -79,6 +80,9 @@ The optional staged-file hook runs Prettier and ESLint. Enable it per clone with
 - Relay transport, persistence, limits, and lifecycle code live under
   `apps/relay/src`; shared public wire records and limits belong in
   `packages/protocol`.
+- CLI commands, adapters, and terminal presentation live under `apps/cli`; its
+  architecture and independent release boundary are documented in the
+  [CLI contributor guide](docs/cli/README.md).
 - Executable UI contracts and native journeys belong under `e2e`; focused
   maintenance and release utilities belong under `tools`.
 - A React hook earns a separate file when reused or when it owns a real lifecycle

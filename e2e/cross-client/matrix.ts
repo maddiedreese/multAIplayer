@@ -740,7 +740,7 @@ async function main() {
   await runJourney("cli", "cli");
   await runJourney("cli", "desktop");
   await runJourney("desktop", "cli");
-  process.stdout.write("CLI-140 mixed-client matrix passed (CLI/CLI, CLI/desktop, desktop/CLI).\n");
+  process.stdout.write("Mixed-client matrix passed (CLI/CLI, CLI/desktop, desktop/CLI).\n");
 }
 
 await main();
