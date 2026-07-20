@@ -56,7 +56,7 @@ export function assertSafeOutputDirectory(allowedRoot, output) {
 export function signingArguments(identity, binary) {
   return identity === "-"
     ? ["--force", "--sign", "-", "--timestamp=none", binary]
-    : ["--force", "--sign", identity, "--timestamp", binary];
+    : ["--force", "--sign", identity, "--options", "runtime", "--timestamp", binary];
 }
 
 export function validateSignatureMetadata(signature) {
@@ -67,6 +67,7 @@ export function validateSignatureMetadata(signature) {
     assert.equal(signature.authority, null);
     assert.equal(signature.teamIdentifier, null);
     assert.equal(signature.timestamp, null);
+    assert.equal(signature.hardenedRuntime, false);
     return;
   }
   assert.equal(signature.mode, "developer-id-distribution");
@@ -75,6 +76,7 @@ export function validateSignatureMetadata(signature) {
   assert.match(signature.authority, /^Developer ID Application:/);
   assert.match(signature.teamIdentifier, /^[A-Z0-9]{10}$/);
   assert.ok(typeof signature.timestamp === "string" && signature.timestamp.length > 0);
+  assert.equal(signature.hardenedRuntime, true);
 }
 
 export function parseCodeSignatureDetails(detail) {
@@ -86,19 +88,22 @@ export function parseCodeSignatureDetails(detail) {
       secureTimestamp: false,
       authority: null,
       teamIdentifier: null,
-      timestamp: null
+      timestamp: null,
+      hardenedRuntime: false
     };
   }
   const authority = detail.match(/^Authority=(.+)$/m)?.[1] || null;
   const rawTeamIdentifier = detail.match(/^TeamIdentifier=(.+)$/m)?.[1] || null;
   const timestamp = detail.match(/^Timestamp=(.+)$/m)?.[1] || null;
+  const hardenedRuntime = /^Runtime Version=.+$/m.test(detail);
   return {
     mode: "developer-id-distribution",
     identityKind: "developer-id-application",
     secureTimestamp: timestamp !== null,
     authority,
     teamIdentifier: rawTeamIdentifier === "not set" ? null : rawTeamIdentifier,
-    timestamp
+    timestamp,
+    hardenedRuntime
   };
 }
 
