@@ -109,19 +109,40 @@ export function MonacoFileEditor({
 
 async function installMonaco(): Promise<typeof Monaco> {
   const [
-    monaco,
     { default: EditorWorker },
     { default: JsonWorker },
     { default: CssWorker },
     { default: HtmlWorker },
     { default: TypeScriptWorker }
   ] = await Promise.all([
-    import("monaco-editor/editor/editor.api.js"),
     import("monaco-editor/editor/editor.worker?worker"),
     import("monaco-editor/language/json/json.worker?worker"),
     import("monaco-editor/language/css/css.worker?worker"),
     import("monaco-editor/language/html/html.worker?worker"),
-    import("monaco-editor/language/typescript/ts.worker?worker"),
+    import("monaco-editor/language/typescript/ts.worker?worker")
+  ]);
+
+  // Monaco 0.56 snapshots MonacoEnvironment when editor.api is evaluated. Install the
+  // worker factory first so every language service receives its offline worker.
+  self.MonacoEnvironment = {
+    getWorker(_workerId: string, label: string) {
+      switch (workerKindForLabel(label)) {
+        case "json":
+          return new JsonWorker();
+        case "css":
+          return new CssWorker();
+        case "html":
+          return new HtmlWorker();
+        case "typescript":
+          return new TypeScriptWorker();
+        case "editor":
+          return new EditorWorker();
+      }
+    }
+  };
+
+  const [monaco] = await Promise.all([
+    import("monaco-editor/editor/editor.api.js"),
     import("monaco-editor/base/browser/domSanitize.js"),
     import("monaco-editor/languages/features/json/register.js"),
     import("monaco-editor/languages/features/css/register.js"),
@@ -139,23 +160,6 @@ async function installMonaco(): Promise<typeof Monaco> {
     import("monaco-editor/languages/definitions/rust/register.js"),
     import("monaco-editor/languages/definitions/yaml/register.js")
   ]);
-
-  self.MonacoEnvironment = {
-    getWorker(_workerId: string, label: string) {
-      switch (workerKindForLabel(label)) {
-        case "json":
-          return new JsonWorker();
-        case "css":
-          return new CssWorker();
-        case "html":
-          return new HtmlWorker();
-        case "typescript":
-          return new TypeScriptWorker();
-        case "editor":
-          return new EditorWorker();
-      }
-    }
-  };
 
   return monaco as unknown as typeof Monaco;
 }
