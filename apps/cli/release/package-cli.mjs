@@ -67,6 +67,8 @@ assert.match(sourceRevision, /^[0-9a-f]{40}$/);
 const sourceDateEpoch = Number(git(["show", "-s", "--format=%ct", sourceRevision]));
 assert.ok(Number.isSafeInteger(sourceDateEpoch) && sourceDateEpoch > 0, "source commit timestamp is invalid");
 
+run("cargo", ["fetch", "--locked", "--manifest-path", resolve(cliRoot, "Cargo.toml")]);
+
 run(
   "cargo",
   [
