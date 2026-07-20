@@ -19,13 +19,14 @@ model, room records, and host-authority rules. A room may contain either client.
 - Encrypted chat, presence, active-host indication, reconnect, and replay.
 - Codex proposals from room members with explicit active-host approval.
 - Host-local Codex app-server execution and compatibility checks.
+- Authenticated host handoff with explicit candidate approval.
 - Shared assistant messages and bounded normalized activity.
 - Host-local approval of supported privileged Codex requests.
 - Atomic encrypted state, bounded encrypted history, and crash recovery.
 - Apple-silicon macOS packaging independent of the desktop release.
 
-Browser, shared-terminal, file-editor, attachment, rich-diff, goals, thread-graph,
-host-handoff, unattended-bot, Linux, Windows, and Homebrew surfaces are not part
+Browser, shared-terminal, file-editor, attachment, rich-diff, goals,
+thread-graph, unattended-bot, Linux, Windows, and Homebrew surfaces are not part
 of this alpha. Unsupported desktop records render as bounded placeholders where
 appropriate instead of breaking the room.
 
@@ -110,6 +111,40 @@ host safely cancels an active turn.
 The host preview includes the proposer, task, room/project association, context
 extent, effective model, reasoning effort, service tier, and sandbox policy.
 There is no global `--yes` or unattended-host mode.
+
+## Host handoff
+
+The desktop and CLI follow the same authenticated host-handoff state machine.
+In an open CLI room, `/handoff offer` creates an offer and `/handoff status`
+reports its current state. A candidate uses `/handoff request <offer-id>` and
+selects a canonical local project through a trusted terminal prompt. The
+outgoing host uses `/handoff approve <offer-id>` only after reviewing the exact
+candidate user, device, and MLS leaf. The transfer completes when the incoming
+member applies the authenticated MLS commit that binds that candidate and offer
+id and the relay atomically records the new host device.
+
+Encrypted chat and authority convergence remain live during that transition.
+The incoming CLI host must exit and reopen the room before hosting Codex. This
+deliberately initializes a fresh host-local Codex controller from the selected
+project and the incoming device's own account and policy rather than continuing
+an outgoing process or session in place.
+
+The encrypted room supplies authenticated collaboration context, not authority
+over either participant's local filesystem. Codex credentials, relay or GitHub
+sessions, browser and terminal sessions, processes, approvals, and project
+directories do not transfer. The incoming host must use its own local accounts,
+select and validate its own project, and review pending work under its own
+policy. A Git patch received from a desktop host remains inert, review-only
+context: `/handoff apply <offer-id>` fails closed because the alpha has no
+trusted CLI patch-application adapter. Applying a reviewed patch requires a
+separate trusted local workflow. Losing host authority cancels host-local work
+still running on the outgoing device.
+
+The authority change is prospective. It prevents the old host from authorizing
+future commits after the transfer, but cannot erase plaintext, credentials,
+history secrets, exports, or external capabilities that device already
+retained. See the accepted [host-handoff decision](../decisions/host-handoff.md)
+for the protocol and recovery invariants.
 
 ## Shared and private data
 

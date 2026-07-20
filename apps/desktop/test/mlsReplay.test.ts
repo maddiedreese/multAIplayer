@@ -26,6 +26,21 @@ test("skips exact-local MLS application replay without invoking native receive",
   assert.equal(recovered, false);
 });
 
+test("skips an exact-local admission commit replay without invoking native receive", async () => {
+  let recovered = false;
+  assert.equal(
+    await handleExactLocalMlsReplay(
+      { ...application, id: "admission-commit-local", messageType: "commit", epochHint: 0 },
+      { userId: "user-local", deviceId: "device-local" },
+      () => {
+        recovered = true;
+      }
+    ),
+    true
+  );
+  assert.equal(recovered, false);
+});
+
 test("retains authenticated host-handoff recovery for an exact-local commit", async () => {
   const handoff: MlsRelayMessage = {
     ...application,

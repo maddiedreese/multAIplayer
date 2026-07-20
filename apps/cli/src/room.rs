@@ -19,6 +19,7 @@ use serde_json::json;
 use std::{
     fmt, fs,
     path::{Path, PathBuf},
+    process::Command,
     time::Duration,
 };
 use thiserror::Error;
@@ -46,8 +47,8 @@ pub enum RoomError {
     CreationPending,
     #[error("The room requires an explicit rejoin or recovery.")]
     RequiresRejoin,
-    #[error("Host handoff is not supported by this CLI version.")]
-    HostHandoffUnsupported,
+    #[error("Host authority changed but this device has no approved local project association.")]
+    HostProjectRequired,
     #[error("The relay room operation failed.")]
     RelayUnavailable,
 }
@@ -558,7 +559,7 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
                 || room.active_host_device_id.as_deref() != Some(self.device_id)
                 || room.accepted_mls_epoch != Some(0)
             {
-                return Err(RoomError::HostHandoffUnsupported);
+                return Err(RoomError::HostProjectRequired);
             }
         } else {
             let device_session = self.backend.establish_device_session()?;
@@ -618,9 +619,8 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
         let is_active_host = room.host_status == HostStatus::Active
             && room.host_user_id.as_deref() == Some(self.user_id)
             && room.active_host_device_id.as_deref() == Some(self.device_id);
-        let created_as_host = association.project_path.is_some();
-        if room.host_status == HostStatus::Active {
-            validate_cli_host_role(created_as_host, is_active_host)?;
+        if is_active_host && association.project_path.is_none() {
+            return Err(RoomError::HostProjectRequired);
         }
         Ok(OpenedRoom {
             is_active_host,
@@ -704,21 +704,18 @@ impl<'a, S: CredentialStore, B: RoomBackend, M: RoomMls> RoomService<'a, S, B, M
     }
 }
 
-fn validate_cli_host_role(created_as_host: bool, is_active_host: bool) -> Result<(), RoomError> {
-    if created_as_host != is_active_host {
-        return Err(RoomError::HostHandoffUnsupported);
-    }
-    Ok(())
-}
-
-/// Debug-only adapter for the required cross-client handoff rejection journey.
+/// Debug-only adapter retained for the mixed-client authority journey.
 #[cfg(debug_assertions)]
 #[doc(hidden)]
 pub fn interoperability_validate_cli_host_role(
-    created_as_host: bool,
+    has_local_project: bool,
     is_active_host: bool,
 ) -> Result<(), RoomError> {
-    validate_cli_host_role(created_as_host, is_active_host)
+    if is_active_host && !has_local_project {
+        Err(RoomError::HostProjectRequired)
+    } else {
+        Ok(())
+    }
 }
 
 pub fn record_joined_room_association(
@@ -742,8 +739,8 @@ pub fn record_joined_room_association(
         .iter_mut()
         .find(|association| association.room_id.as_deref() == Some(room.id.as_str()))
     {
-        if existing.project_path.is_some() || existing.forget_pending {
-            return Err(RoomError::HostHandoffUnsupported);
+        if existing.forget_pending {
+            return Err(RoomError::LocalStateUnavailable);
         }
         existing.team_id = room.team_id.clone();
         existing.room_name = room.name.clone();
@@ -764,6 +761,76 @@ pub fn record_joined_room_association(
         forget_pending: false,
     });
     save_stored_room_state(store, &state)
+}
+
+pub fn bind_handoff_project_association(
+    store: &impl CredentialStore,
+    user_id: &str,
+    device_id: &str,
+    relay_origin: &str,
+    room_id: &str,
+    project: &str,
+) -> Result<PathBuf, RoomError> {
+    let canonical = canonical_project(project)?;
+    let mut state = load_stored_room_state(store, user_id, device_id, relay_origin)?;
+    let association = state
+        .associations
+        .iter_mut()
+        .find(|association| association.room_id.as_deref() == Some(room_id))
+        .filter(|association| {
+            association.complete && !association.left && !association.forget_pending
+        })
+        .ok_or(RoomError::LocalStateUnavailable)?;
+    association.project_path = Some(canonical.clone());
+    save_stored_room_state(store, &state)?;
+    Ok(PathBuf::from(canonical))
+}
+
+pub fn bind_handoff_project_for_offer(
+    store: &impl CredentialStore,
+    user_id: &str,
+    device_id: &str,
+    relay_origin: &str,
+    room_id: &str,
+    project: &str,
+    expected_repo: Option<(&str, &str)>,
+) -> Result<PathBuf, RoomError> {
+    let canonical = canonical_project(project)?;
+    if let Some((owner, repo)) = expected_repo {
+        let output = Command::new("git")
+            .args(["-C", canonical.as_str(), "remote", "get-url", "origin"])
+            .output()
+            .map_err(|_| RoomError::InvalidProject)?;
+        if !output.status.success() || output.stdout.len() > 4_096 {
+            return Err(RoomError::InvalidProject);
+        }
+        let remote = std::str::from_utf8(&output.stdout).map_err(|_| RoomError::InvalidProject)?;
+        let actual = github_repo_identity(remote.trim()).ok_or(RoomError::InvalidProject)?;
+        if !actual.0.eq_ignore_ascii_case(owner) || !actual.1.eq_ignore_ascii_case(repo) {
+            return Err(RoomError::InvalidProject);
+        }
+    }
+    bind_handoff_project_association(store, user_id, device_id, relay_origin, room_id, &canonical)
+}
+
+fn github_repo_identity(remote: &str) -> Option<(String, String)> {
+    let path = if let Some(value) = remote.strip_prefix("git@github.com:") {
+        value
+    } else if let Some(value) = remote.strip_prefix("ssh://git@github.com/") {
+        value
+    } else if let Some(value) = remote.strip_prefix("https://github.com/") {
+        value
+    } else {
+        return None;
+    };
+    let path = path.strip_suffix(".git").unwrap_or(path).trim_matches('/');
+    let mut parts = path.split('/');
+    let owner = parts.next()?;
+    let repo = parts.next()?;
+    if owner.is_empty() || repo.is_empty() || parts.next().is_some() {
+        return None;
+    }
+    Some((owner.to_owned(), repo.to_owned()))
 }
 
 fn load_stored_room_state(
@@ -1410,7 +1477,7 @@ mod tests {
     }
 
     #[test]
-    fn open_revalidates_path_and_rejects_host_handoff() {
+    fn creator_remains_a_participant_after_host_handoff() {
         let project = std::env::temp_dir();
         let store = MemoryCredentialStore::default();
         let mut creator = FakeBackend::new(vec![workspace(vec![])]);
@@ -1423,14 +1490,15 @@ mod tests {
         foreign.active_host_device_id = Some("device_other".into());
         let mut backend = FakeBackend::new(vec![workspace(vec![foreign])]);
         let mut mls = FakeMls::default();
-        let result =
-            RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN).open("room-cli");
-        assert_eq!(result, Err(RoomError::HostHandoffUnsupported));
+        let result = RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN)
+            .open("room-cli")
+            .unwrap();
+        assert!(!result.is_active_host);
         assert_eq!(mls.opens, 1);
     }
 
     #[test]
-    fn joined_participant_opens_remote_host_without_a_project_and_rejects_handoff_to_cli() {
+    fn joined_participant_must_bind_a_canonical_project_before_becoming_host() {
         let store = MemoryCredentialStore::default();
         let mut remote = active_room();
         remote.host = "Desktop Host".into();
@@ -1449,12 +1517,88 @@ mod tests {
         handed_off.host = "CLI Participant".into();
         handed_off.host_user_id = Some(USER.into());
         handed_off.active_host_device_id = Some(DEVICE.into());
-        let mut backend = FakeBackend::new(vec![workspace(vec![handed_off])]);
+        let mut backend = FakeBackend::new(vec![workspace(vec![handed_off.clone()])]);
         let mut mls = FakeMls::default();
         assert_eq!(
             RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN).open("room-cli"),
-            Err(RoomError::HostHandoffUnsupported)
+            Err(RoomError::HostProjectRequired)
         );
+        bind_handoff_project_association(
+            &store,
+            USER,
+            DEVICE,
+            ORIGIN,
+            "room-cli",
+            std::env::temp_dir().to_str().unwrap(),
+        )
+        .unwrap();
+        let mut backend = FakeBackend::new(vec![workspace(vec![handed_off])]);
+        let mut mls = FakeMls::default();
+        assert!(
+            RoomService::new(&store, &mut backend, &mut mls, USER, DEVICE, ORIGIN)
+                .open("room-cli")
+                .unwrap()
+                .is_active_host
+        );
+    }
+
+    #[test]
+    fn handoff_project_repo_binding_rejects_mismatch_and_accepts_exact_origin() {
+        assert_eq!(
+            github_repo_identity("git@github.com:Example/Project.git"),
+            Some(("Example".into(), "Project".into()))
+        );
+        assert_eq!(
+            github_repo_identity("https://evil.example/Example/Project"),
+            None
+        );
+        let store = MemoryCredentialStore::default();
+        let mut remote = active_room();
+        remote.host_user_id = Some("github:desktop-host".into());
+        remote.active_host_device_id = Some("device-desktop".into());
+        record_joined_room_association(&store, USER, DEVICE, ORIGIN, &remote).unwrap();
+        let directory = JourneyDirectory::new();
+        let repository = directory.0.join("repository");
+        fs::create_dir(&repository).unwrap();
+        assert!(Command::new("git")
+            .args(["-C", repository.to_str().unwrap(), "init"])
+            .status()
+            .unwrap()
+            .success());
+        assert!(Command::new("git")
+            .args([
+                "-C",
+                repository.to_str().unwrap(),
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/example/project.git",
+            ])
+            .status()
+            .unwrap()
+            .success());
+        assert_eq!(
+            bind_handoff_project_for_offer(
+                &store,
+                USER,
+                DEVICE,
+                ORIGIN,
+                &remote.id,
+                repository.to_str().unwrap(),
+                Some(("not-the-owner", "not-the-repo")),
+            ),
+            Err(RoomError::InvalidProject)
+        );
+        assert!(bind_handoff_project_for_offer(
+            &store,
+            USER,
+            DEVICE,
+            ORIGIN,
+            &remote.id,
+            repository.to_str().unwrap(),
+            Some(("example", "project")),
+        )
+        .is_ok());
     }
 
     struct RecordingLoopbackHttp {

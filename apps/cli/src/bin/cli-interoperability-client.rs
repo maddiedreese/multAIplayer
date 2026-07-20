@@ -49,6 +49,14 @@ mod debug_client {
         PublishSucceeded {
             message_id: String,
         },
+        TransferHost {
+            next_host_user_id: String,
+            next_host_device_id: String,
+        },
+        AuthorizeTransfer {
+            commit_message_id: String,
+        },
+        GroupSnapshot,
         Encrypt {
             message_id: String,
             payload: String,
@@ -176,6 +184,36 @@ mod debug_client {
                         .mls
                         .interoperability_publish_succeeded(&self.room_id, &message_id)?,
                 })),
+                Command::TransferHost {
+                    next_host_user_id,
+                    next_host_device_id,
+                } => {
+                    let output = self.mls.interoperability_transfer_host(
+                        &self.room_id,
+                        &next_host_user_id,
+                        &next_host_device_id,
+                        "integration-handoff",
+                    )?;
+                    Ok(
+                        json!({ "message": STANDARD.encode(output.message), "messageId": output.outbox_id, "parentEpoch": output.parent_epoch }),
+                    )
+                }
+                Command::AuthorizeTransfer { commit_message_id } => {
+                    let (authorization, signature) =
+                        self.mls.interoperability_authorize_host_transfer(
+                            &self.room_id,
+                            &commit_message_id,
+                        )?;
+                    Ok(
+                        json!({ "authorization": authorization, "signature": STANDARD.encode(signature.signature_der), "publicKey": STANDARD.encode(signature.public_key_spki_der) }),
+                    )
+                }
+                Command::GroupSnapshot => {
+                    let state = self.mls.group_snapshot(&self.room_id)?;
+                    Ok(
+                        json!({ "epoch": state.epoch, "hostLeaf": state.host_leaf, "hostDeviceId": state.host_device_id, "hostTransferId": state.host_transfer_id }),
+                    )
+                }
                 Command::Encrypt {
                     message_id,
                     payload,

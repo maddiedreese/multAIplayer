@@ -349,6 +349,19 @@ async function createAndActivateRoom(
   return body.room;
 }
 
+async function verifyCliHostRoleTransition(host: NativeClient, guest: NativeClient) {
+  const cli = host.kind === "cli" ? host : guest;
+  if (host.kind === "cli") {
+    await cli.command({ command: "validateHostRole", createdAsHost: true, isActiveHost: false });
+    return;
+  }
+  await assert.rejects(
+    cli.command({ command: "validateHostRole", createdAsHost: false, isActiveHost: true }),
+    /no approved local project association/
+  );
+  await cli.command({ command: "validateHostRole", createdAsHost: true, isActiveHost: true });
+}
+
 async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
   const stateRoot = await mkdtemp(join(tmpdir(), "multaiplayer-cross-client-"));
   const provisionalRoomId = `room-cross-${randomUUID()}`;
@@ -385,15 +398,7 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
     const roomId = activeRoom.id;
     await guest.command({ command: "setRoom", roomId });
 
-    const cli = host.kind === "cli" ? host : guest;
-    await assert.rejects(
-      cli.command({
-        command: "validateHostRole",
-        createdAsHost: host.kind === "cli",
-        isActiveHost: host.kind !== "cli"
-      }),
-      /Host handoff is not supported by this CLI version/
-    );
+    await verifyCliHostRoleTransition(host, guest);
 
     const keyPackage = await guest.command<{ keyPackage: string }>({ command: "generateKeyPackage" });
     const admission = await host.command<{
@@ -718,6 +723,156 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
   }
 }
 
+async function runHandoffJourney(hostKind: ClientKind, guestKind: ClientKind) {
+  const stateRoot = await mkdtemp(join(tmpdir(), "multaiplayer-handoff-"));
+  const provisionalRoomId = `room-handoff-${randomUUID()}`;
+  const host = await NativeClient.start(
+    hostKind,
+    `github:${hostKind}-handoff-host-${randomUUID()}`,
+    `${hostKind} host`,
+    provisionalRoomId,
+    stateRoot
+  );
+  const guest = await NativeClient.start(
+    guestKind,
+    `github:${guestKind}-handoff-guest-${randomUUID()}`,
+    `${guestKind} guest`,
+    provisionalRoomId,
+    stateRoot
+  );
+  const relay = await startRelayWithWorkspace({}, workspace(host.identity, guest.identity));
+  const hostSocket = new WebSocket(relay.wsUrl);
+  const guestSocket = new WebSocket(relay.wsUrl);
+  try {
+    await Promise.all([onceOpen(hostSocket), onceOpen(guestSocket)]);
+    const [hostAuth, guestAuth] = await Promise.all([
+      authenticate(relay.baseUrl, host),
+      authenticate(relay.baseUrl, guest)
+    ]);
+    const room = await createAndActivateRoom(relay.baseUrl, host, hostAuth, hostSocket, `${hostKind} handoff room`);
+    await guest.command({ command: "setRoom", roomId: room.id });
+    const keyPackage = await guest.command<{ keyPackage: string }>({ command: "generateKeyPackage" });
+    const admission = await host.command<{
+      commit: string;
+      commitOutboxId: string;
+      parentEpoch: number;
+      welcome: string;
+    }>({ command: "addMember", keyPackage: keyPackage.keyPackage });
+    await publish(hostSocket, {
+      id: admission.commitOutboxId,
+      teamId: "team-core",
+      roomId: room.id,
+      senderUserId: host.identity.userId,
+      senderDeviceId: host.identity.deviceId,
+      createdAt: new Date().toISOString(),
+      messageType: "commit",
+      epochHint: admission.parentEpoch,
+      mlsMessage: admission.commit
+    });
+    await host.command({ command: "publishSucceeded", messageId: admission.commitOutboxId });
+    await guest.command({ command: "joinWelcome", welcome: admission.welcome });
+    await joinRoom(guestSocket, guest, guestAuth.token, room.id);
+
+    const transfer = await host.command<{ message: string; messageId: string; parentEpoch: number }>({
+      command: "transferHost",
+      nextHostUserId: guest.identity.userId,
+      nextHostDeviceId: guest.identity.deviceId
+    });
+    const authorization = await host.command<{
+      authorization: Record<string, unknown>;
+      signature: string;
+      publicKey: string;
+    }>({ command: "authorizeTransfer", commitMessageId: transfer.messageId });
+    const delivered = waitForMessage(
+      guestSocket,
+      (value) => value.type === "mls.message" && (value.message as { id?: string })?.id === transfer.messageId
+    );
+    const updated = waitForMessage(
+      guestSocket,
+      (value) =>
+        value.type === "room.updated" &&
+        (value.room as { id?: string; activeHostDeviceId?: string })?.id === room.id &&
+        (value.room as { activeHostDeviceId?: string }).activeHostDeviceId === guest.identity.deviceId
+    );
+    await publish(hostSocket, {
+      id: transfer.messageId,
+      teamId: "team-core",
+      roomId: room.id,
+      senderUserId: host.identity.userId,
+      senderDeviceId: host.identity.deviceId,
+      createdAt: new Date().toISOString(),
+      messageType: "commit",
+      epochHint: transfer.parentEpoch,
+      mlsMessage: transfer.message,
+      commitEffect: "host_handoff",
+      nextHostUserId: guest.identity.userId,
+      nextHostDeviceId: guest.identity.deviceId,
+      hostTransferAuthorization: {
+        ...authorization.authorization,
+        signatureDer: authorization.signature,
+        publicKeySpkiDer: authorization.publicKey
+      }
+    });
+    await host.command({ command: "publishSucceeded", messageId: transfer.messageId });
+    await guest.command({ command: "process", message: mlsMessage(await delivered).mlsMessage });
+    await updated;
+    for (const client of [host, guest]) {
+      if (client.kind !== "cli") continue;
+      const state = await client.command<{ hostDeviceId: string; hostTransferId: string | null }>({
+        command: "groupSnapshot"
+      });
+      assert.equal(state.hostDeviceId, guest.identity.deviceId);
+      assert.equal(state.hostTransferId, "integration-handoff");
+    }
+
+    for (const [sender, senderSocket, receiver, receiverSocket, body] of [
+      [guest, guestSocket, host, hostSocket, "successor to former host"],
+      [host, hostSocket, guest, guestSocket, "former host to successor"]
+    ] as const) {
+      const chat = {
+        id: `chat-${randomUUID()}`,
+        author: sender.identity.displayName,
+        authorUserId: sender.identity.userId,
+        role: "human",
+        body,
+        time: "12:05 PM",
+        createdAt: new Date().toISOString()
+      };
+      const opened = await sendApplication({
+        sender,
+        senderSocket,
+        receiver,
+        receiverSocket,
+        roomId: room.id,
+        kind: "chat.message",
+        payload: chat,
+        id: chat.id
+      });
+      assert.deepEqual(ChatPlaintextPayload.parse(opened.payload), chat);
+    }
+    await assert.rejects(
+      host.command({
+        command: "transferHost",
+        nextHostUserId: guest.identity.userId,
+        nextHostDeviceId: guest.identity.deviceId
+      }),
+      /not active MLS host|not host|requires active host|MLS state store is unavailable/i
+    );
+    const successorCommit = await guest.command<{ messageId: string }>({
+      command: "transferHost",
+      nextHostUserId: host.identity.userId,
+      nextHostDeviceId: host.identity.deviceId
+    });
+    assert.ok(successorCommit.messageId);
+  } finally {
+    hostSocket.close();
+    guestSocket.close();
+    await Promise.allSettled([host.close(), guest.close()]);
+    await relay.close();
+    await rm(stateRoot, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   requireCliBinary();
   await execFileAsync(
@@ -740,6 +895,9 @@ async function main() {
   await runJourney("cli", "cli");
   await runJourney("cli", "desktop");
   await runJourney("desktop", "cli");
+  await runHandoffJourney("cli", "cli");
+  await runHandoffJourney("cli", "desktop");
+  await runHandoffJourney("desktop", "cli");
   process.stdout.write("Mixed-client matrix passed (CLI/CLI, CLI/desktop, desktop/CLI).\n");
 }
 

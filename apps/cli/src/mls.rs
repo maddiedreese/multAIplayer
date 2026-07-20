@@ -12,13 +12,13 @@ use mls_core::{
     derive_capability_verifier, encode_capability_binding, generate_device_signing_secret,
     issue_capability, mac_binding, mac_response_binding, open, seal, validate_key_package_upload,
     verify_request_binding, verify_response_binding, ApplicationAuthenticatedData,
-    ApplicationAuthenticatedDataInput, BasicAppCredential, CapabilityBinding, EncryptedStore,
-    EngineError, JoinAdmissionMetadata, KeyPackageUpload, MlsEngine, OutboxItem, OutboxMetadata,
-    PendingInviteRequest, SealedPayload, StoreError, WelcomeRetryMetadata,
+    ApplicationAuthenticatedDataInput, BasicAppCredential, CapabilityBinding, DeviceAuthSigner,
+    EncryptedStore, EngineError, JoinAdmissionMetadata, KeyPackageUpload, MlsEngine, OutboxItem,
+    OutboxMetadata, PendingInviteRequest, SealedPayload, StoreError, WelcomeRetryMetadata,
 };
 use multaiplayer_protocol::{
-    MlsMessageType, MlsRelayMessage, RelayClientMessage, RelayErrorCode, RelayServerMessage,
-    Validate,
+    CommitEffect, HostTransferAuthorization, MlsMessageType, MlsRelayMessage, RelayClientMessage,
+    RelayErrorCode, RelayServerMessage, Validate,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
@@ -70,6 +70,23 @@ pub struct DrainReport {
 pub struct OpenedApplication {
     pub authenticated_data: ApplicationAuthenticatedData,
     pub payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MlsGroupSnapshot {
+    pub roster: Vec<(u64, String, String)>,
+    pub self_leaf: u64,
+    pub epoch: u64,
+    pub host_leaf: u64,
+    pub host_device_id: String,
+    pub host_transfer_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PreparedHostTransfer {
+    pub message_id: String,
+    pub parent_epoch: u64,
+    pub relay_message: MlsRelayMessage,
 }
 
 const INVITE_CAPABILITY_ACCOUNT_PREFIX: &str = "invite-capability:v1:";
@@ -313,6 +330,7 @@ pub struct MlsClientService {
     user_id: String,
     device_id: String,
     requires_rejoin: BTreeSet<String>,
+    host_transfer_signer: DeviceAuthSigner,
 }
 
 impl MlsClientService {
@@ -350,6 +368,12 @@ impl MlsClientService {
             user_id: identity.public.user_id.clone(),
             device_id: identity.public.device_id.clone(),
             requires_rejoin: BTreeSet::new(),
+            host_transfer_signer: DeviceAuthSigner::from_secret(
+                identity.mls_signing_secret().to_vec(),
+                identity.public.user_id.clone(),
+                identity.public.device_id.clone(),
+            )
+            .map_err(|_| MlsClientError::StorageUnavailable)?,
         })
     }
 
@@ -377,6 +401,146 @@ impl MlsClientService {
             }
             Err(error) => Err(error),
         }
+    }
+
+    pub fn group_snapshot(&self, room_id: &str) -> Result<MlsGroupSnapshot, MlsClientError> {
+        let host = self
+            .engine
+            .host_context(room_id)
+            .map_err(map_engine_error)?;
+        let roster = self
+            .engine
+            .roster(room_id)
+            .map_err(map_engine_error)?
+            .into_iter()
+            .map(|member| {
+                (
+                    u64::from(member.leaf),
+                    member.credential.github_user_id,
+                    member.credential.device_id,
+                )
+            })
+            .collect();
+        Ok(MlsGroupSnapshot {
+            roster,
+            self_leaf: u64::from(self.engine.self_leaf(room_id).map_err(map_engine_error)?),
+            epoch: self
+                .engine
+                .current_epoch(room_id)
+                .map_err(map_engine_error)?,
+            host_leaf: u64::from(host.host_leaf),
+            host_device_id: host.host_device_id,
+            host_transfer_id: host.transfer_id,
+        })
+    }
+
+    pub fn prepare_host_transfer(
+        &mut self,
+        route: &OutboxRoute,
+        next_leaf: u64,
+        next_device_id: &str,
+        transfer_id: &str,
+        created_at: &str,
+    ) -> Result<PreparedHostTransfer, MlsClientError> {
+        let next_leaf = u32::try_from(next_leaf).map_err(|_| MlsClientError::InvalidOutbox)?;
+        let commit = self
+            .engine
+            .transfer_host(
+                &route.room_id,
+                next_leaf,
+                next_device_id.to_owned(),
+                transfer_id.to_owned(),
+            )
+            .map_err(map_engine_error)?;
+        let authorization = self
+            .engine
+            .host_transfer_authorization(&route.room_id, &commit.outbox_id)
+            .map_err(map_engine_error)?;
+        let canonical =
+            serde_json::to_vec(&authorization).map_err(|_| MlsClientError::InvalidOutbox)?;
+        let signed = self
+            .host_transfer_signer
+            .sign_host_transfer(&canonical)
+            .map_err(|_| MlsClientError::InvalidOutbox)?;
+        let next_user_id = authorization.next_host_user_id.clone();
+        let auth = HostTransferAuthorization {
+            version: authorization.version,
+            transfer_id: authorization.transfer_id,
+            room_id: authorization.room_id,
+            commit_message_id: authorization.commit_message_id,
+            parent_epoch: authorization.parent_epoch,
+            outgoing_host_user_id: authorization.outgoing_host_user_id,
+            outgoing_host_device_id: authorization.outgoing_host_device_id,
+            next_host_user_id: authorization.next_host_user_id,
+            next_host_device_id: authorization.next_host_device_id,
+            next_host_leaf: u64::from(authorization.next_host_leaf),
+            signature_der: STANDARD.encode(signed.signature_der),
+            public_key_spki_der: STANDARD.encode(signed.public_key_spki_der),
+        };
+        let relay_message = MlsRelayMessage {
+            id: commit.outbox_id.clone(),
+            team_id: route.team_id.clone(),
+            room_id: route.room_id.clone(),
+            sender_device_id: self.device_id.clone(),
+            sender_user_id: self.user_id.clone(),
+            created_at: created_at.to_owned(),
+            message_type: MlsMessageType::Commit,
+            epoch_hint: commit.parent_epoch,
+            mls_message: STANDARD.encode(commit.message),
+            commit_effect: Some(CommitEffect::HostHandoff),
+            next_host_user_id: Some(next_user_id),
+            next_host_device_id: Some(next_device_id.to_owned()),
+            host_transfer_authorization: Some(auth),
+        };
+        relay_message
+            .validate()
+            .map_err(|_| MlsClientError::InvalidOutbox)?;
+        Ok(PreparedHostTransfer {
+            message_id: commit.outbox_id,
+            parent_epoch: commit.parent_epoch,
+            relay_message,
+        })
+    }
+
+    pub fn mark_host_transfer_published(
+        &mut self,
+        room_id: &str,
+        message_id: &str,
+    ) -> Result<u64, MlsClientError> {
+        self.engine
+            .publish_succeeded(room_id, message_id)
+            .map_err(map_engine_error)
+    }
+
+    pub fn recover_exact_local_host_transfer(
+        &mut self,
+        room_id: &str,
+        message_id: &str,
+    ) -> Result<Option<u64>, MlsClientError> {
+        let pending = self
+            .store
+            .pending_outbox()
+            .map_err(map_store_error)?
+            .into_iter()
+            .any(|item| item.id == message_id && item.room_id == room_id && item.kind == "handoff");
+        if pending {
+            self.engine
+                .publish_succeeded(room_id, message_id)
+                .map(Some)
+                .map_err(map_engine_error)
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn clear_host_transfer(
+        &mut self,
+        room_id: &str,
+        message_id: &str,
+    ) -> Result<u64, MlsClientError> {
+        self.engine
+            .clear_pending_commit(room_id, message_id)
+            .map_err(map_engine_error)
     }
 
     /// Test-only compatibility boundary used by the mixed desktop/CLI journey.
@@ -436,6 +600,61 @@ impl MlsClientService {
         self.engine
             .publish_succeeded(room_id, message_id)
             .map_err(map_engine_error)
+    }
+
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub fn interoperability_transfer_host(
+        &mut self,
+        room_id: &str,
+        next_user_id: &str,
+        next_device_id: &str,
+        transfer_id: &str,
+    ) -> Result<mls_core::OutboundCommit, MlsClientError> {
+        let next = self
+            .engine
+            .roster(room_id)
+            .map_err(map_engine_error)?
+            .into_iter()
+            .find(|member| {
+                member.credential.github_user_id == next_user_id
+                    && member.credential.device_id == next_device_id
+            })
+            .ok_or(MlsClientError::InvalidOutbox)?;
+        self.engine
+            .transfer_host(
+                room_id,
+                next.leaf,
+                next_device_id.into(),
+                transfer_id.into(),
+            )
+            .map_err(map_engine_error)
+    }
+
+    #[cfg(debug_assertions)]
+    #[doc(hidden)]
+    pub fn interoperability_authorize_host_transfer(
+        &self,
+        room_id: &str,
+        message_id: &str,
+    ) -> Result<
+        (
+            mls_core::HostTransferAuthorizationPayload,
+            mls_core::DeviceAuthSignature,
+        ),
+        MlsClientError,
+    > {
+        let authorization = self
+            .engine
+            .host_transfer_authorization(room_id, message_id)
+            .map_err(map_engine_error)?;
+        let canonical =
+            serde_json::to_vec(&authorization).map_err(|_| MlsClientError::InvalidOutbox)?;
+        let signature = self
+            .host_transfer_signer
+            .sign_host_transfer(&canonical)
+            .map_err(|_| MlsClientError::InvalidOutbox)?;
+        Ok((authorization, signature))
     }
 
     /// Encrypts and durably queues one application record using the existing MLS

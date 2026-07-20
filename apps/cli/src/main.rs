@@ -16,12 +16,15 @@ use multaiplayer_cli::{
         ReconnectPolicy, RelayConnector, RetrySleeper, ThreadSleeper, TungsteniteConnector,
         WorkspaceClient, WorkspaceSnapshot,
     },
-    room::{opened_room_message, CreateRoomRequest, RelayRoomBackend, RoomService},
+    room::{
+        bind_handoff_project_for_offer, opened_room_message, CreateRoomRequest, RelayRoomBackend,
+        RoomService,
+    },
     GITHUB_CLIENT_ID, RELAY_HTTP_ORIGIN,
 };
 use multaiplayer_protocol::{
     ChatPlaintextPayload, CodexEventPlaintextPayload, CodexQueueAction, CodexQueuePlaintextPayload,
-    CodexTurnStatus, RoomRecord,
+    CodexTurnStatus, HostHandoffPlaintextPayload, HostHandoffReason, HostHandoffStatus, RoomRecord,
 };
 use std::{
     collections::BTreeSet,
@@ -40,6 +43,7 @@ use zeroize::Zeroizing;
 
 const MAX_INVITE_CODE_BYTES: u64 = 12_288;
 const ADMISSION_WAIT_LIMIT: Duration = Duration::from_secs(300);
+type HandoffProjectBinder<'a> = dyn FnMut(&str, Option<(&str, &str)>) -> Result<PathBuf, ()> + 'a;
 
 /// Writes user-facing command output without treating it as diagnostic logging.
 /// Callers must render and sanitize untrusted fields before crossing this boundary.
@@ -68,8 +72,11 @@ const HELP: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     "\n\n",
     "Usage: multAIplayer [OPTIONS]\n",
+    "       multAIplayer walkthrough\n",
     "       multAIplayer auth <COMMAND>\n",
     "       multAIplayer room <COMMAND>\n\n",
+    "Getting started:\n",
+    "  walkthrough     Show the login-to-chat walkthrough again\n\n",
     "Auth commands:\n",
     "  login [--open]  Sign in with GitHub's device flow\n",
     "  status          Restore and report the current relay session\n",
@@ -81,7 +88,7 @@ const HELP: &str = concat!(
     "  open <ROOM> [--plain]\n",
     "                  Open a locally associated room and enter encrypted chat\n\n",
     "                  In-room: @codex <TASK>, /approve <ID>, /deny <ID>,\n",
-    "                  /respond <REQUEST-ID> <JSON>, /quit\n\n",
+    "                  /respond <REQUEST-ID> <JSON>, /handoff status, /quit\n\n",
     "  leave <ROOM>    Leave locally while retaining encrypted room data\n",
     "  forget <ROOM>   Destructively forget local association and history\n",
     "  invite <ROOM>   Create and display a secret invite code\n",
@@ -95,12 +102,34 @@ const HELP: &str = concat!(
     "  -h, --help       Print help\n",
     "  -V, --version    Print version\n",
 );
+const WALKTHROUGH: &str = concat!(
+    "\nGetting started with multAIplayer\n\n",
+    "1. Check your sign-in and see your rooms:\n",
+    "   multAIplayer auth status\n",
+    "   multAIplayer room list\n\n",
+    "2. Create a room, or join one you were invited to:\n",
+    "   multAIplayer room create --name \"Project room\" --project /path/to/project\n",
+    "   multAIplayer room join\n",
+    "   Joining reads the secret invite code from stdin; never put it in a command argument.\n\n",
+    "3. Invite and admit someone as the host:\n",
+    "   multAIplayer room invite <ROOM>\n",
+    "   multAIplayer room admissions <ROOM> <INVITE-ID>\n",
+    "   Share only the secret invite code. Keep the displayed invite ID for admissions.\n\n",
+    "4. Open encrypted chat:\n",
+    "   multAIplayer room open <ROOM>\n",
+    "   Type a message, use @codex <task> to propose work, or /quit to leave chat.\n",
+    "   Use /handoff status to see host-transfer offers and /handoff offer as host.\n",
+    "   A candidate requests with /handoff request <OFFER-ID>; approval always stays with the host.\n\n",
+    "Run 'multAIplayer walkthrough' anytime to see this again.\n",
+    "Run 'multAIplayer --help' for all commands.\n",
+);
 const VERSION: &str = concat!("multAIplayer ", env!("CARGO_PKG_VERSION"), "\n");
 const UNSUPPORTED: &str = "error: unsupported arguments\n\nRun 'multAIplayer --help' for usage.\n";
 
 #[derive(Debug, Eq, PartialEq)]
 enum Command {
     Help,
+    Walkthrough,
     Version,
     AuthLogin { open: bool },
     AuthStatus,
@@ -126,6 +155,7 @@ where
     match args.as_slice() {
         [] => Ok(Command::Help),
         [arg] if matches!(arg.as_ref(), "-h" | "--help") => Ok(Command::Help),
+        [arg] if arg.as_ref() == "walkthrough" => Ok(Command::Walkthrough),
         [arg] if matches!(arg.as_ref(), "-V" | "--version") => Ok(Command::Version),
         [auth, login] if auth.as_ref() == "auth" && login.as_ref() == "login" => {
             Ok(Command::AuthLogin { open: false })
@@ -257,6 +287,10 @@ fn main() -> ExitCode {
             print!("{HELP}");
             ExitCode::SUCCESS
         }
+        Ok(Command::Walkthrough) => {
+            print!("{WALKTHROUGH}");
+            ExitCode::SUCCESS
+        }
         Ok(Command::Version) => {
             print!("{VERSION}");
             ExitCode::SUCCESS
@@ -294,6 +328,11 @@ enum RoomLoopDirective {
     Approve(String),
     Deny(String),
     Respond(String, serde_json::Value),
+    HandoffOffer,
+    HandoffRequest { offer_id: String, project: String },
+    HandoffApprove(String),
+    HandoffStatus,
+    HandoffApply(String),
     Quit,
 }
 
@@ -309,6 +348,12 @@ trait RoomLoopAdapter {
     fn trusted_codex_request(&mut self, _request: &PrivilegedRequestPrompt) -> Result<(), ()> {
         Ok(())
     }
+    fn trusted_handoff_approval(
+        &mut self,
+        _offer: &HostHandoffPlaintextPayload,
+    ) -> Result<bool, ()> {
+        Ok(false)
+    }
     fn complete(&self, projected_chat_count: usize) -> Result<bool, ()>;
 }
 
@@ -316,6 +361,7 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
     chat: &mut RecoveringChatRoomSession<'_, C, R>,
     adapter: &mut impl RoomLoopAdapter,
     mut codex: Option<&mut CodexRoomController>,
+    mut bind_project: Option<&mut HandoffProjectBinder<'_>>,
 ) -> Result<(), ()> {
     let mut projected_chat_count = 0;
     let joined_at = utc_timestamp().map_err(|_| ())?;
@@ -342,6 +388,9 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
                 | RoomLoopDirective::Approve(_)
                 | RoomLoopDirective::Deny(_)
                 | RoomLoopDirective::Respond(_, _)
+                | RoomLoopDirective::HandoffOffer
+                | RoomLoopDirective::HandoffRequest { .. }
+                | RoomLoopDirective::HandoffApprove(_)
         );
         let events = match directive {
             RoomLoopDirective::Quit => {
@@ -401,6 +450,78 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
                 .map_err(|_| {
                     eprintln!("room loop: privileged response failed safely");
                 })?,
+            RoomLoopDirective::HandoffOffer => {
+                let controller = codex.as_deref().ok_or(())?;
+                let created_at = utc_timestamp().map_err(|_| ())?;
+                let id = format!("handoff-{}", uuid::Uuid::new_v4());
+                let offer = controller.handoff_offer(&id, &created_at);
+                chat.publish_handoff_offer(&id, offer, &created_at)
+                    .map_err(|error| {
+                        eprintln!("room loop: handoff offer failed safely: {error}");
+                    })?
+            }
+            RoomLoopDirective::HandoffRequest { offer_id, project } => {
+                if let Some(offer) = chat.handoff_offer(&offer_id) {
+                    if chat.validate_handoff_request(&offer_id).is_err() {
+                        eprintln!("room loop: handoff request preconditions are not satisfied; local project was not changed");
+                        return Err(());
+                    }
+                    let expected_repo = match (
+                        offer.git_repo_owner.as_deref(),
+                        offer.git_repo_name.as_deref(),
+                    ) {
+                        (Some(owner), Some(name)) => Some((owner, name)),
+                        (None, None) => None,
+                        _ => {
+                            eprintln!("room loop: handoff repository identity is incomplete; local project was not changed");
+                            return Err(());
+                        }
+                    };
+                    bind_project.as_deref_mut().ok_or(())?(&project, expected_repo)?;
+                    let created_at = utc_timestamp().map_err(|_| ())?;
+                    chat.request_handoff(
+                        &offer_id,
+                        &format!("handoff-request-{}", uuid::Uuid::new_v4()),
+                        &created_at,
+                    )
+                    .map_err(|error| {
+                        eprintln!("room loop: handoff request failed safely: {error}")
+                    })?
+                } else {
+                    eprintln!(
+                        "room loop: handoff offer is unavailable; local project was not changed"
+                    );
+                    Vec::new()
+                }
+            }
+            RoomLoopDirective::HandoffApprove(offer_id) => {
+                let offer = chat.handoff_offer(&offer_id).ok_or(())?;
+                if !adapter.trusted_handoff_approval(&offer)? {
+                    eprintln!("room loop: handoff approval cancelled");
+                    Vec::new()
+                } else {
+                    let created_at = utc_timestamp().map_err(|_| ())?;
+                    chat.approve_handoff(&offer_id, &created_at)
+                        .map_err(|error| {
+                            eprintln!("room loop: handoff approval failed safely: {error}")
+                        })?
+                }
+            }
+            RoomLoopDirective::HandoffStatus => {
+                for offer in chat.handoff_offers() {
+                    println!(
+                        "[handoff] {} from {}: {:?}",
+                        safe_terminal_text(&offer.id),
+                        safe_terminal_text(&offer.from_host),
+                        offer.status
+                    );
+                }
+                Vec::new()
+            }
+            RoomLoopDirective::HandoffApply(offer_id) => {
+                eprintln!("handoff {}: patch application is unavailable in the CLI; review and apply the inert patch with the desktop app or Git tooling you trust", safe_terminal_text(&offer_id));
+                Vec::new()
+            }
             RoomLoopDirective::Wait => {
                 thread::sleep(Duration::from_millis(10));
                 Vec::new()
@@ -481,6 +602,29 @@ struct InteractiveRoomLoop {
     renderer: TerminalRenderer,
 }
 
+impl InteractiveRoomLoop {
+    fn trusted_handoff_project_path(&self, offer_id: &str) -> Result<String, ()> {
+        let prompt = self.renderer.trusted_prompt(&format!(
+            "Enter the local project path for handoff {}. This path stays on this Mac.",
+            safe_terminal_text(offer_id)
+        ));
+        write_trusted_terminal_prompt(&prompt)?;
+        let terminal = std::fs::OpenOptions::new()
+            .read(true)
+            .open("/dev/tty")
+            .map_err(|_| ())?;
+        let mut project = String::new();
+        std::io::BufReader::new(terminal)
+            .read_line(&mut project)
+            .map_err(|_| ())?;
+        let project = project.trim();
+        if project.is_empty() {
+            return Err(());
+        }
+        Ok(project.to_owned())
+    }
+}
+
 impl RoomLoopAdapter for InteractiveRoomLoop {
     fn directive(&mut self, _projected_chat_count: usize) -> Result<RoomLoopDirective, ()> {
         match self.receiver.try_recv() {
@@ -500,6 +644,25 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
                 let response = serde_json::from_str(response).map_err(|_| ())?;
                 Ok(RoomLoopDirective::Respond(request_key.to_owned(), response))
             }
+            Ok(Ok(line)) if line == "/handoff offer" => Ok(RoomLoopDirective::HandoffOffer),
+            Ok(Ok(line)) if line == "/handoff status" => Ok(RoomLoopDirective::HandoffStatus),
+            Ok(Ok(line)) if line.starts_with("/handoff approve ") => Ok(
+                RoomLoopDirective::HandoffApprove(line[18..].trim().to_owned()),
+            ),
+            Ok(Ok(line)) if line.starts_with("/handoff apply ") => Ok(
+                RoomLoopDirective::HandoffApply(line[16..].trim().to_owned()),
+            ),
+            Ok(Ok(line)) if line.starts_with("/handoff request ") => {
+                let offer_id = line[17..].trim();
+                if offer_id.is_empty() || offer_id.contains(char::is_whitespace) {
+                    return Err(());
+                }
+                let project = self.trusted_handoff_project_path(offer_id)?;
+                Ok(RoomLoopDirective::HandoffRequest {
+                    offer_id: offer_id.into(),
+                    project,
+                })
+            }
             Ok(Ok(line)) => Ok(RoomLoopDirective::Send(line)),
             Ok(Err(_)) | Err(TryRecvError::Disconnected) => Ok(RoomLoopDirective::Quit),
             Err(TryRecvError::Empty) => Ok(RoomLoopDirective::Idle),
@@ -518,6 +681,29 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
     fn trusted_codex_request(&mut self, request: &PrivilegedRequestPrompt) -> Result<(), ()> {
         let prompt = self.renderer.trusted_prompt(&request.trusted_text());
         write_trusted_terminal_prompt(&prompt)
+    }
+
+    fn trusted_handoff_approval(
+        &mut self,
+        offer: &HostHandoffPlaintextPayload,
+    ) -> Result<bool, ()> {
+        let user = offer.candidate_user_id.as_deref().ok_or(())?;
+        let device = offer.candidate_device_id.as_deref().ok_or(())?;
+        let leaf = offer.candidate_leaf.ok_or(())?;
+        let prompt = self.renderer.trusted_prompt(&format!(
+            "Transfer future host authority to exact candidate {} on device {} at MLS leaf {}? Type yes to approve.",
+            safe_terminal_text(user), safe_terminal_text(device), leaf
+        ));
+        write_trusted_terminal_prompt(&prompt)?;
+        let terminal = std::fs::OpenOptions::new()
+            .read(true)
+            .open("/dev/tty")
+            .map_err(|_| ())?;
+        let mut answer = String::new();
+        std::io::BufReader::new(terminal)
+            .read_line(&mut answer)
+            .map_err(|_| ())?;
+        Ok(answer.trim() == "yes")
     }
 
     fn complete(&self, _projected_chat_count: usize) -> Result<bool, ()> {
@@ -679,6 +865,45 @@ impl CodexRoomController {
 
     fn can_propose(&self) -> bool {
         self.machine.pending().is_none() && self.active.is_none()
+    }
+
+    fn handoff_offer(&self, id: &str, created_at: &str) -> HostHandoffPlaintextPayload {
+        HostHandoffPlaintextPayload {
+            id: id.into(),
+            from_host: self.host_name.clone(),
+            from_user_id: self.host_user_id.clone(),
+            reason: HostHandoffReason::Manual,
+            project_path: self.project_path.to_string_lossy().into_owned(),
+            git_remote_url: None,
+            git_repo_owner: None,
+            git_repo_name: None,
+            git_branch: None,
+            git_dirty_files: None,
+            git_patch: None,
+            git_patch_truncated: None,
+            codex_model: self.settings.model.clone(),
+            codex_model_policy: self.settings.model_policy.clone(),
+            codex_reasoning_effort: self.settings.reasoning_effort.clone(),
+            codex_reasoning_effort_policy: self.settings.reasoning_policy.clone(),
+            codex_raw_reasoning_enabled: false,
+            codex_speed: self.settings.speed.clone(),
+            codex_service_tier_policy: self.settings.service_tier_policy.clone(),
+            codex_sandbox_level: self.settings.sandbox.clone(),
+            approval_policy: "ask_every_turn".into(),
+            messages_since_last_codex: self.history.len() as u64,
+            queued_codex_turns: vec![],
+            attachment_names: vec![],
+            terminals: vec![],
+            continuation_summary: None,
+            created_at: created_at.into(),
+            status: HostHandoffStatus::Available,
+            candidate_user_id: None,
+            candidate_device_id: None,
+            candidate_leaf: None,
+            accepted_by: None,
+            accepted_by_user_id: None,
+            accepted_at: None,
+        }
     }
 
     fn preview(&self) -> Result<HostPreview, ()> {
@@ -1214,7 +1439,7 @@ fn run_debug_chat_journey(path: &std::path::Path) -> ExitCode {
         crash_after_chat_count: config.crash_after_chat_count,
         deadline: Instant::now() + Duration::from_secs(30),
     };
-    match drive_room_loop(&mut chat, &mut adapter, None) {
+    match drive_room_loop(&mut chat, &mut adapter, None, None) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => {
             eprintln!("debug journey: shared room loop failed safely");
@@ -1454,7 +1679,29 @@ where
             return ExitCode::from(1);
         }
     }
-    match drive_room_loop(&mut chat, &mut adapter, codex.as_mut()) {
+    let room_id = room.id.clone();
+    let user_id_owned = user_id.to_owned();
+    let device_id_owned = device_id.to_owned();
+    let mut bind_project = |project: &str, expected_repo: Option<(&str, &str)>| {
+        bind_handoff_project_for_offer(
+            store,
+            &user_id_owned,
+            &device_id_owned,
+            RELAY_HTTP_ORIGIN,
+            &room_id,
+            project,
+            expected_repo,
+        )
+        .map_err(|error| {
+            eprintln!("room loop: local handoff project was rejected safely: {error}");
+        })
+    };
+    match drive_room_loop(
+        &mut chat,
+        &mut adapter,
+        codex.as_mut(),
+        Some(&mut bind_project),
+    ) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => {
             eprintln!("error: The encrypted room loop failed safely.");
@@ -1886,6 +2133,7 @@ fn run_auth(command: Command) -> ExitCode {
             println!("Signed out. Device identity and room keys were retained.");
         }),
         Command::Help
+        | Command::Walkthrough
         | Command::Version
         | Command::RoomList
         | Command::RoomCreate(_)
@@ -1927,6 +2175,7 @@ where
                     "Signed in as {}. Registered device {}.",
                     session.user.login, session.device.device_id
                 );
+                print!("{WALKTHROUGH}");
                 return Ok(());
             }
         }
@@ -2248,6 +2497,7 @@ mod tests {
         assert_eq!(parse_args([] as [&str; 0]), Ok(Command::Help));
         assert_eq!(parse_args(["-h"]), Ok(Command::Help));
         assert_eq!(parse_args(["--help"]), Ok(Command::Help));
+        assert_eq!(parse_args(["walkthrough"]), Ok(Command::Walkthrough));
         assert_eq!(parse_args(["-V"]), Ok(Command::Version));
         assert_eq!(parse_args(["--version"]), Ok(Command::Version));
         assert_eq!(
@@ -2340,11 +2590,28 @@ mod tests {
 
     #[test]
     fn all_output_is_fixed_and_bounded() {
-        for output in [HELP, VERSION, UNSUPPORTED] {
+        for output in [HELP, WALKTHROUGH, VERSION, UNSUPPORTED] {
             assert!(output.len() <= 2048);
         }
         assert!(!HELP.contains("<invite-code>"));
         assert!(HELP.contains("Read a secret invite code from stdin"));
+        assert!(HELP.contains("multAIplayer walkthrough"));
+        assert!(WALKTHROUGH.contains("multAIplayer auth status"));
+        assert!(WALKTHROUGH.contains("multAIplayer room list"));
+        assert!(WALKTHROUGH.contains("multAIplayer room create"));
+        assert!(WALKTHROUGH.contains("multAIplayer room join"));
+        assert!(WALKTHROUGH.contains("reads the secret invite code from stdin"));
+        assert!(WALKTHROUGH.contains("multAIplayer room invite <ROOM>"));
+        assert!(WALKTHROUGH.contains("multAIplayer room admissions <ROOM> <INVITE-ID>"));
+        assert!(WALKTHROUGH.contains("multAIplayer room open <ROOM>"));
+        assert!(WALKTHROUGH.contains("@codex <task>"));
+        assert!(WALKTHROUGH.contains("/handoff status"));
+        assert!(WALKTHROUGH.contains("/handoff offer"));
+        assert!(WALKTHROUGH.contains("/handoff request <OFFER-ID>"));
+        assert!(WALKTHROUGH.contains("approval always stays with the host"));
+        assert!(WALKTHROUGH.contains("multAIplayer walkthrough"));
+        assert!(!WALKTHROUGH.contains("--yes"));
+        assert!(!WALKTHROUGH.contains("auto-approve"));
         assert!(!HELP.contains("--yes"));
         assert!(!HELP.contains("auto-approve"));
     }

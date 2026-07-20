@@ -14,10 +14,11 @@ claims, audit status, metadata exposure, and residual risks.
 - Public packages are tested on Apple-silicon macOS 15. They use macOS 11 as the
   deployment target, but macOS 11–14 are compatibility targets rather than tested
   support. Intel Macs, Windows, and Linux are not release targets.
-- The CLI is line-oriented and uses the same relay and MLS rooms as the desktop
-  app, but it does not support host handoff, browser, shared terminal, editor,
-  attachments, GitHub panels, goals, thread graphs, or rich diffs. It has no
-  background updater or Homebrew package. See the maintained
+- The CLI is line-oriented and uses the same relay and MLS rooms and
+  authenticated host-handoff boundary as the desktop app, but it does not
+  support browser, shared terminal, editor, attachments, GitHub panels, goals,
+  thread graphs, or rich diffs. It has no background updater or Homebrew
+  package. See the maintained
   [CLI compatibility table](../apps/cli/README.md#compatibility-and-limitations).
 - Official invitations use macOS universal links. Each release still needs a
   cold-start and warm-app test; static entitlement and parser checks do not prove
@@ -86,6 +87,19 @@ claims, audit status, metadata exposure, and residual risks.
   members in authenticated, encrypted `room.config` snapshots. multAIplayer's
   warnings and approval prompts reduce accidental sharing; they are not a sandbox
   or a complete secret scanner.
+- Host handoff changes future authority only. The incoming host is bound by its
+  exact user, device, and MLS leaf, selects and validates its own local project,
+  and uses its own credentials, sessions, processes, and approval policy. The
+  outgoing host must approve that exact candidate. A Git patch received by the
+  CLI remains inert and review-only; this alpha has no trusted CLI patch-apply
+  adapter, so applying a reviewed patch requires a separate trusted local
+  workflow. No patch application, local project access, or process continuation
+  is implied by room membership or encrypted room context. Losing authority
+  cancels host-local work still running on the outgoing device. Handoff cannot
+  erase data or external capabilities the former host already retained.
+  Encrypted chat remains live, but an incoming CLI host must exit and reopen the
+  room before hosting Codex so it starts a fresh local controller from its
+  selected project and own account.
 - Codex's upstream Computer Use and first-party browser capabilities are not
   exposed through multAIplayer's app-server integration. multAIplayer separately
   provides a host-local in-room browser: the active host can open URLs directly,
