@@ -760,6 +760,23 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
         if !valid_envelope_id(&envelope.id) {
             return Err(ChatError::InvalidEncryptedMessage);
         }
+        // The local MLS state already consumed its own ciphertext when the
+        // relay accepted publication. Backlog can replay that exact envelope
+        // after the durable outbox item has been retired, including the Add
+        // commit produced by admission. Receiving it again would attempt to
+        // apply an already-applied ratchet or epoch transition.
+        if envelope.sender_user_id == self.user_id && envelope.sender_device_id == self.device_id {
+            // A self-authored host handoff also needs authenticated local state
+            // projection, as the desktop replay path does. Until that projection
+            // is composed here, fail before creating an incoming-recovery marker
+            // instead of silently treating the handoff as an ordinary echo.
+            if envelope.commit_effect.is_some() {
+                return Err(ChatError::InvalidEncryptedMessage);
+            }
+            self.recovery.remember_processed(&envelope.id);
+            self.persist_recovery()?;
+            return Ok(None);
+        }
         if envelope.message_type == MlsMessageType::Commit {
             let ciphertext = STANDARD
                 .decode(&envelope.mls_message)
@@ -770,13 +787,6 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
             return Ok(None);
         }
         if envelope.message_type != MlsMessageType::Application {
-            return Ok(None);
-        }
-        // The sender already projected its validated local payload. Never feed a
-        // relay echo back into the sender ratchet after publication cleanup.
-        if envelope.sender_user_id == self.user_id && envelope.sender_device_id == self.device_id {
-            self.recovery.remember_processed(&envelope.id);
-            self.persist_recovery()?;
             return Ok(None);
         }
         let ciphertext = STANDARD
@@ -1342,6 +1352,93 @@ mod tests {
         );
         assert!(matches!(result, Err(ChatError::RecoveryInterrupted)));
         assert_eq!(mls.load_room_client_state(&room.id).unwrap(), Some(encoded));
+    }
+
+    #[test]
+    fn accepted_admission_commit_replay_is_retired_without_poisoning_recovery() {
+        let directory = TestDirectory::new();
+        let host_store = MemoryCredentialStore::default();
+        let guest_store = MemoryCredentialStore::default();
+        let host_identity =
+            load_or_create_identity(&host_store, "github:host", "CLI host").unwrap();
+        let guest_identity =
+            load_or_create_identity(&guest_store, "github:guest", "Desktop guest").unwrap();
+        let mut host_mls = MlsClientService::open(
+            &host_store,
+            &host_identity,
+            &directory.0.join("host-mls.db"),
+        )
+        .unwrap();
+        let guest_mls = MlsClientService::open(
+            &guest_store,
+            &guest_identity,
+            &directory.0.join("guest-mls.db"),
+        )
+        .unwrap();
+        let mut room = recovery_room();
+        room.host_user_id = Some(host_identity.public.user_id.clone());
+        room.active_host_device_id = Some(host_identity.public.device_id.clone());
+        host_mls.create_group_idempotent(&room.id).unwrap();
+        let key_package = guest_mls.interoperability_generate_key_package().unwrap();
+        let admission = host_mls
+            .interoperability_add_member(&room.id, &key_package)
+            .unwrap();
+        host_mls
+            .interoperability_publish_succeeded(&room.id, &admission.commit_outbox_id)
+            .unwrap();
+
+        let envelope = MlsRelayMessage {
+            id: admission.commit_outbox_id,
+            team_id: room.team_id.clone(),
+            room_id: room.id.clone(),
+            sender_device_id: host_identity.public.device_id.clone(),
+            sender_user_id: host_identity.public.user_id.clone(),
+            created_at: "2026-07-20T00:00:00.000Z".into(),
+            message_type: MlsMessageType::Commit,
+            epoch_hint: 0,
+            mls_message: STANDARD.encode(admission.commit),
+            commit_effect: None,
+            next_host_user_id: None,
+            next_host_device_id: None,
+            host_transfer_authorization: None,
+        };
+
+        {
+            let mut session = ChatRoomSession::new(
+                RelayConnection::new(NoopSocket),
+                &mut host_mls,
+                room.clone(),
+                &host_identity.public.user_id,
+                &host_identity.public.device_id,
+                &host_identity.public.display_name,
+                &host_identity.public.signature_key_fingerprint,
+            )
+            .unwrap();
+            assert_eq!(session.open_room_event(&envelope).unwrap(), None);
+            assert!(session.recovery.processed(&envelope.id));
+            assert_eq!(session.recovery.pending_envelope_id, None);
+
+            let mut local_handoff = envelope.clone();
+            local_handoff.id = "local-handoff-replay".into();
+            local_handoff.commit_effect = Some(multaiplayer_protocol::CommitEffect::HostHandoff);
+            assert!(matches!(
+                session.open_room_event(&local_handoff),
+                Err(ChatError::InvalidEncryptedMessage)
+            ));
+            assert!(!session.recovery.processed(&local_handoff.id));
+            assert_eq!(session.recovery.pending_envelope_id, None);
+        }
+
+        let reopened = ChatRoomSession::new(
+            RelayConnection::new(NoopSocket),
+            &mut host_mls,
+            room,
+            &host_identity.public.user_id,
+            &host_identity.public.device_id,
+            &host_identity.public.display_name,
+            &host_identity.public.signature_key_fingerprint,
+        );
+        assert!(reopened.is_ok());
     }
 
     #[test]
