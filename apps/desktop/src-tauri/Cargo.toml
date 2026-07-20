@@ -36,7 +36,7 @@ semver = "=1.0.28"
 sha2 = "=0.10.9"
 tauri = { version = "=2.11.5", features = ["unstable"] }
 typed-tauri-command = { path = "crates/typed-tauri-command" }
-tauri-plugin-dialog = "=2.7.1"
+tauri-plugin-dialog = "=2.7.2"
 tauri-plugin-notification = "=2.3.3"
 tauri-plugin-opener = "=2.5.4"
 tauri-plugin-process = "=2.3.1"
@@ -44,8 +44,8 @@ tauri-plugin-shell = "=2.3.5"
 tauri-plugin-updater = "=2.10.1"
 tauri-plugin-wdio = { version = "=1.2.0", optional = true }
 tauri-plugin-wdio-webdriver = { version = "=1.2.0", optional = true }
-serde = { version = "=1.0.228", features = ["derive"] }
-serde_json = "=1.0.150"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
 uuid = { version = "=1.24.0", features = ["v4"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
