@@ -272,12 +272,14 @@ jobs:
               | tr -d ':'
           )"
           signing_identities="$(security find-identity -v -p codesigning build.keychain)"
-          if ! printf '%s\n' "$signing_identities" \
-            | grep -F "$profile_fingerprint" \
-            | grep -Fq "$APPLE_SIGNING_IDENTITY"; then
-            echo "Developer ID provisioning profile does not contain the release signing certificate." >&2
-            exit 1
-          fi
+          matching_identity="$(printf '%s\n' "$signing_identities" | grep -F "$profile_fingerprint" || true)"
+          case "$matching_identity" in
+            *"$APPLE_SIGNING_IDENTITY"*) ;;
+            *)
+              echo "Developer ID provisioning profile does not contain the release signing certificate." >&2
+              exit 1
+              ;;
+          esac
           echo "Validated the release provisioning profile without exposing account metadata."
 
       - name: Configure provisioning profile before bundle signing
