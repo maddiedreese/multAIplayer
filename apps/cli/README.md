@@ -68,6 +68,52 @@ Inside a room, use `@codex <task>` to propose work. The active host must approve
 the exact proposal before Codex starts. Run `multAIplayer --help` for every room
 and admission command.
 
+### Hand off the host
+
+Host handoff changes which room member may approve and run future host-local
+work. It does not transfer a Codex login, credentials, sessions, processes, or a
+project directory. In an open room, the outgoing host starts an offer and shares
+its identifier in the encrypted room:
+
+```text
+/handoff offer
+/handoff status
+```
+
+The incoming member requests that exact offer. The CLI prompts on the trusted
+terminal to select and validate a local project; the encrypted room does not
+grant access to the incoming device's filesystem.
+
+```text
+/handoff request <offer-id>
+```
+
+The outgoing host then reviews the exact requesting user, device, and MLS leaf
+before approving the transfer:
+
+```text
+/handoff approve <offer-id>
+```
+
+After the authenticated MLS host-authority commit is applied, the incoming
+device is the host for future work. Encrypted chat and authority convergence
+continue live, but the incoming CLI host must exit and reopen the room before it
+hosts Codex. Reopening starts a fresh host-local Codex context with the selected
+project; no process or session continues across the handoff.
+
+A Git patch included by a desktop host remains inert, review-only context in the
+CLI. The reserved apply command fails closed because this alpha has no trusted
+CLI patch-application adapter:
+
+```text
+/handoff apply <offer-id>
+```
+
+Use a separate trusted local workflow if you decide to apply a reviewed patch.
+`/handoff apply` never applies it in this CLI version. Use `/handoff status` at
+any point to inspect the current offer state. Authority loss cancels host-local
+work that was still running on the outgoing host.
+
 ## Compatibility and limitations
 
 | Capability                                                                          | CLI alpha     | Desktop alpha interoperability        |
@@ -78,7 +124,8 @@ and admission command.
 | Room create/join/invite/admission                                                   | Supported     | Rooms may be created by either client |
 | Codex proposals and hosted turns                                                    | Supported     | Either supported client may host      |
 | Reconnect, replay, and encrypted history                                            | Supported     | Mixed-client journeys verified        |
-| Host handoff involving the CLI                                                      | Not supported | Fails explicitly                      |
+| Authenticated host-authority handoff                                                | Supported     | Either supported client may hand off  |
+| Applying a handoff Git patch                                                        | Not supported | CLI keeps received patches inert      |
 | Browser, shared terminal, editor, attachments, GitHub panels, goals, and rich diffs | Not supported | Desktop-only records render safely    |
 | Intel macOS, Linux, Windows, Homebrew                                               | Not supported | Deferred                              |
 
