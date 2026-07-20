@@ -32,9 +32,24 @@ test("new draft visibility retries are bounded and stop at the first visible rel
   assert.equal(waits, 2);
 
   lookups = 0;
-  assert.equal(retryReleaseLookup(() => (++lookups, null), () => {}, 2), null);
+  assert.equal(
+    retryReleaseLookup(
+      () => (++lookups, null),
+      () => {},
+      2
+    ),
+    null
+  );
   assert.equal(lookups, 2);
-  assert.throws(() => retryReleaseLookup(() => null, () => {}, 0), /attempts must be positive/);
+  assert.throws(
+    () =>
+      retryReleaseLookup(
+        () => null,
+        () => {},
+        0
+      ),
+    /attempts must be positive/
+  );
 });
 
 test("release tags are validated and classified without loose substring rules", () => {
