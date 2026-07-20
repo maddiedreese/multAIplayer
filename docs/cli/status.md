@@ -2,8 +2,8 @@
 
 Plan version: 1.1
 Decision set: 1.1
-Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
-Current phase: Owner-controlled external-alpha publication decision
+Baseline: `156c55e51ab2db9d00c8eb418c4443a55ddb739e`
+Current phase: Owner-authorized external-alpha publication
 Implementation authorization: Delegated to CLI-000 within the approved runbook
 Last update: 2026-07-19
 
@@ -341,6 +341,13 @@ Last update: 2026-07-19
   manifest, lockfile, invitation encoding, relay/wire contract, MLS policy,
   desktop behavior, release credential, artifact, or publication changed; no
   implementation task is active.
+- On 2026-07-19, the owner explicitly authorized merging the exact accepted CLI
+  integration history to `main`, producing a Developer ID-signed and
+  Apple-notarized `multAIplayer 0.1.0-alpha.1` artifact, publishing the
+  independent CLI release, validating the public one-line installer on an
+  Apple-silicon Mac, and completing the production CLI/desktop interoperability
+  smoke. Publication remains fail-closed until every exact-head release gate
+  succeeds.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -376,7 +383,7 @@ Last update: 2026-07-19
 | CLI-150 | Security hardening and threat-model update | complete | CLI-140 |
 | CLI-160 | Signed CLI packaging and release isolation | complete | CLI-150 |
 | CLI-160-R1 | CLI Cargo package parser EOF correction | complete | CLI-160 |
-| CLI-170 | External-alpha readiness review | awaiting_owner_publication_decision | CLI-160, CLI-160-R1 |
+| CLI-170 | External-alpha readiness review | publication_authorized | CLI-160, CLI-160-R1 |
 | CLI-170-R1 | Public CLI installation and release documentation | complete | CLI-170 |
 | CLI-170-R2 | Join prompt and root install discoverability | complete | CLI-170-R1 |
 

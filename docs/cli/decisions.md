@@ -1,7 +1,7 @@
 # multAIplayer CLI locked decisions
 
-Status: Approved  
-Owner: Maddie D. Reese  
+Status: Approved
+Owner: Maddie D. Reese
 Decision set: 1.1
 Last material update: 2026-07-18
 

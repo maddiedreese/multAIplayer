@@ -1,8 +1,8 @@
 # CLI-000 orchestration runbook
 
-Status: Owner authorized  
-Authority version: 1.0  
-Integration branch: `codex/cli-integration`  
+Status: Owner authorized
+Authority version: 1.0
+Integration branch: `codex/cli-integration`
 Heartbeat cadence: 15 minutes
 
 CLI-000 is the sole automated program orchestrator. This delegation is bounded

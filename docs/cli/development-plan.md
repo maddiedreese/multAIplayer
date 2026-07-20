@@ -1,9 +1,9 @@
 # multAIplayer CLI development plan
 
-Status: Approved  
+Status: Approved
 Plan version: 1.1
-Owner: Maddie D. Reese  
-Approved baseline: GitHub `main` at `156c55e51ab2db9d00c8eb418c4443a55ddb739e`  
+Owner: Maddie D. Reese
+Approved baseline: GitHub `main` at `156c55e51ab2db9d00c8eb418c4443a55ddb739e`
 Last material update: 2026-07-18
 
 This document is the normative source of truth for multAIplayer CLI product
