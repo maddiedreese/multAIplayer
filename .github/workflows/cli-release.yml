@@ -48,7 +48,7 @@ jobs:
   verify:
     name: Locked CLI verification
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     steps:
       - name: Check out exact release source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

@@ -37,6 +37,10 @@ test("CLI publication has an independent exact-source release workflow", () => {
     cliRelease,
     /Set up repository Rust toolchain[\s\S]*components: rustfmt clippy[\s\S]*Run the complete locked CLI gate/
   );
+  assert.match(
+    cliRelease,
+    /verify:\n[\s\S]*?name: Locked CLI verification[\s\S]*?runs-on: macos-15[\s\S]*?Run the complete locked CLI gate/
+  );
   assert.doesNotMatch(cliRelease, /apps\/desktop|tauri|updater/);
 });
 
