@@ -33,12 +33,10 @@ network, keychain, MLS, and app-server failures to fixed error variants rather
 than reflecting upstream prose. Official releases use an entitlement-backed,
 app-private macOS Data Protection Keychain group with a non-interactive
 `WhenUnlocked` policy; they do not use legacy per-binary ACL prompts or a
-plaintext fallback. Upgrade migration attempts legacy credential reads only
-while Keychain UI is disabled. An ACL denial, locked store, or other access
-failure remains an explicit storage error and cannot be reclassified as a
-missing key that permits identity or wrapping-key regeneration. The file-backed
-credential adapter and interoperability client exist only in test or debug
-builds.
+plaintext fallback. An ACL denial, locked store, or other access failure remains
+an explicit storage error and cannot be reclassified as a missing key that
+permits identity or wrapping-key regeneration. The file-backed credential
+adapter and interoperability client exist only in test or debug builds.
 
 Every relay-originating terminal field is rendered as one bounded line. C0/C1
 controls, ANSI escapes, line separators, bidirectional overrides and isolates,

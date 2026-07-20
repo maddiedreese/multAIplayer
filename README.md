@@ -35,8 +35,10 @@ Install the Apple-silicon macOS CLI with one command:
 curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh
 ```
 
-See the [CLI guide](apps/cli/README.md) for authentication, encrypted rooms,
-Codex hosting, compatibility, limitations, updates, and uninstalling.
+After sign-in, the CLI prints a walkthrough covering room creation or joining,
+encrypted chat, Codex hosting, and authenticated host handoff. See the
+[CLI guide](apps/cli/README.md) for the complete flow, compatibility,
+limitations, updates, and uninstalling.
 
 ## The product
 
