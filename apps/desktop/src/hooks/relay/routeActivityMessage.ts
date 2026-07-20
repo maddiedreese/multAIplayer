@@ -19,12 +19,16 @@ import {
 } from "../../presentation/activity/activityLines";
 import { plaintextUserMatchesEnvelope } from "../../application/mls/mlsApplicationMessage";
 import { maxTerminalActivityLines } from "../../appDefaults";
+import { findEnvelopeRoom, isEnvelopeFromActiveRoomHost } from "../../lib/access/roomHost";
+import type { AppStoreState } from "../../store/appStore";
 import type { QueuedCodexTurn } from "../../types";
 import type { MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
 
+type ActivityMessageStore = MlsMessageStoreActions & Pick<AppStoreState, "rooms">;
+
 export async function routeActivityMessage(
   envelope: RoutedMlsMessage,
-  store: MlsMessageStoreActions,
+  store: ActivityMessageStore,
   decrypt: () => Promise<unknown>
 ): Promise<boolean> {
   if (envelope.kind === "terminal.request") {
@@ -72,7 +76,7 @@ export async function routeActivityMessage(
 
 async function routeTerminalRequest(
   envelope: RoutedMlsMessage,
-  store: MlsMessageStoreActions,
+  store: ActivityMessageStore,
   decrypt: () => Promise<unknown>
 ) {
   const parsed = TerminalRequestPlaintextPayload.safeParse(await decrypt());
@@ -82,10 +86,11 @@ async function routeTerminalRequest(
 
 async function routeTerminalEvent(
   envelope: RoutedMlsMessage,
-  store: MlsMessageStoreActions,
+  store: ActivityMessageStore,
   decrypt: () => Promise<unknown>
 ) {
   const plaintext = await decrypt();
+  if (!isAuthoritativeHostEnvelope(envelope, store)) return;
   const result = TerminalResultPlaintextPayload.safeParse(plaintext);
   if (result.success && plaintextUserMatchesEnvelope(envelope, result.data.ranByUserId)) {
     store.appendTerminalLinesForRoom(envelope.roomId, buildTerminalResultLines(result.data), maxTerminalActivityLines);
@@ -96,12 +101,9 @@ async function routeTerminalEvent(
     store.updateTerminalRequestStatus(envelope.roomId, status.data.requestId, status.data.status);
 }
 
-async function routeGitEvent(
-  envelope: RoutedMlsMessage,
-  store: MlsMessageStoreActions,
-  decrypt: () => Promise<unknown>
-) {
+async function routeGitEvent(envelope: RoutedMlsMessage, store: ActivityMessageStore, decrypt: () => Promise<unknown>) {
   const plaintext = await decrypt();
+  if (!isAuthoritativeHostEnvelope(envelope, store)) return;
   const workflow = GitWorkflowEventPlaintextPayload.safeParse(plaintext);
   if (workflow.success && plaintextUserMatchesEnvelope(envelope, workflow.data.runnerUserId)) {
     store.appendGitWorkflowEvent(envelope.roomId, workflow.data);
@@ -125,11 +127,12 @@ async function routeGitEvent(
 
 async function routeCodexActivity(
   envelope: RoutedMlsMessage,
-  store: MlsMessageStoreActions,
+  store: ActivityMessageStore,
   decrypt: () => Promise<unknown>
 ) {
   const plaintext = await decrypt();
   if (envelope.kind === "codex.event") {
+    if (!isAuthoritativeHostEnvelope(envelope, store)) return;
     const parsed = CodexEventPlaintextPayload.safeParse(plaintext);
     if (parsed.success && plaintextUserMatchesEnvelope(envelope, parsed.data.hostUserId)) {
       store.appendCodexEvent(envelope.roomId, parsed.data);
@@ -138,6 +141,7 @@ async function routeCodexActivity(
     return;
   }
   if (envelope.kind === "codex.activity") {
+    if (!isAuthoritativeHostEnvelope(envelope, store)) return;
     const parsed = CodexActivityPlaintextPayload.safeParse(plaintext);
     if (parsed.success && plaintextUserMatchesEnvelope(envelope, parsed.data.hostUserId))
       store.upsertCodexActivity(envelope.roomId, parsed.data);
@@ -150,7 +154,7 @@ async function routeCodexActivity(
 
 async function routeInteractiveRequest(
   envelope: RoutedMlsMessage,
-  store: MlsMessageStoreActions,
+  store: ActivityMessageStore,
   decrypt: () => Promise<unknown>
 ) {
   const plaintext = await decrypt();
@@ -168,12 +172,17 @@ async function routeInteractiveRequest(
     }
     return;
   }
+  if (!isAuthoritativeHostEnvelope(envelope, store)) return;
   const parsed = RequestStatusPlaintextPayload.safeParse(plaintext);
   if (parsed.success && plaintextUserMatchesEnvelope(envelope, parsed.data.decidedByUserId)) {
     if (envelope.kind === "browser.event")
       store.updateBrowserRequestStatus(envelope.roomId, parsed.data.requestId, parsed.data.status);
     else store.updateFileSaveRequestStatus(envelope.roomId, parsed.data.requestId, parsed.data.status);
   }
+}
+
+function isAuthoritativeHostEnvelope(envelope: RoutedMlsMessage, store: ActivityMessageStore): boolean {
+  return isEnvelopeFromActiveRoomHost(findEnvelopeRoom(store.rooms, envelope.roomId), envelope);
 }
 
 export function handleCodexQueueEvent(

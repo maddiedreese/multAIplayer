@@ -6,8 +6,13 @@ export function canRequestBrowserAccess(room: ClientRoomRecord, locked = false):
   return !locked;
 }
 
-export function canHostBrowserAction(room: ClientRoomRecord, user: LocalHostUser, locked = false): boolean {
-  return canRequestBrowserAccess(room, locked) && isLocalUserActiveHostForRoom(room, user);
+export function canHostBrowserAction(
+  room: ClientRoomRecord,
+  user: LocalHostUser,
+  deviceId: string,
+  locked = false
+): boolean {
+  return canRequestBrowserAccess(room, locked) && isLocalUserActiveHostForRoom(room, user, deviceId);
 }
 
 export interface BrowserRequestCandidate {

@@ -172,7 +172,9 @@ tests.
 
 ## Security invariants
 
-- GitHub and relay sessions are origin-bound and stored in macOS Keychain.
+- GitHub and relay sessions, device identity, and encryption key material are
+  stored in the app-isolated macOS Data Protection Keychain. Official builds
+  are entitlement-backed and do not request interactive Keychain permission.
 - Private keys and MLS state do not cross unnecessary UI/process boundaries.
 - Untrusted terminal controls and Unicode spoofing characters are neutralized.
 - Participant and Codex output cannot imitate a trusted approval prompt.

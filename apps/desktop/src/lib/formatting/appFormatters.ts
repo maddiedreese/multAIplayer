@@ -167,6 +167,9 @@ export function shortFingerprint(fingerprint: string): string {
 
 export function isRoomHostMember(member: RoomPresence, room: ClientRoomRecord): boolean {
   if (room.hostStatus !== "active") return false;
-  if (room.hostUserId) return member.userId === room.hostUserId;
+  if (room.hostUserId && room.activeHostDeviceId) {
+    return member.userId === room.hostUserId && member.deviceId === room.activeHostDeviceId;
+  }
+  if (room.hostUserId || room.activeHostDeviceId) return false;
   return member.displayName === room.host;
 }

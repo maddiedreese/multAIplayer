@@ -24,7 +24,7 @@ export function currentSelectedRoomContext() {
   };
   const revoked = state.revokedRoomIds.has(room.id) || state.revokedTeamIds.has(room.teamId);
   const locked = room.archivedAt != null || state.forgottenRoomIds.has(room.id) || revoked;
-  const isActiveHost = isLocalUserActiveHostForRoom(room, localUser);
+  const isActiveHost = isLocalUserActiveHostForRoom(room, localUser, deviceId);
   return {
     room,
     localUser,
@@ -34,7 +34,7 @@ export function currentSelectedRoomContext() {
     isActiveHost,
     canReadLocalWorkspace: canUseLocalWorkspace(room, localUser, locked),
     canRequestBrowser: canRequestBrowserAccess(room, locked),
-    canHostBrowser: canHostBrowserAction(room, localUser, locked),
+    canHostBrowser: canHostBrowserAction(room, localUser, deviceId, locked),
     browserAccessMessage: browserAccessGateMessage(room, locked),
     localWorkspaceMessage: localWorkspaceGateMessage(room, locked),
     hostGateMessage:

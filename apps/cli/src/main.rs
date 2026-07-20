@@ -2609,6 +2609,8 @@ mod tests {
         assert!(WALKTHROUGH.contains("/handoff offer"));
         assert!(WALKTHROUGH.contains("/handoff request <OFFER-ID>"));
         assert!(WALKTHROUGH.contains("approval always stays with the host"));
+        assert!(!WALKTHROUGH.contains("Always Allow"));
+        assert!(!HELP.contains("Always Allow"));
         assert!(WALKTHROUGH.contains("multAIplayer walkthrough"));
         assert!(!WALKTHROUGH.contains("--yes"));
         assert!(!WALKTHROUGH.contains("auto-approve"));

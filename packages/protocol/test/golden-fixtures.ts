@@ -519,7 +519,7 @@ export function buildGoldenFixtureDocument() {
       {
         eventType: "git.workflow",
         status: "completed",
-        branch: "codex/cli-030",
+        branch: "feature/cli-improvements",
         push: false,
         message: "Passed",
         runner: "Maddie",

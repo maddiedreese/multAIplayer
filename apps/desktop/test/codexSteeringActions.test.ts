@@ -56,6 +56,7 @@ const steeringMessage: ChatMessage = {
 
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem("multaiplayer:device-id", room.activeHostDeviceId!);
   tauriInternals.invoke = async (command) => {
     throw new Error(`Unexpected native command: ${command}`);
   };

@@ -246,7 +246,7 @@
       "name": "git-workflow",
       "schema": "GitWorkflowEventPlaintextPayload",
       "kind": "git.event",
-      "json": "{\"eventType\":\"git.workflow\",\"status\":\"completed\",\"branch\":\"codex/cli-030\",\"push\":false,\"message\":\"Passed\",\"runner\":\"Maddie\",\"runnerUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"results\":[{\"command\":\"git diff --check\",\"cwd\":\"/tmp/project\",\"status\":0,\"stdout\":\"\",\"stderr\":\"\"}]}"
+      "json": "{\"eventType\":\"git.workflow\",\"status\":\"completed\",\"branch\":\"feature/cli-improvements\",\"push\":false,\"message\":\"Passed\",\"runner\":\"Maddie\",\"runnerUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"results\":[{\"command\":\"git diff --check\",\"cwd\":\"/tmp/project\",\"status\":0,\"stdout\":\"\",\"stderr\":\"\"}]}"
     },
     {
       "name": "github-actions",

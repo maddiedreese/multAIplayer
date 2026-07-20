@@ -1,6 +1,6 @@
 [package]
 name = "multaiplayer"
-version = "0.1.0-alpha.7"
+version = "0.1.0-alpha.8"
 description = "Private group chat for coding with Codex."
 authors = ["Maddie D. Reese"]
 default-run = "multaiplayer"
@@ -26,7 +26,6 @@ age = { version = "=0.12.1", default-features = false }
 base64 = "=0.22.1"
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }
 codex-activity-projection = { path = "crates/codex-activity-projection" }
-keyring = "=4.1.5"
 libc = "=0.2.186"
 minisign-verify = "=0.2.5"
 mls-core = { path = "crates/mls-core" }
@@ -48,6 +47,14 @@ tauri-plugin-wdio-webdriver = { version = "=1.2.0", optional = true }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.150"
 uuid = { version = "=1.24.0", features = ["v4"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "=1.0.1", features = ["keychain", "protected"] }
+keyring-core = "=1.0.0"
+security-framework = "=3.7.0"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+keyring = "=4.1.5"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"] }

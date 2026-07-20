@@ -145,6 +145,8 @@ export interface CodexAgentTreeNode {
 
 export interface HostHandoffRecord extends HostHandoffPlaintextPayload {
   status: "available" | "requested" | "accepted";
+  /** Authenticated sender device for a received offer; never transmitted in the handoff plaintext. */
+  fromDeviceId?: string;
   candidateUserId?: string;
   candidateDeviceId?: string;
   candidateLeaf?: number;

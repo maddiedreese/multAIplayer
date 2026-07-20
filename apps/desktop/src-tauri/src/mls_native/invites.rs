@@ -27,7 +27,7 @@ pub(crate) fn mls_invite_capability_issue(
     let mut issued = issue_capability();
     let raw = issued.take_url_value();
     let handle = uuid::Uuid::new_v4().to_string();
-    let entry = keyring::Entry::new(
+    let entry = crate::credential_store::credential_entry(
         MLS_KEYCHAIN_SERVICE,
         &format!("mls-invite-capability:{handle}"),
     )
@@ -185,7 +185,7 @@ pub(crate) fn mls_invite_approve(
         "{:x}",
         Sha256::digest(encode_capability_binding(&request.binding).map_err(display_error)?)
     );
-    let entry = keyring::Entry::new(
+    let entry = crate::credential_store::credential_entry(
         MLS_KEYCHAIN_SERVICE,
         &format!("mls-invite-capability:{}", request.capability_handle),
     )
@@ -273,7 +273,7 @@ pub(crate) fn mls_invite_deny(
         "{:x}",
         Sha256::digest(encode_capability_binding(&request.binding).map_err(display_error)?)
     );
-    let entry = keyring::Entry::new(
+    let entry = crate::credential_store::credential_entry(
         MLS_KEYCHAIN_SERVICE,
         &format!("mls-invite-capability:{}", request.capability_handle),
     )

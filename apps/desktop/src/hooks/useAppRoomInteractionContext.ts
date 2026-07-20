@@ -85,6 +85,7 @@ export function useAppRoomInteractionContext({
     hasSelectedRoom,
     selectedRoom,
     localUser: localIdentity.localUser,
+    deviceId: localIdentity.deviceId,
     forgottenRoomIds,
     revokedRoomIds,
     revokedTeamIds,

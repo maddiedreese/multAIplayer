@@ -228,6 +228,7 @@ jobs:
           entitlement_team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.team-identifier' "$profile_plist")"
           provisions_all_devices="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' "$profile_plist")"
           associated_domains="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.associated-domains' "$profile_plist")"
+          keychain_access_groups="$(plutil -extract Entitlements.keychain-access-groups json -o - "$profile_plist")"
           if [ "$team_identifier" != "$APPLE_TEAM_ID" ] || [ "$entitlement_team_identifier" != "$APPLE_TEAM_ID" ]; then
             echo "Developer ID provisioning profile does not authorize the release team." >&2
             exit 1
@@ -240,6 +241,16 @@ jobs:
             echo "Developer ID provisioning profile does not authorize Associated Domains." >&2
             exit 1
           fi
+          # shellcheck disable=SC2016
+          node -e '
+            const groups = JSON.parse(process.argv[1]);
+            const team = process.argv[2];
+            const required = `${team}.com.multaiplayer.desktop`;
+            if (!Array.isArray(groups) || (!groups.includes(required) && !groups.includes(`${team}.*`))) process.exit(1);
+          ' "$keychain_access_groups" "$APPLE_TEAM_ID" || {
+            echo "Developer ID provisioning profile does not authorize the desktop Keychain access group." >&2
+            exit 1
+          }
           if /usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$profile_plist" >/dev/null 2>&1; then
             echo "Release profile must not be device-scoped." >&2
             exit 1
@@ -375,18 +386,31 @@ jobs:
             echo "Release bundle identifier is incorrect." >&2
             exit 1
           fi
-          entitlement_output="$(codesign -d --entitlements - "$app_path" 2>/dev/null)"
-          expected_domains="$(printf '%s\n' 'applinks:multaiplayer.com' 'applinks:open.multaiplayer.com')"
-          signed_domains="$(printf '%s\n' "$entitlement_output" | sed -n 's/^[[:space:]]*\[String\] \(applinks:.*\)$/\1/p')"
-          if ! printf '%s\n' "$entitlement_output" | grep -q '^.*\[Key\] com\.apple\.developer\.associated-domains$' || \
-            [ "$signed_domains" != "$expected_domains" ]; then
+          signed_entitlements="$(mktemp)"
+          codesign -d --entitlements :- "$app_path" > "$signed_entitlements"
+          plutil -lint "$signed_entitlements"
+          signed_application_identifier="$(plutil -extract com.apple.application-identifier raw -o - "$signed_entitlements")"
+          signed_team_identifier="$(plutil -extract com.apple.developer.team-identifier raw -o - "$signed_entitlements")"
+          if [ "$signed_application_identifier" != "AXP55K75AX.com.multaiplayer.desktop" ] || \
+            [ "$signed_team_identifier" != "AXP55K75AX" ]; then
+            echo "Signed application has an incorrect application or team identifier entitlement." >&2
+            exit 1
+          fi
+          signed_domains="$(plutil -extract com.apple.developer.associated-domains json -o - "$signed_entitlements")"
+          if [ "$signed_domains" != '["applinks:multaiplayer.com","applinks:open.multaiplayer.com"]' ]; then
             echo "Signed application has incorrect Associated Domains entitlements." >&2
             exit 1
           fi
-          if printf '%s\n' "$entitlement_output" | grep -q '\[Key\] com\.apple\.security\.get-task-allow$'; then
+          signed_keychain_groups="$(plutil -extract keychain-access-groups json -o - "$signed_entitlements")"
+          if [ "$signed_keychain_groups" != '["AXP55K75AX.com.multaiplayer.desktop"]' ]; then
+            echo "Signed application has an incorrect Keychain access group entitlement." >&2
+            exit 1
+          fi
+          if plutil -extract com.apple.security.get-task-allow raw -o - "$signed_entitlements" >/dev/null 2>&1; then
             echo "Signed release application must not be debug-enabled." >&2
             exit 1
           fi
+          rm -f "$signed_entitlements"
           if ! codesign -dvv "$app_path" 2>&1 | grep -Eq 'flags=.*runtime'; then
             echo "Signed release application is missing the hardened runtime." >&2
             exit 1

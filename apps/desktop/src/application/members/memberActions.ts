@@ -146,7 +146,8 @@ export function createMemberActions({
       const { localUser, deviceId } = currentLocalIdentity();
       const activeRooms = rooms.filter((room) => room.teamId === selectedTeam && !room.archivedAt && !room.deletedAt);
       const unavailableRooms = activeRooms.filter(
-        (room) => room.hostStatus !== "active" || room.hostUserId !== localUser.id
+        (room) =>
+          room.hostStatus !== "active" || room.hostUserId !== localUser.id || room.activeHostDeviceId !== deviceId
       );
       if (unavailableRooms.length > 0) {
         const names = unavailableRooms.map((room) => room.name).join(", ");

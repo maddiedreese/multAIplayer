@@ -25,7 +25,7 @@ import { detectCodexTurnRiskFlags, messagesSinceLastCodex } from "../lib/codex/c
 import { inspectorAttentionCounts } from "../presentation/inspector/inspectorAttention";
 import { canUseRoomChat } from "../lib/chat/chatPolicy";
 import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
-import type { LocalHostUser } from "../lib/access/roomHost";
+import { isLocalUserActiveHostForRoom, type LocalHostUser } from "../lib/access/roomHost";
 import type { ClientRoomRecord } from "@multaiplayer/protocol";
 import { useAppStore } from "../store/appStore";
 import { useShallow } from "zustand/react/shallow";
@@ -54,6 +54,7 @@ export interface SelectedRoomRuntimeValues {
 interface SelectedRoomRuntimeOptions extends SelectedRoomRuntimeValues {
   selectedRoom: ClientRoomRecord | null;
   localUser: LocalHostUser;
+  deviceId: string;
   isSelectedRoomLocked: boolean;
   messages: ChatMessage[];
   replyToMessageId: string | null;
@@ -72,6 +73,7 @@ type SelectedRoomRuntimeSelection = Pick<
   SelectedRoomRuntimeOptions,
   | "selectedRoom"
   | "localUser"
+  | "deviceId"
   | "isSelectedRoomLocked"
   | "messages"
   | "replyToMessageId"
@@ -107,6 +109,7 @@ export function useSelectedRoomRuntime(selection: SelectedRoomRuntimeSelection):
 export function deriveSelectedRoomRuntime({
   selectedRoom,
   localUser,
+  deviceId,
   isSelectedRoomLocked,
   messages,
   replyToMessageId,
@@ -137,7 +140,7 @@ export function deriveSelectedRoomRuntime({
   const selectedTerminal = roomTerminals.find((terminal) => terminal.id === selectedTerminalId) ?? null;
   const selectedTerminalCanRestart = Boolean(selectedTerminal && !selectedTerminal.running);
   const selectedTerminalCanControl = selectedRoom
-    ? canControlRoomTerminal(selectedRoom, localUser, selectedTerminal, isSelectedRoomLocked)
+    ? canControlRoomTerminal(selectedRoom, localUser, deviceId, selectedTerminal, isSelectedRoomLocked)
     : false;
   const inspectorAttention = inspectorAttentionCounts({ approvalVisible, terminalRequests, browserRequests });
   const approvalTranscriptMessages = messagesSinceLastCodex(activeCodexApproval?.messages ?? messages) as ChatMessage[];
@@ -162,7 +165,9 @@ export function deriveSelectedRoomRuntime({
     queuedAt: turn.queuedAt,
     messagesSinceLastCodex: currentMessagesSinceLastCodex,
     canCancel:
-      !isSelectedRoomLocked && (turn.requestedByUserId === localUser.id || selectedRoom?.hostUserId === localUser.id)
+      !isSelectedRoomLocked &&
+      (turn.requestedByUserId === localUser.id ||
+        Boolean(selectedRoom && isLocalUserActiveHostForRoom(selectedRoom, localUser, deviceId)))
   }));
   const pendingAttachmentSummary =
     `${pendingAttachments.length}/${maxMessageAttachments} files · ` +

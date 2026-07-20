@@ -16,6 +16,7 @@ interface UseRoomAccessOptions {
   hasSelectedRoom: boolean;
   selectedRoom: ClientRoomRecord | null;
   localUser: LocalHostUser;
+  deviceId: string;
   forgottenRoomIds: Set<string>;
   revokedRoomIds: Set<string>;
   revokedTeamIds: Set<string>;
@@ -27,6 +28,7 @@ export function useRoomAccess({
   hasSelectedRoom,
   selectedRoom,
   localUser,
+  deviceId,
   forgottenRoomIds,
   revokedRoomIds,
   revokedTeamIds,
@@ -57,7 +59,7 @@ export function useRoomAccess({
       roomSettingsGateMessage: "Select a room before changing room settings."
     };
   }
-  const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
+  const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser, deviceId);
   const isSelectedRoomForgotten = forgottenRoomIds.has(selectedRoom.id);
   const isSelectedRoomRevoked = revokedRoomIds.has(selectedRoom.id) || revokedTeamIds.has(selectedRoom.teamId);
   const isSelectedRoomArchived = Boolean(selectedRoom.archivedAt);
@@ -65,8 +67,10 @@ export function useRoomAccess({
   const canReadLocalWorkspace = hasSelectedRoom && canUseLocalWorkspace(selectedRoom, localUser, isSelectedRoomLocked);
   const canRequestWorkspace = hasSelectedRoom && canRequestWorkspaceAction(selectedRoom, isSelectedRoomLocked);
   const canRequestBrowser = hasSelectedRoom && canRequestBrowserAccess(selectedRoom, isSelectedRoomLocked);
-  const canHostBrowser = hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, isSelectedRoomLocked);
-  const canCopyRoomInvite = hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, isSelectedRoomLocked);
+  const canHostBrowser =
+    hasSelectedRoom && canHostBrowserAction(selectedRoom, localUser, deviceId, isSelectedRoomLocked);
+  const canCopyRoomInvite =
+    hasSelectedRoom && canCreateRoomInvite(selectedRoom, localUser, deviceId, isSelectedRoomLocked);
   const localWorkspaceMessage = localWorkspaceGateMessage(selectedRoom, isSelectedRoomLocked);
   const roomPosture = roomPostureSummary({
     locked: isSelectedRoomLocked,

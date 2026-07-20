@@ -12,6 +12,7 @@ const room: ClientRoomRecord = {
   projectPath: "/Users/maddie/project",
   host: "Maddie",
   hostUserId: "github:maddiedreese",
+  activeHostDeviceId: "device-host",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
@@ -19,16 +20,21 @@ const room: ClientRoomRecord = {
 };
 
 test("room invites require the active host", () => {
-  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }), false);
+  assert.equal(canCreateRoomInvite(room, { id: "github:peer", name: "Peer" }, "device-host"), false);
+  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }, "device-peer"), false);
 });
 
 test("offline rooms cannot create invites", () => {
   assert.equal(
-    canCreateRoomInvite({ ...room, hostStatus: "offline" }, { id: "github:maddiedreese", name: "Maddie" }),
+    canCreateRoomInvite(
+      { ...room, hostStatus: "offline" },
+      { id: "github:maddiedreese", name: "Maddie" },
+      "device-host"
+    ),
     false
   );
 });
 
 test("locked rooms cannot create invites", () => {
-  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }, true), false);
+  assert.equal(canCreateRoomInvite(room, { id: "github:maddiedreese", name: "Maddie" }, "device-host", true), false);
 });

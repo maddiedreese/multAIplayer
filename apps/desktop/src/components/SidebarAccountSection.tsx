@@ -1,7 +1,6 @@
 import { ExternalLink, Search, X } from "lucide-react";
 import type { GitHubAuthConfig, GitHubDeviceStart, SignedInUser } from "../lib/identity/authClient";
 import { GitHubIcon } from "./GitHubIcon";
-import { GitHubKeychainNotice } from "./GitHubKeychainNotice";
 
 const brandIcon = new URL("../assets/multaiplayer-icon.png", import.meta.url).href;
 
@@ -60,7 +59,6 @@ export function SidebarAccountSection({
                 ? "Waiting for GitHub"
                 : "Sign in with GitHub"}
           </button>
-          <GitHubKeychainNotice compact />
         </>
       )}
       {deviceFlow && (

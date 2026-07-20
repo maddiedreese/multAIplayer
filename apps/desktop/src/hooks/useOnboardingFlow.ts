@@ -171,7 +171,12 @@ export function useOnboardingFlow({
       githubAuth.currentUser?.id,
       localDeviceId
     );
-    if (!selectedRoom || !localRequest || selectedRoom.hostUserId === githubAuth.currentUser?.id) return;
+    if (
+      !selectedRoom ||
+      !localRequest ||
+      (selectedRoom.hostUserId === githubAuth.currentUser?.id && selectedRoom.activeHostDeviceId === localDeviceId)
+    )
+      return;
     if (onboarding.markers.membership === null && onboarding.intent !== "join") {
       applyEvent({ type: "choose_intent", intent: "join" });
       applyEvent({ type: "show_surface", surface: "workspace" });

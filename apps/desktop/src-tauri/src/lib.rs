@@ -16,6 +16,7 @@ mod codex_threads;
 mod codex_turn_lifecycle;
 mod command_error;
 mod command_safety;
+mod credential_store;
 mod diagnostics;
 mod git;
 mod github;

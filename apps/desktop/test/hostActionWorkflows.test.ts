@@ -57,6 +57,7 @@ test.beforeEach(() => {
     throw new Error(`Unexpected native command: ${command}`);
   };
   localStorage.clear();
+  localStorage.setItem("multaiplayer:device-id", room.activeHostDeviceId!);
   localStorage.setItem(
     "multaiplayer:app-config",
     JSON.stringify({ relayHttpUrl: "https://relay.test", relayWsUrl: "wss://relay.test/rooms" })

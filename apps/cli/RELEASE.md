@@ -1,60 +1,86 @@
 # multAIplayer CLI release packaging
 
-The CLI has its own version, archive names, checksums, build manifest, and Apple
-code signature. It is not an input to the desktop updater, notarization,
-version synchronization, asset manifest, or release workflow.
+The CLI has its own version, archive, checksum manifest, app identity, and Apple
+release contract. It is not an input to the desktop updater, desktop signing,
+desktop notarization, version synchronization, or desktop asset manifest.
 
-From a clean Apple-silicon macOS checkout at the intended source commit, create
-and verify a local ad-hoc-signed inspection package:
+## Credential identity
+
+Public CLI releases are packaged as `multAIplayer.app`, with the executable at
+`Contents/MacOS/multAIplayer`. The stable credential identity is:
+
+- bundle identifier: `com.multaiplayer.cli`;
+- Apple team: `AXP55K75AX`;
+- application identifier and sole Keychain access group:
+  `AXP55K75AX.com.multaiplayer.cli`.
+
+This app-style boundary lets the released CLI use the Data Protection Keychain
+as the same signed application across launches and updates. It avoids the
+per-executable Keychain ACL authorization dialog; replacing a bare executable
+cannot provide that stable identity.
+
+Developer ID packaging requires both an installed Developer ID Application
+identity and an explicit Developer ID provisioning profile. The private signing
+key remains in the maintainer's Keychain. Pass the profile without copying it
+into the repository:
+
+```sh
+MULTAIPLAYER_CLI_SIGNING_IDENTITY='Developer ID Application: multAIplayer (AXP55K75AX)' \
+MULTAIPLAYER_CLI_PROVISIONING_PROFILE='/absolute/path/to/multAIplayer CLI.provisionprofile' \
+  node apps/cli/release/package-cli.mjs --output apps/cli/dist
+```
+
+The same profile can be supplied as `--provisioning-profile /absolute/path`.
+Packaging decodes it with macOS, rejects expired/development profiles, and
+requires the exact team and application identifier. Apple's profile must carry
+only its team-scoped `AXP55K75AX.*` Keychain authorization; the signed app is
+independently restricted to the exact CLI group above. It embeds the profile,
+signs the whole app bundle with hardened runtime and the checked-in entitlements,
+then independently reads the signed entitlements and profile back. It extracts
+the actual leaf signing certificate
+from the completed code signature and requires that exact DER SHA-256
+fingerprint to appear once in the profile's `DeveloperCertificates` allowlist;
+certificate display names are never used for authorization. A mismatch fails
+packaging.
+
+## Local inspection mode
+
+From a clean Apple-silicon checkout, this command creates an ad-hoc inspection
+artifact:
 
 ```sh
 node apps/cli/release/package-cli.mjs --output apps/cli/dist
 ```
 
-For a distribution candidate, select an already-installed, release-maintainer
-Developer ID identity without exporting private key material:
+Ad-hoc mode deliberately embeds no provisioning profile and signs with no
+protected credential entitlement. It therefore cannot impersonate or access
+the public CLI's protected credential group. It is not publishable.
 
-```sh
-MULTAIPLAYER_CLI_SIGNING_IDENTITY='Developer ID Application: Example (TEAMID)' \
-  node apps/cli/release/package-cli.mjs --output apps/cli/dist
-```
+## Output and publication
 
-The packager accepts only the direct, non-symlinked `apps/cli/dist` output
-directory. It requires a clean Git tree, uses the exact `HEAD` revision and
-commit timestamp, builds the locked `aarch64-apple-darwin` target, signs only a
-staged copy of `multAIplayer`, and immediately runs the independent package
-verifier. It emits:
+The packager accepts only the direct, non-symlinked `apps/cli/dist` directory.
+It requires a clean tree, records exact `HEAD` and its timestamp, builds the
+locked Apple-silicon target, generates locked dependency notices, signs only the
+staged CLI app, and runs the independent verifier. It emits:
 
 - `multAIplayer-cli-v<version>-darwin-arm64.tar.gz`;
-- the matching `.manifest.json` with source revision, binary/archive checksums,
-  and signature metadata;
-- `SHA256SUMS.txt` covering both files.
+- a matching manifest with source, archive, binary, signature, entitlement, and
+  provisioning-profile evidence;
+- `SHA256SUMS.txt` binding the archive and manifest.
 
-The archive contains only the executable, build metadata, installation guide,
-Apache-2.0 license, and generated notices for the locked Cargo graph. Packaging
-fails if a dependency omits an SPDX license expression, supplies only an
-unreviewed license file, or introduces an expression outside the checked-in
-reviewed allowlist.
+Developer ID artifacts require a secure timestamp and hardened runtime. Before
+publication, submit the exact app-containing artifact to Apple's notarization
+service without changing the signed bundle. Apple's online notarization check
+for the extracted app must succeed. Packaging itself never tags, notarizes,
+uploads, publishes, or writes any desktop release surface.
 
-Local ad-hoc inspection signatures explicitly disable timestamps so repeated
-local verification does not depend on a signing service. Developer ID
-distribution signatures instead require Apple's secure timestamp and hardened
-runtime. The verifier requires Developer ID authority, Team ID, timestamp, and
-hardened-runtime evidence in the manifest. Verification independently inspects
-the extracted executable with `codesign -d` and requires its observed metadata
-to exactly match both manifests. The modes cannot be relabeled.
+The independent tag is `cli-v<version>`. Publish only the exact verified,
+notarized archive, manifest, and checksum file. The maintained installer selects
+that exact CLI tag and never follows the desktop application's release channel.
 
-Packaging never tags, uploads, publishes, or changes a GitHub Release. A release
-maintainer must submit the exact signed binary to Apple's notarization service
-separately and require `codesign -R='notarized' --check-notarization` to succeed
-before publication. The standalone executable is checked through Apple's online
-notarization record rather than a stapled ticket, so verification may require
-network access. Notarization must not enter the desktop release
-workflow or change the already verified CLI binary. External distribution is
-not performed by the isolated packaging command.
-
-The independent CLI tag convention is `cli-v<version>`. Publish the archive,
-matching manifest, and `SHA256SUMS.txt` as assets of that exact tag only after
-the signed and notarized candidate passes release verification. The maintained
-installer resolves that exact version and tag; it never selects the desktop
-application's latest release.
+The `CLI Release` workflow is the maintained publisher. It accepts only the
+exact version tag already reachable from `main`, reruns the locked CLI and
+supply-chain gates, packages on Apple silicon with the dedicated CLI profile,
+submits the signed app to Apple, verifies the online notarization decision, and
+creates a new prerelease without overwriting an existing one. Desktop updater
+artifacts and desktop release metadata are never inputs to this workflow.

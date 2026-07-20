@@ -32,6 +32,7 @@ import { createCodexImageAttachment } from "../application/codex/codexGeneratedI
 
 export function useCodexTurnActions({
   localUser,
+  deviceId,
   maxTerminalActivityLines,
   replaceRoom,
   publishCodexEvent,
@@ -79,7 +80,7 @@ export function useCodexTurnActions({
       state.setApprovalVisibleForRoom(roomId, false);
       return false;
     }
-    if (!canApproveCodexTurn(room, localUser, locked)) {
+    if (!canApproveCodexTurn(room, localUser, deviceId, locked)) {
       const message =
         room.hostStatus === "active"
           ? `Only ${room.host} can approve host-side actions in this room.`

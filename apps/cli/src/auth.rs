@@ -185,7 +185,7 @@ impl<'a, S: CredentialStore, H: HttpClient> AuthClient<'a, S, H> {
 
     pub fn restore_session(&self) -> Result<Option<RestoredSession>, CliError> {
         let Some(encoded) = self.store.get(RELAY_SESSION_ACCOUNT)? else {
-            return Ok(None);
+            return self.restore_from_github_credential();
         };
         let record: StoredRelaySession =
             serde_json::from_str(&encoded).map_err(|_| CliError::InvalidStoredCredential)?;
@@ -198,7 +198,8 @@ impl<'a, S: CredentialStore, H: HttpClient> AuthClient<'a, S, H> {
         let response = self.http.get(&endpoint, &[("cookie", &cookie)])?;
         require_exact_response_url(&response, &endpoint, CliError::RelayUnavailable)?;
         if response.status == 401 {
-            return Ok(None);
+            self.store.delete(RELAY_SESSION_ACCOUNT)?;
+            return self.restore_from_github_credential();
         }
         if !(200..300).contains(&response.status) {
             return Err(CliError::RelayUnavailable);
@@ -208,6 +209,23 @@ impl<'a, S: CredentialStore, H: HttpClient> AuthClient<'a, S, H> {
         Ok(Some(RestoredSession {
             user,
             relay_origin: self.relay_origin.clone(),
+        }))
+    }
+
+    fn restore_from_github_credential(&self) -> Result<Option<RestoredSession>, CliError> {
+        let Some(encoded) = self.store.get(GITHUB_TOKEN_ACCOUNT)? else {
+            return Ok(None);
+        };
+        let record: StoredGitHubCredential =
+            serde_json::from_str(&encoded).map_err(|_| CliError::InvalidStoredCredential)?;
+        if record.version != 1 || record.relay_origin != self.relay_origin {
+            return Err(CliError::RelayOriginMismatch);
+        }
+        validate_access_token(&record.token)?;
+        let authenticated = self.finish_login(Zeroizing::new(record.token))?;
+        Ok(Some(RestoredSession {
+            user: authenticated.user,
+            relay_origin: authenticated.relay_origin,
         }))
     }
 
@@ -635,6 +653,19 @@ mod tests {
         )
     }
 
+    fn verified_relay_response(session: &str) -> HttpResponse {
+        let mut response = MockHttp::respond(
+            &format!("{RELAY}/auth/github/verify"),
+            200,
+            json!({ "user": { "id": "github:42", "login": "maddie", "name": "Maddie" } }),
+        );
+        response.headers.insert(
+            "set-cookie".to_owned(),
+            format!("multaiplayer_session={session}; Path=/; HttpOnly; Secure"),
+        );
+        response
+    }
+
     #[derive(Default)]
     struct RecordingOpener(RefCell<Vec<String>>);
 
@@ -911,6 +942,96 @@ mod tests {
             .headers
             .iter()
             .any(|(name, value)| name == "cookie" && value.contains(SESSION)));
+    }
+
+    #[test]
+    fn missing_relay_session_is_reestablished_from_the_origin_bound_github_credential() {
+        let store = MemoryCredentialStore::default();
+        store.values.borrow_mut().insert(
+            GITHUB_TOKEN_ACCOUNT.to_owned(),
+            serde_json::to_string(&StoredGitHubCredential {
+                version: 1,
+                relay_origin: RELAY.to_owned(),
+                token: ACCESS_TOKEN.to_owned(),
+            })
+            .unwrap(),
+        );
+        let device = load_or_create_identity(&store, "github:42", "Maddie")
+            .unwrap()
+            .public;
+        let http = MockHttp::default();
+        http.push(verified_relay_response(SESSION));
+        http.push(device_response(&serde_json::to_value(device).unwrap()));
+
+        let client = AuthClient::new(&store, &http, CLIENT_ID, RELAY).unwrap();
+        let restored = client.restore_session().unwrap().unwrap();
+
+        assert_eq!(restored.user.login, "maddie");
+        let requests = http.requests.borrow();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].url, format!("{RELAY}/auth/github/verify"));
+        assert_eq!(requests[1].url, format!("{RELAY}/devices"));
+        assert!(requests.iter().all(
+            |request| request.url != GITHUB_DEVICE_CODE_URL && request.url != GITHUB_TOKEN_URL
+        ));
+        assert!(store
+            .values
+            .borrow()
+            .get(RELAY_SESSION_ACCOUNT)
+            .unwrap()
+            .contains(SESSION));
+    }
+
+    #[test]
+    fn expired_relay_session_reauthenticates_without_repeating_the_device_flow() {
+        const REFRESHED_SESSION: &str = "refreshed_relay_session_value_1234567890";
+        let store = MemoryCredentialStore::default();
+        store.values.borrow_mut().insert(
+            RELAY_SESSION_ACCOUNT.to_owned(),
+            serde_json::to_string(&StoredRelaySession {
+                version: 1,
+                relay_origin: RELAY.to_owned(),
+                session: SESSION.to_owned(),
+            })
+            .unwrap(),
+        );
+        store.values.borrow_mut().insert(
+            GITHUB_TOKEN_ACCOUNT.to_owned(),
+            serde_json::to_string(&StoredGitHubCredential {
+                version: 1,
+                relay_origin: RELAY.to_owned(),
+                token: ACCESS_TOKEN.to_owned(),
+            })
+            .unwrap(),
+        );
+        let device = load_or_create_identity(&store, "github:42", "Maddie")
+            .unwrap()
+            .public;
+        let http = MockHttp::default();
+        http.push(MockHttp::respond(
+            &format!("{RELAY}/auth/me"),
+            401,
+            json!({}),
+        ));
+        http.push(verified_relay_response(REFRESHED_SESSION));
+        http.push(device_response(&serde_json::to_value(device).unwrap()));
+
+        let client = AuthClient::new(&store, &http, CLIENT_ID, RELAY).unwrap();
+        let restored = client.restore_session().unwrap().unwrap();
+
+        assert_eq!(restored.user.login, "maddie");
+        let requests = http.requests.borrow();
+        assert_eq!(requests.len(), 3);
+        assert_eq!(requests[0].url, format!("{RELAY}/auth/me"));
+        assert_eq!(requests[1].url, format!("{RELAY}/auth/github/verify"));
+        assert_eq!(requests[2].url, format!("{RELAY}/devices"));
+        assert!(requests.iter().all(
+            |request| request.url != GITHUB_DEVICE_CODE_URL && request.url != GITHUB_TOKEN_URL
+        ));
+        let stored: StoredRelaySession =
+            serde_json::from_str(store.values.borrow().get(RELAY_SESSION_ACCOUNT).unwrap())
+                .unwrap();
+        assert_eq!(stored.session, REFRESHED_SESSION);
     }
 
     #[test]

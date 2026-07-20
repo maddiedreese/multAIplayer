@@ -137,7 +137,7 @@ export function ActiveRoomMainColumn({
   const localDeviceId = React.useMemo(() => loadOrCreateDeviceId(), []);
   const localUser = mainColumnLocalUser(currentUser, localDeviceId);
   const roomLocked = forgotten || revoked || Boolean(selectedRoom.archivedAt);
-  const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser);
+  const isActiveHost = isLocalUserActiveHostForRoom(selectedRoom, localUser, localDeviceId);
   const {
     pendingAttachments,
     selectedMessageIds,
@@ -268,7 +268,7 @@ export function ActiveRoomMainColumn({
       approvalSummary: composeApprovalSummary(),
       isActiveHost,
       codexRunning: codex?.running ?? false,
-      canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, roomLocked),
+      canApproveCodex: hasSelectedRoom && canApproveCodexTurn(selectedRoom, localUser, localDeviceId, roomLocked),
       canUseChat,
       canSendMessage: canUseChat && (Boolean(chat?.draft?.trim()) || pendingAttachments.length > 0),
       roomLocked,
@@ -283,7 +283,9 @@ export function ActiveRoomMainColumn({
         currentMessagesSinceLastCodex,
         roomLocked,
         localUser.id,
-        selectedRoom.hostUserId
+        localDeviceId,
+        selectedRoom.hostUserId,
+        selectedRoom.activeHostDeviceId
       ),
       localPreviewCards,
       pendingAttachmentSummary:
@@ -355,13 +357,23 @@ function focusApprovalCard() {
 
 function queuedCodexTurnRows<
   T extends { turnId: string; requestedBy: string; requestedByUserId: string; queuedAt: string }
->(turns: T[], messagesSinceLastCodex: number, roomLocked: boolean, localUserId: string, hostUserId?: string) {
+>(
+  turns: T[],
+  messagesSinceLastCodex: number,
+  roomLocked: boolean,
+  localUserId: string,
+  localDeviceId: string,
+  hostUserId?: string,
+  activeHostDeviceId?: string
+) {
   return turns.map((turn) => ({
     turnId: turn.turnId,
     requestedBy: turn.requestedBy,
     requestedByUserId: turn.requestedByUserId,
     queuedAt: turn.queuedAt,
     messagesSinceLastCodex,
-    canCancel: !roomLocked && (turn.requestedByUserId === localUserId || hostUserId === localUserId)
+    canCancel:
+      !roomLocked &&
+      (turn.requestedByUserId === localUserId || (hostUserId === localUserId && activeHostDeviceId === localDeviceId))
   }));
 }

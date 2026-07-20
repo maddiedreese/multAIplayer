@@ -166,6 +166,7 @@ function NativeApp() {
   const selectedRuntime = useSelectedRoomRuntime({
     selectedRoom: selectedContext.selectedRoom,
     localUser: localIdentity.localUser,
+    deviceId: localIdentity.deviceId,
     isSelectedRoomLocked: roomInteraction.isSelectedRoomLocked,
     messages: selectedContext.messages,
     replyToMessageId: selectedContext.replyToMessageId,

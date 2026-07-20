@@ -482,8 +482,10 @@ pub(super) fn validate_relay_url(value: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-pub(super) fn token_entry(account: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYCHAIN_SERVICE, account)
+pub(super) fn token_entry(
+    account: &str,
+) -> Result<crate::credential_store::CredentialEntry, String> {
+    crate::credential_store::credential_entry(KEYCHAIN_SERVICE, account)
         .map_err(|_| "The credential store is unavailable.".to_owned())
 }
 
@@ -519,7 +521,7 @@ pub(super) fn load_identity_token() -> Result<String, String> {
 fn try_load_identity_token() -> Result<Option<String>, String> {
     let token = match token_entry(IDENTITY_KEYCHAIN_ACCOUNT)?.get_password() {
         Ok(token) => token,
-        Err(keyring::Error::NoEntry) => return Ok(None),
+        Err(crate::credential_store::CredentialStoreError::NoEntry) => return Ok(None),
         Err(_) => return Err("The stored GitHub identity could not be read securely.".to_owned()),
     };
     if token.is_empty() || token.len() > MAX_TOKEN_CHARS || token.chars().any(char::is_whitespace) {
@@ -545,7 +547,7 @@ pub fn github_repository_access_status(
 
 fn delete_token(account: &str) -> Result<(), String> {
     match token_entry(account)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Ok(()) | Err(crate::credential_store::CredentialStoreError::NoEntry) => Ok(()),
         Err(_) => {
             Err("GitHub credentials could not be removed from the credential store.".to_owned())
         }

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 
 export const releaseRoot = new URL("./", import.meta.url);
@@ -11,6 +12,11 @@ export function readReleaseConfig() {
   assert.equal(config.schema, "multaiplayer-cli-release-v1");
   assert.equal(config.product, "multAIplayer CLI");
   assert.equal(config.binary, "multAIplayer");
+  assert.equal(config.bundle, "multAIplayer.app");
+  assert.equal(config.bundleIdentifier, "com.multaiplayer.cli");
+  assert.equal(config.teamIdentifier, "AXP55K75AX");
+  assert.equal(config.keychainAccessGroup, "AXP55K75AX.com.multaiplayer.cli");
+  assert.equal(config.profileKeychainAccessGroup, "AXP55K75AX.*");
   assert.match(config.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
   assert.equal(config.target, "aarch64-apple-darwin");
   assert.equal(config.platform, "darwin-arm64");
@@ -53,10 +59,225 @@ export function assertSafeOutputDirectory(allowedRoot, output) {
   }
 }
 
-export function signingArguments(identity, binary) {
+export function signingArguments(identity, bundle, entitlements = null) {
   return identity === "-"
-    ? ["--force", "--sign", "-", "--timestamp=none", binary]
-    : ["--force", "--sign", identity, "--options", "runtime", "--timestamp", binary];
+    ? ["--force", "--sign", "-", "--timestamp=none", bundle]
+    : ["--force", "--sign", identity, "--options", "runtime", "--timestamp", "--entitlements", entitlements, bundle];
+}
+
+export function validateProtectedEntitlements(entitlements, config = readReleaseConfig()) {
+  assert.ok(entitlements && typeof entitlements === "object", "signed entitlements are required");
+  assert.equal(
+    entitlements["com.apple.application-identifier"],
+    config.keychainAccessGroup,
+    "application identifier must match the CLI Keychain access group"
+  );
+  assert.equal(
+    entitlements["com.apple.developer.team-identifier"],
+    config.teamIdentifier,
+    "signed Team ID must match the CLI release team"
+  );
+  assert.deepEqual(
+    entitlements["keychain-access-groups"],
+    [config.keychainAccessGroup],
+    "the release may access only its stable CLI Keychain group"
+  );
+  assert.notEqual(entitlements["get-task-allow"], true, "distribution credentials must not be debuggable");
+}
+
+export function assertNoProtectedEntitlements(entitlements = {}, config = readReleaseConfig()) {
+  assert.notEqual(entitlements["com.apple.application-identifier"], config.keychainAccessGroup);
+  assert.notEqual(entitlements["com.apple.developer.team-identifier"], config.teamIdentifier);
+  assert.equal(
+    Array.isArray(entitlements["keychain-access-groups"]) &&
+      entitlements["keychain-access-groups"].includes(config.keychainAccessGroup),
+    false,
+    "ad-hoc inspection builds must not claim the protected CLI Keychain group"
+  );
+}
+
+export function validateProvisioningProfile(profile, config = readReleaseConfig(), now = new Date()) {
+  assert.ok(profile && typeof profile === "object", "a decoded provisioning profile is required");
+  assert.ok(profile.UUID && profile.Name, "the provisioning profile must have a name and UUID");
+  assert.deepEqual(profile.TeamIdentifier, [config.teamIdentifier], "profile Team ID must match the release team");
+  assert.ok(
+    Array.isArray(profile.ApplicationIdentifierPrefix) &&
+      profile.ApplicationIdentifierPrefix.some(
+        (prefix) => prefix === config.teamIdentifier || prefix === `${config.teamIdentifier}.`
+      ),
+    "profile application identifier prefix must match the release team"
+  );
+  assert.equal(profile.ProvisionsAllDevices, true, "a Developer ID distribution profile is required");
+  assert.equal(profile.ProvisionedDevices, undefined, "development profiles are not valid for public releases");
+  assert.ok(new Date(profile.ExpirationDate) > now, "the provisioning profile is expired");
+  assert.equal(
+    profile.Entitlements?.["com.apple.application-identifier"],
+    config.keychainAccessGroup,
+    "profile application identifier must match the CLI release identity"
+  );
+  assert.equal(
+    profile.Entitlements?.["com.apple.developer.team-identifier"],
+    config.teamIdentifier,
+    "profile entitlement Team ID must match the CLI release team"
+  );
+  assert.deepEqual(
+    profile.Entitlements?.["keychain-access-groups"],
+    [config.profileKeychainAccessGroup],
+    "profile must contain only Apple's team-scoped Keychain authorization"
+  );
+  assert.notEqual(profile.Entitlements?.["get-task-allow"], true, "distribution profiles must not be debuggable");
+  return {
+    uuid: profile.UUID,
+    name: profile.Name,
+    expiration: new Date(profile.ExpirationDate).toISOString(),
+    teamIdentifier: config.teamIdentifier,
+    applicationIdentifier: config.keychainAccessGroup,
+    keychainAccessGroups: [config.profileKeychainAccessGroup]
+  };
+}
+
+export function decodePlistBuffer(buffer, label = "property list") {
+  const result = spawnSync("plutil", ["-convert", "json", "-o", "-", "--", "-"], {
+    input: buffer,
+    maxBuffer: 8 * 1024 * 1024
+  });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, `${label} is not a valid property list`);
+  return JSON.parse(result.stdout.toString("utf8"));
+}
+
+function extractProvisioningProfile(buffer) {
+  const temporary = mkdtempSync(resolve(tmpdir(), "multaiplayer-cli-profile-"));
+  try {
+    const plistPath = resolve(temporary, "profile.plist");
+    writeFileSync(plistPath, buffer);
+    const profileXml = plutil(plistPath, null, "xml1").toString("utf8");
+    const certificateXml = plutil(plistPath, "DeveloperCertificates", "xml1").toString("utf8");
+    const certificates = [...certificateXml.matchAll(/<data>([\s\S]*?)<\/data>/g)].map((match) =>
+      match[1].replace(/\s+/g, "")
+    );
+    assert.ok(certificates.length > 0, "provisioning profile has no DeveloperCertificates allowlist");
+    return {
+      UUID: plistRaw(plistPath, "UUID"),
+      Name: plistRaw(plistPath, "Name"),
+      TeamIdentifier: plistStringArray(plistPath, "TeamIdentifier"),
+      ApplicationIdentifierPrefix: plistStringArray(plistPath, "ApplicationIdentifierPrefix"),
+      ProvisionsAllDevices: plistRaw(plistPath, "ProvisionsAllDevices") === "true",
+      ProvisionedDevices: profileXml.includes("<key>ProvisionedDevices</key>")
+        ? plistStringArray(plistPath, "ProvisionedDevices")
+        : undefined,
+      ExpirationDate: plistRaw(plistPath, "ExpirationDate"),
+      Entitlements: {
+        "com.apple.application-identifier": plistRaw(plistPath, "Entitlements.com\\.apple\\.application-identifier"),
+        "com.apple.developer.team-identifier": plistRaw(
+          plistPath,
+          "Entitlements.com\\.apple\\.developer\\.team-identifier"
+        ),
+        "keychain-access-groups": plistStringArray(plistPath, "Entitlements.keychain-access-groups"),
+        ...(profileXml.includes("<key>get-task-allow</key>")
+          ? { "get-task-allow": plistRaw(plistPath, "Entitlements.get-task-allow") === "true" }
+          : {})
+      },
+      DeveloperCertificates: certificates
+    };
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
+function plistRaw(path, keyPath) {
+  return plutil(path, keyPath, "raw").toString("utf8").trim();
+}
+
+function plistStringArray(path, keyPath) {
+  const count = Number(plistRaw(path, keyPath));
+  assert.ok(Number.isSafeInteger(count) && count >= 0, `provisioning profile field ${keyPath} is not an array`);
+  return Array.from({ length: count }, (_, index) => plistRaw(path, `${keyPath}.${index}`));
+}
+
+function plutil(path, keyPath, format) {
+  const args =
+    keyPath === null
+      ? ["-convert", format, "-o", "-", "--", path]
+      : ["-extract", keyPath, format, "-o", "-", "--", path];
+  const result = spawnSync("plutil", args, { encoding: null, maxBuffer: 8 * 1024 * 1024 });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, `provisioning profile field ${keyPath || "root"} is invalid`);
+  return result.stdout;
+}
+
+export function inspectProvisioningProfile(path, config = readReleaseConfig()) {
+  assert.ok(path, "Developer ID mode requires --provisioning-profile or MULTAIPLAYER_CLI_PROVISIONING_PROFILE");
+  assert.equal(existsSync(path), true, "the provisioning profile does not exist");
+  const result = spawnSync("security", ["cms", "-D", "-i", path], {
+    encoding: null,
+    maxBuffer: 8 * 1024 * 1024
+  });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, "the provisioning profile could not be decoded by macOS");
+  const decoded = extractProvisioningProfile(result.stdout);
+  return { decoded, metadata: validateProvisioningProfile(decoded, config) };
+}
+
+export function inspectSignedEntitlements(bundle) {
+  const result = spawnSync("codesign", ["-d", "--entitlements", "-", "--xml", bundle], {
+    encoding: null,
+    maxBuffer: 8 * 1024 * 1024
+  });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, "codesign entitlement inspection failed");
+  const combined = Buffer.concat([result.stdout || Buffer.alloc(0), result.stderr || Buffer.alloc(0)]);
+  const start = combined.indexOf(Buffer.from("<?xml"));
+  assert.notEqual(start, -1, "codesign did not return an entitlement property list");
+  const closingTag = Buffer.from("</plist>");
+  const end = combined.indexOf(closingTag, start);
+  assert.notEqual(end, -1, "codesign returned an incomplete entitlement property list");
+  return decodePlistBuffer(combined.subarray(start, end + closingTag.length), "signed entitlements");
+}
+
+export function inspectSigningCertificate(bundle) {
+  const temporary = mkdtempSync(resolve(tmpdir(), "multaiplayer-cli-signing-certificate-"));
+  try {
+    const prefix = resolve(temporary, "certificate-");
+    const result = spawnSync("codesign", ["-d", `--extract-certificates=${prefix}`, bundle], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    if (result.error) throw result.error;
+    assert.equal(result.status, 0, "the signing certificate chain could not be extracted");
+    const leafPath = `${prefix}0`;
+    assert.equal(existsSync(leafPath), true, "the Developer ID signature has no leaf signing certificate");
+    const der = readFileSync(leafPath);
+    assert.ok(der.length > 0, "the Developer ID leaf signing certificate is empty");
+    return {
+      sha256: createHash("sha256").update(der).digest("hex"),
+      der
+    };
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
+export function bindProvisioningProfileToSigningCertificate(profile, signingCertificate) {
+  assert.ok(Array.isArray(profile?.DeveloperCertificates), "profile has no DeveloperCertificates allowlist");
+  assert.match(signingCertificate?.sha256 || "", /^[0-9a-f]{64}$/);
+  const certificateHashes = profile.DeveloperCertificates.map((certificate, index) => {
+    assert.equal(typeof certificate, "string", `profile DeveloperCertificates[${index}] is not certificate data`);
+    assert.match(
+      certificate,
+      /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/,
+      `profile DeveloperCertificates[${index}] is not canonical base64`
+    );
+    const der = Buffer.from(certificate, "base64");
+    assert.ok(der.length > 0, `profile DeveloperCertificates[${index}] is empty`);
+    return createHash("sha256").update(der).digest("hex");
+  });
+  assert.equal(
+    certificateHashes.filter((hash) => hash === signingCertificate.sha256).length,
+    1,
+    "the exact leaf signing certificate must appear once in the provisioning profile"
+  );
+  return signingCertificate.sha256;
 }
 
 export function validateSignatureMetadata(signature) {

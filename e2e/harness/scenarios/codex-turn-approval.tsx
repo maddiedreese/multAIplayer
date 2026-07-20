@@ -24,6 +24,9 @@ export const mockedBoundaries = ["encrypted room-event delivery", "native Codex 
 
 const host = { id: "github:host", name: "Maddie" };
 const member = { id: "github:member", name: "Avery" };
+const hostDeviceId = "device-host";
+const memberDeviceId = "device-member";
+const deviceIdByActor = { host: hostDeviceId, member: memberDeviceId } as const;
 const room: RoomRecord = {
   id: "room-codex-e2e",
   teamId: "team-e2e",
@@ -31,6 +34,7 @@ const room: RoomRecord = {
   projectPath: "/tmp/multaiplayer-e2e",
   host: host.name,
   hostUserId: host.id,
+  activeHostDeviceId: hostDeviceId,
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   mode: { chat: true, code: true, workspace: true, browser: true },
@@ -85,7 +89,7 @@ export default function CodexApprovalScenario() {
   );
 
   const localUser = actor === "host" ? host : member;
-  const canApprove = canApproveCodexTurn(room, localUser);
+  const canApprove = canApproveCodexTurn(room, localUser, deviceIdByActor[actor]);
   const visibleMessages = messagesSinceLastCodex(approval?.messages ?? messages) as ChatMessage[];
   const summary = approval?.summary;
 

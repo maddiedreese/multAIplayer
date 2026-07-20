@@ -14,6 +14,7 @@ import type { ChatMessage, HostHandoffRecord, LocalRoomHistoryPayload } from "..
 export const seededTeams: TeamRecord[] = [{ id: "team-core", name: "Core Team", members: 2, role: "owner" }];
 
 const roomDefaults = {
+  activeHostDeviceId: "nonbrowser",
   approvalPolicy: "ask_every_turn" as const,
   codexModel: defaultCodexModel,
   codexModelPolicy: defaultCodexModelPolicy,

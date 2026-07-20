@@ -1,10 +1,14 @@
 use crate::CliError;
+#[cfg(target_os = "macos")]
+use keyring_core::{api::CredentialStoreApi, Entry};
 use reqwest::{
     blocking::Client,
     header::{HeaderMap, HeaderName, HeaderValue},
     Url,
 };
 use serde_json::Value;
+#[cfg(all(target_os = "macos", not(debug_assertions)))]
+use std::collections::HashMap;
 use std::{collections::BTreeMap, io::Read, process::Command, time::Duration};
 
 #[cfg(any(test, debug_assertions))]
@@ -16,6 +20,12 @@ use std::{
 };
 
 pub const KEYCHAIN_SERVICE: &str = "com.multaiplayer.cli";
+#[cfg(not(debug_assertions))]
+const KEYCHAIN_ACCESS_GROUP: &str = "AXP55K75AX.com.multaiplayer.cli";
+#[cfg(debug_assertions)]
+pub const KEYCHAIN_BACKEND: &str = "data-protection-keychain-default-group";
+#[cfg(not(debug_assertions))]
+pub const KEYCHAIN_BACKEND: &str = "data-protection-keychain";
 
 pub trait CredentialStore {
     fn get(&self, account: &str) -> Result<Option<String>, CliError>;
@@ -27,17 +37,76 @@ pub trait CredentialStore {
 pub struct KeychainStore;
 
 impl KeychainStore {
-    fn entry(account: &str) -> Result<keyring::Entry, CliError> {
-        keyring::Entry::new(KEYCHAIN_SERVICE, account)
+    #[cfg(target_os = "macos")]
+    fn entry(account: &str) -> Result<Entry, CliError> {
+        #[cfg(debug_assertions)]
+        let store = apple_native_keyring_store::protected::Store::new();
+        #[cfg(not(debug_assertions))]
+        let store = {
+            let configuration = HashMap::from([("access-group", KEYCHAIN_ACCESS_GROUP)]);
+            apple_native_keyring_store::protected::Store::new_with_configuration(&configuration)
+        };
+
+        store
+            .and_then(|store| store.build(KEYCHAIN_SERVICE, account, None))
             .map_err(|_| CliError::CredentialStoreUnavailable)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn entry(_account: &str) -> Result<(), CliError> {
+        Err(CliError::CredentialStoreUnavailable)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn migrate_legacy_without_ui(
+        account: &str,
+        protected: &Entry,
+    ) -> Result<Option<String>, CliError> {
+        static MIGRATION_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+        let _migration = MIGRATION_LOCK
+            .lock()
+            .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        match protected.get_password() {
+            Ok(value) => return Ok(Some(value)),
+            Err(keyring_core::Error::NoEntry) => {}
+            Err(_) => return Err(CliError::CredentialStoreUnavailable),
+        }
+
+        let _interaction =
+            security_framework::os::macos::keychain::SecKeychain::disable_user_interaction()
+                .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        let legacy = apple_native_keyring_store::keychain::Store::new()
+            .and_then(|store| store.build(KEYCHAIN_SERVICE, account, None))
+            .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        let Some(value) = classify_legacy_read(legacy.get_password())? else {
+            return Ok(None);
+        };
+        protected
+            .set_password(&value)
+            .map_err(|_| CliError::CredentialStoreUnavailable)?;
+        let _ = legacy.delete_credential();
+        Ok(Some(value))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn classify_legacy_read(
+    result: Result<String, keyring_core::Error>,
+) -> Result<Option<String>, CliError> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring_core::Error::NoEntry) => Ok(None),
+        Err(_) => Err(CliError::CredentialStoreUnavailable),
     }
 }
 
 impl CredentialStore for KeychainStore {
     fn get(&self, account: &str) -> Result<Option<String>, CliError> {
-        match Self::entry(account)?.get_password() {
+        let entry = Self::entry(account)?;
+        match entry.get_password() {
             Ok(value) => Ok(Some(value)),
-            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(keyring_core::Error::NoEntry) => Self::migrate_legacy_without_ui(account, &entry),
             Err(_) => Err(CliError::CredentialStoreUnavailable),
         }
     }
@@ -50,7 +119,7 @@ impl CredentialStore for KeychainStore {
 
     fn delete(&self, account: &str) -> Result<(), CliError> {
         match Self::entry(account)?.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
             Err(_) => Err(CliError::CredentialStoreUnavailable),
         }
     }
@@ -378,5 +447,28 @@ pub(crate) mod tests {
     fn keychain_namespace_is_cli_specific() {
         assert_eq!(KEYCHAIN_SERVICE, "com.multaiplayer.cli");
         assert!(!KEYCHAIN_SERVICE.contains("desktop"));
+    }
+
+    #[test]
+    fn credential_backend_is_explicit_for_the_build_mode() {
+        #[cfg(debug_assertions)]
+        assert_eq!(KEYCHAIN_BACKEND, "data-protection-keychain-default-group");
+        #[cfg(not(debug_assertions))]
+        assert_eq!(KEYCHAIN_BACKEND, "data-protection-keychain");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn legacy_access_denial_is_not_misclassified_as_missing_key_material() {
+        assert!(matches!(
+            classify_legacy_read(Err(keyring_core::Error::NoEntry)),
+            Ok(None)
+        ));
+        let denied =
+            keyring_core::Error::NoStorageAccess(Box::new(std::io::Error::other("locked")));
+        assert!(matches!(
+            classify_legacy_read(Err(denied)),
+            Err(CliError::CredentialStoreUnavailable)
+        ));
     }
 }

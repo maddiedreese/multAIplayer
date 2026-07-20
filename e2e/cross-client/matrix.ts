@@ -565,6 +565,7 @@ async function runJourney(hostKind: ClientKind, guestKind: ClientKind) {
       const publishedTurns: Array<ReturnType<typeof CodexEventPlaintextPayload.parse>> = [];
       const actions = useCodexTurnActions({
         localUser: { id: host.identity.userId, name: host.identity.displayName },
+        deviceId: host.identity.deviceId,
         maxTerminalActivityLines: 100,
         replaceRoom: () => undefined,
         publishCodexEvent: async (event, boundRoom) => {

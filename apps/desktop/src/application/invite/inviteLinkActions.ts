@@ -42,7 +42,7 @@ export function createInviteLinkActions(
       return;
     }
     const roomId = selectedRoom.id;
-    if (!canCreateRoomInvite(selectedRoom, localUser, false)) {
+    if (!canCreateRoomInvite(selectedRoom, localUser, deviceId, false)) {
       setInviteMessageForRoom(roomId, "Only the active host can create approval-gated invite links.");
       return;
     }

@@ -12,6 +12,7 @@ const room: ClientRoomRecord = {
   projectPath: "/Users/maddie/project",
   host: "Maddie",
   hostUserId: "github:maddie",
+  activeHostDeviceId: "device-host",
   hostStatus: "active",
   approvalPolicy: "ask_every_turn",
   codexModel: "gpt-5.4",
@@ -22,11 +23,12 @@ const host = { id: "github:maddie", name: "Maddie" };
 const terminal = { roomId: room.id };
 
 test("terminal control requires active host access and matching room terminal", () => {
-  assert.equal(canControlRoomTerminal(room, host, terminal), true);
-  assert.equal(canControlRoomTerminal(room, { id: "github:peer", name: "Peer" }, terminal), false);
-  assert.equal(canControlRoomTerminal(room, host, { roomId: "other-room" }), false);
-  assert.equal(canControlRoomTerminal(room, host, null), false);
-  assert.equal(canControlRoomTerminal(room, host, terminal, true), false);
+  assert.equal(canControlRoomTerminal(room, host, "device-host", terminal), true);
+  assert.equal(canControlRoomTerminal(room, { id: "github:peer", name: "Peer" }, "device-host", terminal), false);
+  assert.equal(canControlRoomTerminal(room, host, "device-peer", terminal), false);
+  assert.equal(canControlRoomTerminal(room, host, "device-host", { roomId: "other-room" }), false);
+  assert.equal(canControlRoomTerminal(room, host, "device-host", null), false);
+  assert.equal(canControlRoomTerminal(room, host, "device-host", terminal, true), false);
 });
 
 test("terminal control messages explain unavailable controls", () => {

@@ -1,48 +1,48 @@
 # Install multAIplayer CLI on Apple-silicon macOS
 
-The CLI archive is independent from the multAIplayer desktop application and
-does not use the desktop updater.
-
-The supported installation command is:
+The CLI release is independent from the desktop app and does not use its
+updater. Install it without `sudo`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh
 ```
 
-That installer performs the checksum, Developer ID metadata, secure timestamp,
-and Apple notarization checks below before copying the binary to `/usr/local/bin`.
+The installer downloads one version-bound CLI release, verifies checksums and
+safe archive paths, then verifies the complete `multAIplayer.app` bundle. It
+requires the exact bundle ID, Developer ID team, secure timestamp, hardened
+runtime signature, signed Data Protection Keychain entitlements, embedded
+Developer ID provisioning profile, exact leaf-certificate authorization by that
+profile, and successful Apple notarization check. It rejects unexpected archive
+entries and all links or special entry types before extracting anything.
 
-## Manual verification and installation
+The versioned app is installed under
+`~/Library/Application Support/multAIplayer/cli/versions/<version>/` and the
+command is exposed through `~/.local/bin/multAIplayer`. No administrator access
+is requested. Add `~/.local/bin` to `PATH` if your shell does not already include
+it. `MULTAIPLAYER_CLI_DATA_DIR` and `MULTAIPLAYER_CLI_BIN_DIR` can override these
+two user-local locations.
 
-1. Download the `multAIplayer-cli-*-darwin-arm64.tar.gz` archive, its matching
-   `.manifest.json`, and `SHA256SUMS.txt` from the same published release.
-2. Verify both files from their download directory:
+## Manual verification
 
-   ```sh
-   shasum -a 256 -c SHA256SUMS.txt
-   ```
+Download the archive, matching `.manifest.json`, and `SHA256SUMS.txt` from the
+same `cli-v<version>` release, then:
 
-3. Extract the archive and verify the Apple code signature:
+```sh
+shasum -a 256 -c SHA256SUMS.txt
+tar -xzf multAIplayer-cli-*-darwin-arm64.tar.gz
+codesign --verify --strict --verbose=2 \
+  multAIplayer-cli-*-darwin-arm64/multAIplayer.app
+codesign -d --verbose=4 --entitlements - --xml \
+  multAIplayer-cli-*-darwin-arm64/multAIplayer.app
+security cms -D -i \
+  multAIplayer-cli-*-darwin-arm64/multAIplayer.app/Contents/embedded.provisionprofile
+codesign -vvvv -R='notarized' --check-notarization \
+  multAIplayer-cli-*-darwin-arm64/multAIplayer.app
+```
 
-   ```sh
-   tar -xzf multAIplayer-cli-*-darwin-arm64.tar.gz
-   codesign --verify --strict --verbose=2 multAIplayer-cli-*-darwin-arm64/multAIplayer
-   codesign -d --verbose=4 multAIplayer-cli-*-darwin-arm64/multAIplayer
-   codesign -vvvv -R='notarized' --check-notarization multAIplayer-cli-*-darwin-arm64/multAIplayer
-   ```
-
-4. Inspect the `sourceRevision`, signature identity, and checksums in the release
-   manifest, then install the executable somewhere on your `PATH`:
-
-   ```sh
-   sudo install -d -m 0755 /usr/local/bin
-   sudo install -m 0755 multAIplayer-cli-*-darwin-arm64/multAIplayer /usr/local/bin/multAIplayer
-   multAIplayer --version
-   ```
-
-Only Developer ID-signed artifacts with a secure signing timestamp and
-successful Apple notarization check are distribution builds. Confirm
-that `codesign -d` reports a `Developer ID Application` authority, a 10-character
-Team Identifier, and a timestamp matching the release manifest. An ad-hoc signature produced by the local
-packaging default is timestamp-free, is labeled `adhoc-local-verification` in
-the manifest, and is not a supported public release.
+The signature must authorize only `AXP55K75AX.com.multaiplayer.cli` for team
+`AXP55K75AX`. Apple's Developer ID profile must bind that exact application ID
+and contain only the team-scoped `AXP55K75AX.*` Keychain authorization that
+permits the signature's narrower group. `Info.plist` must identify
+`com.multaiplayer.cli`. An ad-hoc inspection archive has no embedded profile or
+protected Keychain entitlement and is not a public release.

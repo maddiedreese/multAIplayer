@@ -15,6 +15,7 @@ import { approvalPolicyLabels } from "../../appDefaults";
 import type { AppStoreState } from "../../store/appStore";
 import type { MlsMessageRouteContext, MlsMessageStoreActions, RoutedMlsMessage } from "./mlsMessageRouteTypes";
 import { applyRoomConfig } from "../../application/mls/roomConfigSnapshot";
+import { acceptedHandoffMatchesOffer } from "../../lib/handoff/hostHandoffMachine";
 
 export async function routeRoomMessage(
   envelope: RoutedMlsMessage,
@@ -76,7 +77,10 @@ async function routeHostHandoffRequest(
   );
   if (
     !offer ||
-    offer.fromUserId !== room?.hostUserId ||
+    !isEnvelopeFromActiveRoomHost(room, {
+      senderUserId: offer.fromUserId,
+      senderDeviceId: offer.fromDeviceId ?? ""
+    }) ||
     parsed.data.candidateUserId !== envelope.senderUserId ||
     parsed.data.candidateDeviceId !== envelope.senderDeviceId
   )
@@ -103,7 +107,7 @@ async function routeHostHandoffOffer(
   const room = findEnvelopeRoom(context.roomsRef.current, envelope.roomId);
   if (!isEnvelopeFromActiveRoomHost(room, envelope) || parsed.data.fromUserId !== envelope.senderUserId) {
     store.setHostMessageForRoom(envelope.roomId, roomHostEnvelopeRejectionMessage(room, "host handoff"));
-  } else store.appendHostHandoff(envelope.roomId, hostHandoffRecord(parsed.data));
+  } else store.appendHostHandoff(envelope.roomId, hostHandoffRecord(parsed.data, envelope.senderDeviceId));
 }
 
 type DecodedHostHandoff = ReturnType<typeof HostHandoffPlaintextPayload.parse>;
@@ -127,11 +131,12 @@ type HostHandoffDecisionFields = Pick<
   "candidateUserId" | "candidateDeviceId" | "candidateLeaf" | "acceptedBy" | "acceptedByUserId" | "acceptedAt"
 >;
 
-function hostHandoffRecord(payload: DecodedHostHandoff): RoutedHostHandoff {
+function hostHandoffRecord(payload: DecodedHostHandoff, fromDeviceId: string): RoutedHostHandoff {
   return {
     id: payload.id,
     fromHost: payload.fromHost,
     fromUserId: payload.fromUserId,
+    fromDeviceId,
     reason: payload.reason,
     projectPath: payload.projectPath,
     ...hostHandoffGitFields(payload),
@@ -206,16 +211,9 @@ async function routeAcceptedHostHandoff(
   const parsed = HostHandoffAcceptedPlaintextPayload.safeParse(await decrypt());
   if (!parsed.success) return;
   const offer = getStore().codexRuntimeByRoom[envelope.roomId]?.hostHandoffs?.find(
-    (handoff) => handoff.id === parsed.data.offerId && handoff.fromUserId === envelope.senderUserId
+    (handoff) => handoff.id === parsed.data.offerId
   );
-  if (
-    !offer ||
-    offer.status !== "requested" ||
-    offer.candidateUserId !== parsed.data.hostUserId ||
-    offer.candidateDeviceId !== parsed.data.hostDeviceId ||
-    offer.candidateLeaf !== parsed.data.hostLeaf
-  )
-    return;
+  if (!acceptedHandoffMatchesOffer(envelope, parsed.data, offer)) return;
   store.applyAcceptedHostHandoffForRoom(envelope.roomId, {
     ...offer,
     status: "accepted",
