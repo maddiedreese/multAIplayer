@@ -3516,7 +3516,7 @@ dependencies = [
 
 [[package]]
 name = "multaiplayer"
-version = "0.1.0-alpha.8"
+version = "0.1.0-alpha.9"
 dependencies = [
  "age",
  "apple-native-keyring-store",

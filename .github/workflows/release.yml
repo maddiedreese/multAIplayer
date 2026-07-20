@@ -212,7 +212,6 @@ jobs:
           profile_path="apps/desktop/src-tauri/release.provisionprofile"
           profile_plist="$RUNNER_TEMP/release-profile.plist"
           profile_certificate="$RUNNER_TEMP/profile-certificate.der"
-          signing_certificate="$RUNNER_TEMP/signing-certificate.der"
           echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > "$profile_path"
           openssl cms -verify \
             -inform DER \
@@ -262,11 +261,20 @@ jobs:
           }
           plutil -extract DeveloperCertificates.0 raw -o - "$profile_plist" \
             | base64 --decode > "$profile_certificate"
-          security find-certificate \
-            -c "$APPLE_SIGNING_IDENTITY" \
-            -p build.keychain \
-            | openssl x509 -outform DER -out "$signing_certificate"
-          if ! cmp -s "$profile_certificate" "$signing_certificate"; then
+          profile_fingerprint="$(
+            openssl x509 \
+              -inform DER \
+              -in "$profile_certificate" \
+              -noout \
+              -fingerprint \
+              -sha1 \
+              | cut -d= -f2 \
+              | tr -d ':'
+          )"
+          signing_identities="$(security find-identity -v -p codesigning build.keychain)"
+          if ! printf '%s\n' "$signing_identities" \
+            | grep -F "$profile_fingerprint" \
+            | grep -Fq "$APPLE_SIGNING_IDENTITY"; then
             echo "Developer ID provisioning profile does not contain the release signing certificate." >&2
             exit 1
           fi

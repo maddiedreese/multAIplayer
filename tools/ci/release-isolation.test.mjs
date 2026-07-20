@@ -45,3 +45,11 @@ test("ordinary CI requires selected CLI checks and does not change the release w
   assert.match(ci, /require_when_changed "\$CLI_CHANGED" "\$CLI_RESULT"/);
   assert.doesNotMatch(release, /apps\/cli|run-cli-checks|cli-core/);
 });
+
+test("desktop release validates the imported signing identity by profile fingerprint", () => {
+  const release = readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8");
+  assert.match(release, /profile_fingerprint=/);
+  assert.match(release, /security find-identity -v -p codesigning build\.keychain/);
+  assert.match(release, /grep -F "\$profile_fingerprint"[\s\S]*grep -Fq "\$APPLE_SIGNING_IDENTITY"/);
+  assert.doesNotMatch(release, /security find-certificate/);
+});
