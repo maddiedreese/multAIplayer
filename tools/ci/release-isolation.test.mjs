@@ -54,6 +54,8 @@ test("desktop release validates the imported signing identity by profile fingerp
   const release = readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8");
   assert.match(release, /profile_fingerprint=/);
   assert.match(release, /security find-identity -v -p codesigning build\.keychain/);
-  assert.match(release, /grep -F "\$profile_fingerprint"[\s\S]*grep -Fq "\$APPLE_SIGNING_IDENTITY"/);
+  assert.match(release, /matching_identity=.*grep -F "\$profile_fingerprint"/);
+  assert.match(release, /case "\$matching_identity" in[\s\S]*"\$APPLE_SIGNING_IDENTITY"/);
+  assert.doesNotMatch(release, /grep -Fq "\$APPLE_SIGNING_IDENTITY"/);
   assert.doesNotMatch(release, /security find-certificate/);
 });
