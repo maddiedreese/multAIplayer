@@ -326,6 +326,21 @@ Last update: 2026-07-19
   creates and accepts the exact Developer ID-signed, Apple-notarized distribution
   artifact and publishes its independent CLI release assets; no implementation
   task is active.
+- CLI-170-R2 completed the owner-approved join UX and root install
+  discoverability correction at
+  `119063133289eedeef2c4ace9c32044ec55ba8a7`. The exact one-line installer is
+  now visible in the repository README. `multAIplayer room join` writes a fixed
+  local prompt, reads one bounded stdin line after Return, and no longer waits
+  for an undocumented EOF; the invitation remains absent from arguments,
+  diagnostics, events, and prompt output. Formatting, warnings-denied Clippy,
+  the focused input/secrecy test, 9 installer-policy tests, documentation/link
+  checks, the locked 131-test CLI/protocol/mixed-client suite, and all 18
+  classification/release-isolation tests passed. Classification selected
+  documentation, JavaScript, and CLI only, with no desktop, relay, shared,
+  workflow, macOS packaging, or protected desktop-release path. No dependency,
+  manifest, lockfile, invitation encoding, relay/wire contract, MLS policy,
+  desktop behavior, release credential, artifact, or publication changed; no
+  implementation task is active.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -363,6 +378,7 @@ Last update: 2026-07-19
 | CLI-160-R1 | CLI Cargo package parser EOF correction | complete | CLI-160 |
 | CLI-170 | External-alpha readiness review | awaiting_owner_publication_decision | CLI-160, CLI-160-R1 |
 | CLI-170-R1 | Public CLI installation and release documentation | complete | CLI-170 |
+| CLI-170-R2 | Join prompt and root install discoverability | complete | CLI-170-R1 |
 
 ## Release safety snapshot
 
