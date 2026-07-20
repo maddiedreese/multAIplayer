@@ -85,6 +85,8 @@ test("public CLI packaging requires the explicit stable app and provisioning bou
   assert.match(packager, /assertNoProtectedEntitlements/);
   assert.match(packager, /embedded\.provisionprofile/);
   assert.match(packager, /cli\.entitlements\.plist/);
+  assert.match(packager, /"fetch", "--locked", "--manifest-path"/);
+  assert.match(packager, /\["metadata", "--locked", "--offline"/);
   assert.match(verifier, /validateProtectedEntitlements/);
   assert.match(verifier, /assertNoProtectedEntitlements/);
   assert.match(verifier, /bindProvisioningProfileToSigningCertificate/);
