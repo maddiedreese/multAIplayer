@@ -24,6 +24,7 @@ jobs:
       workflow: ${{ steps.paths.outputs.workflow }}
       javascript: ${{ steps.paths.outputs.javascript }}
       native: ${{ steps.paths.outputs.native }}
+      cli: ${{ steps.paths.outputs.cli }}
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -80,7 +81,7 @@ jobs:
   analyze-rust:
     name: rust
     needs: changes
-    if: needs.changes.outputs.native == 'true' || needs.changes.outputs.workflow == 'true'
+    if: needs.changes.outputs.native == 'true' || needs.changes.outputs.cli == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
