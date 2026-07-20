@@ -6,6 +6,12 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.14] - 2026-07-20
+
+### Fixed
+
+- macOS release signatures now embed Apple's complete pinned Developer ID certificate chain and are verified with an isolated empty keychain, so independent verification cannot be masked by certificates installed on the build machine.
+
 ## [0.1.0-alpha.13] - 2026-07-20
 
 ### Added
