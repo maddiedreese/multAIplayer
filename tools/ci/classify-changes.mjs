@@ -20,6 +20,7 @@ const domains = [
 ];
 
 const protectedReleasePatterns = [
+  /^\.github\/workflows\/cli-release\.yml$/,
   /^\.github\/workflows\/release\.yml$/,
   /^apps\/desktop\/package\.json$/,
   /^apps\/desktop\/src-tauri\/Cargo\.(?:lock|toml)$/,

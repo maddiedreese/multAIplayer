@@ -77,3 +77,10 @@ uploads, publishes, or writes any desktop release surface.
 The independent tag is `cli-v<version>`. Publish only the exact verified,
 notarized archive, manifest, and checksum file. The maintained installer selects
 that exact CLI tag and never follows the desktop application's release channel.
+
+The `CLI Release` workflow is the maintained publisher. It accepts only the
+exact version tag already reachable from `main`, reruns the locked CLI and
+supply-chain gates, packages on Apple silicon with the dedicated CLI profile,
+submits the signed app to Apple, verifies the online notarization decision, and
+creates a new prerelease without overwriting an existing one. Desktop updater
+artifacts and desktop release metadata are never inputs to this workflow.

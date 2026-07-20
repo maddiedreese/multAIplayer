@@ -21,6 +21,17 @@ test("CLI packaging remains independent from desktop release inputs", () => {
   }
 });
 
+test("CLI publication has an independent exact-source release workflow", () => {
+  const cliRelease = readFileSync(resolve(root, ".github/workflows/cli-release.yml"), "utf8");
+  assert.match(cliRelease, /cli-v\*/);
+  assert.match(cliRelease, /node apps\/cli\/release\/package-cli\.mjs/);
+  assert.match(cliRelease, /xcrun notarytool submit/);
+  assert.match(cliRelease, /codesign -vvvv -R='notarized' --check-notarization/);
+  assert.match(cliRelease, /CLI_APPLE_PROVISIONING_PROFILE/);
+  assert.match(cliRelease, /gh release create/);
+  assert.doesNotMatch(cliRelease, /apps\/desktop|tauri|updater/);
+});
+
 test("ordinary CI requires selected CLI checks and does not change the release workflow", () => {
   const ci = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
   const release = readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8");

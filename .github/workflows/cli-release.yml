@@ -1,0 +1,191 @@
+name: CLI Release
+
+on:
+  push:
+    tags:
+      - "cli-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing CLI release tag, such as cli-vX.Y.Z-alpha.N"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve immutable CLI release source
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Check out release history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - name: Require an exact main-reachable CLI version tag
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          case "$RELEASE_TAG" in
+            cli-v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "CLI releases require an exact cli-v<version> tag." >&2; exit 1 ;;
+          esac
+          git fetch origin main --tags --force
+          commit="$(git rev-parse "${RELEASE_TAG}^{commit}")"
+          git merge-base --is-ancestor "$commit" origin/main
+          version="$(node -p "JSON.parse(require('fs').readFileSync('apps/cli/release/release-config.json')).version")"
+          test "$RELEASE_TAG" = "cli-v${version}"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Locked CLI verification
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact release source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ needs.resolve.outputs.commit }}
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
+      - name: Set up repository Rust toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run the complete locked CLI gate
+        run: node tools/ci/run-cli-checks.mjs
+
+  supply-chain:
+    name: Exact-source supply-chain gate
+    needs: resolve
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/supply-chain.yml
+    with:
+      commit: ${{ needs.resolve.outputs.commit }}
+
+  build:
+    name: Sign and notarize Apple-silicon CLI
+    needs: [resolve, verify, supply-chain]
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact release source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.resolve.outputs.commit }}
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
+      - name: Set up repository Rust toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Install Apple-silicon Rust target
+        run: rustup target add aarch64-apple-darwin
+      - name: Import Developer ID identity
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY KEYCHAIN_PASSWORD; do
+            test -n "${!name}" || { echo "Missing release signing secret: $name" >&2; exit 1; }
+          done
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            build.keychain
+          security find-identity -v -p codesigning build.keychain | grep -F "$APPLE_SIGNING_IDENTITY"
+      - name: Build and independently verify the signed CLI archive
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          CLI_APPLE_PROVISIONING_PROFILE: ${{ secrets.CLI_APPLE_PROVISIONING_PROFILE }}
+        run: |
+          test -n "$CLI_APPLE_PROVISIONING_PROFILE" || { echo "Missing CLI provisioning profile." >&2; exit 1; }
+          printf '%s' "$CLI_APPLE_PROVISIONING_PROFILE" | base64 --decode > "$RUNNER_TEMP/cli.provisionprofile"
+          MULTAIPLAYER_CLI_SIGNING_IDENTITY="$APPLE_SIGNING_IDENTITY" \
+          MULTAIPLAYER_CLI_PROVISIONING_PROFILE="$RUNNER_TEMP/cli.provisionprofile" \
+            node apps/cli/release/package-cli.mjs --output apps/cli/dist
+      - name: Submit the exact signed app bundle for notarization
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            test -n "${!name}" || { echo "Missing notarization secret: $name" >&2; exit 1; }
+          done
+          stem="multAIplayer-cli-v${RELEASE_VERSION}-darwin-arm64"
+          archive="apps/cli/dist/${stem}.tar.gz"
+          mkdir "$RUNNER_TEMP/notarization"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/notarization"
+          app="$RUNNER_TEMP/notarization/${stem}/multAIplayer.app"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/multAIplayer-cli-notarization.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/multAIplayer-cli-notarization.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --no-progress
+          codesign -vvvv -R='notarized' --check-notarization "$app"
+          node apps/cli/release/verify-package.mjs --output apps/cli/dist
+      - name: Retain exact verified release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: multaiplayer-cli-${{ needs.resolve.outputs.version }}
+          path: apps/cli/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish verified CLI release
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download exact verified release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: multaiplayer-cli-${{ needs.resolve.outputs.version }}
+          path: dist
+      - name: Verify checksums and publish without overwriting
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          (cd dist && shasum -a 256 -c SHA256SUMS.txt)
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --prerelease \
+            --title "multAIplayer CLI ${RELEASE_VERSION}" \
+            --notes "Apple-silicon CLI prerelease. Install with the one-line command in the repository README."
