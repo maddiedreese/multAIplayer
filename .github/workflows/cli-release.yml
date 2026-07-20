@@ -61,7 +61,7 @@ jobs:
         with:
           components: rustfmt clippy
       - name: Install locked repository dependencies
-        run: npm ci --ignore-scripts
+        run: npm ci
       - name: Run the complete locked CLI gate
         run: node tools/ci/run-cli-checks.mjs
 
