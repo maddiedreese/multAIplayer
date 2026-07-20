@@ -6,6 +6,17 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.13] - 2026-07-20
+
+### Added
+
+- The CLI now guides newly signed-in users through room creation or joining, messaging, Codex hosting, and device-bound host handoff.
+
+### Security
+
+- macOS credentials now use app-scoped data-protection Keychain access, preserving native encrypted storage without presenting normal sign-in or runtime password prompts.
+- Host handoff is bound to the selected recipient device and transfers room authority only after the authenticated MLS handoff completes.
+
 ## [0.1.0-alpha.7] - 2026-07-18
 
 ### Fixed
