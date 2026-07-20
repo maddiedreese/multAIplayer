@@ -95,4 +95,3 @@ you intentionally want to destroy that room's local association and history.
 ## Build and package locally
 
 Contributor and release packaging instructions are in [RELEASE.md](RELEASE.md).
-

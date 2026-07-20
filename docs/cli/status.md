@@ -307,7 +307,25 @@ Last update: 2026-07-19
   remain user-visible. The audit recommendation is technically ready but
   **NO-GO for publication** until the owner authorizes a Developer ID-signed
   public artifact and publication. CLI-170 therefore awaits the owner-controlled
-  final decision; no implementation task is active.
+  final decision.
+- CLI-170-R1 completed the owner-approved public installation and release
+  documentation correction at
+  `2dd51addec75df882c1925a138611a3f9adf0d4a`. The public command is a single
+  `curl ... | sh` entry point backed by an exact-version, exact-CLI-tag installer
+  that fails closed on platform, archive/manifest checksums, Developer ID mode,
+  authority, Team ID, secure timestamp, and notarized Gatekeeper assessment
+  before installing. The CLI quickstart, compatibility matrix, limitations,
+  update/uninstall behavior, release/notarization boundary, and stdin-only invite
+  syntax now match the accepted implementation. Shell syntax, 9 packaging-policy
+  tests, documentation/link checks, the locked 131-test CLI/protocol/mixed-client
+  suite, and all 18 classification/release-isolation tests passed. The first
+  sandboxed composed run was denied local listener creation; the required
+  unrestricted rerun passed. Classification selected documentation, JavaScript,
+  and CLI only, with no desktop, shared, relay, workflow, macOS packaging, or
+  protected desktop-release path. Publication remains blocked until the owner
+  creates and accepts the exact Developer ID-signed, Apple-notarized distribution
+  artifact and publishes its independent CLI release assets; no implementation
+  task is active.
 - Every later implementation task is
   `waiting_for_orchestrator_approval` until CLI-000 confirms dependencies and
   grants exact task approval.
@@ -344,6 +362,7 @@ Last update: 2026-07-19
 | CLI-160 | Signed CLI packaging and release isolation | complete | CLI-150 |
 | CLI-160-R1 | CLI Cargo package parser EOF correction | complete | CLI-160 |
 | CLI-170 | External-alpha readiness review | awaiting_owner_publication_decision | CLI-160, CLI-160-R1 |
+| CLI-170-R1 | Public CLI installation and release documentation | complete | CLI-170 |
 
 ## Release safety snapshot
 
