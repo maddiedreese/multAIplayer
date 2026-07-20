@@ -38,8 +38,10 @@ identity, and encryption key material in multAIplayer's private Data Protection
 Keychain access group. Normal CLI use does not show Keychain permission prompts,
 and the CLI cannot read unrelated Keychain items. When upgrading from an older
 alpha, the CLI attempts a one-time legacy credential migration with Keychain UI
-disabled. A legacy item that cannot be read silently produces a storage error;
-the CLI does not replace device or room encryption keys.
+disabled. An unreadable legacy login is not allowed to trigger a system prompt;
+sign in again when asked. If continuity-critical device or room keys cannot be
+migrated, encrypted state fails closed and requires a clean rejoin. A clean
+rejoin cannot restore history encrypted by the unavailable keys.
 
 After a successful login, the CLI prints a short walkthrough from sign-in to
 encrypted chat. Show it again at any time without changing local or remote
@@ -156,7 +158,8 @@ Rerun the installation command to install the version selected by the maintained
 installer. The CLI has no background updater and does not use the desktop
 updater.
 
-To remove the command and installed CLI versions:
+To remove the command and installed CLI versions while preserving encrypted
+room state:
 
 ```sh
 rm "$HOME/.local/bin/multAIplayer"
@@ -164,10 +167,13 @@ rm -R "$HOME/Library/Application Support/multAIplayer/cli"
 ```
 
 Removing the command does not delete Keychain credentials. Removing the CLI
-data directory also removes encrypted room state. Use `multAIplayer auth logout`
-before uninstalling to clear the GitHub and relay credentials. Use
-`multAIplayer room forget <room>` only when you intentionally want to destroy
-that room's local association and history.
+installation directory does not remove encrypted room state, which is stored
+separately at `~/Library/Application Support/com.multaiplayer.cli`. Use
+`multAIplayer auth logout` before uninstalling to clear the GitHub and relay
+credentials. Use `multAIplayer room forget <room>` only when you intentionally
+want to destroy that room's local association and history. Removing the separate
+state directory is a destructive last resort: it forces every room on this Mac
+to rejoin and permanently loses locally retained encrypted history.
 
 ## Build and package locally
 
