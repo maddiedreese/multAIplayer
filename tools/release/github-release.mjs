@@ -41,6 +41,25 @@ export function findReleaseByTag(releases, tag) {
   return matches[0] ?? null;
 }
 
+export function retryReleaseLookup(lookup, wait, attempts = 5) {
+  assert.ok(Number.isSafeInteger(attempts) && attempts > 0, "release lookup attempts must be positive");
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const release = lookup();
+    if (release !== null) return release;
+    if (attempt < attempts) wait();
+  }
+  return null;
+}
+
+function waitForReleaseByTag(repository, tag) {
+  const release = retryReleaseLookup(
+    () => releaseByTag(repository, tag, { optional: true }),
+    () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1_000)
+  );
+  if (release) return release;
+  throw new Error(`GitHub release ${tag} was not visible after draft creation`);
+}
+
 function releaseByTag(repository, tag, { optional = false } = {}) {
   const published = api(`repos/${repository}/releases/tags/${tag}`, { optional: true });
   if (published) return published;
@@ -141,7 +160,7 @@ export function publishRelease({ assetsDirectory, expectedCommit, prerelease, re
     gh(args, { stdio: "inherit" });
   }
 
-  metadata = releaseByTag(repository, tag);
+  metadata = plan === "create-draft" ? waitForReleaseByTag(repository, tag) : releaseByTag(repository, tag);
   for (const asset of metadata.assets) {
     assertPrivateDraft(repository, tag);
     gh(["release", "delete-asset", tag, asset.name, "--yes", "--repo", repository], { stdio: "inherit" });
