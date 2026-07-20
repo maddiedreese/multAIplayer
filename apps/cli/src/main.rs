@@ -41,6 +41,24 @@ use zeroize::Zeroizing;
 const MAX_INVITE_CODE_BYTES: u64 = 12_288;
 const ADMISSION_WAIT_LIMIT: Duration = Duration::from_secs(300);
 
+/// Writes user-facing command output without treating it as diagnostic logging.
+/// Callers must render and sanitize untrusted fields before crossing this boundary.
+fn write_stdout_line(message: &str) {
+    let stdout = std::io::stdout();
+    let mut output = stdout.lock();
+    let _ = output.write_all(message.as_bytes());
+    let _ = output.write_all(b"\n");
+}
+
+/// Writes an interactive trusted prompt to the terminal UI channel. Prompt
+/// renderers sanitize and bound all projected content before it reaches here.
+fn write_trusted_terminal_prompt(message: &str) {
+    let stderr = std::io::stderr();
+    let mut output = stderr.lock();
+    let _ = output.write_all(message.as_bytes());
+    let _ = output.write_all(b"\n");
+}
+
 const HELP: &str = concat!(
     "multAIplayer ",
     env!("CARGO_PKG_VERSION"),
@@ -481,11 +499,13 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
     }
 
     fn trusted_codex_preview(&mut self, preview: &HostPreview) {
-        eprintln!("{}", self.renderer.trusted_prompt(&preview.trusted_text()));
+        let prompt = self.renderer.trusted_prompt(&preview.trusted_text());
+        write_trusted_terminal_prompt(&prompt);
     }
 
     fn trusted_codex_request(&mut self, request: &PrivilegedRequestPrompt) {
-        eprintln!("{}", self.renderer.trusted_prompt(&request.trusted_text()));
+        let prompt = self.renderer.trusted_prompt(&request.trusted_text());
+        write_trusted_terminal_prompt(&prompt);
     }
 
     fn complete(&self, _projected_chat_count: usize) -> Result<bool, ()> {
@@ -1297,7 +1317,7 @@ fn run_room(command: Command) -> ExitCode {
     };
     match result {
         Ok(Outcome::Opened(opened, project_path)) => {
-            println!("{}", opened_room_message(&opened));
+            write_stdout_line(&opened_room_message(&opened));
             match chat_mode {
                 Some(mode) => run_opened_room_chat(
                     &store,
@@ -1315,15 +1335,17 @@ fn run_room(command: Command) -> ExitCode {
             }
         }
         Ok(Outcome::Left(room)) => {
-            println!(
+            let message = format!(
                 "Left {} ({}) locally. Encrypted room data is retained until forget.",
                 safe_terminal_text(&room.name),
-                room.id
+                safe_terminal_text(&room.id)
             );
+            write_stdout_line(&message);
             ExitCode::SUCCESS
         }
         Ok(Outcome::Forgotten(room_id)) => {
-            println!("Forgot {room_id} on this device.");
+            let room_id = safe_terminal_text(&room_id);
+            write_stdout_line(&format!("Forgot {room_id} on this device."));
             ExitCode::SUCCESS
         }
         Err(error) => room_error(error),
