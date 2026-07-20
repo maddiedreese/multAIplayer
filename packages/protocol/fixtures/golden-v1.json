@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "authority": "packages/protocol Zod schemas",
+  "cases": [
+    {
+      "name": "client-join",
+      "schema": "RelayClientMessage",
+      "json": "{\"type\":\"join\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"userId\":\"user-1\",\"deviceId\":\"device-1\",\"inviteId\":\"invite-1\",\"deviceSessionToken\":\"ssssssssssssssssssssssssssssssss\"}"
+    },
+    {
+      "name": "client-subscribe-team",
+      "schema": "RelayClientMessage",
+      "json": "{\"type\":\"subscribe.team\",\"teamId\":\"team-1\",\"userId\":\"user-1\",\"deviceId\":\"device-1\"}"
+    },
+    {
+      "name": "client-subscribe-workspace",
+      "schema": "RelayClientMessage",
+      "json": "{\"type\":\"subscribe.workspace\",\"userId\":\"user-1\",\"deviceId\":\"device-1\"}"
+    },
+    {
+      "name": "client-publish",
+      "schema": "RelayClientMessage",
+      "json": "{\"type\":\"publish\",\"message\":{\"id\":\"message-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"senderDeviceId\":\"device-1\",\"senderUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"messageType\":\"application\",\"epochHint\":7,\"mlsMessage\":\"AA==\"}}"
+    },
+    {
+      "name": "client-presence",
+      "schema": "RelayClientMessage",
+      "json": "{\"type\":\"presence\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"userId\":\"user-1\",\"deviceId\":\"device-1\",\"displayName\":\"Maddie\",\"avatarUrl\":\"https://example.test/avatar\",\"publicKeyFingerprint\":\"sha256:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd\"}"
+    },
+    {
+      "name": "server-joined",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"joined\",\"teamId\":\"team-1\",\"roomId\":\"room-1\"}"
+    },
+    {
+      "name": "server-team-subscribed",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"team.subscribed\",\"teamId\":\"team-1\"}"
+    },
+    {
+      "name": "server-workspace-subscribed",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"workspace.subscribed\"}"
+    },
+    {
+      "name": "server-invite-requested",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"invite.requested\",\"inviteId\":\"invite-1\",\"requestId\":\"request-1\"}"
+    },
+    {
+      "name": "server-published",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"published\",\"messageId\":\"message-1\"}"
+    },
+    {
+      "name": "server-mls-message",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"mls.message\",\"message\":{\"id\":\"message-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"senderDeviceId\":\"device-1\",\"senderUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"messageType\":\"application\",\"epochHint\":7,\"mlsMessage\":\"AA==\"}}"
+    },
+    {
+      "name": "server-presence",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"presence\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"userId\":\"user-1\",\"deviceId\":\"device-1\",\"displayName\":\"Maddie\",\"status\":\"online\"}"
+    },
+    {
+      "name": "server-room-updated",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"room.updated\",\"room\":{\"id\":\"room-1\",\"teamId\":\"team-1\",\"acceptedMlsEpoch\":7,\"name\":\"Protocol room\",\"host\":\"Maddie\",\"hostUserId\":\"user-1\",\"activeHostDeviceId\":\"device-1\",\"hostStatus\":\"active\",\"approvalPolicy\":\"ask_every_turn\"}}"
+    },
+    {
+      "name": "server-team-updated",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"team.updated\",\"team\":{\"id\":\"team-1\",\"name\":\"Core team\",\"members\":2,\"role\":\"owner\"}}"
+    },
+    {
+      "name": "server-error",
+      "schema": "RelayServerMessage",
+      "json": "{\"type\":\"error\",\"message\":\"stale\",\"code\":\"stale_epoch\",\"messageId\":\"message-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\"}"
+    },
+    {
+      "name": "mls-application",
+      "schema": "MlsRelayMessage",
+      "json": "{\"id\":\"message-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"senderDeviceId\":\"device-1\",\"senderUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"messageType\":\"application\",\"epochHint\":7,\"mlsMessage\":\"AA==\"}"
+    },
+    {
+      "name": "mls-host-handoff",
+      "schema": "MlsRelayMessage",
+      "json": "{\"id\":\"message-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"senderDeviceId\":\"device-1\",\"senderUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"messageType\":\"commit\",\"epochHint\":7,\"mlsMessage\":\"AA==\",\"commitEffect\":\"host_handoff\",\"nextHostUserId\":\"user-2\",\"nextHostDeviceId\":\"device-2\",\"hostTransferAuthorization\":{\"version\":2,\"transferId\":\"transfer-1\",\"roomId\":\"room-1\",\"commitMessageId\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"parentEpoch\":7,\"outgoingHostUserId\":\"user-1\",\"outgoingHostDeviceId\":\"device-1\",\"nextHostUserId\":\"user-2\",\"nextHostDeviceId\":\"device-2\",\"nextHostLeaf\":1,\"signatureDer\":\"AA==\",\"publicKeySpkiDer\":\"AA==\"}}"
+    },
+    {
+      "name": "key-package-upload",
+      "schema": "KeyPackageUpload",
+      "json": "{\"id\":\"package-1\",\"keyPackage\":\"AA==\",\"keyPackageHash\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"ciphersuite\":2}"
+    },
+    {
+      "name": "key-package-record",
+      "schema": "KeyPackageRecord",
+      "json": "{\"id\":\"package-1\",\"keyPackage\":\"AA==\",\"keyPackageHash\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"ciphersuite\":2,\"userId\":\"user-1\",\"deviceId\":\"device-1\",\"credentialIdentity\":\"credential-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "presence-record",
+      "schema": "PresenceMessage",
+      "json": "{\"type\":\"presence\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"userId\":\"user-1\",\"deviceId\":\"device-1\",\"displayName\":\"Maddie\",\"publicKeyFingerprint\":\"sha256:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd\"}"
+    },
+    {
+      "name": "http-error-passthrough",
+      "schema": "RelayHttpErrorResponse",
+      "json": "{\"error\":\"Slow down.\",\"code\":\"rate_limited\",\"retryAfterSeconds\":5}"
+    },
+    {
+      "name": "team-record",
+      "schema": "TeamRecord",
+      "json": "{\"id\":\"team-1\",\"name\":\"Core team\",\"members\":2,\"role\":\"owner\"}"
+    },
+    {
+      "name": "team-member-record",
+      "schema": "TeamMemberRecord",
+      "json": "{\"teamId\":\"team-1\",\"userId\":\"user-1\",\"role\":\"admin\",\"joinedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "device-record",
+      "schema": "DeviceRecord",
+      "json": "{\"userId\":\"user-1\",\"deviceId\":\"device-1\",\"displayName\":\"Maddie\",\"signaturePublicKey\":\"signature-key\",\"signatureKeyFingerprint\":\"sha256:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd\",\"hpkePublicKey\":\"hpke-key\",\"hpkeKeyFingerprint\":\"sha256:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd:abcd\",\"registeredAt\":\"2026-07-18T12:34:56.000Z\",\"lastSeenAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "room-record",
+      "schema": "RoomRecord",
+      "json": "{\"id\":\"room-1\",\"teamId\":\"team-1\",\"acceptedMlsEpoch\":7,\"name\":\"Protocol room\",\"host\":\"Maddie\",\"hostUserId\":\"user-1\",\"activeHostDeviceId\":\"device-1\",\"hostStatus\":\"active\",\"approvalPolicy\":\"ask_every_turn\"}"
+    },
+    {
+      "name": "client-room-record",
+      "schema": "ClientRoomRecord",
+      "json": "{\"id\":\"room-1\",\"teamId\":\"team-1\",\"acceptedMlsEpoch\":7,\"name\":\"Protocol room\",\"host\":\"Maddie\",\"hostUserId\":\"user-1\",\"activeHostDeviceId\":\"device-1\",\"hostStatus\":\"active\",\"approvalPolicy\":\"ask_every_turn\",\"projectPath\":\"/tmp/project\",\"codexModel\":\"gpt-5.6-sol\",\"codexModelPolicy\":\"auto\",\"codexReasoningEffort\":\"medium\",\"codexReasoningEffortPolicy\":\"auto\",\"codexRawReasoningEnabled\":false,\"codexSpeed\":\"standard\",\"codexServiceTierPolicy\":\"auto\",\"codexSandboxLevel\":\"workspace_write\",\"configRevision\":1,\"configEpoch\":7,\"configPending\":false,\"unread\":0}"
+    },
+    {
+      "name": "invite-record",
+      "schema": "InviteRecord",
+      "json": "{\"id\":\"invite-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"creatorUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"expiresAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "invite-join-request",
+      "schema": "InviteJoinRequestRecord",
+      "json": "{\"requestId\":\"request-1\",\"inviteId\":\"invite-1\",\"requesterUserId\":\"user-2\",\"requesterDeviceId\":\"device-2\",\"keyPackageId\":\"package-1\",\"keyPackageHash\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"sealedRequest\":\"AA==\",\"createdAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "invite-response",
+      "schema": "InviteResponseRecord",
+      "json": "{\"requestId\":\"request-1\",\"inviteId\":\"invite-1\",\"requesterUserId\":\"user-2\",\"requesterDeviceId\":\"device-2\",\"keyPackageHash\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"status\":\"approved\",\"responseBinding\":{\"version\":3,\"phase\":\"response\",\"inviteId\":\"invite-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"keyEpoch\":7,\"keyPackageHash\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"requestId\":\"request-1\",\"requestNonce\":\"nonce-1\",\"requesterUserId\":\"user-2\",\"requesterDeviceId\":\"device-2\",\"hostUserId\":\"user-1\",\"hostDeviceId\":\"device-1\",\"expiresAt\":\"2026-07-18T12:34:56.000Z\",\"status\":\"approved\",\"decidedAt\":\"2026-07-18T12:34:56.000Z\"},\"responseMac\":\"AA==\",\"welcome\":\"AA==\",\"createdAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "attachment-record",
+      "schema": "AttachmentBlobRecord",
+      "json": "{\"id\":\"blob-1\",\"teamId\":\"team-1\",\"roomId\":\"room-1\",\"name\":\"note.txt\",\"type\":\"text/plain\",\"size\":5,\"uploadedByUserId\":\"user-1\",\"epoch\":7,\"sealedBlob\":\"AA==\",\"createdAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "chat-message",
+      "schema": "ChatPlaintextPayload",
+      "kind": "chat.message",
+      "json": "{\"id\":\"chat-1\",\"author\":\"Maddie\",\"authorUserId\":\"user-1\",\"role\":\"human\",\"body\":\"Hello\",\"time\":\"12:34\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"attachments\":[{\"id\":\"attachment-1\",\"name\":\"note.txt\",\"type\":\"text/plain\",\"size\":5,\"content\":\"hello\"}]}"
+    },
+    {
+      "name": "chat-reaction",
+      "schema": "ChatReactionPlaintextPayload",
+      "kind": "chat.reaction",
+      "json": "{\"id\":\"reaction-1\",\"messageId\":\"chat-1\",\"emoji\":\"👍\",\"action\":\"add\",\"reactor\":\"Maddie\",\"reactorUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "chat-edit",
+      "schema": "ChatEditPlaintextPayload",
+      "kind": "chat.edit",
+      "json": "{\"id\":\"edit-1\",\"messageId\":\"chat-1\",\"body\":\"Hello again\",\"editedBy\":\"Maddie\",\"editedByUserId\":\"user-1\",\"editedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "chat-delete",
+      "schema": "ChatDeletePlaintextPayload",
+      "kind": "chat.delete",
+      "json": "{\"id\":\"delete-1\",\"messageId\":\"chat-1\",\"deletedBy\":\"Maddie\",\"deletedByUserId\":\"user-1\",\"deletedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "terminal-request",
+      "schema": "TerminalRequestPlaintextPayload",
+      "kind": "terminal.request",
+      "json": "{\"id\":\"request-1\",\"requester\":\"Maddie\",\"requesterUserId\":\"user-1\",\"command\":\"cargo test\",\"cwd\":\"/tmp/project\",\"requestedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "terminal-result",
+      "schema": "TerminalResultPlaintextPayload",
+      "kind": "terminal.event",
+      "json": "{\"eventType\":\"terminal.result\",\"requestId\":\"request-1\",\"command\":\"cargo test\",\"cwd\":\"/tmp/project\",\"exitStatus\":0,\"stdout\":\"ok\",\"stderr\":\"\",\"ranBy\":\"Maddie\",\"ranByUserId\":\"user-1\",\"startedAt\":\"2026-07-18T12:34:56.000Z\",\"finishedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "terminal-status",
+      "schema": "RequestStatusPlaintextPayload",
+      "kind": "terminal.event",
+      "json": "{\"requestId\":\"request-1\",\"status\":\"approved\",\"decidedBy\":\"Maddie\",\"decidedByUserId\":\"user-1\",\"decidedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "browser-request",
+      "schema": "BrowserRequestPlaintextPayload",
+      "kind": "browser.request",
+      "json": "{\"id\":\"browser-1\",\"requester\":\"Maddie\",\"requesterUserId\":\"user-1\",\"url\":\"https://example.test\",\"reason\":\"Docs\",\"requestedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "browser-status",
+      "schema": "RequestStatusPlaintextPayload",
+      "kind": "browser.event",
+      "json": "{\"requestId\":\"request-1\",\"status\":\"approved\",\"decidedBy\":\"Maddie\",\"decidedByUserId\":\"user-1\",\"decidedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "workspace-request",
+      "schema": "WorkspaceFileSaveRequestPlaintextPayload",
+      "kind": "workspace.request",
+      "json": "{\"eventType\":\"workspace.file.save\",\"id\":\"save-1\",\"requester\":\"Maddie\",\"requesterUserId\":\"user-1\",\"path\":\"src/lib.rs\",\"previousContent\":\"old\",\"nextContent\":\"new\",\"requestedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "workspace-status",
+      "schema": "RequestStatusPlaintextPayload",
+      "kind": "workspace.event",
+      "json": "{\"requestId\":\"request-1\",\"status\":\"approved\",\"decidedBy\":\"Maddie\",\"decidedByUserId\":\"user-1\",\"decidedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "preview-event",
+      "schema": "LocalPreviewPlaintextPayload",
+      "kind": "preview.event",
+      "json": "{\"eventType\":\"local.preview\",\"id\":\"preview-1\",\"sharedBy\":\"Maddie\",\"sharedByUserId\":\"user-1\",\"sourceUrl\":\"http://localhost:3000\",\"status\":\"live\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"updatedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "codex-event",
+      "schema": "CodexEventPlaintextPayload",
+      "kind": "codex.event",
+      "json": "{\"eventType\":\"codex.turn\",\"turnId\":\"turn-1\",\"status\":\"completed\",\"message\":\"Done\",\"model\":\"gpt-5.6-sol\",\"host\":\"Maddie\",\"hostUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "codex-activity",
+      "schema": "CodexActivityPlaintextPayload",
+      "kind": "codex.activity",
+      "json": "{\"eventType\":\"codex.activity\",\"activityId\":\"activity-1\",\"turnId\":\"turn-1\",\"itemId\":\"item-1\",\"kind\":\"reasoning\",\"status\":\"completed\",\"title\":\"Reasoning\",\"details\":{\"type\":\"reasoning\",\"summaries\":[\"Checked parity.\"]},\"startedAt\":\"2026-07-18T12:34:56.000Z\",\"updatedAt\":\"2026-07-18T12:34:56.000Z\",\"host\":\"Maddie\",\"hostUserId\":\"user-1\"}"
+    },
+    {
+      "name": "codex-queue",
+      "schema": "CodexQueuePlaintextPayload",
+      "kind": "codex.queue",
+      "json": "{\"eventType\":\"codex.queue\",\"queueEventId\":\"queue-1\",\"turnId\":\"turn-1\",\"action\":\"queued\",\"requestedBy\":\"Maddie\",\"requestedByUserId\":\"user-1\",\"queuePosition\":1,\"queueSize\":1,\"createdAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "git-workflow",
+      "schema": "GitWorkflowEventPlaintextPayload",
+      "kind": "git.event",
+      "json": "{\"eventType\":\"git.workflow\",\"status\":\"completed\",\"branch\":\"codex/cli-030\",\"push\":false,\"message\":\"Passed\",\"runner\":\"Maddie\",\"runnerUserId\":\"user-1\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"results\":[{\"command\":\"git diff --check\",\"cwd\":\"/tmp/project\",\"status\":0,\"stdout\":\"\",\"stderr\":\"\"}]}"
+    },
+    {
+      "name": "github-actions",
+      "schema": "GitHubActionsEventPlaintextPayload",
+      "kind": "git.event",
+      "json": "{\"eventType\":\"github.actions\",\"owner\":\"owner\",\"repo\":\"repo\",\"branch\":\"main\",\"summary\":{\"label\":\"Passing\",\"detail\":\"All checks passed\",\"tone\":\"green\"},\"message\":\"Passing\",\"checkedBy\":\"Maddie\",\"checkedByUserId\":\"user-1\",\"checkedAt\":\"2026-07-18T12:34:56.000Z\",\"runs\":[{\"id\":1,\"name\":\"test\",\"status\":\"completed\",\"conclusion\":\"success\",\"url\":\"https://example.test/run\",\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"updatedAt\":\"2026-07-18T12:34:56.000Z\"}]}"
+    },
+    {
+      "name": "host-handoff",
+      "schema": "HostHandoffPlaintextPayload",
+      "kind": "room.host",
+      "json": "{\"id\":\"handoff-1\",\"fromHost\":\"Maddie\",\"fromUserId\":\"user-1\",\"reason\":\"manual\",\"projectPath\":\"/tmp/project\",\"codexModel\":\"gpt-5.6-sol\",\"codexModelPolicy\":\"auto\",\"codexReasoningEffort\":\"medium\",\"codexReasoningEffortPolicy\":\"auto\",\"codexRawReasoningEnabled\":false,\"codexSpeed\":\"standard\",\"codexServiceTierPolicy\":\"auto\",\"codexSandboxLevel\":\"workspace_write\",\"approvalPolicy\":\"ask_every_turn\",\"messagesSinceLastCodex\":0,\"queuedCodexTurns\":[],\"attachmentNames\":[],\"terminals\":[],\"createdAt\":\"2026-07-18T12:34:56.000Z\",\"status\":\"available\"}"
+    },
+    {
+      "name": "host-handoff-request",
+      "schema": "HostHandoffRequestPlaintextPayload",
+      "kind": "room.host.request",
+      "json": "{\"phase\":\"candidate_request\",\"offerId\":\"handoff-1\",\"candidateUserId\":\"user-2\",\"candidateDeviceId\":\"device-2\",\"candidateLeaf\":1}"
+    },
+    {
+      "name": "host-handoff-accepted",
+      "schema": "HostHandoffAcceptedPlaintextPayload",
+      "kind": "room.host.accepted",
+      "json": "{\"phase\":\"accepted\",\"offerId\":\"handoff-1\",\"hostUserId\":\"user-2\",\"hostDeviceId\":\"device-2\",\"hostLeaf\":1,\"committedEpoch\":8}"
+    },
+    {
+      "name": "room-settings",
+      "schema": "RoomSettingsPlaintextPayload",
+      "kind": "room.settings",
+      "json": "{\"eventType\":\"room.settings\",\"id\":\"settings-1\",\"setting\":\"roomName\",\"previousValue\":\"Old\",\"nextValue\":\"New\",\"changedBy\":\"Maddie\",\"changedByUserId\":\"user-1\",\"changedAt\":\"2026-07-18T12:34:56.000Z\"}"
+    },
+    {
+      "name": "room-config",
+      "schema": "RoomConfigPlaintextPayload",
+      "kind": "room.config",
+      "json": "{\"eventType\":\"room.config\",\"configRevision\":1,\"emittingEpoch\":7,\"projectPath\":\"/tmp/project\",\"codexModel\":\"gpt-5.6-sol\",\"codexModelPolicy\":\"auto\",\"codexReasoningEffort\":\"medium\",\"codexReasoningEffortPolicy\":\"auto\",\"codexRawReasoningEnabled\":false,\"codexSpeed\":\"standard\",\"codexServiceTierPolicy\":\"auto\",\"codexSandboxLevel\":\"workspace_write\"}"
+    }
+  ]
+}

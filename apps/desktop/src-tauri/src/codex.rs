@@ -1,11 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
 use std::sync::atomic::Ordering;
-use std::sync::{mpsc, Arc, Mutex, OnceLock};
-use std::thread;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
@@ -26,11 +23,15 @@ use crate::codex_steering::{
     new_codex_steering_responses, register_active_codex_turn, route_codex_steer_response,
 };
 use crate::codex_turn_lifecycle::{cancel_codex_turns_for_room, CodexTurnLease};
-use crate::process::terminate_child;
 use crate::validation::{
     codex_timeout, ensure_codex_input, ensure_room_id, normalize_codex_thread_id,
 };
 use crate::workspace::ensure_existing_dir;
+use codex_activity_projection::host::{
+    extract_text_delta as core_extract_text_delta, thread_id_from_response,
+    thread_request as core_thread_request, thread_start_request as codex_thread_start_request,
+    AppServerProcess, AppServerProcessConfig,
+};
 use codex_activity_projection::{bounded_codex_identifier, project_codex_activity};
 
 #[derive(Debug, Serialize)]
@@ -100,10 +101,9 @@ pub(crate) struct CodexSandboxConfig {
 }
 
 struct CodexServerSession {
-    child: Child,
+    process: AppServerProcess,
     stdin: SharedStdin,
     inbox: RpcInbox,
-    stderr_rx: mpsc::Receiver<String>,
     next_id: i64,
     last_used: Instant,
     session_id: u64,
@@ -395,7 +395,7 @@ impl Drop for CodexServerSession {
     fn drop(&mut self) {
         self.rpc_state
             .cancel_session(self.session_id, "Codex app-server session ended");
-        terminate_child(&mut self.child);
+        self.process.terminate();
     }
 }
 
@@ -501,56 +501,15 @@ pub(crate) fn codex_thread_request(
     cwd: &str,
     model: &str,
 ) -> Value {
-    match previous_thread_id {
-        Some(thread_id) => codex_thread_resume_request(id, thread_id, cwd, model),
-        None => codex_thread_start_request(id, cwd, model),
-    }
+    core_thread_request(id, previous_thread_id, cwd, model)
 }
 
-fn codex_thread_start_request(id: i64, cwd: &str, model: &str) -> Value {
-    json!({
-        "method": "thread/start",
-        "id": id,
-        "params": {
-            "model": model,
-            "cwd": cwd
-        }
-    })
-}
-
-fn codex_thread_resume_request(id: i64, thread_id: &str, cwd: &str, model: &str) -> Value {
-    json!({
-        "method": "thread/resume",
-        "id": id,
-        "params": {
-            "threadId": thread_id,
-            "model": model,
-            "cwd": cwd,
-            "excludeTurns": true
-        }
-    })
-}
-
-fn extract_text_delta(value: &Value) -> Option<String> {
-    let params = value.get("params")?;
-    for key in ["delta", "text", "message", "content"] {
-        if let Some(text) = params.get(key).and_then(Value::as_str) {
-            return Some(text.to_string());
-        }
-    }
-    if let Some(item) = params.get("item") {
-        for key in ["text", "message", "content"] {
-            if let Some(text) = item.get(key).and_then(Value::as_str) {
-                return Some(text.to_string());
-            }
-        }
-    }
-    None
-}
-
-fn cleanup_on_error<T>(child: &mut Child, result: Result<T, String>) -> Result<T, String> {
+fn cleanup_on_error<T>(
+    process: &mut AppServerProcess,
+    result: Result<T, String>,
+) -> Result<T, String> {
     if result.is_err() {
-        terminate_child(child);
+        process.terminate();
     }
     result
 }

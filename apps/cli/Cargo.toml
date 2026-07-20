@@ -1,0 +1,31 @@
+[package]
+name = "multaiplayer-cli"
+version = "0.1.0-alpha.1"
+description = "Terminal client for multAIplayer."
+authors = ["Maddie D. Reese"]
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[[bin]]
+name = "multAIplayer"
+path = "src/main.rs"
+
+[workspace]
+members = ["crates/protocol"]
+resolver = "2"
+
+[dependencies]
+base64 = "=0.22.1"
+codex-host-core = { package = "codex-activity-projection", path = "../desktop/src-tauri/crates/codex-activity-projection" }
+keyring = "=4.1.5"
+mls-core = { path = "../desktop/src-tauri/crates/mls-core" }
+multaiplayer-protocol = { path = "crates/protocol" }
+reqwest = { version = "=0.12.28", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+thiserror = "=2.0.18"
+tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+uuid = { version = "=1.24.0", features = ["v4"] }
+zeroize = "=1.9.0"

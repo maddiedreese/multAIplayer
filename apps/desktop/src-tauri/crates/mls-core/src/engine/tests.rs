@@ -127,3 +127,50 @@ fn corrupt_serialized_group_requires_rejoin_but_missing_group_does_not() {
         .unwrap();
     assert_eq!(engine.join_welcome("corrupt-room", &add.welcome), Ok(1));
 }
+
+#[test]
+fn exact_forget_clears_room_caches_only_after_durable_success_and_is_repeatable() {
+    let mut engine = MlsEngine::new(BasicAppCredential {
+        github_user_id: "1".into(),
+        device_id: "device".into(),
+    })
+    .unwrap();
+    engine.create_group("room-delete").unwrap();
+    engine.create_group("room-sibling").unwrap();
+    let pending = engine.hosts.get("room-delete").unwrap().clone();
+    engine.pending_hosts.insert("room-delete".into(), pending);
+
+    engine
+        .group_storage
+        .fail_room_deletion_at_for_test(Some(crate::storage::RoomDeletionStage::BeforeCommit));
+    let error = engine.forget_group("room-delete").unwrap_err();
+    assert_eq!(error.category(), Some(super::EngineErrorCategory::Storage));
+    assert!(engine.groups.contains_key("room-delete"));
+    assert!(engine.hosts.contains_key("room-delete"));
+    assert!(engine.pending_hosts.contains_key("room-delete"));
+    assert!(engine
+        .group_storage
+        .has_group_snapshot(b"room-delete")
+        .unwrap());
+    assert!(engine.groups.contains_key("room-sibling"));
+    assert!(engine.hosts.contains_key("room-sibling"));
+
+    engine.group_storage.fail_room_deletion_at_for_test(None);
+    engine.forget_group("room-delete").unwrap();
+    assert!(!engine.groups.contains_key("room-delete"));
+    assert!(!engine.hosts.contains_key("room-delete"));
+    assert!(!engine.pending_hosts.contains_key("room-delete"));
+    assert!(!engine
+        .group_storage
+        .has_group_snapshot(b"room-delete")
+        .unwrap());
+    assert!(engine.groups.contains_key("room-sibling"));
+    assert!(engine.hosts.contains_key("room-sibling"));
+
+    engine.forget_group("room-delete").unwrap();
+    assert_eq!(
+        engine.open_group("room-delete"),
+        Err(EngineError::GroupNotFound)
+    );
+    assert_eq!(engine.open_group("room-sibling"), Ok(0));
+}

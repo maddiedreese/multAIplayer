@@ -21,6 +21,11 @@ jobs:
       workflow: ${{ steps.paths.outputs.workflow }}
       javascript: ${{ steps.paths.outputs.javascript }}
       native: ${{ steps.paths.outputs.native }}
+      cli: ${{ steps.paths.outputs.cli }}
+      desktop: ${{ steps.paths.outputs.desktop }}
+      relay: ${{ steps.paths.outputs.relay }}
+      shared: ${{ steps.paths.outputs.shared }}
+      protected_release: ${{ steps.paths.outputs.protected_release }}
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -127,10 +132,30 @@ jobs:
       - name: Verify native code and release metadata
         run: npm run check:release-versions && npm run fmt:rust:check && npm run lint:rust && npm run test:native
 
+  cli-core:
+    name: CLI isolation and checks
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Set up locked Node and npm
+        uses: ./.github/actions/setup-node-npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Set up repository Rust toolchain and CLI lint components
+        uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt clippy
+      - name: Verify CLI classification, release isolation, and Rust workspace
+        run: node --test tools/ci/classify-changes.test.mjs tools/ci/release-isolation.test.mjs && node tools/ci/run-cli-checks.mjs
+
   required-core-checks:
     name: Required core checks
     if: always()
-    needs: [changes, documentation, workflow-policy, web-and-relay, native-core]
+    needs: [changes, documentation, workflow-policy, web-and-relay, native-core, cli-core]
     runs-on: ubuntu-latest
     steps:
       - name: Require every core check
@@ -139,11 +164,16 @@ jobs:
           DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
           WEB_RELAY_RESULT: ${{ needs.web-and-relay.result }}
           NATIVE_RESULT: ${{ needs.native-core.result }}
+          CLI_RESULT: ${{ needs.cli-core.result }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           WORKFLOW_CHANGED: ${{ needs.changes.outputs.workflow }}
           DOCUMENTATION_CHANGED: ${{ needs.changes.outputs.documentation }}
           JAVASCRIPT_CHANGED: ${{ needs.changes.outputs.javascript }}
           NATIVE_CHANGED: ${{ needs.changes.outputs.native }}
+          CLI_CHANGED: ${{ needs.changes.outputs.cli }}
+          DESKTOP_CHANGED: ${{ needs.changes.outputs.desktop }}
+          SHARED_CHANGED: ${{ needs.changes.outputs.shared }}
+          PROTECTED_RELEASE_CHANGED: ${{ needs.changes.outputs.protected_release }}
         run: |
           [ "$CHANGES_RESULT" = "success" ] || exit 1
           require_when_changed() {
@@ -166,3 +196,11 @@ jobs:
           require_when_changed "$WORKFLOW_CHANGED" "$WORKFLOW_POLICY_RESULT"
           require_when_changed "$JAVASCRIPT_CHANGED" "$WEB_RELAY_RESULT"
           require_when_changed "$NATIVE_CHANGED" "$NATIVE_RESULT"
+          require_when_changed "$CLI_CHANGED" "$CLI_RESULT"
+          if [ "$SHARED_CHANGED" = "true" ] && { [ "$CLI_CHANGED" != "true" ] || [ "$DESKTOP_CHANGED" != "true" ]; }; then
+            echo "Shared changes must select both CLI and desktop client suites." >&2
+            exit 1
+          fi
+          if [ "$PROTECTED_RELEASE_CHANGED" = "true" ]; then
+            echo "Protected desktop release paths changed; review the changed-path summary and require exact owner approval."
+          fi
