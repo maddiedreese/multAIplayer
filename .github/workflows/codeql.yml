@@ -37,10 +37,11 @@ jobs:
   analyze:
     # Keep this job id stable: GitHub identifies the default CodeQL
     # configuration as <workflow path>:<job id> when comparing a PR with main.
+    # The repository code-scanning ruleset compares every PR with this
+    # configuration, so it must run even when a PR does not edit JavaScript.
     # The additional language matrix below must not replace that identity.
     name: JavaScript and TypeScript
     needs: changes
-    if: needs.changes.outputs.javascript == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
