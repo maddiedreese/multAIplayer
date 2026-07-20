@@ -1,1 +1,1 @@
-declare module "monaco-editor/base/browser/domSanitize.js";
+declare module "monaco-editor/esm/vs/base/browser/domSanitize.js";

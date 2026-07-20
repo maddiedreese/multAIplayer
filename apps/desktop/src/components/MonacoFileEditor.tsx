@@ -109,21 +109,37 @@ export function MonacoFileEditor({
 
 async function installMonaco(): Promise<typeof Monaco> {
   const [
+    monaco,
     { default: EditorWorker },
     { default: JsonWorker },
     { default: CssWorker },
     { default: HtmlWorker },
     { default: TypeScriptWorker }
   ] = await Promise.all([
-    import("monaco-editor/editor/editor.worker?worker"),
-    import("monaco-editor/language/json/json.worker?worker"),
-    import("monaco-editor/language/css/css.worker?worker"),
-    import("monaco-editor/language/html/html.worker?worker"),
-    import("monaco-editor/language/typescript/ts.worker?worker")
+    import("monaco-editor/esm/vs/editor/editor.api.js"),
+    import("monaco-editor/esm/vs/editor/editor.worker?worker"),
+    import("monaco-editor/esm/vs/language/json/json.worker?worker"),
+    import("monaco-editor/esm/vs/language/css/css.worker?worker"),
+    import("monaco-editor/esm/vs/language/html/html.worker?worker"),
+    import("monaco-editor/esm/vs/language/typescript/ts.worker?worker"),
+    import("monaco-editor/esm/vs/base/browser/domSanitize.js"),
+    import("monaco-editor/esm/vs/language/json/monaco.contribution.js"),
+    import("monaco-editor/esm/vs/language/css/monaco.contribution.js"),
+    import("monaco-editor/esm/vs/language/html/monaco.contribution.js"),
+    import("monaco-editor/esm/vs/language/typescript/monaco.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/css/css.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/scss/scss.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/less/less.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/html/html.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/handlebars/handlebars.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/razor/razor.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/rust/rust.contribution.js"),
+    import("monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js")
   ]);
 
-  // Monaco 0.56 snapshots MonacoEnvironment when editor.api is evaluated. Install the
-  // worker factory first so every language service receives its offline worker.
   self.MonacoEnvironment = {
     getWorker(_workerId: string, label: string) {
       switch (workerKindForLabel(label)) {
@@ -140,26 +156,6 @@ async function installMonaco(): Promise<typeof Monaco> {
       }
     }
   };
-
-  const [monaco] = await Promise.all([
-    import("monaco-editor/editor/editor.api.js"),
-    import("monaco-editor/base/browser/domSanitize.js"),
-    import("monaco-editor/languages/features/json/register.js"),
-    import("monaco-editor/languages/features/css/register.js"),
-    import("monaco-editor/languages/features/html/register.js"),
-    import("monaco-editor/languages/features/typescript/register.js"),
-    import("monaco-editor/languages/definitions/javascript/register.js"),
-    import("monaco-editor/languages/definitions/typescript/register.js"),
-    import("monaco-editor/languages/definitions/css/register.js"),
-    import("monaco-editor/languages/definitions/scss/register.js"),
-    import("monaco-editor/languages/definitions/less/register.js"),
-    import("monaco-editor/languages/definitions/html/register.js"),
-    import("monaco-editor/languages/definitions/handlebars/register.js"),
-    import("monaco-editor/languages/definitions/razor/register.js"),
-    import("monaco-editor/languages/definitions/markdown/register.js"),
-    import("monaco-editor/languages/definitions/rust/register.js"),
-    import("monaco-editor/languages/definitions/yaml/register.js")
-  ]);
 
   return monaco as unknown as typeof Monaco;
 }
