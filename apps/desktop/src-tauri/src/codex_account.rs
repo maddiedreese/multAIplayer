@@ -1,47 +1,24 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::Command;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-use crate::process::terminate_child;
+use codex_activity_projection::host::{
+    bounded_string, capabilities_for_version, parse_codex_version, safe_error_text, safe_url,
+    sanitize_host_notification, AppServerProcess, AppServerProcessConfig, CodexHostCapabilities,
+    SharedStdin,
+};
+#[cfg(test)]
+use codex_activity_projection::host::{parse_semver, selected_manifest};
 
 const RPC_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_SAFE_TEXT: usize = 2_000;
 const MAX_ITEMS: usize = 200;
-const MANIFEST_0133: &str = include_str!("../../../../contracts/codex-app-server/0.133.0.json");
-const MANIFEST_0143: &str = include_str!("../../../../contracts/codex-app-server/0.143.0.json");
-const MANIFEST_0144: &str = include_str!("../../../../contracts/codex-app-server/0.144.0.json");
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CompatibilityManifest {
-    codex_version: String,
-    client_request_methods: Vec<String>,
-    server_notification_methods: Vec<String>,
-    app_tool_approval_modes: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CodexHostCapabilities {
-    codex_version: String,
-    manifest_version: String,
-    supports_account: bool,
-    supports_browser_login: bool,
-    supports_device_login: bool,
-    supports_hosted_login_success: bool,
-    supports_apps: bool,
-    supports_mcp: bool,
-    supports_writes_approval: bool,
-    compatibility_warning: Option<String>,
-    pub(crate) supports_last_turn_fork: bool,
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -125,24 +102,10 @@ pub(crate) struct CodexAppApprovalRequest {
     mode: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CodexHostNotification {
-    method: String,
-    params: Value,
-}
-
 struct HostProcess {
-    child: Child,
-    stdin: Arc<Mutex<ChildStdin>>,
+    process: AppServerProcess,
     pending: Arc<Mutex<HashMap<i64, mpsc::Sender<Value>>>>,
     capabilities: CodexHostCapabilities,
-}
-
-impl Drop for HostProcess {
-    fn drop(&mut self) {
-        terminate_child(&mut self.child);
-    }
 }
 
 #[derive(Default)]
@@ -159,7 +122,7 @@ impl CodexHostState {
             .map_err(|_| "Codex host-control state is unavailable".to_string())?;
         if slot
             .as_mut()
-            .is_some_and(|process| process.child.try_wait().ok().flatten().is_none())
+            .is_some_and(|process| process.process.is_alive())
         {
             return Ok(());
         }
@@ -209,7 +172,7 @@ impl CodexHostState {
                 .map_err(|_| "Codex host-control response state is unavailable".to_string())?
                 .insert(id, tx);
             if let Err(error) = send_json(
-                &process.stdin,
+                &process.process.stdin(),
                 json!({ "method": method, "id": id, "params": params }),
             ) {
                 if let Ok(mut pending) = process.pending.lock() {
@@ -243,19 +206,6 @@ impl CodexHostState {
     }
 }
 
-impl CodexHostCapabilities {
-    fn supports_method(&self, method: &str) -> bool {
-        let Ok(manifest) = selected_manifest(&self.codex_version) else {
-            return false;
-        };
-        method == "initialize"
-            || manifest
-                .client_request_methods
-                .iter()
-                .any(|entry| entry == method)
-    }
-}
-
 fn start_host_process(app: AppHandle) -> Result<HostProcess, String> {
     let version_output = Command::new("codex")
         .arg("--version")
@@ -266,34 +216,20 @@ fn start_host_process(app: AppHandle) -> Result<HostProcess, String> {
         "Codex version is not compatible with the app-server manifest".to_string()
     })?;
     let capabilities = capabilities_for_version(&version)?;
-    let mut child = Command::new("codex")
-        .arg("app-server")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|error| format!("Failed to start Codex host-control app-server: {error}"))?;
-    let stdin = match child.stdin.take() {
-        Some(stdin) => Arc::new(Mutex::new(stdin)),
-        None => {
-            terminate_child(&mut child);
-            return Err("Codex stdin is unavailable".to_string());
-        }
-    };
-    let stdout = match child.stdout.take() {
-        Some(stdout) => stdout,
-        None => {
-            terminate_child(&mut child);
-            return Err("Codex stdout is unavailable".to_string());
-        }
-    };
+    let mut process = AppServerProcess::spawn(&AppServerProcessConfig::codex(
+        vec!["app-server".to_string()],
+        None,
+        false,
+    ))
+    .map_err(|error| format!("Failed to start Codex host-control app-server: {error}"))?;
+    let stdin = process.stdin();
+    let stdout_lines = process.take_stdout_lines()?;
     let pending = Arc::new(Mutex::new(HashMap::<i64, mpsc::Sender<Value>>::new()));
     let reader_pending = pending.clone();
     let reader_stdin = stdin.clone();
-    thread::spawn(move || read_host_messages(stdout, reader_stdin, reader_pending, app));
+    thread::spawn(move || read_host_messages(stdout_lines, reader_stdin, reader_pending, app));
     let process = HostProcess {
-        child,
-        stdin,
+        process,
         pending,
         capabilities,
     };
@@ -304,7 +240,7 @@ fn start_host_process(app: AppHandle) -> Result<HostProcess, String> {
         .map_err(|_| "Codex response state is unavailable".to_string())?
         .insert(1, tx);
     send_json(
-        &process.stdin,
+        &process.process.stdin(),
         json!({
             "method": "initialize",
             "id": 1,
@@ -321,19 +257,19 @@ fn start_host_process(app: AppHandle) -> Result<HostProcess, String> {
         return Err("Codex host-control initialization failed".to_string());
     }
     send_json(
-        &process.stdin,
+        &process.process.stdin(),
         json!({ "method": "initialized", "params": {} }),
     )?;
     Ok(process)
 }
 
 fn read_host_messages(
-    stdout: impl std::io::Read,
-    stdin: Arc<Mutex<ChildStdin>>,
+    stdout_lines: mpsc::Receiver<String>,
+    stdin: SharedStdin,
     pending: Arc<Mutex<HashMap<i64, mpsc::Sender<Value>>>>,
     app: AppHandle,
 ) {
-    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+    for line in stdout_lines {
         let Ok(value) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
@@ -361,7 +297,7 @@ fn read_host_messages(
         let Some(method) = value.get("method").and_then(Value::as_str) else {
             continue;
         };
-        if let Some(notification) = sanitize_notification(method, value.get("params")) {
+        if let Some(notification) = sanitize_host_notification(method, value.get("params")) {
             let _ = app.emit("codex://host-notification", notification);
         }
     }
@@ -370,104 +306,9 @@ fn read_host_messages(
     }
 }
 
-fn send_json(stdin: &Arc<Mutex<ChildStdin>>, value: Value) -> Result<(), String> {
-    let mut stdin = stdin
-        .lock()
-        .map_err(|_| "Codex stdin is unavailable".to_string())?;
-    writeln!(stdin, "{value}")
-        .map_err(|error| format!("Failed to write Codex request: {error}"))?;
-    stdin
-        .flush()
-        .map_err(|error| format!("Failed to flush Codex request: {error}"))
+fn send_json(stdin: &SharedStdin, value: Value) -> Result<(), String> {
+    codex_activity_projection::host::send_json_shared(stdin, value)
 }
-
-fn sanitize_notification(method: &str, params: Option<&Value>) -> Option<CodexHostNotification> {
-    let input = params.and_then(Value::as_object)?;
-    let mut output = Map::new();
-    match method {
-        "account/login/completed" => {
-            copy_safe_string(input, &mut output, "loginId", 256);
-            copy_bool(input, &mut output, "success");
-            copy_safe_error(input, &mut output);
-        }
-        "account/updated" => {
-            copy_safe_string(input, &mut output, "authMode", 64);
-            copy_safe_string(input, &mut output, "planType", 64);
-        }
-        "mcpServer/oauthLogin/completed" => {
-            copy_safe_string(input, &mut output, "name", 256);
-            copy_bool(input, &mut output, "success");
-            copy_safe_error(input, &mut output);
-        }
-        "mcpServer/startupStatus/updated" => {
-            copy_safe_string(input, &mut output, "name", 256);
-            copy_safe_string(input, &mut output, "status", 64);
-            copy_safe_error(input, &mut output);
-        }
-        "app/list/updated" => {}
-        _ => return None,
-    }
-    Some(CodexHostNotification {
-        method: method.to_string(),
-        params: Value::Object(output),
-    })
-}
-
-fn copy_safe_string(
-    input: &Map<String, Value>,
-    output: &mut Map<String, Value>,
-    key: &str,
-    max: usize,
-) {
-    if let Some(value) = input
-        .get(key)
-        .and_then(Value::as_str)
-        .filter(|value| value.chars().count() <= max)
-    {
-        output.insert(key.to_string(), Value::String(value.to_string()));
-    }
-}
-
-fn copy_bool(input: &Map<String, Value>, output: &mut Map<String, Value>, key: &str) {
-    if let Some(value) = input.get(key).and_then(Value::as_bool) {
-        output.insert(key.to_string(), Value::Bool(value));
-    }
-}
-
-fn copy_safe_error(input: &Map<String, Value>, output: &mut Map<String, Value>) {
-    if let Some(value) = input.get("error").and_then(Value::as_str) {
-        output.insert("error".to_string(), Value::String(safe_error_text(value)));
-    }
-}
-
-fn safe_error_text(value: &str) -> String {
-    let bounded = value.chars().take(MAX_SAFE_TEXT).collect::<String>();
-    bounded
-        .split_whitespace()
-        .map(|part| {
-            let lower = part.to_ascii_lowercase();
-            if lower.contains("token")
-                || lower.contains("secret")
-                || lower.contains("authorization")
-                || lower.contains("password")
-                || lower.contains("api_key")
-                || lower.contains("cookie")
-                || lower.starts_with("http://")
-                || lower.starts_with("https://")
-                || part.starts_with("eyJ")
-            {
-                "[redacted]"
-            } else {
-                part
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-#[path = "codex_account/compatibility.rs"]
-mod compatibility;
-use compatibility::*;
 #[typed_tauri_command::command]
 pub(crate) async fn codex_host_snapshot(
     state: tauri::State<'_, CodexHostState>,

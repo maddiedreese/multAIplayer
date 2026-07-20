@@ -38,6 +38,36 @@ if (
   throw new Error("docs/codex-hosting.md is out of sync with the Codex support policy");
 }
 
+const cliIndex = readFileSync(new URL("../docs/cli/README.md", import.meta.url), "utf8");
+if (cliIndex.includes("intentionally not implemented")) {
+  throw new Error("docs/cli/README.md still describes the implemented CLI as unimplemented");
+}
+
+const cliPlan = readFileSync(new URL("../docs/cli/development-plan.md", import.meta.url), "utf8");
+if (/multAIplayer room join\s+<invite-code>/.test(cliPlan)) {
+  throw new Error("CLI documentation must not place an invitation capability in a shell argument");
+}
+
+const cliGuide = readFileSync(new URL("../apps/cli/README.md", import.meta.url), "utf8");
+const rootReadme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+const cliInstallCommand =
+  "curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh";
+if (!rootReadme.includes(cliInstallCommand)) {
+  throw new Error("README.md must expose the maintained one-line CLI install command");
+}
+for (const required of [
+  cliInstallCommand,
+  "multAIplayer room join",
+  "Paste the secret invitation code, then press Return:",
+  "## Compatibility and limitations",
+  "## Update and uninstall"
+]) {
+  if (!cliGuide.includes(required)) throw new Error(`apps/cli/README.md is missing maintained guidance: ${required}`);
+}
+if (/multAIplayer room join\s+<invite-code>/.test(cliGuide)) {
+  throw new Error("apps/cli/README.md must keep invitation capabilities out of shell arguments");
+}
+
 function walkMarkdown(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);

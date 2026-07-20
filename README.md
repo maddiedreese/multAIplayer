@@ -14,13 +14,29 @@
 <p align="center">
   <a href="https://multaiplayer.com">Website</a> ·
   <a href="docs/using-the-app.md">User guide</a> ·
+  <a href="apps/cli/README.md">CLI</a> ·
   <a href="docs/faq.md">FAQ</a> ·
   <a href="docs/threat-model.md">Threat model</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 > [!IMPORTANT]
-> multAIplayer is a free, open-source macOS alpha. Use only Developer ID-signed, notarized builds published from this repository's release workflow. Current platform and product constraints are listed in [Alpha limitations](docs/alpha-limitations.md).
+> multAIplayer is a free, open-source macOS alpha. Use only Developer ID-signed,
+> notarized builds published from this repository. Desktop builds use the tagged
+> release workflow; CLI builds use the isolated, owner-approved CLI release
+> process. Current platform and product constraints are listed in
+> [Alpha limitations](docs/alpha-limitations.md).
+
+## Command-line client
+
+Install the Apple-silicon macOS CLI with one command:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/maddiedreese/multAIplayer/main/apps/cli/install.sh | sh
+```
+
+See the [CLI guide](apps/cli/README.md) for authentication, encrypted rooms,
+Codex hosting, compatibility, limitations, updates, and uninstalling.
 
 ## The product
 
@@ -51,6 +67,10 @@ multAIplayer is an independent open-source project. It is **not** an official Op
 Rooms use RFC 9420 MLS through `mls-rs`; the relay routes encrypted records while observing the metadata required to operate the service. The integration is unaudited. The [threat model](docs/threat-model.md) is the sole source for security properties, assumptions, metadata exposure, and residual risks; [SECURITY.md](SECURITY.md) explains private reporting.
 
 ## Build locally
+
+The Apple-silicon terminal client has a separate [installation and quickstart
+guide](apps/cli/README.md). Its binary, version, checksums, signing, and release
+process are independent from the desktop updater and artifacts.
 
 Prerequisites are Node.js 24.x, npm 11.16.0, Rust 1.89.x/Cargo, Xcode command-line tools, and Codex:
 
@@ -88,6 +108,7 @@ Pull requests run workspace checks and product journeys when executable code cha
 | Path                                     | Responsibility                                           |
 | ---------------------------------------- | -------------------------------------------------------- |
 | `apps/desktop`                           | React/Tauri desktop, host workflows, native capabilities |
+| `apps/cli`                               | Rust terminal client and independent CLI packaging       |
 | `apps/desktop/src-tauri/crates/mls-core` | MLS, invite cryptography, exporters, encrypted state     |
 | `apps/relay`                             | Authenticated transport, SQLite persistence, and quotas  |
 | `packages/protocol`                      | Shared wire records and runtime validation               |

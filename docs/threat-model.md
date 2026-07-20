@@ -12,6 +12,71 @@ Initial trust boundaries:
 - GitHub: identity provider and PR API.
 - Other room members: trusted only with content intentionally shared in the room.
 
+## Terminal CLI Boundary
+
+The Apple-silicon macOS CLI is a second native client of the same relay and MLS
+rooms. It keeps the GitHub token, relay session, device private keys, MLS
+wrapping key, invitation capability material, and host-local room association in
+the macOS credential store. Its MLS database contains encrypted group state,
+outbox records, replay state, and bounded encrypted history. Missing,
+cross-identity, malformed, truncated, or incompatible state fails with an
+explicit recovery error; the CLI does not silently replace or delete that state.
+The destructive `room forget` path is separate from logout and leave and removes
+only the exact selected room after a durable tombstone is written.
+
+Invite codes are accepted only from bounded standard input, never a CLI
+argument. Hosted Codex context and privileged responses travel over the child
+process's JSON-RPC standard input; the child command line contains only fixed,
+non-secret model, service-tier, sandbox, approval-policy, and network settings.
+The normal CLI has no persistent diagnostic or crash-report sink and maps
+network, keychain, MLS, and app-server failures to fixed error variants rather
+than reflecting upstream prose. Release builds use macOS Keychain; the
+file-backed credential adapter and interoperability client exist only in test or
+debug builds.
+
+Every relay-originating terminal field is rendered as one bounded line. C0/C1
+controls, ANSI escapes, line separators, bidirectional overrides and isolates,
+zero-width format controls, interlinear controls, BOM, and Unicode
+noncharacters are replaced before display. The same sanitizer covers chat,
+presence, room names, Codex previews, privileged requests, and the native
+admission prompt. Renderer-owned fixed prefixes and delimiters distinguish
+untrusted room content from trusted human decisions even without color. There
+is no global `--yes`; admission, Codex turns, and privileged requests require an
+exact explicit response bound to the current room, host, proposal or request,
+native Codex session, method, parameters, and expiry. Canonical project
+containment and active-host authority are rechecked immediately before use.
+
+Maintained executable evidence includes the following tests and journeys:
+
+- `chat::tests::every_unicode_terminal_control_property_is_neutralized`,
+  `room::tests::room_output_neutralizes_directional_and_zero_width_spoofing`,
+  `tests::trusted_host_prompt_requires_an_exact_explicit_decision`, and
+  `codex::tests::trusted_prompt_neutralizes_terminal_spoofing_and_bounds_display`;
+- `auth::tests::every_public_error_and_debug_path_is_secret_free`, the invite
+  capability mutation/redaction tests, the MLS corrupt-state and exact-forget
+  tests, and the Codex context/shared-activity redaction tests;
+- the three-process encrypted-chat journey, headless production admission and
+  binary-command journey, and the desktop/CLI cross-client matrix, all executed
+  by `node tools/ci/run-cli-checks.mjs`;
+- the native KeyPackage and Codex projection fuzz targets, relay parser fuzz and
+  process-security journeys, Gitleaks history scan, dependency audits, license
+  policy, changed-path classification, and protected-release isolation gates.
+
+These controls do not make the host operating-system account or native process
+untrusted. Another local process with the user's authority may inspect memory,
+credential-store access, standard input, or the project working tree. A user can
+also defeat stdin-only invite handling by placing a literal invite in an outer
+shell command, script, clipboard manager, or terminal recorder. Redaction is a
+bounded defense against known credential and path shapes, not a proof that
+arbitrary user text contains no novel secret. Room members receive content the
+host intentionally shares, and an approved Codex turn can read or modify data
+allowed by its effective sandbox and can use the network when the host selected
+that setting. Unicode neutralization blocks terminal state changes and the
+maintained spoofing classes, but it cannot guarantee identical glyph rendering
+across every terminal, font, locale, or accessibility tool. As elsewhere in
+this document, the CLI and its MLS integration have not received an independent
+professional security audit.
+
 ## Relay Metadata Authorization
 
 Relay authentication is enabled by default in every environment. Self-hosters can explicitly set `MULTAIPLAYER_RELAY_UNSAFE_DISABLE_AUTH=true` for a private local/LAN development relay, but that is an unsafe opt-out from the hosted privacy posture.
