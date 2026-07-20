@@ -58,6 +58,8 @@ jobs:
         uses: ./.github/actions/setup-node-npm
       - name: Set up repository Rust toolchain
         uses: ./.github/actions/setup-rust
+        with:
+          components: rustfmt
       - name: Install locked repository dependencies
         run: npm ci --ignore-scripts
       - name: Run the complete locked CLI gate
