@@ -50,13 +50,17 @@ fn write_stdout_line(message: &str) {
     let _ = output.write_all(b"\n");
 }
 
-/// Writes an interactive trusted prompt to the terminal UI channel. Prompt
-/// renderers sanitize and bound all projected content before it reaches here.
-fn write_trusted_terminal_prompt(message: &str) {
-    let stderr = std::io::stderr();
-    let mut output = stderr.lock();
-    let _ = output.write_all(message.as_bytes());
-    let _ = output.write_all(b"\n");
+/// Writes an interactive trusted prompt only to the controlling terminal, so
+/// redirected command output cannot capture approval details. Prompt renderers
+/// sanitize and bound all projected content before it reaches this boundary.
+fn write_trusted_terminal_prompt(message: &str) -> Result<(), ()> {
+    let mut terminal = std::fs::OpenOptions::new()
+        .write(true)
+        .open("/dev/tty")
+        .map_err(|_| ())?;
+    terminal.write_all(message.as_bytes()).map_err(|_| ())?;
+    terminal.write_all(b"\n").map_err(|_| ())?;
+    terminal.flush().map_err(|_| ())
 }
 
 const HELP: &str = concat!(
@@ -299,8 +303,12 @@ trait RoomLoopAdapter {
     }
     fn directive(&mut self, projected_chat_count: usize) -> Result<RoomLoopDirective, ()>;
     fn emit(&mut self, event: &multaiplayer_cli::chat::ProjectedEvent);
-    fn trusted_codex_preview(&mut self, _preview: &HostPreview) {}
-    fn trusted_codex_request(&mut self, _request: &PrivilegedRequestPrompt) {}
+    fn trusted_codex_preview(&mut self, _preview: &HostPreview) -> Result<(), ()> {
+        Ok(())
+    }
+    fn trusted_codex_request(&mut self, _request: &PrivilegedRequestPrompt) -> Result<(), ()> {
+        Ok(())
+    }
     fn complete(&self, projected_chat_count: usize) -> Result<bool, ()>;
 }
 
@@ -437,7 +445,9 @@ fn drive_room_loop<C: RelayConnector, R: RetrySleeper>(
                 emit_room_event(chat, adapter, Some(controller), event)?;
             }
             if let Some(request) = controller.take_privileged_prompt() {
-                adapter.trusted_codex_request(&request);
+                adapter.trusted_codex_request(&request).map_err(|()| {
+                    eprintln!("room loop: trusted terminal unavailable; approval stopped safely");
+                })?;
             }
         }
         if adapter.complete(projected_chat_count).map_err(|()| {
@@ -457,7 +467,9 @@ fn emit_room_event<C: RelayConnector, R: RetrySleeper>(
 ) -> Result<(), ()> {
     if let Some(controller) = codex {
         if let Some(preview) = controller.observe(&event, unix_now(), chat.is_active_host())? {
-            adapter.trusted_codex_preview(&preview);
+            adapter.trusted_codex_preview(&preview).map_err(|()| {
+                eprintln!("room loop: trusted terminal unavailable; approval stopped safely");
+            })?;
         }
     }
     adapter.emit(&event);
@@ -498,14 +510,14 @@ impl RoomLoopAdapter for InteractiveRoomLoop {
         println!("{}", self.renderer.render(event));
     }
 
-    fn trusted_codex_preview(&mut self, preview: &HostPreview) {
+    fn trusted_codex_preview(&mut self, preview: &HostPreview) -> Result<(), ()> {
         let prompt = self.renderer.trusted_prompt(&preview.trusted_text());
-        write_trusted_terminal_prompt(&prompt);
+        write_trusted_terminal_prompt(&prompt)
     }
 
-    fn trusted_codex_request(&mut self, request: &PrivilegedRequestPrompt) {
+    fn trusted_codex_request(&mut self, request: &PrivilegedRequestPrompt) -> Result<(), ()> {
         let prompt = self.renderer.trusted_prompt(&request.trusted_text());
-        write_trusted_terminal_prompt(&prompt);
+        write_trusted_terminal_prompt(&prompt)
     }
 
     fn complete(&self, _projected_chat_count: usize) -> Result<bool, ()> {

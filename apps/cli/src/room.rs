@@ -5,8 +5,9 @@ use crate::{
     mls::{MlsClientError, MlsClientService},
     platform::{CredentialStore, HttpClient},
     relay::{
-        connect_with_retries, ReconnectPolicy, RelayConnection, RelayTransportError, ThreadSleeper,
-        TungsteniteConnector, WorkspaceClient, WorkspaceSnapshot, MAX_HTTP_RESPONSE_BYTES,
+        connect_with_retries, decode_workspace_response, ReconnectPolicy, RelayConnection,
+        RelayTransportError, ThreadSleeper, TungsteniteConnector, WorkspaceClient,
+        WorkspaceSnapshot, MAX_HTTP_RESPONSE_BYTES,
     },
     CliError,
 };
@@ -22,9 +23,6 @@ use std::{
 };
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
-
-#[cfg(test)]
-use crate::relay::decode_workspace_response;
 
 pub const ROOM_STATE_ACCOUNT: &str = "room-associations:v1";
 const NATIVE_SESSION_HEADER: &str = "x-multaiplayer-session";
@@ -122,10 +120,9 @@ pub struct RelayRoomBackend<'a, S, H> {
     store: &'a S,
     http: &'a H,
     relay_origin: String,
+    relay_session: Zeroizing<String>,
     session: &'a RestoredSession,
     identity: &'a DeviceIdentity,
-    #[cfg(test)]
-    loopback_session: Option<Zeroizing<String>>,
     #[cfg(test)]
     loopback_websocket_url: Option<String>,
 }
@@ -139,14 +136,17 @@ impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
         identity: &'a DeviceIdentity,
     ) -> Result<Self, RoomError> {
         WorkspaceClient::new(store, http, relay_origin).map_err(map_cli_error)?;
+        let relay_session = load_relay_transport_session(store, relay_origin)
+            .map_err(map_cli_error)?
+            .ok_or(RoomError::AuthenticationRequired)?
+            .secret;
         Ok(Self {
             store,
             http,
             relay_origin: relay_origin.to_owned(),
+            relay_session,
             session,
             identity,
-            #[cfg(test)]
-            loopback_session: None,
             #[cfg(test)]
             loopback_websocket_url: None,
         })
@@ -186,22 +186,11 @@ impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
             store,
             http,
             relay_origin: parsed.origin().ascii_serialization(),
+            relay_session: Zeroizing::new(relay_session.to_owned()),
             session,
             identity,
-            loopback_session: Some(Zeroizing::new(relay_session.to_owned())),
             loopback_websocket_url: Some(websocket_url.to_owned()),
         })
-    }
-
-    fn headers(&self) -> Result<Zeroizing<String>, RoomError> {
-        #[cfg(test)]
-        if let Some(session) = &self.loopback_session {
-            return Ok(session.clone());
-        }
-        load_relay_transport_session(self.store, &self.relay_origin)
-            .map_err(map_cli_error)?
-            .map(|session| session.secret)
-            .ok_or(RoomError::AuthenticationRequired)
     }
 
     fn decode_room_response(
@@ -236,29 +225,24 @@ impl<'a, S: CredentialStore, H: HttpClient> RelayRoomBackend<'a, S, H> {
 
 impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, H> {
     fn workspace(&mut self) -> Result<WorkspaceSnapshot, RoomError> {
-        #[cfg(test)]
-        if self.loopback_session.is_some() {
-            let url = endpoint(&self.relay_origin, "/teams").map_err(map_cli_error)?;
-            let session = self.headers()?;
-            let response = self
-                .http
-                .get(&url, &[(NATIVE_SESSION_HEADER, session.as_str())])
-                .map_err(map_cli_error)?;
-            return decode_workspace_response(response, &url).map_err(map_cli_error);
-        }
-        WorkspaceClient::new(self.store, self.http, &self.relay_origin)
-            .and_then(|client| client.load())
-            .map_err(map_cli_error)
+        let url = endpoint(&self.relay_origin, "/teams").map_err(map_cli_error)?;
+        let response = self
+            .http
+            .get(
+                &url,
+                &[(NATIVE_SESSION_HEADER, self.relay_session.as_str())],
+            )
+            .map_err(map_cli_error)?;
+        decode_workspace_response(response, &url).map_err(map_cli_error)
     }
 
     fn create_room(&mut self, team_id: &str, name: &str) -> Result<RoomRecord, RoomError> {
         let url = endpoint(&self.relay_origin, "/rooms").map_err(map_cli_error)?;
-        let session = self.headers()?;
         let response = self
             .http
             .post_json(
                 &url,
-                &[(NATIVE_SESSION_HEADER, session.as_str())],
+                &[(NATIVE_SESSION_HEADER, self.relay_session.as_str())],
                 &json!({
                     "teamId": team_id,
                     "name": name,
@@ -270,7 +254,6 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
     }
 
     fn establish_device_session(&mut self) -> Result<Zeroizing<String>, RoomError> {
-        let session = self.headers()?;
         let device_id = &self.identity.public.device_id;
         let challenge_url = endpoint(
             &self.relay_origin,
@@ -281,7 +264,7 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
             .http
             .post_json(
                 &challenge_url,
-                &[(NATIVE_SESSION_HEADER, session.as_str())],
+                &[(NATIVE_SESSION_HEADER, self.relay_session.as_str())],
                 &json!({}),
             )
             .map_err(map_cli_error)?;
@@ -316,7 +299,7 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
             .http
             .post_json(
                 &session_url,
-                &[(NATIVE_SESSION_HEADER, session.as_str())],
+                &[(NATIVE_SESSION_HEADER, self.relay_session.as_str())],
                 &json!({
                     "challenge": challenge.challenge,
                     "signature": STANDARD.encode(signature.signature_der)
@@ -353,8 +336,7 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
     fn join_room(&mut self, room: &RoomRecord, device_session: &str) -> Result<(), RoomError> {
         #[cfg(test)]
         let mut connector = if let Some(websocket_url) = &self.loopback_websocket_url {
-            let session = self.headers()?;
-            TungsteniteConnector::from_loopback_test_url(websocket_url, session.as_str())
+            TungsteniteConnector::from_loopback_test_url(websocket_url, self.relay_session.as_str())
                 .map_err(map_relay)?
         } else {
             TungsteniteConnector::from_store(self.store, &self.relay_origin).map_err(map_relay)?
@@ -389,13 +371,12 @@ impl<S: CredentialStore, H: HttpClient> RoomBackend for RelayRoomBackend<'_, S, 
     ) -> Result<RoomRecord, RoomError> {
         let url = endpoint(&self.relay_origin, &format!("/rooms/{}/host", room.id))
             .map_err(map_cli_error)?;
-        let session = self.headers()?;
         let response = self
             .http
             .patch_json(
                 &url,
                 &[
-                    (NATIVE_SESSION_HEADER, session.as_str()),
+                    (NATIVE_SESSION_HEADER, self.relay_session.as_str()),
                     (DEVICE_SESSION_HEADER, device_session),
                 ],
                 &json!({
