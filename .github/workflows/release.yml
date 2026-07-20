@@ -241,7 +241,7 @@ jobs:
             echo "Developer ID provisioning profile does not authorize Associated Domains." >&2
             exit 1
           fi
-          # shellcheck disable=SC2016 -- JavaScript template literals must remain literal for Node.
+          # shellcheck disable=SC2016
           node -e '
             const groups = JSON.parse(process.argv[1]);
             const team = process.argv[2];
