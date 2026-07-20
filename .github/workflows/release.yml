@@ -202,10 +202,21 @@ jobs:
           printf '%s  %s\n' \
             f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a \
             "$developer_id_g2" | shasum -a 256 -c -
-          security import "$developer_id_g2" \
-            -k build.keychain \
-            -T /usr/bin/codesign \
-            -T /usr/bin/security
+          if ! security find-certificate -c "Developer ID Certification Authority" build.keychain >/dev/null 2>&1; then
+            security import "$developer_id_g2" \
+              -k build.keychain \
+              -T /usr/bin/codesign \
+              -T /usr/bin/security
+          fi
+          keychain_g2_pem="$RUNNER_TEMP/keychain-developer-id-g2.pem"
+          keychain_g2_der="$RUNNER_TEMP/keychain-developer-id-g2.der"
+          security find-certificate \
+            -c "Developer ID Certification Authority" \
+            -p build.keychain > "$keychain_g2_pem"
+          openssl x509 -in "$keychain_g2_pem" -outform der -out "$keychain_g2_der"
+          printf '%s  %s\n' \
+            f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a \
+            "$keychain_g2_der" | shasum -a 256 -c -
           security list-keychains -d user -s build.keychain
           security set-key-partition-list \
             -S apple-tool:,apple:,codesign: \

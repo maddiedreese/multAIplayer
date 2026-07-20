@@ -6,6 +6,15 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.15] - 2026-07-20
+
+### Fixed
+
+- macOS signing setup now handles Developer ID certificate bundles that already include Apple's pinned intermediate while still validating the exact certificate before signing.
+- The desktop sidebar now scrolls independently and offers accessible Teams and per-team Rooms disclosures, while terminal and host-handoff controls remain readable at narrow panel widths.
+- Starting a local interactive terminal from **New terminal** no longer shows a redundant system confirmation; remote commands and terminal input retain their exact native approval prompts.
+- Desktop JavaScript and Rust dependencies include the latest reviewed compatible patch and tooling updates from the open Dependabot set.
+
 ## [0.1.0-alpha.14] - 2026-07-20
 
 ### Fixed

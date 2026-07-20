@@ -1,7 +1,7 @@
 {
   "name": "@multaiplayer/desktop",
   "private": true,
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -19,15 +19,15 @@
     "tauri:build:native-e2e": "tauri build --debug --bundles app --features native-e2e --config src-tauri/tauri.native-e2e.conf.json"
   },
   "dependencies": {
-    "@multaiplayer/protocol": "0.1.0-alpha.14",
+    "@multaiplayer/protocol": "0.1.0-alpha.15",
     "@tauri-apps/api": "2.11.1",
-    "@tauri-apps/plugin-dialog": "2.7.1",
+    "@tauri-apps/plugin-dialog": "2.7.2",
     "@tauri-apps/plugin-notification": "2.3.3",
     "@tauri-apps/plugin-process": "2.3.1",
     "@tauri-apps/plugin-updater": "2.10.1",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
-    "lucide-react": "1.24.0",
+    "lucide-react": "1.25.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "zustand": "5.0.14"
@@ -42,7 +42,7 @@
     "@vitejs/plugin-react": "6.0.3",
     "jsdom": "29.1.1",
     "monaco-editor": "0.55.1",
-    "postcss": "8.5.19",
+    "postcss": "8.5.20",
     "tsx": "4.23.1",
     "typescript": "6.0.3",
     "vite": "8.1.5"

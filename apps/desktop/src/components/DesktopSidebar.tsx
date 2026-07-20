@@ -79,6 +79,14 @@ export interface DesktopSidebarProps {
   onSelectSidebarPanel: (panel: SidebarPanelName) => void;
 }
 
+function visibleTeamsSection(collapsed: boolean, searchActive: boolean): boolean {
+  return !collapsed || searchActive;
+}
+
+function visibleTeamForm(formVisible: boolean, teamsSectionVisible: boolean): boolean {
+  return formVisible && teamsSectionVisible;
+}
+
 export function DesktopSidebar({
   currentUser,
   authBusy,
@@ -118,11 +126,14 @@ export function DesktopSidebar({
   const [teamCreateOpen, setTeamCreateOpen] = useState(false);
   const [roomCreateOpen, setRoomCreateOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [teamsCollapsed, setTeamsCollapsed] = useState(false);
   const [collapsedTeams, setCollapsedTeams] = useState<Record<string, boolean>>({});
 
   const teamFormVisible = !searchActive && !showArchived && teamCreateOpen;
   const roomFormVisible = !searchActive && !showArchived && roomCreateOpen;
   const visibleTeams = visibleSidebarTeams(teams, rooms, showArchived);
+  const teamsSectionVisible = visibleTeamsSection(teamsCollapsed, searchActive);
+  const showTeamForm = visibleTeamForm(teamFormVisible, teamsSectionVisible);
   const archivedCount = teams.filter((team) => team.archived).length + rooms.filter((room) => room.archived).length;
   const roomsForTeam = (team: SidebarTeamDisplay) => visibleSidebarRooms(rooms, team, showArchived);
 
@@ -146,15 +157,20 @@ export function DesktopSidebar({
         <SidebarTeamsTitle
           searchActive={searchActive}
           showArchived={showArchived}
+          collapsed={!teamsSectionVisible}
           teamCreateOpen={teamCreateOpen}
+          onToggleCollapsed={() => setTeamsCollapsed((current) => !current)}
           onToggleArchived={() => {
             setShowArchived((current) => !current);
             setTeamCreateOpen(false);
             setRoomCreateOpen(false);
           }}
-          onToggleTeamCreate={() => setTeamCreateOpen((open) => !open)}
+          onToggleTeamCreate={() => {
+            setTeamsCollapsed(false);
+            setTeamCreateOpen((open) => !open);
+          }}
         />
-        {teamFormVisible && (
+        {showTeamForm && (
           <div className="sidebar-create-form">
             <input
               value={newTeamName}
@@ -172,7 +188,7 @@ export function DesktopSidebar({
             </button>
           </div>
         )}
-        <div className="team-list nested-team-list">
+        <div className="team-list nested-team-list" hidden={!teamsSectionVisible}>
           {visibleTeams.map((team) => (
             <SidebarTeamGroup
               key={team.id}

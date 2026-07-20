@@ -182,7 +182,7 @@
 
 .handoff-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 12px;
   padding: 12px;
@@ -254,6 +254,8 @@
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
+  justify-self: start;
+  max-width: 100%;
 }
 
 .handoff-row button:disabled {

@@ -67,5 +67,9 @@ test("desktop release validates the imported signing identity by profile fingerp
   assert.match(release, /Print :keychain-access-groups:1/);
   assert.doesNotMatch(release, /plutil -extract (?:com\.apple|keychain-access-groups)/);
   assert.doesNotMatch(release, /grep -Fq "\$APPLE_SIGNING_IDENTITY"/);
-  assert.doesNotMatch(release, /security find-certificate/);
+  assert.match(release, /security find-certificate[\s\S]{0,200}-c "Developer ID Certification Authority"/);
+  assert.doesNotMatch(
+    release,
+    /security find-certificate[\s\S]{0,200}(?:\$APPLE_SIGNING_IDENTITY|\$profile_fingerprint)/
+  );
 });

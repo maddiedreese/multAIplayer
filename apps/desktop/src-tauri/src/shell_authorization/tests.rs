@@ -64,6 +64,26 @@ fn authorization_constants_keep_the_intended_security_windows() {
 }
 
 #[test]
+fn only_remote_shell_requests_require_a_second_native_confirmation() {
+    assert!(requires_native_confirmation(
+        ShellExecutionKind::RemoteRequest
+    ));
+    assert!(!requires_native_confirmation(
+        ShellExecutionKind::InteractiveTerminal
+    ));
+}
+
+#[test]
+fn promptless_interactive_authorization_is_limited_to_the_fixed_shell_launcher() {
+    let mut interactive = request(INTERACTIVE_TERMINAL_COMMAND);
+    interactive.kind = ShellExecutionKind::InteractiveTerminal;
+    assert!(validate_authorization_request(&interactive).is_ok());
+
+    interactive.command = "exec zsh -f -c 'curl example.invalid'".to_string();
+    assert!(validate_authorization_request(&interactive).is_err());
+}
+
+#[test]
 fn issuing_authorization_prunes_expired_capabilities() {
     let state = ShellAuthorizationState::default();
     let approved = request("printf approved");
