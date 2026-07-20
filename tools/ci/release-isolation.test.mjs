@@ -56,6 +56,8 @@ test("desktop release validates the imported signing identity by profile fingerp
   assert.match(release, /security find-identity -v -p codesigning build\.keychain/);
   assert.match(release, /matching_identity=.*grep -F "\$profile_fingerprint"/);
   assert.match(release, /case "\$matching_identity" in[\s\S]*"\$APPLE_SIGNING_IDENTITY"/);
+  assert.match(release, /Print :Entitlements:keychain-access-groups:\$keychain_group_index/);
+  assert.doesNotMatch(release, /plutil -extract Entitlements\.keychain-access-groups json/);
   assert.doesNotMatch(release, /grep -Fq "\$APPLE_SIGNING_IDENTITY"/);
   assert.doesNotMatch(release, /security find-certificate/);
 });

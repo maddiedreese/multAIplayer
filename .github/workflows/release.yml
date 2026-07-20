@@ -227,7 +227,6 @@ jobs:
           entitlement_team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.team-identifier' "$profile_plist")"
           provisions_all_devices="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' "$profile_plist")"
           associated_domains="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.associated-domains' "$profile_plist")"
-          keychain_access_groups="$(plutil -extract Entitlements.keychain-access-groups json -o - "$profile_plist")"
           if [ "$team_identifier" != "$APPLE_TEAM_ID" ] || [ "$entitlement_team_identifier" != "$APPLE_TEAM_ID" ]; then
             echo "Developer ID provisioning profile does not authorize the release team." >&2
             exit 1
@@ -240,16 +239,25 @@ jobs:
             echo "Developer ID provisioning profile does not authorize Associated Domains." >&2
             exit 1
           fi
-          # shellcheck disable=SC2016
-          node -e '
-            const groups = JSON.parse(process.argv[1]);
-            const team = process.argv[2];
-            const required = `${team}.com.multaiplayer.desktop`;
-            if (!Array.isArray(groups) || (!groups.includes(required) && !groups.includes(`${team}.*`))) process.exit(1);
-          ' "$keychain_access_groups" "$APPLE_TEAM_ID" || {
+          keychain_access_authorized=false
+          keychain_group_index=0
+          while keychain_group="$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Entitlements:keychain-access-groups:$keychain_group_index" \
+              "$profile_plist" \
+              2>/dev/null
+          )"; do
+            case "$keychain_group" in
+              "$APPLE_TEAM_ID.com.multaiplayer.desktop"|"$APPLE_TEAM_ID.*")
+                keychain_access_authorized=true
+                ;;
+            esac
+            keychain_group_index=$((keychain_group_index + 1))
+          done
+          if [ "$keychain_access_authorized" != "true" ]; then
             echo "Developer ID provisioning profile does not authorize the desktop Keychain access group." >&2
             exit 1
-          }
+          fi
           if /usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$profile_plist" >/dev/null 2>&1; then
             echo "Release profile must not be device-scoped." >&2
             exit 1
