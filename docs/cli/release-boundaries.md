@@ -41,13 +41,16 @@ desktop application bundle.
 The public CLI identity is fixed to bundle `com.multaiplayer.cli`, Apple team
 `AXP55K75AX`, and the sole Data Protection Keychain access group
 `AXP55K75AX.com.multaiplayer.cli`. Distribution packaging requires an explicit,
-unexpired Developer ID provisioning profile authorizing that exact tuple. It
-embeds the profile, enables hardened runtime, signs the app bundle with the
-reviewed entitlements, and verifies the resulting signature, entitlements, and
-profile. The exact observed leaf certificate fingerprint—not its potentially
-duplicated common name—must appear once in the profile's DeveloperCertificates
-allowlist. This stable signed application boundary prevents interactive
-Keychain ACL prompts in the installed release.
+unexpired Developer ID provisioning profile binding that exact application ID.
+Apple emits the profile's sole Keychain authorization as the team-scoped
+`AXP55K75AX.*`; the signed app is independently required to request only the
+narrower CLI group above. Packaging embeds the profile, enables hardened
+runtime, signs the app bundle with the reviewed entitlements, and verifies the
+resulting signature, entitlements, and profile. The exact observed leaf
+certificate fingerprint—not its potentially duplicated common name—must appear
+once in the profile's DeveloperCertificates allowlist. This stable signed
+application boundary prevents interactive Keychain ACL prompts in the installed
+release.
 
 The local default remains a timestamp-free ad-hoc inspection mode, but carries
 neither the distribution profile nor protected credential entitlements. It

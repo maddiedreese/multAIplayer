@@ -11,6 +11,7 @@ bundle_name="multAIplayer.app"
 bundle_id="com.multaiplayer.cli"
 team_id="AXP55K75AX"
 keychain_group="AXP55K75AX.com.multaiplayer.cli"
+profile_keychain_group="AXP55K75AX.*"
 data_dir="${MULTAIPLAYER_CLI_DATA_DIR:-${HOME}/Library/Application Support/multAIplayer/cli}"
 bin_dir="${MULTAIPLAYER_CLI_BIN_DIR:-${HOME}/.local/bin}"
 
@@ -154,7 +155,7 @@ security cms -D -i "$profile" >"${temporary}/profile.plist" 2>/dev/null
 profile_uuid="$(plutil -extract UUID raw -o - "${temporary}/profile.plist")"
 profile_application_id="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "${temporary}/profile.plist")"
 profile_team="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.team-identifier' "${temporary}/profile.plist")"
-profile_keychain_group="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:keychain-access-groups:0' "${temporary}/profile.plist")"
+observed_profile_keychain_group="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:keychain-access-groups:0' "${temporary}/profile.plist")"
 profile_team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "${temporary}/profile.plist")"
 profile_prefix="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationIdentifierPrefix:0' "${temporary}/profile.plist")"
 profile_all_devices="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' "${temporary}/profile.plist")"
@@ -162,7 +163,7 @@ profile_expiration="$(plutil -extract ExpirationDate raw -o - "${temporary}/prof
 [ "$profile_uuid" = "$claimed_profile_uuid" ] || fail "the embedded profile does not match the release manifest."
 [ "$profile_application_id" = "$keychain_group" ] || fail "the profile does not authorize the CLI application identifier."
 [ "$profile_team" = "$team_id" ] || fail "the profile Team ID is incorrect."
-[ "$profile_keychain_group" = "$keychain_group" ] || fail "the profile does not authorize the CLI Keychain group."
+[ "$observed_profile_keychain_group" = "$profile_keychain_group" ] || fail "the profile does not contain Apple's expected team-scoped Keychain authorization."
 [ "$profile_team_identifier" = "$team_id" ] || fail "the profile identity does not belong to the CLI release team."
 case "$profile_prefix" in
   "$team_id"|"${team_id}.") ;;

@@ -40,7 +40,9 @@ codesign -vvvv -R='notarized' --check-notarization \
   multAIplayer-cli-*-darwin-arm64/multAIplayer.app
 ```
 
-The signature and profile must both authorize only
-`AXP55K75AX.com.multaiplayer.cli` for team `AXP55K75AX`, and `Info.plist` must
-identify `com.multaiplayer.cli`. An ad-hoc inspection archive has no embedded
-profile or protected Keychain entitlement and is not a public release.
+The signature must authorize only `AXP55K75AX.com.multaiplayer.cli` for team
+`AXP55K75AX`. Apple's Developer ID profile must bind that exact application ID
+and contain only the team-scoped `AXP55K75AX.*` Keychain authorization that
+permits the signature's narrower group. `Info.plist` must identify
+`com.multaiplayer.cli`. An ad-hoc inspection archive has no embedded profile or
+protected Keychain entitlement and is not a public release.

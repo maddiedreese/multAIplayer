@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 
@@ -16,6 +16,7 @@ export function readReleaseConfig() {
   assert.equal(config.bundleIdentifier, "com.multaiplayer.cli");
   assert.equal(config.teamIdentifier, "AXP55K75AX");
   assert.equal(config.keychainAccessGroup, "AXP55K75AX.com.multaiplayer.cli");
+  assert.equal(config.profileKeychainAccessGroup, "AXP55K75AX.*");
   assert.match(config.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
   assert.equal(config.target, "aarch64-apple-darwin");
   assert.equal(config.platform, "darwin-arm64");
@@ -109,14 +110,29 @@ export function validateProvisioningProfile(profile, config = readReleaseConfig(
   assert.equal(profile.ProvisionsAllDevices, true, "a Developer ID distribution profile is required");
   assert.equal(profile.ProvisionedDevices, undefined, "development profiles are not valid for public releases");
   assert.ok(new Date(profile.ExpirationDate) > now, "the provisioning profile is expired");
-  validateProtectedEntitlements(profile.Entitlements, config);
+  assert.equal(
+    profile.Entitlements?.["com.apple.application-identifier"],
+    config.keychainAccessGroup,
+    "profile application identifier must match the CLI release identity"
+  );
+  assert.equal(
+    profile.Entitlements?.["com.apple.developer.team-identifier"],
+    config.teamIdentifier,
+    "profile entitlement Team ID must match the CLI release team"
+  );
+  assert.deepEqual(
+    profile.Entitlements?.["keychain-access-groups"],
+    [config.profileKeychainAccessGroup],
+    "profile must contain only Apple's team-scoped Keychain authorization"
+  );
+  assert.notEqual(profile.Entitlements?.["get-task-allow"], true, "distribution profiles must not be debuggable");
   return {
     uuid: profile.UUID,
     name: profile.Name,
     expiration: new Date(profile.ExpirationDate).toISOString(),
     teamIdentifier: config.teamIdentifier,
     applicationIdentifier: config.keychainAccessGroup,
-    keychainAccessGroups: [config.keychainAccessGroup]
+    keychainAccessGroups: [config.profileKeychainAccessGroup]
   };
 }
 
@@ -130,6 +146,66 @@ export function decodePlistBuffer(buffer, label = "property list") {
   return JSON.parse(result.stdout.toString("utf8"));
 }
 
+function extractProvisioningProfile(buffer) {
+  const temporary = mkdtempSync(resolve(tmpdir(), "multaiplayer-cli-profile-"));
+  try {
+    const plistPath = resolve(temporary, "profile.plist");
+    writeFileSync(plistPath, buffer);
+    const profileXml = plutil(plistPath, null, "xml1").toString("utf8");
+    const certificateXml = plutil(plistPath, "DeveloperCertificates", "xml1").toString("utf8");
+    const certificates = [...certificateXml.matchAll(/<data>([\s\S]*?)<\/data>/g)].map((match) =>
+      match[1].replace(/\s+/g, "")
+    );
+    assert.ok(certificates.length > 0, "provisioning profile has no DeveloperCertificates allowlist");
+    return {
+      UUID: plistRaw(plistPath, "UUID"),
+      Name: plistRaw(plistPath, "Name"),
+      TeamIdentifier: plistStringArray(plistPath, "TeamIdentifier"),
+      ApplicationIdentifierPrefix: plistStringArray(plistPath, "ApplicationIdentifierPrefix"),
+      ProvisionsAllDevices: plistRaw(plistPath, "ProvisionsAllDevices") === "true",
+      ProvisionedDevices: profileXml.includes("<key>ProvisionedDevices</key>")
+        ? plistStringArray(plistPath, "ProvisionedDevices")
+        : undefined,
+      ExpirationDate: plistRaw(plistPath, "ExpirationDate"),
+      Entitlements: {
+        "com.apple.application-identifier": plistRaw(plistPath, "Entitlements.com\\.apple\\.application-identifier"),
+        "com.apple.developer.team-identifier": plistRaw(
+          plistPath,
+          "Entitlements.com\\.apple\\.developer\\.team-identifier"
+        ),
+        "keychain-access-groups": plistStringArray(plistPath, "Entitlements.keychain-access-groups"),
+        ...(profileXml.includes("<key>get-task-allow</key>")
+          ? { "get-task-allow": plistRaw(plistPath, "Entitlements.get-task-allow") === "true" }
+          : {})
+      },
+      DeveloperCertificates: certificates
+    };
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
+function plistRaw(path, keyPath) {
+  return plutil(path, keyPath, "raw").toString("utf8").trim();
+}
+
+function plistStringArray(path, keyPath) {
+  const count = Number(plistRaw(path, keyPath));
+  assert.ok(Number.isSafeInteger(count) && count >= 0, `provisioning profile field ${keyPath} is not an array`);
+  return Array.from({ length: count }, (_, index) => plistRaw(path, `${keyPath}.${index}`));
+}
+
+function plutil(path, keyPath, format) {
+  const args =
+    keyPath === null
+      ? ["-convert", format, "-o", "-", "--", path]
+      : ["-extract", keyPath, format, "-o", "-", "--", path];
+  const result = spawnSync("plutil", args, { encoding: null, maxBuffer: 8 * 1024 * 1024 });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, `provisioning profile field ${keyPath || "root"} is invalid`);
+  return result.stdout;
+}
+
 export function inspectProvisioningProfile(path, config = readReleaseConfig()) {
   assert.ok(path, "Developer ID mode requires --provisioning-profile or MULTAIPLAYER_CLI_PROVISIONING_PROFILE");
   assert.equal(existsSync(path), true, "the provisioning profile does not exist");
@@ -139,7 +215,7 @@ export function inspectProvisioningProfile(path, config = readReleaseConfig()) {
   });
   if (result.error) throw result.error;
   assert.equal(result.status, 0, "the provisioning profile could not be decoded by macOS");
-  const decoded = decodePlistBuffer(result.stdout, "provisioning profile");
+  const decoded = extractProvisioningProfile(result.stdout);
   return { decoded, metadata: validateProvisioningProfile(decoded, config) };
 }
 

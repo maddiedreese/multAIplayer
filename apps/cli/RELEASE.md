@@ -32,10 +32,12 @@ MULTAIPLAYER_CLI_PROVISIONING_PROFILE='/absolute/path/to/multAIplayer CLI.provis
 
 The same profile can be supplied as `--provisioning-profile /absolute/path`.
 Packaging decodes it with macOS, rejects expired/development profiles, and
-requires the exact team, application identifier, and one-item Keychain access
-group above. It embeds the profile, signs the whole app bundle with hardened
-runtime and the checked-in entitlements, then independently reads the signed
-entitlements and profile back. It extracts the actual leaf signing certificate
+requires the exact team and application identifier. Apple's profile must carry
+only its team-scoped `AXP55K75AX.*` Keychain authorization; the signed app is
+independently restricted to the exact CLI group above. It embeds the profile,
+signs the whole app bundle with hardened runtime and the checked-in entitlements,
+then independently reads the signed entitlements and profile back. It extracts
+the actual leaf signing certificate
 from the completed code signature and requires that exact DER SHA-256
 fingerprint to appear once in the profile's `DeveloperCertificates` allowlist;
 certificate display names are never used for authorization. A mismatch fails

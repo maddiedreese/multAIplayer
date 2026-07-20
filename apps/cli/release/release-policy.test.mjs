@@ -43,6 +43,7 @@ test("CLI release identity is independent and matches its Cargo package", () => 
   assert.equal(config.bundleIdentifier, "com.multaiplayer.cli");
   assert.equal(config.teamIdentifier, "AXP55K75AX");
   assert.equal(config.keychainAccessGroup, "AXP55K75AX.com.multaiplayer.cli");
+  assert.equal(config.profileKeychainAccessGroup, "AXP55K75AX.*");
   assert.equal(artifactStem(config), `multAIplayer-cli-v${config.version}-darwin-arm64`);
 });
 
@@ -208,7 +209,10 @@ test("Developer ID profile and signed entitlements bind the stable non-interacti
     ApplicationIdentifierPrefix: [config.teamIdentifier],
     ProvisionsAllDevices: true,
     ExpirationDate: "2099-01-01T00:00:00.000Z",
-    Entitlements: protectedEntitlements
+    Entitlements: {
+      ...protectedEntitlements,
+      "keychain-access-groups": [config.profileKeychainAccessGroup]
+    }
   };
   assert.deepEqual(validateProvisioningProfile(profile, config, new Date("2026-07-20T00:00:00.000Z")), {
     uuid: profile.UUID,
@@ -216,11 +220,26 @@ test("Developer ID profile and signed entitlements bind the stable non-interacti
     expiration: profile.ExpirationDate,
     teamIdentifier: config.teamIdentifier,
     applicationIdentifier: config.keychainAccessGroup,
-    keychainAccessGroups: [config.keychainAccessGroup]
+    keychainAccessGroups: [config.profileKeychainAccessGroup]
   });
   assert.throws(() => validateProvisioningProfile({ ...profile, ProvisionsAllDevices: false }, config));
   assert.throws(() => validateProvisioningProfile({ ...profile, ProvisionedDevices: ["device"] }, config));
   assert.throws(() => validateProvisioningProfile({ ...profile, ExpirationDate: "2020-01-01T00:00:00.000Z" }, config));
+  assert.throws(() =>
+    validateProvisioningProfile(
+      {
+        ...profile,
+        Entitlements: { ...profile.Entitlements, "keychain-access-groups": [config.keychainAccessGroup] }
+      },
+      config
+    )
+  );
+  assert.throws(() =>
+    validateProvisioningProfile(
+      { ...profile, Entitlements: { ...profile.Entitlements, "get-task-allow": true } },
+      config
+    )
+  );
 
   assert.doesNotThrow(() => assertNoProtectedEntitlements({}, config));
   assert.throws(() => assertNoProtectedEntitlements(protectedEntitlements, config));
