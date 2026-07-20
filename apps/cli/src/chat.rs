@@ -1,4 +1,5 @@
 use crate::{
+    handoff::HandoffState,
     mls::{MlsClientError, MlsClientService, OutboxRoute, RelayMlsPublisher},
     relay::{
         connect_with_retries, ReconnectPolicy, RelayConnection, RelayConnector, RelaySocket,
@@ -9,8 +10,10 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use mls_core::ApplicationAuthenticatedDataInput;
 use multaiplayer_protocol::{
     ChatPlaintextPayload, ChatRole, CodexActivityPlaintextPayload, CodexEventPlaintextPayload,
-    CodexQueueAction, CodexQueuePlaintextPayload, MlsMessageType, MlsRelayMessage, PresenceStatus,
-    RelayClientMessage, RelayServerMessage, RoomEvent, RoomRecord, Validate,
+    CodexQueueAction, CodexQueuePlaintextPayload, HostHandoffAcceptedPlaintextPayload,
+    HostHandoffPlaintextPayload, HostHandoffRequestPlaintextPayload, MlsMessageType,
+    MlsRelayMessage, PresenceStatus, RelayClientMessage, RelayErrorCode, RelayServerMessage,
+    RoomEvent, RoomRecord, Validate,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, time::Duration};
@@ -21,6 +24,9 @@ const CHAT_KIND: &str = "chat.message";
 const CODEX_QUEUE_KIND: &str = "codex.queue";
 const CODEX_TURN_KIND: &str = "codex.turn";
 const CODEX_ACTIVITY_KIND: &str = "codex.activity";
+const HOST_OFFER_KIND: &str = "room.host";
+const HOST_REQUEST_KIND: &str = "room.host.request";
+const HOST_ACCEPTED_KIND: &str = "room.host.accepted";
 const MAX_RENDERED_TEXT_CHARS: usize = 4_096;
 const RECOVERY_VERSION: u8 = 1;
 const MAX_HISTORY_EVENTS: usize = 100;
@@ -42,6 +48,9 @@ pub enum ProjectedEvent {
     CodexProposal(CodexQueuePlaintextPayload),
     CodexTurn(CodexEventPlaintextPayload),
     CodexActivity(CodexActivityPlaintextPayload),
+    HostHandoff(HostHandoffPlaintextPayload),
+    HostHandoffRequest(HostHandoffRequestPlaintextPayload),
+    HostHandoffAccepted(HostHandoffAcceptedPlaintextPayload),
     Presence {
         display_name: String,
         device_id: String,
@@ -82,6 +91,8 @@ struct RoomRecoveryState {
     pending_envelope_id: Option<String>,
     #[serde(default)]
     codex_thread_id: Option<String>,
+    #[serde(default)]
+    handoffs: HandoffState,
 }
 
 impl RoomRecoveryState {
@@ -96,6 +107,7 @@ impl RoomRecoveryState {
             history: Vec::new(),
             pending_envelope_id: None,
             codex_thread_id: None,
+            handoffs: HandoffState::default(),
         }
     }
 
@@ -107,6 +119,12 @@ impl RoomRecoveryState {
             || self.device_id != device_id
             || self.processed_envelope_ids.len() > MAX_PROCESSED_ENVELOPES
             || self.history.len() > MAX_HISTORY_EVENTS
+            || self.handoffs.offers.len() > crate::handoff::MAX_HANDOFFS
+            || self
+                .handoffs
+                .offers
+                .iter()
+                .any(|offer| offer.validate().is_err())
             || self
                 .processed_envelope_ids
                 .iter()
@@ -153,6 +171,9 @@ impl RoomRecoveryState {
                 | ProjectedEvent::CodexProposal(_)
                 | ProjectedEvent::CodexTurn(_)
                 | ProjectedEvent::CodexActivity(_)
+                | ProjectedEvent::HostHandoff(_)
+                | ProjectedEvent::HostHandoffRequest(_)
+                | ProjectedEvent::HostHandoffAccepted(_)
                 | ProjectedEvent::Unsupported { .. }
         ) {
             return;
@@ -239,6 +260,24 @@ impl TerminalRenderer {
                     }
                 }
             }
+            ProjectedEvent::HostHandoff(offer) => format!(
+                "[handoff] {} offered host authority (id: {}). Use /handoff request {} to volunteer.",
+                safe_untrusted_text(&offer.from_host, 120),
+                safe_untrusted_text(&offer.id, 160),
+                safe_untrusted_text(&offer.id, 160)
+            ),
+            ProjectedEvent::HostHandoffRequest(request) => format!(
+                "[handoff] candidate {} on {} requested authority for {}",
+                safe_untrusted_text(&request.candidate_user_id, 160),
+                safe_untrusted_text(&request.candidate_device_id, 128),
+                safe_untrusted_text(&request.offer_id, 160)
+            ),
+            ProjectedEvent::HostHandoffAccepted(accepted) => format!(
+                "[handoff] authority committed to {} on {} at epoch {}",
+                safe_untrusted_text(&accepted.host_user_id, 160),
+                safe_untrusted_text(&accepted.host_device_id, 128),
+                accepted.committed_epoch
+            ),
             ProjectedEvent::Presence {
                 display_name,
                 device_id,
@@ -520,6 +559,167 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
         Ok(projected)
     }
 
+    pub fn publish_handoff_offer(
+        &mut self,
+        message_id: &str,
+        mut offer: HostHandoffPlaintextPayload,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        if !self.is_active_host() || offer.id != message_id || offer.from_user_id != self.user_id {
+            return Err(ChatError::InvalidMessage);
+        }
+        offer.status = multaiplayer_protocol::HostHandoffStatus::Available;
+        offer.candidate_user_id = None;
+        offer.candidate_device_id = None;
+        offer.candidate_leaf = None;
+        self.recovery.handoffs.remember_offer(offer.clone());
+        let event = ProjectedEvent::HostHandoff(offer.clone());
+        self.queue_projected_event(message_id, HOST_OFFER_KIND, &offer, &event, created_at)?;
+        let mut projected = vec![event];
+        projected.extend(self.publish_queued_application(message_id, created_at)?);
+        Ok(projected)
+    }
+
+    pub fn request_handoff(
+        &mut self,
+        offer_id: &str,
+        message_id: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        self.validate_handoff_request(offer_id)?;
+        let group = self.mls.group_snapshot(&self.room.id)?;
+        let Some((leaf, user_id, device_id)) = group
+            .roster
+            .iter()
+            .find(|(leaf, _, _)| *leaf == group.self_leaf)
+        else {
+            return Err(ChatError::InvalidMessage);
+        };
+        let request = HostHandoffRequestPlaintextPayload {
+            phase: "candidate_request".into(),
+            offer_id: offer_id.to_owned(),
+            candidate_user_id: user_id.clone(),
+            candidate_device_id: device_id.clone(),
+            candidate_leaf: *leaf,
+        };
+        if !self.recovery.handoffs.request_candidate(&request) {
+            return Err(ChatError::InvalidMessage);
+        }
+        let event = ProjectedEvent::HostHandoffRequest(request.clone());
+        self.queue_projected_event(message_id, HOST_REQUEST_KIND, &request, &event, created_at)?;
+        let mut projected = vec![event];
+        projected.extend(self.publish_queued_application(message_id, created_at)?);
+        Ok(projected)
+    }
+
+    pub fn validate_handoff_request(&self, offer_id: &str) -> Result<(), ChatError> {
+        if self.is_active_host() || self.recovery.handoffs.offer(offer_id).is_none() {
+            return Err(ChatError::InvalidMessage);
+        }
+        let group = self.mls.group_snapshot(&self.room.id)?;
+        let Some((_, user_id, device_id)) = group
+            .roster
+            .iter()
+            .find(|(leaf, _, _)| *leaf == group.self_leaf)
+        else {
+            return Err(ChatError::InvalidMessage);
+        };
+        if user_id != &self.user_id || device_id != &self.device_id {
+            return Err(ChatError::InvalidMessage);
+        }
+        Ok(())
+    }
+
+    pub fn approve_handoff(
+        &mut self,
+        offer_id: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        if !self.is_active_host() {
+            return Err(ChatError::InvalidMessage);
+        }
+        let offer = self
+            .recovery
+            .handoffs
+            .offer(offer_id)
+            .cloned()
+            .ok_or(ChatError::InvalidMessage)?;
+        let (Some(candidate_user), Some(candidate_device), Some(candidate_leaf)) = (
+            offer.candidate_user_id.as_ref(),
+            offer.candidate_device_id.as_ref(),
+            offer.candidate_leaf,
+        ) else {
+            return Err(ChatError::InvalidMessage);
+        };
+        let group = self.mls.group_snapshot(&self.room.id)?;
+        if !group.roster.iter().any(|(leaf, user, device)| {
+            *leaf == candidate_leaf && user == candidate_user && device == candidate_device
+        }) {
+            return Err(ChatError::InvalidMessage);
+        }
+        let route = OutboxRoute {
+            team_id: self.room.team_id.clone(),
+            room_id: self.room.id.clone(),
+            created_at: created_at.into(),
+        };
+        let prepared = self.mls.prepare_host_transfer(
+            &route,
+            candidate_leaf,
+            candidate_device,
+            offer_id,
+            created_at,
+        )?;
+        let mut received = Vec::new();
+        let publish = self.connection.publish_and_wait_for_ack(
+            &RelayClientMessage::Publish {
+                message: Box::new(prepared.relay_message.clone()),
+            },
+            Duration::from_secs(10),
+            &mut |message| {
+                received.push(message.clone());
+                Ok(())
+            },
+        );
+        if matches!(
+            publish,
+            Err(RelayTransportError::AckRejected(Some(
+                RelayErrorCode::StaleEpoch
+            )))
+        ) {
+            self.mls
+                .clear_host_transfer(&self.room.id, &prepared.message_id)?;
+            return Err(ChatError::Relay(RelayTransportError::AckRejected(Some(
+                RelayErrorCode::StaleEpoch,
+            ))));
+        }
+        publish?;
+        let epoch = self
+            .mls
+            .mark_host_transfer_published(&self.room.id, &prepared.message_id)?;
+        let mut projected = self.project_received(received)?;
+        let accepted = HostHandoffAcceptedPlaintextPayload {
+            phase: "accepted".into(),
+            offer_id: offer_id.into(),
+            host_user_id: candidate_user.clone(),
+            host_device_id: candidate_device.clone(),
+            host_leaf: candidate_leaf,
+            committed_epoch: epoch,
+        };
+        // This event improves live UX only. The commit above already completed authority.
+        let informational_id = format!("handoff-accepted-{}", uuid::Uuid::new_v4());
+        let event = ProjectedEvent::HostHandoffAccepted(accepted.clone());
+        self.queue_projected_event(
+            &informational_id,
+            HOST_ACCEPTED_KIND,
+            &accepted,
+            &event,
+            created_at,
+        )?;
+        projected.push(event);
+        projected.extend(self.publish_queued_application(&informational_id, created_at)?);
+        Ok(projected)
+    }
+
     pub fn send_codex_cancelled(
         &mut self,
         envelope_id: &str,
@@ -771,7 +971,15 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
             // is composed here, fail before creating an incoming-recovery marker
             // instead of silently treating the handoff as an ordinary echo.
             if envelope.commit_effect.is_some() {
-                return Err(ChatError::InvalidEncryptedMessage);
+                self.mls
+                    .recover_exact_local_host_transfer(&self.room.id, &envelope.id)?;
+                let event = self.recover_host_transfer(envelope)?;
+                self.recovery.remember_processed(&envelope.id);
+                if let Some(event) = event.as_ref() {
+                    self.recovery.remember_history(event);
+                }
+                self.persist_recovery()?;
+                return Ok(event);
             }
             self.recovery.remember_processed(&envelope.id);
             self.persist_recovery()?;
@@ -783,8 +991,13 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
                 .map_err(|_| ChatError::InvalidEncryptedMessage)?;
             self.begin_incoming(&envelope.id)?;
             self.mls.process_incoming(&self.room.id, &ciphertext)?;
-            self.finish_incoming(&envelope.id, None)?;
-            return Ok(None);
+            let projected = if envelope.commit_effect.is_some() {
+                self.recover_host_transfer(envelope)?
+            } else {
+                None
+            };
+            self.finish_incoming(&envelope.id, projected.as_ref())?;
+            return Ok(projected);
         }
         if envelope.message_type != MlsMessageType::Application {
             return Ok(None);
@@ -841,6 +1054,32 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
                 Some(ProjectedEvent::CodexActivity(activity))
             }
             RoomEvent::CodexActivity(_) => return Err(ChatError::InvalidEncryptedMessage),
+            RoomEvent::HostHandoff(offer)
+                if self.envelope_from_active_host(envelope)
+                    && offer.from_user_id == envelope.sender_user_id =>
+            {
+                self.recovery.handoffs.remember_offer(offer.clone());
+                Some(ProjectedEvent::HostHandoff(offer))
+            }
+            RoomEvent::HostHandoff(_) => return Err(ChatError::InvalidEncryptedMessage),
+            RoomEvent::HostHandoffRequest(request)
+                if request.candidate_user_id == envelope.sender_user_id
+                    && request.candidate_device_id == envelope.sender_device_id
+                    && self.recovery.handoffs.request_candidate(&request) =>
+            {
+                Some(ProjectedEvent::HostHandoffRequest(request))
+            }
+            RoomEvent::HostHandoffRequest(_) => return Err(ChatError::InvalidEncryptedMessage),
+            RoomEvent::HostHandoffAccepted(accepted)
+                if self.recovery.handoffs.accept_informational(
+                    &accepted,
+                    &envelope.sender_user_id,
+                    &envelope.created_at,
+                ) =>
+            {
+                Some(ProjectedEvent::HostHandoffAccepted(accepted))
+            }
+            RoomEvent::HostHandoffAccepted(_) => return Err(ChatError::InvalidEncryptedMessage),
             RoomEvent::Unsupported { kind } => Some(ProjectedEvent::Unsupported { kind }),
             _ => Some(ProjectedEvent::Unsupported {
                 kind: aad.kind.clone(),
@@ -855,6 +1094,34 @@ impl<'a, S: RelaySocket> ChatRoomSession<'a, S> {
             && self.room.active_host_device_id.as_deref()
                 == Some(envelope.sender_device_id.as_str())
             && self.room.host_status == multaiplayer_protocol::HostStatus::Active
+    }
+
+    fn recover_host_transfer(
+        &mut self,
+        envelope: &MlsRelayMessage,
+    ) -> Result<Option<ProjectedEvent>, ChatError> {
+        let auth = envelope
+            .host_transfer_authorization
+            .as_ref()
+            .ok_or(ChatError::InvalidEncryptedMessage)?;
+        let state = self.mls.group_snapshot(&self.room.id)?;
+        if state.epoch != envelope.epoch_hint + 1
+            || state.host_leaf != auth.next_host_leaf
+            || state.host_device_id != auth.next_host_device_id
+            || state.host_transfer_id.as_deref() != Some(auth.transfer_id.as_str())
+            || !self.recovery.handoffs.accept_committed(envelope)
+        {
+            return Err(ChatError::InvalidEncryptedMessage);
+        }
+        let accepted = HostHandoffAcceptedPlaintextPayload {
+            phase: "accepted".into(),
+            offer_id: auth.transfer_id.clone(),
+            host_user_id: auth.next_host_user_id.clone(),
+            host_device_id: auth.next_host_device_id.clone(),
+            host_leaf: auth.next_host_leaf,
+            committed_epoch: state.epoch,
+        };
+        Ok(Some(ProjectedEvent::HostHandoffAccepted(accepted)))
     }
 
     fn begin_incoming(&mut self, envelope_id: &str) -> Result<(), ChatError> {
@@ -1005,6 +1272,59 @@ where
         }
     }
 
+    pub fn publish_handoff_offer(
+        &mut self,
+        message_id: &str,
+        offer: HostHandoffPlaintextPayload,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        match self
+            .inner
+            .publish_handoff_offer(message_id, offer, created_at)
+        {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(created_at),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn request_handoff(
+        &mut self,
+        offer_id: &str,
+        message_id: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        match self.inner.request_handoff(offer_id, message_id, created_at) {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(created_at),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn validate_handoff_request(&self, offer_id: &str) -> Result<(), ChatError> {
+        self.inner.validate_handoff_request(offer_id)
+    }
+
+    pub fn approve_handoff(
+        &mut self,
+        offer_id: &str,
+        created_at: &str,
+    ) -> Result<Vec<ProjectedEvent>, ChatError> {
+        match self.inner.approve_handoff(offer_id, created_at) {
+            Ok(projected) => Ok(projected),
+            Err(error) if retryable_chat_error(&error) => self.reconnect_and_join(created_at),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn handoff_offer(&self, offer_id: &str) -> Option<HostHandoffPlaintextPayload> {
+        self.inner.recovery.handoffs.offer(offer_id).cloned()
+    }
+
+    pub fn handoff_offers(&self) -> Vec<HostHandoffPlaintextPayload> {
+        self.inner.recovery.handoffs.offers.clone()
+    }
+
     pub fn send_codex_turn(
         &mut self,
         envelope_id: &str,
@@ -1140,6 +1460,9 @@ fn valid_history_event(event: &ProjectedEvent) -> bool {
         ProjectedEvent::CodexProposal(proposal) => proposal.validate().is_ok(),
         ProjectedEvent::CodexTurn(turn) => turn.validate().is_ok(),
         ProjectedEvent::CodexActivity(activity) => activity.validate().is_ok(),
+        ProjectedEvent::HostHandoff(offer) => offer.validate().is_ok(),
+        ProjectedEvent::HostHandoffRequest(request) => request.validate().is_ok(),
+        ProjectedEvent::HostHandoffAccepted(accepted) => accepted.validate().is_ok(),
         ProjectedEvent::Unsupported { kind } => {
             !kind.is_empty() && kind.chars().count() <= 128 && !kind.chars().any(char::is_control)
         }
@@ -1439,6 +1762,125 @@ mod tests {
             &host_identity.public.signature_key_fingerprint,
         );
         assert!(reopened.is_ok());
+    }
+
+    #[test]
+    fn exact_local_handoff_replay_commits_once_and_reopens_cleanly() {
+        let directory = TestDirectory::new();
+        let host_store = MemoryCredentialStore::default();
+        let guest_store = MemoryCredentialStore::default();
+        let host_identity =
+            load_or_create_identity(&host_store, "github:host", "CLI host").unwrap();
+        let guest_identity =
+            load_or_create_identity(&guest_store, "github:guest", "CLI guest").unwrap();
+        let mut host_mls = MlsClientService::open(
+            &host_store,
+            &host_identity,
+            &directory.0.join("host-handoff.db"),
+        )
+        .unwrap();
+        let mut guest_mls = MlsClientService::open(
+            &guest_store,
+            &guest_identity,
+            &directory.0.join("guest-handoff.db"),
+        )
+        .unwrap();
+        let mut room = recovery_room();
+        room.host_user_id = Some(host_identity.public.user_id.clone());
+        room.active_host_device_id = Some(host_identity.public.device_id.clone());
+        host_mls.create_group_idempotent(&room.id).unwrap();
+        let key_package = guest_mls.interoperability_generate_key_package().unwrap();
+        let admission = host_mls
+            .interoperability_add_member(&room.id, &key_package)
+            .unwrap();
+        host_mls
+            .interoperability_publish_succeeded(&room.id, &admission.commit_outbox_id)
+            .unwrap();
+        guest_mls
+            .interoperability_join_welcome(&room.id, &admission.welcome)
+            .unwrap();
+        let guest = guest_mls.group_snapshot(&room.id).unwrap();
+        let route = OutboxRoute {
+            team_id: room.team_id.clone(),
+            room_id: room.id.clone(),
+            created_at: "2026-07-20T00:01:00.000Z".into(),
+        };
+        let stale = host_mls
+            .prepare_host_transfer(
+                &route,
+                guest.self_leaf,
+                &guest_identity.public.device_id,
+                "handoff-stale-at-relay",
+                &route.created_at,
+            )
+            .unwrap();
+        host_mls
+            .clear_host_transfer(&room.id, &stale.message_id)
+            .unwrap();
+        assert_eq!(
+            host_mls.group_snapshot(&room.id).unwrap().host_device_id,
+            host_identity.public.device_id
+        );
+        let prepared = host_mls
+            .prepare_host_transfer(
+                &route,
+                guest.self_leaf,
+                &guest_identity.public.device_id,
+                "handoff-local-replay",
+                &route.created_at,
+            )
+            .unwrap();
+        let mut offer: HostHandoffPlaintextPayload = from_json(
+            r#"{"id":"handoff-local-replay","fromHost":"CLI host","fromUserId":"github:host","reason":"manual","projectPath":"/tmp/project","codexModel":"gpt-5.6-sol","codexModelPolicy":"auto","codexReasoningEffort":"medium","codexReasoningEffortPolicy":"auto","codexRawReasoningEnabled":false,"codexSpeed":"standard","codexServiceTierPolicy":"auto","codexSandboxLevel":"workspace_write","approvalPolicy":"ask_every_turn","messagesSinceLastCodex":0,"queuedCodexTurns":[],"attachmentNames":[],"terminals":[],"createdAt":"2026-07-20T00:00:00.000Z","status":"available"}"#,
+        )
+        .unwrap();
+        offer.from_user_id = host_identity.public.user_id.clone();
+        let request = HostHandoffRequestPlaintextPayload {
+            phase: "candidate_request".into(),
+            offer_id: offer.id.clone(),
+            candidate_user_id: guest_identity.public.user_id.clone(),
+            candidate_device_id: guest_identity.public.device_id.clone(),
+            candidate_leaf: guest.self_leaf,
+        };
+
+        {
+            let mut session = ChatRoomSession::new(
+                RelayConnection::new(NoopSocket),
+                &mut host_mls,
+                room.clone(),
+                &host_identity.public.user_id,
+                &host_identity.public.device_id,
+                &host_identity.public.display_name,
+                &host_identity.public.signature_key_fingerprint,
+            )
+            .unwrap();
+            session.recovery.handoffs.remember_offer(offer);
+            assert!(session.recovery.handoffs.request_candidate(&request));
+            session.persist_recovery().unwrap();
+            assert!(matches!(
+                session.open_room_event(&prepared.relay_message).unwrap(),
+                Some(ProjectedEvent::HostHandoffAccepted(_))
+            ));
+            assert!(session.recovery.processed(&prepared.message_id));
+            assert_eq!(session.recovery.pending_envelope_id, None);
+            assert_eq!(
+                session.mls.group_snapshot(&room.id).unwrap().host_device_id,
+                guest_identity.public.device_id
+            );
+        }
+
+        let reopened = ChatRoomSession::new(
+            RelayConnection::new(NoopSocket),
+            &mut host_mls,
+            room,
+            &host_identity.public.user_id,
+            &host_identity.public.device_id,
+            &host_identity.public.display_name,
+            &host_identity.public.signature_key_fingerprint,
+        )
+        .unwrap();
+        assert!(reopened.recovery.processed(&prepared.message_id));
+        assert_eq!(reopened.recovery.pending_envelope_id, None);
     }
 
     #[test]
