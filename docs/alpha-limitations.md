@@ -7,11 +7,18 @@ claims, audit status, metadata exposure, and residual risks.
 
 ## Releases and platforms
 
-- Treat a build as supported only when it passes the signed, notarized release
-  process in [Verifying releases](reproducible-builds.md) and is published from this repository.
+- Treat a build as supported only when it is Developer ID signed, notarized, and
+  published from this repository. Desktop builds follow
+  [Verifying releases](reproducible-builds.md); CLI builds follow the isolated
+  [CLI release process](../apps/cli/RELEASE.md).
 - Public packages are tested on Apple-silicon macOS 15. They use macOS 11 as the
   deployment target, but macOS 11–14 are compatibility targets rather than tested
   support. Intel Macs, Windows, and Linux are not release targets.
+- The CLI is line-oriented and uses the same relay and MLS rooms as the desktop
+  app, but it does not support host handoff, browser, shared terminal, editor,
+  attachments, GitHub panels, goals, thread graphs, or rich diffs. It has no
+  background updater or Homebrew package. See the maintained
+  [CLI compatibility table](../apps/cli/README.md#compatibility-and-limitations).
 - Official invitations use macOS universal links. Each release still needs a
   cold-start and warm-app test; static entitlement and parser checks do not prove
   operating-system dispatch.

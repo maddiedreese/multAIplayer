@@ -11,7 +11,7 @@ and verify a local ad-hoc-signed inspection package:
 node apps/cli/release/package-cli.mjs --output apps/cli/dist
 ```
 
-For an owner-authorized distribution build, select an already-installed,
+For an owner-authorized distribution candidate, select an already-installed,
 owner-managed Developer ID identity without exporting private key material:
 
 ```sh
@@ -45,5 +45,16 @@ the manifest. Verification independently inspects the extracted executable with
 to exactly match both manifests. The modes cannot be relabeled.
 
 Packaging never tags, uploads, publishes, or changes a GitHub Release. Those
-actions remain owner-controlled. Notarization and external distribution are not
-part of this isolated CLI packaging task.
+actions remain owner-controlled. The owner must submit the exact signed binary
+to Apple's notarization service separately and require a successful Gatekeeper
+assessment before publication. The standalone executable is assessed through
+Apple's online notarization record rather than a stapled ticket, so assessment
+may require network access. Notarization must not enter the desktop release
+workflow or change the already verified CLI binary. External distribution is
+not part of this isolated CLI packaging task.
+
+The independent CLI tag convention is `cli-v<version>`. Publish the archive,
+matching manifest, and `SHA256SUMS.txt` as assets of that exact tag only after
+the owner accepts the signed and notarized candidate. The maintained installer
+resolves that exact version and tag; it never selects the desktop application's
+latest release.
