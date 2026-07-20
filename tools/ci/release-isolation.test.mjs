@@ -31,7 +31,7 @@ test("CLI publication has an independent exact-source release workflow", () => {
   assert.match(cliRelease, /gh release create/);
   assert.match(
     cliRelease,
-    /Install locked repository dependencies[\s\S]*npm ci --ignore-scripts[\s\S]*Run the complete locked CLI gate/
+    /Install locked repository dependencies[\s\S]*run: npm ci\n[\s\S]*Run the complete locked CLI gate/
   );
   assert.match(
     cliRelease,
