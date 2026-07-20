@@ -31,6 +31,14 @@ multAIplayer auth status
 multAIplayer room list
 ```
 
+After a successful login, the CLI prints a short walkthrough from sign-in to
+encrypted chat. Show it again at any time without changing local or remote
+state:
+
+```sh
+multAIplayer walkthrough
+```
+
 Create and host a room from a local project:
 
 ```sh
@@ -40,7 +48,9 @@ multAIplayer room open <room>
 ```
 
 To join, run the command without putting the secret invitation capability in a
-shell argument. At the fixed local prompt, paste the code and press Return:
+shell argument. At the fixed local prompt, paste the code and press Return. The
+host keeps the non-secret invite ID printed by `room invite`, then reviews the
+pending request with `room admissions`:
 
 ```sh
 multAIplayer room join
@@ -48,6 +58,10 @@ multAIplayer room join
 
 ```text
 Paste the secret invitation code, then press Return:
+```
+
+```sh
+multAIplayer room admissions <room> <invite-id>
 ```
 
 Inside a room, use `@codex <task>` to propose work. The active host must approve

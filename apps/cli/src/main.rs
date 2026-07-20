@@ -68,8 +68,11 @@ const HELP: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     "\n\n",
     "Usage: multAIplayer [OPTIONS]\n",
+    "       multAIplayer walkthrough\n",
     "       multAIplayer auth <COMMAND>\n",
     "       multAIplayer room <COMMAND>\n\n",
+    "Getting started:\n",
+    "  walkthrough     Show the login-to-chat walkthrough again\n\n",
     "Auth commands:\n",
     "  login [--open]  Sign in with GitHub's device flow\n",
     "  status          Restore and report the current relay session\n",
@@ -95,12 +98,32 @@ const HELP: &str = concat!(
     "  -h, --help       Print help\n",
     "  -V, --version    Print version\n",
 );
+const WALKTHROUGH: &str = concat!(
+    "\nGetting started with multAIplayer\n\n",
+    "1. Check your sign-in and see your rooms:\n",
+    "   multAIplayer auth status\n",
+    "   multAIplayer room list\n\n",
+    "2. Create a room, or join one you were invited to:\n",
+    "   multAIplayer room create --name \"Project room\" --project /path/to/project\n",
+    "   multAIplayer room join\n",
+    "   Joining reads the secret invite code from stdin; never put it in a command argument.\n\n",
+    "3. Invite and admit someone as the host:\n",
+    "   multAIplayer room invite <ROOM>\n",
+    "   multAIplayer room admissions <ROOM> <INVITE-ID>\n",
+    "   Share only the secret invite code. Keep the displayed invite ID for admissions.\n\n",
+    "4. Open encrypted chat:\n",
+    "   multAIplayer room open <ROOM>\n",
+    "   Type a message, use @codex <task> to propose work, or /quit to leave chat.\n\n",
+    "Run 'multAIplayer walkthrough' anytime to see this again.\n",
+    "Run 'multAIplayer --help' for all commands.\n",
+);
 const VERSION: &str = concat!("multAIplayer ", env!("CARGO_PKG_VERSION"), "\n");
 const UNSUPPORTED: &str = "error: unsupported arguments\n\nRun 'multAIplayer --help' for usage.\n";
 
 #[derive(Debug, Eq, PartialEq)]
 enum Command {
     Help,
+    Walkthrough,
     Version,
     AuthLogin { open: bool },
     AuthStatus,
@@ -126,6 +149,7 @@ where
     match args.as_slice() {
         [] => Ok(Command::Help),
         [arg] if matches!(arg.as_ref(), "-h" | "--help") => Ok(Command::Help),
+        [arg] if arg.as_ref() == "walkthrough" => Ok(Command::Walkthrough),
         [arg] if matches!(arg.as_ref(), "-V" | "--version") => Ok(Command::Version),
         [auth, login] if auth.as_ref() == "auth" && login.as_ref() == "login" => {
             Ok(Command::AuthLogin { open: false })
@@ -255,6 +279,10 @@ fn main() -> ExitCode {
     match command {
         Ok(Command::Help) => {
             print!("{HELP}");
+            ExitCode::SUCCESS
+        }
+        Ok(Command::Walkthrough) => {
+            print!("{WALKTHROUGH}");
             ExitCode::SUCCESS
         }
         Ok(Command::Version) => {
@@ -1886,6 +1914,7 @@ fn run_auth(command: Command) -> ExitCode {
             println!("Signed out. Device identity and room keys were retained.");
         }),
         Command::Help
+        | Command::Walkthrough
         | Command::Version
         | Command::RoomList
         | Command::RoomCreate(_)
@@ -1927,6 +1956,7 @@ where
                     "Signed in as {}. Registered device {}.",
                     session.user.login, session.device.device_id
                 );
+                print!("{WALKTHROUGH}");
                 return Ok(());
             }
         }
@@ -2248,6 +2278,7 @@ mod tests {
         assert_eq!(parse_args([] as [&str; 0]), Ok(Command::Help));
         assert_eq!(parse_args(["-h"]), Ok(Command::Help));
         assert_eq!(parse_args(["--help"]), Ok(Command::Help));
+        assert_eq!(parse_args(["walkthrough"]), Ok(Command::Walkthrough));
         assert_eq!(parse_args(["-V"]), Ok(Command::Version));
         assert_eq!(parse_args(["--version"]), Ok(Command::Version));
         assert_eq!(
@@ -2340,11 +2371,24 @@ mod tests {
 
     #[test]
     fn all_output_is_fixed_and_bounded() {
-        for output in [HELP, VERSION, UNSUPPORTED] {
+        for output in [HELP, WALKTHROUGH, VERSION, UNSUPPORTED] {
             assert!(output.len() <= 2048);
         }
         assert!(!HELP.contains("<invite-code>"));
         assert!(HELP.contains("Read a secret invite code from stdin"));
+        assert!(HELP.contains("multAIplayer walkthrough"));
+        assert!(WALKTHROUGH.contains("multAIplayer auth status"));
+        assert!(WALKTHROUGH.contains("multAIplayer room list"));
+        assert!(WALKTHROUGH.contains("multAIplayer room create"));
+        assert!(WALKTHROUGH.contains("multAIplayer room join"));
+        assert!(WALKTHROUGH.contains("reads the secret invite code from stdin"));
+        assert!(WALKTHROUGH.contains("multAIplayer room invite <ROOM>"));
+        assert!(WALKTHROUGH.contains("multAIplayer room admissions <ROOM> <INVITE-ID>"));
+        assert!(WALKTHROUGH.contains("multAIplayer room open <ROOM>"));
+        assert!(WALKTHROUGH.contains("@codex <task>"));
+        assert!(WALKTHROUGH.contains("multAIplayer walkthrough"));
+        assert!(!WALKTHROUGH.contains("--yes"));
+        assert!(!WALKTHROUGH.contains("auto-approve"));
         assert!(!HELP.contains("--yes"));
         assert!(!HELP.contains("auto-approve"));
     }
