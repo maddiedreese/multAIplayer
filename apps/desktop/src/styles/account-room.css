@@ -6,8 +6,8 @@
   width: 46px;
   height: 46px;
   border-radius: 8px;
-  background: #ededed;
-  color: #2e2e2e;
+  background: var(--surface-muted);
+  color: var(--text);
   font-weight: 780;
 }
 
@@ -29,7 +29,7 @@
 
 .account-section span {
   margin-top: 3px;
-  color: #727272;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -53,7 +53,7 @@
 .codex-account-panel .panel-title small,
 .codex-approval-mode small,
 .codex-host-row small {
-  color: #727272;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
 }
@@ -73,16 +73,27 @@
 
 .codex-approval-mode select {
   min-height: 34px;
-  padding: 0 9px;
-  border: 1px solid #dcdcdc;
+  padding: 0 30px 0 9px;
+  border: 1px solid var(--border);
   border-radius: 7px;
-  background: #ffffff;
-  color: #2e2e2e;
+  background-color: var(--surface);
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
 }
 
 .codex-host-list {
   padding-top: 8px;
-  border-top: 1px solid #e8e8e8;
+  border-top: 1px solid var(--border);
 }
 
 .codex-host-list > strong {
@@ -103,13 +114,13 @@
 }
 
 .info-row span {
-  color: #727272;
+  color: var(--text-muted);
 }
 
 .relay-config-section label {
   display: grid;
   gap: 5px;
-  color: #5f5f5f;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 720;
 }
@@ -119,11 +130,11 @@
   min-width: 0;
   min-height: 34px;
   padding: 7px 8px;
-  border: 1px solid #dcdcdc;
+  border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
-  background: #ffffff;
-  color: #1e1e1e;
+  background: var(--surface);
+  color: var(--text);
   font-size: 12px;
 }
 

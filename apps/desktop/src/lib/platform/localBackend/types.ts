@@ -292,6 +292,9 @@ export interface TerminalSnapshot {
   exitStatus: number | null;
   startedAt: string;
   lines: TerminalLine[];
+  /** Live PTY screen data. This is deliberately removed from retained room history. */
+  displayRevision?: number;
+  displayChunks?: Array<{ revision: number; text: string }>;
 }
 
 export interface LocalPreviewDetectedServer {

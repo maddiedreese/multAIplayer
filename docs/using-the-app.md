@@ -129,6 +129,8 @@ Non-host members can request exact terminal commands. The active host sees the r
 
 **New terminal** is a direct local-user terminal, like a normal project terminal in an editor. It opens without confirmation dialogs, starts in the room's displayed project folder, prints that working folder at the top, and sends keyboard input directly to the PTY. It is deliberately not confined to the room folder: the local user can interrupt commands, change directories, and use their ordinary shell environment. Remote room members cannot type into that terminal directly; their command requests continue through the separate review and native-confirmation flow.
 
+The live terminal screen follows the PTY exactly, including prompts, cursor movement, shell echo, and no-echo password input. That live screen is memory-only and is not written to retained room history. Copied, retained, and shareable terminal output uses a separate bounded projection that redacts known secret patterns.
+
 Terminal output is visible to the room when shared through terminal request results, Codex events, copied Markdown, or approved context. Secret-looking commands and output get warnings, but hosts should review carefully.
 
 ## Browser

@@ -6,6 +6,19 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.17] - 2026-07-20
+
+### Fixed
+
+- The desktop project card now identifies attached non-Git workspaces as local folders instead of remaining indefinitely in a loading state.
+- Interactive terminals now render the live PTY screen with normal prompt, cursor, shell-echo, and monospaced font behavior; rapid keystrokes are queued in order instead of being dropped.
+- Teams are the top-level sidebar structure, with rooms nested beneath each team and room creation available directly from every active team.
+- Profile, Codex account, team, and room controls remain readable in both themes; the Codex approval dropdown no longer uses the macOS beveled style, and all four sidebar footer controls stay fixed in one row while sidebar content scrolls.
+
+### Security
+
+- Live terminal screen data remains memory-only and is removed from retained room history; the separate retained and shareable terminal projection continues to redact known secret patterns.
+
 ## [0.1.0-alpha.16] - 2026-07-20
 
 ### Fixed

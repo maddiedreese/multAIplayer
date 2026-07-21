@@ -1,4 +1,15 @@
-import { Archive, ChevronDown, ChevronRight, Circle, Plus, RotateCcw, Trash2, UsersRound, X } from "lucide-react";
+import {
+  Archive,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  FolderGit2,
+  Plus,
+  RotateCcw,
+  Trash2,
+  UsersRound,
+  X
+} from "lucide-react";
 import { useThemeMode } from "../hooks/useThemeMode";
 import type { SidebarPanelName } from "../lib/core/uiTypes";
 import type { SidebarRoomDisplay, SidebarTeamDisplay } from "./DesktopSidebar";
@@ -12,8 +23,17 @@ export function SidebarTeamGroup({
   collapsed,
   showArchived,
   searchActive,
+  roomCreateOpen,
+  newRoomName,
+  newRoomProjectPath,
+  defaultProjectPath,
   onToggleCollapsed,
+  onToggleRoomCreate,
   onSelectTeam,
+  onNewRoomNameChange,
+  onNewRoomProjectPathChange,
+  onChooseNewRoomProjectPath,
+  onCreateRoom,
   onSelectRoom,
   onSetTeamLifecycle,
   onSetRoomLifecycle
@@ -23,8 +43,17 @@ export function SidebarTeamGroup({
   collapsed: boolean;
   showArchived: boolean;
   searchActive: boolean;
+  roomCreateOpen: boolean;
+  newRoomName: string;
+  newRoomProjectPath: string;
+  defaultProjectPath: string;
   onToggleCollapsed: () => void;
+  onToggleRoomCreate: () => void;
   onSelectTeam: (teamId: string) => void;
+  onNewRoomNameChange: (name: string) => void;
+  onNewRoomProjectPathChange: (path: string) => void;
+  onChooseNewRoomProjectPath: () => void;
+  onCreateRoom: () => void;
   onSelectRoom: (roomId: string, teamId?: string) => void;
   onSetTeamLifecycle: TeamLifecycle;
   onSetRoomLifecycle: RoomLifecycle;
@@ -58,6 +87,18 @@ export function SidebarTeamGroup({
           <small>{team.meta}</small>
         </button>
         <div className="sidebar-row-actions">
+          {!showArchived && !searchActive && (
+            <button
+              type="button"
+              className="icon-only"
+              aria-label={roomCreateOpen ? `Hide new room form for ${team.name}` : `New room in ${team.name}`}
+              aria-expanded={roomCreateOpen}
+              title={`New room in ${team.name}`}
+              onClick={onToggleRoomCreate}
+            >
+              {roomCreateOpen ? <X size={13} /> : <Plus size={13} />}
+            </button>
+          )}
           <button
             type="button"
             className="icon-only"
@@ -80,6 +121,19 @@ export function SidebarTeamGroup({
       </div>
       {!collapsed && (
         <div className="nested-room-list">
+          {roomCreateOpen && !showArchived && !searchActive && (
+            <NestedRoomCreateForm
+              {...{
+                newRoomName,
+                newRoomProjectPath,
+                defaultProjectPath,
+                onNewRoomNameChange,
+                onNewRoomProjectPathChange,
+                onChooseNewRoomProjectPath,
+                onCreateRoom
+              }}
+            />
+          )}
           {rooms.map((room) => (
             <button
               key={room.id}
@@ -127,6 +181,55 @@ export function SidebarTeamGroup({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function NestedRoomCreateForm({
+  newRoomName,
+  newRoomProjectPath,
+  defaultProjectPath,
+  onNewRoomNameChange,
+  onNewRoomProjectPathChange,
+  onChooseNewRoomProjectPath,
+  onCreateRoom
+}: {
+  newRoomName: string;
+  newRoomProjectPath: string;
+  defaultProjectPath: string;
+  onNewRoomNameChange: (name: string) => void;
+  onNewRoomProjectPathChange: (path: string) => void;
+  onChooseNewRoomProjectPath: () => void;
+  onCreateRoom: () => void;
+}) {
+  const canCreate = Boolean(newRoomName.trim() && newRoomProjectPath.trim());
+  return (
+    <div className="sidebar-create-form nested-room-create-form">
+      <input
+        value={newRoomName}
+        onChange={(event) => onNewRoomNameChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && canCreate) {
+            event.preventDefault();
+            onCreateRoom();
+          }
+        }}
+        placeholder="Room name"
+        autoFocus
+      />
+      <div className="path-create-row">
+        <input
+          value={newRoomProjectPath}
+          onChange={(event) => onNewRoomProjectPathChange(event.target.value)}
+          placeholder={defaultProjectPath}
+        />
+        <button type="button" onClick={onChooseNewRoomProjectPath} aria-label="Choose project folder">
+          <FolderGit2 size={14} />
+        </button>
+      </div>
+      <button type="button" onClick={onCreateRoom} disabled={!canCreate}>
+        Create room
+      </button>
     </div>
   );
 }
