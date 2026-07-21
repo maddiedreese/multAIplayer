@@ -23,9 +23,10 @@
 
 .drawer-section {
   display: grid;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface-strong);
+  color: var(--text);
   min-width: 0;
   padding: 14px 16px;
   gap: 10px;
@@ -50,7 +51,7 @@
 }
 
 .info-row strong {
-  color: #1e1e1e;
+  color: var(--text);
   font-weight: 720;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,7 +111,7 @@
 
 .history-defaults {
   display: grid;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--border);
   border-radius: 8px;
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
@@ -229,10 +230,13 @@
 }
 
 .sidebar-footer {
-  margin-top: auto;
+  flex: 0 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  position: relative;
+  z-index: 2;
+  background: var(--sidebar);
 }
 
 .sidebar-footer button {
@@ -264,6 +268,17 @@
   scrollbar-gutter: stable;
 }
 
+.sidebar-drawer,
+.sidebar-drawer * {
+  font-family: var(--font-sans) !important;
+}
+
+.sidebar-drawer :where(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none !important;
+}
+
 .sidebar-drawer .drawer-section,
 .sidebar-drawer .drawer-section * {
   min-width: 0;
@@ -277,6 +292,33 @@
 
 .sidebar-drawer .drawer-section :where(input:not([type="checkbox"]), select, textarea, button) {
   width: 100%;
+}
+
+.sidebar-drawer .drawer-section .icon-button {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  justify-self: end;
+  border: 1px solid var(--border);
+  background: var(--button-bg);
+  color: var(--text);
+}
+
+.sidebar-drawer .room-archive-panel input {
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.sidebar-drawer .drawer-section a {
+  color: var(--text);
+  text-decoration-color: var(--text-soft);
+  text-underline-offset: 2px;
 }
 
 .sidebar-drawer :where(.checkbox-row, .history-defaults) :where(span, strong) {

@@ -27,6 +27,8 @@ test("terminal history drops interactive input while retaining process output", 
   const [terminal] = terminalsForLocalHistory([
     {
       ...alphaTerminal,
+      displayRevision: 1,
+      displayChunks: [{ revision: 1, text: "ghp_live_screen_secret" }],
       lines: [
         { stream: "stdout", text: "Password: " },
         { stream: "stdin", text: "ghp_attacker_shaped_secret" },
@@ -36,6 +38,8 @@ test("terminal history drops interactive input while retaining process output", 
   ]);
 
   assert.equal(terminal?.running, false);
+  assert.equal(terminal?.displayRevision, undefined);
+  assert.equal(terminal?.displayChunks, undefined);
   assert.deepEqual(terminal?.lines, [
     { stream: "stdout", text: "Password: " },
     { stream: "system", text: "done" }

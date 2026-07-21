@@ -252,21 +252,21 @@ button:disabled {
   min-width: 0;
   height: 32px;
   padding: 0 9px;
-  border: 1px solid #dcdcdc;
+  border: 1px solid var(--border);
   border-radius: 7px;
-  background: #ffffff;
-  color: #1f1f1f;
+  background: var(--surface-strong);
+  color: var(--text);
   font-size: 12px;
 }
 
 .sidebar-create-form input:disabled {
-  background: #f1f1f1;
-  color: #838383;
+  background: var(--surface-muted);
+  color: var(--text-soft);
 }
 
 .sidebar-create-form > button:disabled {
-  background: #f0f0f0;
-  color: #929292;
+  background: var(--surface-muted);
+  color: var(--text-soft);
 }
 
 .path-create-row {

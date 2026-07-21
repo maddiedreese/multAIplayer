@@ -7,6 +7,8 @@ export interface RoomTerminalSnapshot {
 export interface PersistableTerminalSnapshot extends RoomTerminalSnapshot {
   running: boolean;
   lines: unknown[];
+  displayRevision?: number;
+  displayChunks?: unknown[];
 }
 
 export function replaceRoomTerminalSnapshots<T extends RoomTerminalSnapshot>(
@@ -51,6 +53,8 @@ function terminalForLocalHistory<T extends PersistableTerminalSnapshot>(terminal
   return {
     ...terminal,
     running: false,
+    displayRevision: undefined,
+    displayChunks: undefined,
     lines: terminal.lines.filter(isRetainableTerminalLine).slice(-1000)
   };
 }

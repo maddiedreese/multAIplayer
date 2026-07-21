@@ -249,6 +249,34 @@ test("terminal input writes directly without a native confirmation dialog", asyn
   assert.deepEqual(stored?.lines, [{ stream: "stdout", text: "prompt output" }]);
 });
 
+test("rapid terminal keystrokes are queued and written in order", async () => {
+  const inputs: string[] = [];
+  let finishFirst: (() => void) | undefined;
+  const firstWrite = new Promise<void>((resolve) => {
+    finishFirst = resolve;
+  });
+  nativeInvoke = async (command, args) => {
+    if (command !== "terminal_write") throw new Error(`Unexpected native command: ${command}`);
+    const input = (args as { request: { input: string } }).request.input;
+    inputs.push(input);
+    if (input === "a") await firstWrite;
+    return runningTerminal;
+  };
+  useAppStore.getState().syncTerminalSnapshotsForRoom(room.id, [runningTerminal]);
+  useAppStore.getState().setSelectedTerminalIdForRoom(room.id, runningTerminal.id);
+  const actions = createTerminalActions(createOptions());
+
+  const first = actions.sendTerminalData("a");
+  const second = actions.sendTerminalData("b");
+  const third = actions.sendTerminalData("c");
+  await Promise.resolve();
+  assert.deepEqual(inputs, ["a"]);
+
+  finishFirst?.();
+  await Promise.all([first, second, third]);
+  assert.deepEqual(inputs, ["a", "b", "c"]);
+});
+
 test("late terminal input completion cannot overwrite state after a room switch", async () => {
   const otherRoom: ClientRoomRecord = {
     ...defaultTestRoom,

@@ -74,8 +74,17 @@ test("team disclosure collapses its room list", () => {
     ],
     showArchived: false,
     searchActive: false,
+    roomCreateOpen: false,
+    newRoomName: "",
+    newRoomProjectPath: "/tmp/project",
+    defaultProjectPath: "/tmp/project",
     onToggleCollapsed: () => undefined,
+    onToggleRoomCreate: () => undefined,
     onSelectTeam: () => undefined,
+    onNewRoomNameChange: () => undefined,
+    onNewRoomProjectPathChange: () => undefined,
+    onChooseNewRoomProjectPath: () => undefined,
+    onCreateRoom: () => undefined,
     onSelectRoom: () => undefined,
     onSetTeamLifecycle: () => undefined,
     onSetRoomLifecycle: () => undefined
@@ -86,4 +95,68 @@ test("team disclosure collapses its room list", () => {
   view.rerender(<SidebarTeamGroup {...props} collapsed />);
   assert.equal(view.queryByText("Room one"), null);
   assert.ok(view.getByRole("button", { name: "Expand Team one" }));
+});
+
+test("each team owns its room creation control and nested form", () => {
+  let toggles = 0;
+  let creates = 0;
+  const view = render(
+    <SidebarTeamGroup
+      team={{ id: "team-one", name: "Team one", meta: "1 member", active: true, archived: false }}
+      rooms={[]}
+      collapsed={false}
+      showArchived={false}
+      searchActive={false}
+      roomCreateOpen={false}
+      newRoomName="Room one"
+      newRoomProjectPath="/tmp/project"
+      defaultProjectPath="/tmp/project"
+      onToggleCollapsed={() => undefined}
+      onToggleRoomCreate={() => {
+        toggles += 1;
+      }}
+      onSelectTeam={() => undefined}
+      onNewRoomNameChange={() => undefined}
+      onNewRoomProjectPathChange={() => undefined}
+      onChooseNewRoomProjectPath={() => undefined}
+      onCreateRoom={() => {
+        creates += 1;
+      }}
+      onSelectRoom={() => undefined}
+      onSetTeamLifecycle={() => undefined}
+      onSetRoomLifecycle={() => undefined}
+    />
+  );
+
+  fireEvent.click(view.getByRole("button", { name: "New room in Team one" }));
+  assert.equal(toggles, 1);
+
+  view.rerender(
+    <SidebarTeamGroup
+      team={{ id: "team-one", name: "Team one", meta: "1 member", active: true, archived: false }}
+      rooms={[]}
+      collapsed={false}
+      showArchived={false}
+      searchActive={false}
+      roomCreateOpen
+      newRoomName="Room one"
+      newRoomProjectPath="/tmp/project"
+      defaultProjectPath="/tmp/project"
+      onToggleCollapsed={() => undefined}
+      onToggleRoomCreate={() => undefined}
+      onSelectTeam={() => undefined}
+      onNewRoomNameChange={() => undefined}
+      onNewRoomProjectPathChange={() => undefined}
+      onChooseNewRoomProjectPath={() => undefined}
+      onCreateRoom={() => {
+        creates += 1;
+      }}
+      onSelectRoom={() => undefined}
+      onSetTeamLifecycle={() => undefined}
+      onSetRoomLifecycle={() => undefined}
+    />
+  );
+  assert.ok(view.getByPlaceholderText("Room name"));
+  fireEvent.click(view.getByRole("button", { name: "Create room" }));
+  assert.equal(creates, 1);
 });

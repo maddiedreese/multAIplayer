@@ -97,6 +97,7 @@ export function TerminalPanel({
   });
   const renderedTerminalIdRef = useRef<string | null>(null);
   const renderedLineCountRef = useRef(0);
+  const renderedDisplayRevisionRef = useRef(0);
 
   useEffect(() => {
     terminalControlRef.current = {
@@ -119,10 +120,13 @@ export function TerminalPanel({
       '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace';
     const xterm = new XTerm({
       cursorBlink: true,
-      convertEol: true,
-      fontFamily: terminalFont,
+      convertEol: false,
+      fontFamily: terminalFont.includes("SFMono-Regular")
+        ? 'Menlo, Monaco, Consolas, "Liberation Mono", monospace'
+        : terminalFont,
       fontSize: 13,
-      lineHeight: 1.35,
+      letterSpacing: 0,
+      lineHeight: 1.2,
       theme: readTerminalTheme()
     });
     const fitAddon = new FitAddon();
@@ -172,6 +176,7 @@ export function TerminalPanel({
       fitAddonRef.current = null;
       renderedTerminalIdRef.current = null;
       renderedLineCountRef.current = 0;
+      renderedDisplayRevisionRef.current = 0;
     };
   }, []);
 
@@ -182,6 +187,7 @@ export function TerminalPanel({
       xterm.clear();
       renderedTerminalIdRef.current = null;
       renderedLineCountRef.current = 0;
+      renderedDisplayRevisionRef.current = 0;
       return;
     }
 
@@ -189,13 +195,34 @@ export function TerminalPanel({
       xterm.reset();
       renderedTerminalIdRef.current = selectedTerminal.id;
       renderedLineCountRef.current = 0;
+      renderedDisplayRevisionRef.current = 0;
     }
 
-    const newLines = selectedTerminal.lines.slice(renderedLineCountRef.current);
-    for (const line of newLines) {
-      writeTerminalLine(xterm, line);
+    const displayChunks = selectedTerminal.displayChunks ?? [];
+    if (selectedTerminal.displayChunks !== undefined) {
+      const firstRevision = displayChunks[0]?.revision;
+      if (
+        renderedDisplayRevisionRef.current > 0 &&
+        firstRevision !== undefined &&
+        firstRevision > renderedDisplayRevisionRef.current + 1
+      ) {
+        xterm.reset();
+        renderedDisplayRevisionRef.current = 0;
+      }
+      for (const chunk of displayChunks) {
+        if (chunk.revision > renderedDisplayRevisionRef.current) {
+          xterm.write(chunk.text);
+          renderedDisplayRevisionRef.current = chunk.revision;
+        }
+      }
+      renderedLineCountRef.current = selectedTerminal.lines.length;
+    } else {
+      const newLines = selectedTerminal.lines.slice(renderedLineCountRef.current);
+      for (const line of newLines) {
+        writeTerminalLine(xterm, line);
+      }
+      renderedLineCountRef.current = selectedTerminal.lines.length;
     }
-    renderedLineCountRef.current = selectedTerminal.lines.length;
     try {
       fitAddonRef.current?.fit();
     } catch {

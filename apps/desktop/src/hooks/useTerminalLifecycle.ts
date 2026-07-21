@@ -58,7 +58,9 @@ export function useTerminalLifecycle({
     if (!canReadLocalWorkspace || !selectedRoomId || !selectedTerminalId || !selectedTerminalRunning) return;
     let cancelled = false;
     const timer = window.setInterval(() => {
-      readTerminal(selectedTerminalId)
+      const selectedTerminal = useAppStore.getState().terminals.find((terminal) => terminal.id === selectedTerminalId);
+      const afterRevision = selectedTerminal?.displayRevision;
+      readTerminal(selectedTerminalId, afterRevision)
         .then((snapshot) => {
           if (cancelled) return;
           useAppStore.getState().upsertTerminalSnapshot(snapshot);
@@ -68,7 +70,7 @@ export function useTerminalLifecycle({
             useAppStore.getState().setTerminalErrorForRoom(selectedRoomId, String(error));
           }
         });
-    }, 1500);
+    }, 100);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

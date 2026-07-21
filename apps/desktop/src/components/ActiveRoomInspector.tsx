@@ -7,6 +7,7 @@ import { canStageRoomChatAttachment } from "../lib/chat/chatPolicy";
 import { formatBytes, formatCodexModel, formatTimestamp } from "../lib/formatting/appFormatters";
 import { resolveFilePreviewTab } from "../lib/files/filePreview";
 import { resolveGitWorkflowDraft, type GitWorkflowDraft } from "../lib/git/gitWorkflowDraft";
+import { projectStatusLabel } from "../lib/git/projectStatus";
 import { defaultProjectPath } from "../lib/platform/localBackend";
 import { buildRoomMemberRows, buildTeamMemberRows } from "../presentation/roster/rosterDisplayRows";
 import { canControlRoomTerminal } from "../lib/terminal/terminalAccess";
@@ -240,7 +241,7 @@ export function ActiveRoomInspector({
       project: {
         projectPath: selectedRoom.projectPath,
         projectPathDraft,
-        branchLabel: gitStatus?.branch ?? "loading",
+        branchLabel: projectStatusLabel(gitStatus?.branch),
         ...projectControlState,
         onProjectPathDraftChange: (path) => setProjectPathDraftForRoom(selectedRoom.id, path, selectedRoom.projectPath),
         onChooseProjectPath: sources.roomRuntime.chooseProjectPath,

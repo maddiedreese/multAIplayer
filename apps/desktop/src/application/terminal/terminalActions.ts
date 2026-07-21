@@ -59,6 +59,7 @@ export function createTerminalActions({
   publishRequestStatus,
   publishTerminalResult
 }: TerminalActionsOptions) {
+  let terminalInputQueue = Promise.resolve();
   const currentContext = () => currentSelectedRoomContext();
   function currentTerminalState(selectedRoom: ClientRoomRecord) {
     const store = useAppStore.getState();
@@ -292,7 +293,8 @@ export function createTerminalActions({
 
   async function sendTerminalData(input: string) {
     if (!input) return;
-    await writeRawTerminalInput(input);
+    terminalInputQueue = terminalInputQueue.then(() => writeRawTerminalInput(input));
+    await terminalInputQueue;
   }
 
   async function writeRawTerminalInput(input: string) {
@@ -327,10 +329,10 @@ export function createTerminalActions({
     if (!terminal) return;
     const roomId = selectedRoom.id;
     const terminalId = terminal.id;
-    if (reportRoomTerminalActionInFlight(roomId)) return;
+    const afterRevision = terminal.displayRevision;
     setTerminalErrorForRoom(roomId, null);
     try {
-      const snapshot = await writeTerminal(roomId, terminalId, input);
+      const snapshot = await writeTerminal(roomId, terminalId, input, afterRevision);
       if (shouldApplyRoomScopedUiUpdate(selectedRoomIdRef.current, roomId)) {
         upsertTerminalSnapshot(snapshot);
       }

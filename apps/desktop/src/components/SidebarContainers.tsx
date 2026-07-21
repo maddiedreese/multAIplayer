@@ -175,7 +175,6 @@ export function DesktopSidebarContainer({ sources }: { sources: SidebarSources }
       newRoomName={newRoomName}
       newRoomProjectPath={newRoomProjectPath}
       defaultProjectPath={defaultProjectPath}
-      selectedTeam={Boolean(selectedTeam)}
       teams={display.sidebarTeamRows}
       rooms={display.sidebarRoomRows}
       messageHits={display.sidebarMessageHitRows}

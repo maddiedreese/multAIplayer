@@ -20,15 +20,23 @@ export async function listTerminals(roomId: string): Promise<TerminalSnapshot[]>
   return invokeNative<TerminalSnapshot[]>("terminal_list", { roomId });
 }
 
-export async function readTerminal(id: string): Promise<TerminalSnapshot> {
+export async function readTerminal(id: string, afterRevision?: number): Promise<TerminalSnapshot> {
   if (!isTauriRuntime()) return requireNativeRuntime("Terminals");
-  return invokeNative<TerminalSnapshot>("terminal_read", { id });
+  return invokeNative<TerminalSnapshot>("terminal_read", {
+    id,
+    ...(afterRevision === undefined ? {} : { afterRevision })
+  });
 }
 
-export async function writeTerminal(roomId: string, id: string, input: string): Promise<TerminalSnapshot> {
+export async function writeTerminal(
+  roomId: string,
+  id: string,
+  input: string,
+  afterRevision?: number
+): Promise<TerminalSnapshot> {
   if (!isTauriRuntime()) return requireNativeRuntime("Terminals");
   return invokeNative<TerminalSnapshot>("terminal_write", {
-    request: { roomId, id, input }
+    request: { roomId, id, input, ...(afterRevision === undefined ? {} : { afterRevision }) }
   });
 }
 

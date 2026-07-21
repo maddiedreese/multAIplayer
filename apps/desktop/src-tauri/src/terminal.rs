@@ -2,7 +2,7 @@ use crate::host_sandbox::interactive_terminal_program;
 use crate::output::redact_known_secrets;
 use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::{BufReader, Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -28,6 +28,7 @@ struct TerminalSession {
     writer: Box<dyn Write + Send>,
     _master: Box<dyn MasterPty + Send>,
     output: Arc<Mutex<Vec<TerminalLine>>>,
+    display: Arc<Mutex<TerminalDisplay>>,
     started_at: String,
 }
 
@@ -36,6 +37,43 @@ struct TerminalSession {
 pub(crate) struct TerminalLine {
     pub(crate) stream: String,
     pub(crate) text: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(crate) struct TerminalDisplayChunk {
+    revision: u64,
+    text: String,
+}
+
+struct TerminalDisplay {
+    next_revision: u64,
+    chunks: VecDeque<TerminalDisplayChunk>,
+}
+
+impl TerminalDisplay {
+    fn new(cwd: &str) -> Self {
+        let mut display = Self {
+            next_revision: 1,
+            chunks: VecDeque::new(),
+        };
+        display.push(format!("Working in {cwd}\r\n"));
+        display
+    }
+
+    fn push(&mut self, text: String) {
+        if text.is_empty() {
+            return;
+        }
+        self.chunks.push_back(TerminalDisplayChunk {
+            revision: self.next_revision,
+            text,
+        });
+        self.next_revision = self.next_revision.saturating_add(1);
+        while self.chunks.len() > MAX_TERMINAL_DISPLAY_CHUNKS {
+            self.chunks.pop_front();
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -50,6 +88,8 @@ pub(crate) struct TerminalSnapshot {
     exit_status: Option<i32>,
     started_at: String,
     lines: Vec<TerminalLine>,
+    display_revision: u64,
+    display_chunks: Vec<TerminalDisplayChunk>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,6 +107,7 @@ pub(crate) struct TerminalWriteRequest {
     id: String,
     room_id: String,
     input: String,
+    after_revision: Option<u64>,
 }
 
 #[typed_tauri_command::command]
@@ -136,8 +177,9 @@ pub(crate) fn terminal_start(
             text: format!("$ {}", request.command),
         },
     ]));
+    let display = Arc::new(Mutex::new(TerminalDisplay::new(&canonical_cwd)));
 
-    capture_terminal_stream(reader, "stdout", Arc::clone(&output));
+    capture_terminal_stream(reader, "stdout", Arc::clone(&output), Arc::clone(&display));
 
     let session = TerminalSession {
         room_id: request.room_id,
@@ -148,13 +190,14 @@ pub(crate) fn terminal_start(
         writer,
         _master: pair.master,
         output,
+        display,
         started_at: unix_timestamp_millis().to_string(),
     };
     sessions.insert(id.clone(), session);
     let session = sessions
         .get_mut(&id)
         .ok_or_else(|| "Terminal failed to start".to_string())?;
-    Ok(snapshot_terminal(&id, session)?)
+    Ok(snapshot_terminal(&id, session, None)?)
 }
 
 #[typed_tauri_command::command]
@@ -170,7 +213,7 @@ pub(crate) fn terminal_list(
     let mut snapshots = Vec::new();
     for (id, session) in sessions.iter_mut() {
         if session.room_id == room_id {
-            snapshots.push(snapshot_terminal(id, session)?);
+            snapshots.push(snapshot_terminal(id, session, None)?);
         }
     }
     snapshots.sort_by(|left, right| left.name.cmp(&right.name));
@@ -181,6 +224,7 @@ pub(crate) fn terminal_list(
 pub(crate) fn terminal_read(
     state: State<'_, TerminalState>,
     id: String,
+    after_revision: Option<u64>,
 ) -> crate::command_error::CommandResult<TerminalSnapshot> {
     ensure_terminal_id(&id)?;
     let mut sessions = state
@@ -190,7 +234,7 @@ pub(crate) fn terminal_read(
     let session = sessions
         .get_mut(&id)
         .ok_or_else(|| format!("Terminal not found: {id}"))?;
-    Ok(snapshot_terminal(&id, session)?)
+    Ok(snapshot_terminal(&id, session, after_revision)?)
 }
 
 #[typed_tauri_command::command]
@@ -220,7 +264,11 @@ pub(crate) fn terminal_write(
         .writer
         .flush()
         .map_err(|error| format!("Failed to flush terminal input: {error}"))?;
-    Ok(snapshot_terminal(&request.id, session)?)
+    Ok(snapshot_terminal(
+        &request.id,
+        session,
+        request.after_revision,
+    )?)
 }
 
 #[typed_tauri_command::command]
@@ -237,7 +285,7 @@ pub(crate) fn terminal_stop(
         .get_mut(&id)
         .ok_or_else(|| format!("Terminal not found: {id}"))?;
     terminate_terminal_child(session.child.as_mut());
-    Ok(snapshot_terminal(&id, session)?)
+    Ok(snapshot_terminal(&id, session, None)?)
 }
 
 fn terminal_id(room_id: &str, name: &str) -> String {
@@ -248,7 +296,11 @@ fn existing_is_running(session: &mut TerminalSession) -> bool {
     matches!(session.child.try_wait(), Ok(None))
 }
 
-fn snapshot_terminal(id: &str, session: &mut TerminalSession) -> Result<TerminalSnapshot, String> {
+fn snapshot_terminal(
+    id: &str,
+    session: &mut TerminalSession,
+    after_revision: Option<u64>,
+) -> Result<TerminalSnapshot, String> {
     let exit_status = match session.child.try_wait() {
         Ok(Some(status)) => Some(status.exit_code() as i32),
         Ok(None) => None,
@@ -259,6 +311,17 @@ fn snapshot_terminal(id: &str, session: &mut TerminalSession) -> Result<Terminal
         .lock()
         .map_err(|_| "Terminal output is unavailable".to_string())?
         .clone();
+    let display = session
+        .display
+        .lock()
+        .map_err(|_| "Terminal display is unavailable".to_string())?;
+    let display_revision = display.next_revision.saturating_sub(1);
+    let display_chunks = display
+        .chunks
+        .iter()
+        .filter(|chunk| after_revision.is_none_or(|revision| chunk.revision > revision))
+        .cloned()
+        .collect();
     Ok(TerminalSnapshot {
         id: id.to_string(),
         room_id: session.room_id.clone(),
@@ -269,6 +332,8 @@ fn snapshot_terminal(id: &str, session: &mut TerminalSession) -> Result<Terminal
         exit_status,
         started_at: session.started_at.clone(),
         lines,
+        display_revision,
+        display_chunks,
     })
 }
 
@@ -276,8 +341,12 @@ fn terminate_terminal_child(child: &mut dyn PtyChild) {
     let _ = child.kill();
 }
 
-fn capture_terminal_stream<T>(stream: T, name: &'static str, output: Arc<Mutex<Vec<TerminalLine>>>)
-where
+fn capture_terminal_stream<T>(
+    stream: T,
+    name: &'static str,
+    output: Arc<Mutex<Vec<TerminalLine>>>,
+    display: Arc<Mutex<TerminalDisplay>>,
+) where
     T: Read + Send + 'static,
 {
     thread::spawn(move || {
@@ -301,7 +370,13 @@ where
                 Ok(byte_count) => byte_count,
                 Err(_) => break,
             };
-            for text in redactor.push(&String::from_utf8_lossy(&buffer[..byte_count]), false) {
+            let text = String::from_utf8_lossy(&buffer[..byte_count]).into_owned();
+            if let Ok(mut terminal_display) = display.lock() {
+                // This screen stream is intentionally separate from retained room history.
+                // It preserves PTY prompts, cursor movement, shell echo, and no-echo input.
+                terminal_display.push(text.clone());
+            }
+            for text in redactor.push(&text, false) {
                 push_terminal_line(
                     &output,
                     TerminalLine {
@@ -313,6 +388,8 @@ where
         }
     });
 }
+
+const MAX_TERMINAL_DISPLAY_CHUNKS: usize = 1024;
 
 const MAX_TERMINAL_REDACTION_PENDING_BYTES: usize = 8 * 1024;
 const STREAM_REDACTION_MARKER: &str = "[REDACTED BY MULTAIPLAYER]\n";

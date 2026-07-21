@@ -35,9 +35,9 @@
 .section-title button {
   display: grid;
   place-items: center;
-  border: 1px solid #dcdcdc;
-  background: #ffffff;
-  color: #505050;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text-muted);
   width: 32px;
   height: 32px;
   min-width: 32px;
@@ -80,7 +80,7 @@
 .team-button small {
   min-width: 0;
   overflow: hidden;
-  color: #707070;
+  color: var(--text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 82px;
@@ -170,8 +170,8 @@
   font-size: 12px;
 }
 
-.room-create-section {
-  margin-top: 4px;
+.nested-room-create-form {
+  margin: 4px 4px 8px 0;
 }
 
 .browser-toolbar input {
@@ -698,6 +698,9 @@
 
 .xterm-host .xterm {
   height: 100%;
+  letter-spacing: 0 !important;
+  font-kerning: none;
+  font-variant-ligatures: none;
 }
 
 .terminal-panel .panel-title {
