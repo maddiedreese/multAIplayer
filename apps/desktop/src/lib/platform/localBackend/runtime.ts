@@ -16,7 +16,7 @@ async function authorizeShellExecution(request: {
   roomId: string;
   cwd: string;
   command: string;
-  kind: "remote_request" | "interactive_terminal";
+  kind: "remote_request";
   requesterLabel: string;
 }): Promise<string> {
   return invokeNative<string>("authorize_shell_execution", { request });

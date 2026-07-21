@@ -1,7 +1,7 @@
 {
   "name": "multaiplayer",
   "private": true,
-  "version": "0.1.0-alpha.15",
+  "version": "0.1.0-alpha.16",
   "description": "Private group chat for coding with Codex. Open source.",
   "license": "Apache-2.0",
   "type": "module",
@@ -80,7 +80,7 @@
     "globals": "17.7.0",
     "prettier": "3.9.5",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.64.0",
+    "typescript-eslint": "8.65.0",
     "webdriverio": "9.29.1",
     "yaml": "2.9.0"
   },
@@ -88,6 +88,7 @@
     "@wdio/native-utils": "2.5.0",
     "encoding-sniffer": "1.0.2",
     "glob": "13.0.6",
+    "shell-quote": "1.10.0",
     "serialize-javascript": "7.0.5",
     "monaco-editor": {
       "dompurify": "$dompurify"

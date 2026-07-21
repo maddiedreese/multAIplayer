@@ -16,7 +16,7 @@ const baseUrl = `http://127.0.0.1:${port}/e2e/harness/index.html`;
 const expectedCaptureGeometry = new Map([
   ["room-chat.png", { width: 760, minHeight: 390, maxHeight: 400 }],
   ["room-browser.png", { width: 760, minHeight: 360, maxHeight: 360 }],
-  ["room-terminal.png", { width: 760, minHeight: 400, maxHeight: 460 }],
+  ["room-terminal.png", { width: 760, minHeight: 400, maxHeight: 465 }],
   ["room-app.png", { width: 1200, minHeight: 700, maxHeight: 700 }]
 ]);
 

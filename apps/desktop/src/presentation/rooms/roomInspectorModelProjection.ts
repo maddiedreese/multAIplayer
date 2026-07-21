@@ -1,10 +1,4 @@
-import {
-  defaultCodexModel,
-  defaultCodexReasoningEffort,
-  defaultCodexSandboxLevel,
-  defaultCodexSpeed,
-  type ClientRoomRecord
-} from "@multaiplayer/protocol";
+import { defaultCodexSandboxLevel, type ClientRoomRecord } from "@multaiplayer/protocol";
 import {
   catalogModelOptions,
   catalogReasoningOptionsForModel,
@@ -18,13 +12,13 @@ export function buildRoomInspectorModelProjection(
   codexProbe: CodexProbe | null,
   customModelDraft?: string
 ) {
-  const selectedModel = room.codexModel ?? defaultCodexModel;
   const resolved = resolveCodexRunSettings(room, codexProbe);
+  const selectedModel = resolved.model;
   return {
     selectedModel,
-    selectedReasoningEffort: room.codexReasoningEffort ?? defaultCodexReasoningEffort,
+    selectedReasoningEffort: resolved.reasoningEffort,
     rawReasoningEnabled: room.codexRawReasoningEnabled ?? false,
-    selectedSpeed: room.codexSpeed ?? defaultCodexSpeed,
+    selectedSpeed: resolved.speed,
     selectedSandboxLevel: room.codexSandboxLevel ?? defaultCodexSandboxLevel,
     customModel: customModelDraft ?? selectedModel,
     modelOptions: catalogModelOptions(codexProbe),

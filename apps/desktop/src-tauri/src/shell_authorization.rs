@@ -10,21 +10,17 @@ use tauri_plugin_dialog::{
 use uuid::Uuid;
 
 use crate::command_safety::{command_review_risk, CommandReviewRisk};
-use crate::validation::{
-    ensure_room_id, ensure_terminal_command, ensure_terminal_id, ensure_terminal_input,
-};
+use crate::validation::{ensure_room_id, ensure_terminal_command};
 use crate::workspace::ensure_existing_dir;
 
 const AUTHORIZATION_LIFETIME: Duration = Duration::from_secs(120);
 const EXACT_COMMAND_GRANT_LIFETIME: Duration = Duration::from_secs(10 * 60);
 const MAX_REQUESTER_LABEL_CHARS: usize = 160;
-const INTERACTIVE_TERMINAL_COMMAND: &str = "exec zsh -f";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ShellExecutionKind {
     RemoteRequest,
-    InteractiveTerminal,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -46,23 +42,6 @@ struct AuthorizedShellExecution {
     expires_at: Instant,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub(crate) struct TerminalInputAuthorizationRequest {
-    pub(crate) room_id: String,
-    pub(crate) terminal_id: String,
-    pub(crate) input: String,
-    pub(crate) requester_label: String,
-}
-
-#[derive(Clone, Debug)]
-struct AuthorizedTerminalInput {
-    room_id: String,
-    terminal_id: String,
-    input: String,
-    expires_at: Instant,
-}
-
 #[derive(Clone, Debug)]
 struct ExactCommandGrant {
     room_id: String,
@@ -74,7 +53,6 @@ struct ExactCommandGrant {
 #[derive(Default)]
 pub(crate) struct ShellAuthorizationState {
     authorizations: Mutex<HashMap<String, AuthorizedShellExecution>>,
-    terminal_input_authorizations: Mutex<HashMap<String, AuthorizedTerminalInput>>,
     exact_command_grants: Mutex<Vec<ExactCommandGrant>>,
     confirmation_in_flight: AtomicBool,
 }
@@ -139,31 +117,7 @@ impl ShellAuthorizationState {
         Ok(authorization.cwd)
     }
 
-    fn issue_terminal_input(
-        &self,
-        request: &TerminalInputAuthorizationRequest,
-    ) -> Result<String, String> {
-        validate_terminal_input_authorization_request(request)?;
-        let token = Uuid::new_v4().to_string();
-        let authorization = AuthorizedTerminalInput {
-            room_id: request.room_id.clone(),
-            terminal_id: request.terminal_id.clone(),
-            input: request.input.clone(),
-            expires_at: Instant::now() + AUTHORIZATION_LIFETIME,
-        };
-        let mut authorizations = self
-            .terminal_input_authorizations
-            .lock()
-            .map_err(|_| "Native terminal input authorization state is unavailable".to_string())?;
-        authorizations.retain(|_, value| value.expires_at > Instant::now());
-        authorizations.insert(token.clone(), authorization);
-        Ok(token)
-    }
-
     fn has_exact_command_grant(&self, request: &ShellAuthorizationRequest) -> Result<bool, String> {
-        if request.kind != ShellExecutionKind::RemoteRequest {
-            return Ok(false);
-        }
         let canonical_cwd = canonical_workspace(&request.cwd)?;
         let now = Instant::now();
         let mut grants = self
@@ -179,9 +133,6 @@ impl ShellAuthorizationState {
     }
 
     fn grant_exact_command(&self, request: &ShellAuthorizationRequest) -> Result<(), String> {
-        if request.kind != ShellExecutionKind::RemoteRequest {
-            return Err("Reusable grants are limited to one-shot room commands".to_string());
-        }
         let grant = ExactCommandGrant {
             room_id: request.room_id.clone(),
             cwd: canonical_workspace(&request.cwd)?,
@@ -211,34 +162,6 @@ impl ShellAuthorizationState {
         grants.retain(|grant| grant.room_id != room_id);
         Ok(before - grants.len())
     }
-
-    pub(crate) fn consume_terminal_input(
-        &self,
-        token: &str,
-        room_id: &str,
-        terminal_id: &str,
-        input: &str,
-    ) -> Result<(), String> {
-        let mut authorizations = self
-            .terminal_input_authorizations
-            .lock()
-            .map_err(|_| "Native terminal input authorization state is unavailable".to_string())?;
-        let authorization = authorizations.remove(token).ok_or_else(|| {
-            "Native confirmation is required before sending terminal input".to_string()
-        })?;
-        if authorization.expires_at <= Instant::now() {
-            return Err(
-                "Native terminal input confirmation expired; approve the input again".to_string(),
-            );
-        }
-        if authorization.room_id != room_id
-            || authorization.terminal_id != terminal_id
-            || authorization.input != input
-        {
-            return Err("Native terminal input confirmation does not match this input".to_string());
-        }
-        Ok(())
-    }
 }
 
 #[typed_tauri_command::command]
@@ -252,28 +175,16 @@ pub(crate) async fn authorize_shell_execution(
     // State methods independently canonicalize before matching or storing authority. Keep the
     // original request here; rebuilding it with the same canonical path would be redundant.
     let request_for_issue = request.clone();
-    // Clicking "New terminal" is the local user's explicit authorization to create this
-    // tightly bound PTY. Keep native confirmation for every remote command and for later
-    // terminal input, where content may originate outside that direct UI gesture.
-    if !requires_native_confirmation(request_for_issue.kind) {
-        return Ok(state.issue(&request_for_issue)?);
-    }
     let review_risk = command_review_risk(&request_for_issue.command);
     if review_risk.is_none() && state.has_exact_command_grant(&request_for_issue)? {
         return Ok(state.issue(&request_for_issue)?);
     }
     state.begin_confirmation()?;
-    let source = match request.kind {
-        ShellExecutionKind::RemoteRequest => format!(
-            "Remote room request from {}",
-            request.requester_label.trim()
-        ),
-        ShellExecutionKind::InteractiveTerminal => "Local interactive terminal".to_string(),
-    };
-    let mutable_state_warning = match request.kind {
-        ShellExecutionKind::RemoteRequest => "\n\nRemembering repeats only this command text. Workspace files, scripts, hooks, configuration, and environment may change between runs.",
-        ShellExecutionKind::InteractiveTerminal => "",
-    };
+    let source = format!(
+        "Remote room request from {}",
+        request.requester_label.trim()
+    );
+    let mutable_state_warning = "\n\nRemembering repeats only this command text. Workspace files, scripts, hooks, configuration, and environment may change between runs.";
     let risk_warning = match review_risk {
         Some(CommandReviewRisk::CredentialAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text mentions a credential or secret path. This heuristic is incomplete. The macOS filesystem sandbox confines writes to the selected workspace but permits documented system/toolchain reads, child processes, inherited environment, and network access. This approval can only be used once.",
         Some(CommandReviewRisk::NetworkAccess) => "\n\nHIGH-RISK REVIEW SIGNAL: this command text names a network-capable operation. This heuristic is incomplete. The macOS filesystem sandbox confines writes to the selected workspace but permits documented system/toolchain reads, child processes, inherited environment, and network access. This approval can only be used once.",
@@ -307,7 +218,7 @@ pub(crate) async fn authorize_shell_execution(
                     if review_risk.is_some() {
                         "Allow once".to_string()
                     } else {
-                        "Start terminal".to_string()
+                        "Run once".to_string()
                     },
                     "Cancel".to_string(),
                 ))
@@ -324,7 +235,7 @@ pub(crate) async fn authorize_shell_execution(
         _ => false,
     };
     let approved = matches!(decision, MessageDialogResult::Yes | MessageDialogResult::Ok)
-        || matches!(decision, MessageDialogResult::Custom(ref value) if value == "Run once" || value == "Start terminal" || value == "Allow once")
+        || matches!(decision, MessageDialogResult::Custom(ref value) if value == "Run once" || value == "Allow once")
         || (reusable && review_risk.is_none());
     if !approved {
         return Err("Command execution was denied in the native confirmation dialog".into());
@@ -333,10 +244,6 @@ pub(crate) async fn authorize_shell_execution(
         state.grant_exact_command(&request_for_issue)?;
     }
     Ok(state.issue(&request_for_issue)?)
-}
-
-fn requires_native_confirmation(kind: ShellExecutionKind) -> bool {
-    matches!(kind, ShellExecutionKind::RemoteRequest)
 }
 
 #[typed_tauri_command::command]
@@ -371,54 +278,10 @@ pub(crate) async fn clear_shell_execution_grants(
     Ok(state.clear_exact_command_grants(&room_id)?)
 }
 
-#[typed_tauri_command::command]
-pub(crate) async fn authorize_terminal_input(
-    app: AppHandle,
-    state: State<'_, ShellAuthorizationState>,
-    request: TerminalInputAuthorizationRequest,
-) -> crate::command_error::CommandResult<String> {
-    validate_terminal_input_authorization_request(&request)?;
-    state.begin_confirmation()?;
-    let message = format!(
-        "Interactive terminal input from {}\n\nRoom: {}\nTerminal: {}\n\nExact input (control characters are escaped):\n{}",
-        request.requester_label.trim(),
-        request.room_id,
-        request.terminal_id,
-        visible_terminal_input(&request.input)
-    );
-    let dialog_result = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
-            .message(message)
-            .title("Allow terminal input?")
-            .kind(MessageDialogKind::Warning)
-            .buttons(MessageDialogButtons::OkCancelCustom(
-                "Send input".to_string(),
-                "Cancel".to_string(),
-            ))
-            .blocking_show()
-    })
-    .await;
-    state.finish_confirmation();
-    let approved = dialog_result
-        .map_err(|error| format!("Native terminal input confirmation failed: {error}"))?;
-    if !approved {
-        return Err("Terminal input was denied in the native confirmation dialog".into());
-    }
-    Ok(state.issue_terminal_input(&request)?)
-}
-
 fn validate_authorization_request(request: &ShellAuthorizationRequest) -> Result<(), String> {
     ensure_room_id(&request.room_id)?;
     ensure_existing_dir(&request.cwd)?;
     ensure_terminal_command(&request.command)?;
-    if request.kind == ShellExecutionKind::InteractiveTerminal
-        && request.command != INTERACTIVE_TERMINAL_COMMAND
-    {
-        return Err(
-            "Interactive terminal authorization only permits the app's fixed shell launcher"
-                .to_string(),
-        );
-    }
     validate_requester_label(&request.requester_label)
 }
 
@@ -431,15 +294,6 @@ fn canonical_workspace(cwd: &str) -> Result<String, String> {
         .map_err(|_| "Working directory must be valid UTF-8".to_string())
 }
 
-fn validate_terminal_input_authorization_request(
-    request: &TerminalInputAuthorizationRequest,
-) -> Result<(), String> {
-    ensure_room_id(&request.room_id)?;
-    ensure_terminal_id(&request.terminal_id)?;
-    ensure_terminal_input(&request.input)?;
-    validate_requester_label(&request.requester_label)
-}
-
 fn validate_requester_label(requester_label: &str) -> Result<(), String> {
     let requester = requester_label.trim();
     if requester.is_empty()
@@ -449,10 +303,6 @@ fn validate_requester_label(requester_label: &str) -> Result<(), String> {
         return Err("Shell requester label is invalid".to_string());
     }
     Ok(())
-}
-
-fn visible_terminal_input(input: &str) -> String {
-    input.chars().flat_map(char::escape_default).collect()
 }
 
 #[cfg(test)]

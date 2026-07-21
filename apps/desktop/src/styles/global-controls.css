@@ -128,6 +128,56 @@ button svg {
   line-height: 1.15;
 }
 
+/* Canonical late overrides prevent legacy light-only rules from defeating dark tokens. */
+html[data-theme="dark"] .search-box,
+html[data-theme="dark"] .profile-card,
+html[data-theme="dark"] .project-card {
+  border-color: var(--border);
+  background: var(--surface-strong) !important;
+  color: var(--text);
+}
+
+html[data-theme="dark"] .search-box input,
+html[data-theme="dark"] .profile-card strong,
+html[data-theme="dark"] .project-card strong {
+  color: var(--text) !important;
+}
+
+html[data-theme="dark"] .profile-card span,
+html[data-theme="dark"] .project-card span,
+html[data-theme="dark"] .profile-card > svg {
+  color: var(--text-muted) !important;
+}
+
+html[data-theme="dark"] .search-box button {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.section-title .section-disclosure {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.model-options button {
+  align-content: start;
+  min-height: 64px;
+  padding: 11px 12px;
+}
+
+.model-options :where(strong, span) {
+  display: block;
+  line-height: 1.35;
+}
+
+.model-options strong {
+  overflow: visible;
+  white-space: normal;
+}
+
 .app-shell :where(h2) {
   font-size: 18px;
   font-weight: 700;

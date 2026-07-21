@@ -47,3 +47,43 @@ test("room inspector model projection keeps a room-scoped custom draft", () => {
   assert.equal(projection.selectedModel, "gpt-stable");
   assert.equal(projection.customModel, "gpt-next");
 });
+
+test("room inspector projects the same resolved model and controls as the room header", () => {
+  const room = seededRooms[0];
+  assert.ok(room);
+  const projection = buildRoomInspectorModelProjection(
+    {
+      ...room,
+      codexModel: "stored-fallback",
+      codexModelPolicy: "auto",
+      codexReasoningEffort: "low",
+      codexReasoningEffortPolicy: "auto",
+      codexSpeed: "standard",
+      codexServiceTierPolicy: "auto"
+    },
+    {
+      available: true,
+      version: "test",
+      error: null,
+      modelError: null,
+      models: [
+        {
+          id: "active-model",
+          model: "active-model",
+          label: "Active model",
+          description: "The runtime default",
+          hidden: false,
+          isDefault: true,
+          supportedReasoningEfforts: ["high"],
+          defaultReasoningEffort: "high",
+          serviceTiers: ["fast"],
+          defaultServiceTier: "fast"
+        }
+      ]
+    }
+  );
+
+  assert.equal(projection.selectedModel, "active-model");
+  assert.equal(projection.selectedReasoningEffort, "high");
+  assert.equal(projection.selectedSpeed, "fast");
+});

@@ -76,7 +76,9 @@ function ReadmeSidebar() {
         <SidebarTeamsTitle
           searchActive={false}
           showArchived={false}
+          collapsed={false}
           teamCreateOpen={false}
+          onToggleCollapsed={noop}
           onToggleArchived={noop}
           onToggleTeamCreate={noop}
         />

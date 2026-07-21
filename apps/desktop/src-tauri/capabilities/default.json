@@ -44,7 +44,6 @@
     "allow-run-shell-command",
     "allow-authorize-shell-execution",
     "allow-clear-shell-execution-grants",
-    "allow-authorize-terminal-input",
     "allow-terminal-start",
     "allow-terminal-list",
     "allow-terminal-read",

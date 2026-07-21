@@ -6,6 +6,15 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.16] - 2026-07-20
+
+### Fixed
+
+- The desktop terminal now behaves like a normal local PTY: it opens directly in the room project, accepts ordinary keystrokes without system dialogs, supports shell job control and directory changes, and still prevents remote members from injecting input.
+- Dark-mode search, account, and project surfaces use readable theme colors; room and model choices no longer overlap at narrow widths; and the file editor has consistent content padding.
+- The room header and inspector now share the same resolved Codex model, reasoning, and speed settings, including host-catalog defaults and custom model identifiers.
+- Routine success and status messages no longer appear as global room notices; warnings, failures, and actions that need attention remain visible.
+
 ## [0.1.0-alpha.15] - 2026-07-20
 
 ### Fixed
