@@ -1,5 +1,6 @@
 use crate::host_sandbox::interactive_terminal_program;
 use crate::output::redact_known_secrets;
+use crate::user_shell::user_login_shell;
 use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -145,7 +146,7 @@ pub(crate) fn terminal_start(
         sessions.remove(&id);
     }
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell = user_login_shell();
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -167,6 +168,7 @@ pub(crate) fn terminal_start(
     command.env("TERM", "xterm-256color");
     command.env("COLORTERM", "truecolor");
     command.env("TERM_PROGRAM", "multAIplayer");
+    command.env("SHELL", &shell);
     for argument in arguments {
         command.arg(argument);
     }
@@ -189,7 +191,7 @@ pub(crate) fn terminal_start(
         TerminalLine {
             stream: "system".to_string(),
             text: if request.command == "interactive-login-shell" {
-                "$SHELL -l".to_string()
+                format!("{shell} -l")
             } else {
                 format!("$ {}", request.command)
             },

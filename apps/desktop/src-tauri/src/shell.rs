@@ -1,6 +1,7 @@
 use crate::host_sandbox::sandboxed_shell_command;
 use crate::output::redact_and_bound_command_output;
 use crate::shell_authorization::{ShellAuthorizationState, ShellExecutionKind};
+use crate::user_shell::user_login_shell;
 use crate::validation::ensure_terminal_command;
 use crate::workspace::ensure_existing_dir;
 use serde::{Deserialize, Serialize};
@@ -42,7 +43,7 @@ pub(crate) async fn run_shell_command(
         )
         .map_err(crate::command_error::CommandError::unauthorized)?;
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell = user_login_shell();
     let output = sandboxed_shell_command(&shell, &canonical_cwd, &request.command)?
         .output()
         .map_err(|error| {

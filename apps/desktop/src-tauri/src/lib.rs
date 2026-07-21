@@ -33,6 +33,7 @@ mod shell_authorization;
 mod terminal;
 mod trusted_auth;
 pub mod updater_auth;
+mod user_shell;
 mod validation;
 mod workspace;
 use browser::*;

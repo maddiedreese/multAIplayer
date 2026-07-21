@@ -13,6 +13,7 @@ interface UseTerminalAutoOpenOptions {
   terminalBusy: boolean;
   roomTerminalCount: number;
   selectedRoomId: string | null;
+  selectedRoomProjectPath: string;
   terminalAutoOpenedRoomsRef: LatestRef<Set<string>>;
   openInteractiveTerminal: (options?: { reuseExisting?: boolean; quiet?: boolean }) => Promise<void>;
 }
@@ -26,10 +27,12 @@ export function useTerminalAutoOpen({
   terminalBusy,
   roomTerminalCount,
   selectedRoomId,
+  selectedRoomProjectPath,
   terminalAutoOpenedRoomsRef,
   openInteractiveTerminal
 }: UseTerminalAutoOpenOptions) {
   useEffect(() => {
+    const terminalAutoOpenKey = `${selectedRoomId ?? ""}\u0000${selectedRoomProjectPath}`;
     if (
       inspectorTab !== "terminal" ||
       !hasSelectedRoom ||
@@ -39,12 +42,12 @@ export function useTerminalAutoOpen({
       isSelectedRoomLocked ||
       terminalBusy ||
       roomTerminalCount > 0 ||
-      terminalAutoOpenedRoomsRef.current.has(selectedRoomId)
+      terminalAutoOpenedRoomsRef.current.has(terminalAutoOpenKey)
     ) {
       return;
     }
 
-    terminalAutoOpenedRoomsRef.current.add(selectedRoomId);
+    terminalAutoOpenedRoomsRef.current.add(terminalAutoOpenKey);
     void openInteractiveTerminal({ reuseExisting: true, quiet: true });
   }, [
     canReadLocalWorkspace,
@@ -54,6 +57,7 @@ export function useTerminalAutoOpen({
     isSelectedRoomLocked,
     roomTerminalCount,
     selectedRoomId,
+    selectedRoomProjectPath,
     openInteractiveTerminal,
     terminalAutoOpenedRoomsRef,
     terminalBusy

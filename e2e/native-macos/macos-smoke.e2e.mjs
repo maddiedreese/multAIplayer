@@ -1,10 +1,17 @@
 /* global describe, it, window, document, getComputedStyle */
 import { browser, expect, $ } from "@wdio/globals";
 import { mkdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 const expectedVersion = JSON.parse(
   readFileSync(new URL("../../apps/desktop/package.json", import.meta.url), "utf8")
 ).version;
+const expectedLoginShell = execFileSync("/usr/bin/id", ["-P", String(process.getuid())], {
+  encoding: "utf8"
+})
+  .trim()
+  .split(":")
+  .at(-1);
 
 const nativeInvoke = (command, args = {}) =>
   browser.execute(
@@ -145,13 +152,16 @@ describe("packaged macOS WKWebView smoke", () => {
       request: {
         id: terminal.id,
         roomId: "native-smoke-room",
-        input: "printf '%s\\n' terminal-output-visible\n"
+        input: "printf '%s\\n' terminal-output-visible; printf '__multAIplayer_shell__%s\\n' \"$SHELL\"\n"
       }
     });
     await browser.waitUntil(async () => {
       const snapshot = await nativeInvoke("terminal_read", { id: terminal.id });
       const display = snapshot.displayChunks.map((chunk) => chunk.text).join("");
-      return display.match(/terminal-output-visible/g)?.length >= 2;
+      return (
+        display.match(/terminal-output-visible/g)?.length >= 2 &&
+        display.includes(`__multAIplayer_shell__${expectedLoginShell}`)
+      );
     });
     await nativeInvoke("terminal_stop", { id: terminal.id });
 
