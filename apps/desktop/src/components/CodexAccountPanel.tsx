@@ -1,5 +1,4 @@
-import { ExternalLink, LogIn, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
-import type { CodexAppApprovalMode } from "../lib/platform/localBackend";
+import { ExternalLink, LogIn, LogOut, RefreshCw } from "lucide-react";
 import { useCodexAccount, type CodexAccountController } from "../hooks/useCodexAccount";
 import { InfoRow } from "./common";
 
@@ -26,8 +25,6 @@ function CodexNativeAccountPanel({ controller }: { controller: CodexAccountContr
     <section className="drawer-section codex-account-panel">
       <CodexAccountSummary controller={controller} />
       <CodexLoginControls controller={controller} />
-      <CodexApprovalModeControl controller={controller} />
-      <CodexInventory controller={controller} />
       {controller.message && <div className="workflow-message">{controller.message}</div>}
     </section>
   );
@@ -40,7 +37,7 @@ function CodexAccountSummary({ controller }: { controller: CodexAccountControlle
       <div className="panel-title">
         <div>
           <strong>Codex on this device</strong>
-          <small>Host-local account and connector controls</small>
+          <small>Host-local Codex account</small>
         </div>
         <button
           className="icon-button"
@@ -101,80 +98,6 @@ function CodexLoginControls({ controller }: { controller: CodexAccountController
           </button>
         </div>
       )}
-    </>
-  );
-}
-
-function CodexApprovalModeControl({ controller }: { controller: CodexAccountController }) {
-  const { snapshot, busy, approvalMode, updateApprovalMode } = controller;
-  return (
-    <label className="codex-approval-mode">
-      <span>
-        <ShieldCheck size={14} /> Global app tool approvals
-      </span>
-      <select
-        value={approvalMode}
-        disabled={busy || !snapshot?.capabilities.supportsApps}
-        onChange={(event) => void updateApprovalMode(event.target.value as CodexAppApprovalMode)}
-      >
-        <option value="" disabled>
-          Choose a default…
-        </option>
-        <option value="auto">Automatic</option>
-        <option value="prompt">Always prompt</option>
-        {snapshot?.capabilities.supportsWritesApproval && <option value="writes">Prompt for writes</option>}
-      </select>
-      <small>
-        This persists in the device-wide Codex config and affects other Codex clients. “Prompt for writes” trusts only
-        tools that declare themselves read-only.
-      </small>
-    </label>
-  );
-}
-
-function CodexInventory({ controller }: { controller: CodexAccountController }) {
-  const { snapshot, mcpLogin, busy, connectMcp } = controller;
-  return (
-    <>
-      <div className="codex-host-list">
-        <strong>Apps ({snapshot?.apps.length ?? 0})</strong>
-        {snapshot?.appsError && <small>{snapshot.appsError}</small>}
-        {snapshot?.apps.slice(0, 8).map((app) => (
-          <div key={app.id} className="codex-host-row">
-            <span>{app.name}</span>
-            <small>{app.enabled ? (app.accessible ? "Ready" : "Sign-in needed") : "Disabled"}</small>
-          </div>
-        ))}
-      </div>
-
-      {mcpLogin && (
-        <div className="device-flow drawer-flow">
-          <span>{mcpLogin.name} authorization</span>
-          <a href={mcpLogin.url} target="_blank" rel="noreferrer">
-            Open authorization <ExternalLink size={13} />
-          </a>
-        </div>
-      )}
-
-      <div className="codex-host-list">
-        <strong>MCP servers ({snapshot?.mcpServers.length ?? 0})</strong>
-        {snapshot?.mcpError && <small>{snapshot.mcpError}</small>}
-        {snapshot?.mcpServers.map((server) => (
-          <div key={server.name} className="codex-host-row">
-            <span>
-              {server.name}
-              <small>
-                {server.toolCount} tools · {server.authStatus}
-              </small>
-            </span>
-            {server.authStatus === "notLoggedIn" && (
-              <button className="secondary" onClick={() => void connectMcp(server.name)} disabled={busy}>
-                Connect
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
     </>
   );
 }

@@ -18,6 +18,10 @@ export class NativeCommandError extends Error {
   ) {
     super(message);
   }
+
+  override toString(): string {
+    return this.message;
+  }
 }
 
 type InvokeBinding = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;

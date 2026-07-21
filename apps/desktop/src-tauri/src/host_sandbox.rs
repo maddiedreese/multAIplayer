@@ -32,10 +32,14 @@ pub(crate) fn interactive_terminal_program(
     {
         // This PTY is controlled directly by the local user. Start their shell in the
         // room cwd so normal job control works; remote room commands remain sandboxed.
-        Ok((
-            shell.to_string(),
-            vec!["-c".to_string(), command.to_string()],
-        ))
+        if command == "interactive-login-shell" {
+            Ok((shell.to_string(), vec!["-l".to_string()]))
+        } else {
+            Ok((
+                shell.to_string(),
+                vec!["-c".to_string(), command.to_string()],
+            ))
+        }
     }
     #[cfg(not(target_os = "macos"))]
     {

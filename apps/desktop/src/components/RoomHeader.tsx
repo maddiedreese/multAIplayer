@@ -137,6 +137,10 @@ export function RoomHeader({
           aria-expanded={!controlsCollapsed}
           aria-label={controlsCollapsed ? "Expand room controls" : "Collapse room controls"}
           title={controlsCollapsed ? "Expand room controls" : "Collapse room controls"}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
           onClick={() => setControlsCollapsed((collapsed) => !collapsed)}
         >
           {controlsCollapsed ? <ChevronDown size={17} /> : <ChevronUp size={17} />}

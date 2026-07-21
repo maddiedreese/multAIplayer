@@ -25,34 +25,33 @@ describe("packaged macOS WKWebView smoke", () => {
       await (await $("button=Explore the interface")).click();
     }
 
-    const profileButton = await $("button=Profile");
-    await expect(profileButton).toBeDisplayed();
-    await profileButton.click();
-
-    await expect($(".sidebar-drawer")).toBeDisplayed();
-    await expect($(".sidebar-drawer span")).toHaveText("Account");
+    await browser.execute(() => {
+      if (document.querySelector(".sidebar-drawer")) return;
+      [...document.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Profile")?.click();
+    });
+    await browser.waitUntil(() => browser.execute(() => Boolean(document.querySelector(".sidebar-drawer"))));
+    const profileText = await browser.execute(() => document.querySelector(".sidebar-drawer")?.textContent ?? "");
+    expect(profileText).not.toContain("Apps (");
+    expect(profileText).not.toContain("MCP servers (");
 
     const sidebarPresentation = await browser.execute(() => {
       const drawerSection = document.querySelector(".sidebar-drawer .drawer-section");
-      const approvalSelect = document.querySelector(".codex-approval-mode select");
       const refreshButton = document.querySelector(".codex-account-panel .icon-button");
       const archiveInput = document.querySelector(".room-archive-panel input");
       const sidebar = document.querySelector(".sidebar");
       const sidebarScroll = document.querySelector(".sidebar-scroll");
       const footerButtons = [...document.querySelectorAll(".sidebar-footer button")];
+      const drawerParagraphs = [...document.querySelectorAll(".sidebar-drawer p")];
       const originalTheme = document.documentElement.dataset.theme;
       const themes = Object.fromEntries(
         ["light", "dark"].map((theme) => {
           document.documentElement.dataset.theme = theme;
           const sectionStyle = getComputedStyle(drawerSection);
-          const selectStyle = getComputedStyle(approvalSelect);
           return [
             theme,
             {
               sectionBackground: sectionStyle.backgroundColor,
               sectionColor: sectionStyle.color,
-              selectAppearance: selectStyle.appearance,
-              selectShadow: selectStyle.boxShadow,
               refreshAppearance: getComputedStyle(refreshButton).appearance,
               refreshShadow: getComputedStyle(refreshButton).boxShadow,
               refreshWidth: getComputedStyle(refreshButton).width,
@@ -71,14 +70,14 @@ describe("packaged macOS WKWebView smoke", () => {
         sidebarOverflow: getComputedStyle(sidebar).overflow,
         scrollOverflowY: getComputedStyle(sidebarScroll).overflowY,
         footerRows: new Set(footerButtons.map((button) => button.offsetTop)).size,
-        footerButtonCount: footerButtons.length
+        footerButtonCount: footerButtons.length,
+        paragraphFontSizes: drawerParagraphs.map((paragraph) => getComputedStyle(paragraph).fontSize),
+        paragraphFonts: drawerParagraphs.map((paragraph) => getComputedStyle(paragraph).fontFamily)
       };
     });
     for (const theme of ["light", "dark"]) {
       const presentation = sidebarPresentation.themes[theme];
       expect(presentation.sectionColor).not.toBe(presentation.sectionBackground);
-      expect(presentation.selectAppearance).toBe("none");
-      expect(presentation.selectShadow).toBe("none");
       expect(presentation.refreshAppearance).toBe("none");
       expect(presentation.refreshShadow).toBe("none");
       expect(presentation.refreshWidth).toBe("32px");
@@ -90,33 +89,69 @@ describe("packaged macOS WKWebView smoke", () => {
     expect(sidebarPresentation.scrollOverflowY).toBe("auto");
     expect(sidebarPresentation.footerButtonCount).toBe(4);
     expect(sidebarPresentation.footerRows).toBe(1);
+    expect(new Set(sidebarPresentation.paragraphFontSizes)).toEqual(new Set(["13px"]));
+    expect(new Set(sidebarPresentation.paragraphFonts).size).toBeLessThanOrEqual(1);
+    await browser.saveScreenshot("reports/native-macos-smoke/profile.png");
+
+    await browser.execute(() => document.querySelector('button[aria-label="Close panel"]')?.click());
+    const hasRoomControlsToggle = await browser.execute(() => Boolean(document.querySelector(".room-controls-toggle")));
+    if (hasRoomControlsToggle) {
+      for (let index = 0; index < 4; index += 1) {
+        const state = await browser.execute(() => {
+          const toggle = document.querySelector(".room-controls-toggle");
+          const before = toggle?.getAttribute("aria-expanded");
+          toggle?.click();
+          return { before, after: toggle?.getAttribute("aria-expanded") };
+        });
+        expect(state.after).toBe(state.before === "true" ? "false" : "true");
+      }
+    }
+
+    await browser.execute(() =>
+      [...document.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Help")?.click()
+    );
+    await browser.waitUntil(() => browser.execute(() => Boolean(document.querySelector(".help-drawer-panel"))));
+    const helpTypography = await browser.execute(() => {
+      const paragraphs = [...document.querySelectorAll(".help-drawer-panel p")];
+      return paragraphs.map((paragraph) => ({
+        font: getComputedStyle(paragraph).fontFamily,
+        size: getComputedStyle(paragraph).fontSize,
+        lineHeight: getComputedStyle(paragraph).lineHeight
+      }));
+    });
+    expect(new Set(helpTypography.map(({ font }) => font)).size).toBe(1);
+    expect(new Set(helpTypography.map(({ size }) => size))).toEqual(new Set(["13px"]));
+    await browser.saveScreenshot("reports/native-macos-smoke/help.png");
+    await browser.execute(() => document.querySelector('button[aria-label="Close panel"]')?.click());
 
     const version = await nativeInvoke("app_version");
     expect(version).toBe(expectedVersion);
 
-    const terminalProject = "/tmp/multaiplayer-native-terminal-smoke";
+    const terminalProject = process.env.NATIVE_SMOKE_PROJECT_PATH || "/tmp/multaiplayer-native-terminal-smoke";
     mkdirSync(terminalProject, { recursive: true });
+    const projectFiles = await nativeInvoke("project_files", {
+      request: { cwd: terminalProject, query: "", limit: 80 }
+    });
+    expect(Array.isArray(projectFiles)).toBe(true);
     const terminal = await nativeInvoke("terminal_start", {
       request: {
         roomId: "native-smoke-room",
         name: "shell",
         cwd: terminalProject,
-        command: "exec zsh -f"
+        command: "interactive-login-shell"
       }
     });
     await nativeInvoke("terminal_write", {
       request: {
         id: terminal.id,
         roomId: "native-smoke-room",
-        input: "printf 'alpha17-terminal-ok\\n'\n"
+        input: "printf '%s\\n' terminal-output-visible\n"
       }
     });
     await browser.waitUntil(async () => {
       const snapshot = await nativeInvoke("terminal_read", { id: terminal.id });
-      return snapshot.displayChunks
-        .map((chunk) => chunk.text)
-        .join("")
-        .includes("alpha17-terminal-ok");
+      const display = snapshot.displayChunks.map((chunk) => chunk.text).join("");
+      return display.match(/terminal-output-visible/g)?.length >= 2;
     });
     await nativeInvoke("terminal_stop", { id: terminal.id });
 

@@ -24,7 +24,7 @@ import { useAppStore } from "../../store/appStore";
 import type { TerminalCommandRequest } from "../../types";
 import { currentSelectedRoom, currentSelectedRoomContext } from "../workspace/selectedWorkspace";
 
-const defaultInteractiveShellCommand = "exec zsh -f";
+const defaultInteractiveShellCommand = "interactive-login-shell";
 
 interface TerminalActionsOptions {
   selectedRoomIdRef: MutableRefObject<string | null>;

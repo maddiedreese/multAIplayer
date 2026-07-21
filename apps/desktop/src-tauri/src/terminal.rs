@@ -115,24 +115,31 @@ pub(crate) fn terminal_start(
     state: State<'_, TerminalState>,
     request: TerminalStartRequest,
 ) -> crate::command_error::CommandResult<TerminalSnapshot> {
-    ensure_room_id(&request.room_id)?;
-    ensure_terminal_name(&request.name)?;
-    ensure_terminal_command(&request.command)?;
-    let canonical_cwd = canonical_project_root(&request.cwd)?;
+    ensure_room_id(&request.room_id)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    ensure_terminal_name(&request.name)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    ensure_terminal_command(&request.command)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    let canonical_cwd = canonical_project_root(&request.cwd)
+        .map_err(crate::command_error::CommandError::unavailable)?;
     let canonical_cwd = canonical_cwd
         .to_str()
-        .ok_or_else(|| "Project path must be valid UTF-8".to_string())?
+        .ok_or_else(|| {
+            crate::command_error::CommandError::invalid_argument("Project path must be valid UTF-8")
+        })?
         .to_string();
 
     let id = terminal_id(&request.room_id, &request.name);
-    let mut sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Terminal state is unavailable".to_string())?;
+    let mut sessions = state.sessions.lock().map_err(|_| {
+        crate::command_error::CommandError::unavailable("Terminal state is unavailable")
+    })?;
 
     if let Some(existing) = sessions.get_mut(&id) {
         if existing_is_running(existing) {
-            return Err(format!("Terminal {} is already running", request.name).into());
+            return Err(crate::command_error::CommandError::invalid_argument(
+                format!("Terminal {} is already running", request.name),
+            ));
         }
         terminate_terminal_child(existing.child.as_mut());
         sessions.remove(&id);
@@ -147,26 +154,33 @@ pub(crate) fn terminal_start(
             pixel_width: 0,
             pixel_height: 0,
         })
-        .map_err(|error| format!("Failed to open terminal pty: {error}"))?;
+        .map_err(|error| {
+            crate::command_error::CommandError::process(format!(
+                "Failed to open terminal pty: {error}"
+            ))
+        })?;
     let (program, arguments) =
-        interactive_terminal_program(&shell, &canonical_cwd, &request.command)?;
+        interactive_terminal_program(&shell, &canonical_cwd, &request.command)
+            .map_err(crate::command_error::CommandError::process)?;
     let mut command = CommandBuilder::new(program);
     command.cwd(&canonical_cwd);
+    command.env("TERM", "xterm-256color");
+    command.env("COLORTERM", "truecolor");
+    command.env("TERM_PROGRAM", "multAIplayer");
     for argument in arguments {
         command.arg(argument);
     }
-    let child = pair
-        .slave
-        .spawn_command(command)
-        .map_err(|error| format!("Failed to start terminal: {error}"))?;
-    let reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|error| format!("Failed to read terminal pty: {error}"))?;
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|error| format!("Failed to write terminal pty: {error}"))?;
+    let child = pair.slave.spawn_command(command).map_err(|error| {
+        crate::command_error::CommandError::process(format!("Failed to start terminal: {error}"))
+    })?;
+    let reader = pair.master.try_clone_reader().map_err(|error| {
+        crate::command_error::CommandError::process(format!("Failed to read terminal pty: {error}"))
+    })?;
+    let writer = pair.master.take_writer().map_err(|error| {
+        crate::command_error::CommandError::process(format!(
+            "Failed to write terminal pty: {error}"
+        ))
+    })?;
     let output = Arc::new(Mutex::new(vec![
         TerminalLine {
             stream: "system".to_string(),
@@ -174,7 +188,11 @@ pub(crate) fn terminal_start(
         },
         TerminalLine {
             stream: "system".to_string(),
-            text: format!("$ {}", request.command),
+            text: if request.command == "interactive-login-shell" {
+                "$SHELL -l".to_string()
+            } else {
+                format!("$ {}", request.command)
+            },
         },
     ]));
     let display = Arc::new(Mutex::new(TerminalDisplay::new(&canonical_cwd)));
@@ -196,8 +214,8 @@ pub(crate) fn terminal_start(
     sessions.insert(id.clone(), session);
     let session = sessions
         .get_mut(&id)
-        .ok_or_else(|| "Terminal failed to start".to_string())?;
-    Ok(snapshot_terminal(&id, session, None)?)
+        .ok_or_else(|| crate::command_error::CommandError::process("Terminal failed to start"))?;
+    snapshot_terminal(&id, session, None).map_err(crate::command_error::CommandError::process)
 }
 
 #[typed_tauri_command::command]
@@ -205,15 +223,17 @@ pub(crate) fn terminal_list(
     state: State<'_, TerminalState>,
     room_id: String,
 ) -> crate::command_error::CommandResult<Vec<TerminalSnapshot>> {
-    ensure_room_id(&room_id)?;
-    let mut sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Terminal state is unavailable".to_string())?;
+    ensure_room_id(&room_id).map_err(crate::command_error::CommandError::invalid_argument)?;
+    let mut sessions = state.sessions.lock().map_err(|_| {
+        crate::command_error::CommandError::unavailable("Terminal state is unavailable")
+    })?;
     let mut snapshots = Vec::new();
     for (id, session) in sessions.iter_mut() {
         if session.room_id == room_id {
-            snapshots.push(snapshot_terminal(id, session, None)?);
+            snapshots.push(
+                snapshot_terminal(id, session, None)
+                    .map_err(crate::command_error::CommandError::process)?,
+            );
         }
     }
     snapshots.sort_by(|left, right| left.name.cmp(&right.name));
@@ -226,15 +246,15 @@ pub(crate) fn terminal_read(
     id: String,
     after_revision: Option<u64>,
 ) -> crate::command_error::CommandResult<TerminalSnapshot> {
-    ensure_terminal_id(&id)?;
-    let mut sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Terminal state is unavailable".to_string())?;
-    let session = sessions
-        .get_mut(&id)
-        .ok_or_else(|| format!("Terminal not found: {id}"))?;
-    Ok(snapshot_terminal(&id, session, after_revision)?)
+    ensure_terminal_id(&id).map_err(crate::command_error::CommandError::invalid_argument)?;
+    let mut sessions = state.sessions.lock().map_err(|_| {
+        crate::command_error::CommandError::unavailable("Terminal state is unavailable")
+    })?;
+    let session = sessions.get_mut(&id).ok_or_else(|| {
+        crate::command_error::CommandError::not_found("Terminal session was not found")
+    })?;
+    snapshot_terminal(&id, session, after_revision)
+        .map_err(crate::command_error::CommandError::process)
 }
 
 #[typed_tauri_command::command]
@@ -242,33 +262,41 @@ pub(crate) fn terminal_write(
     state: State<'_, TerminalState>,
     request: TerminalWriteRequest,
 ) -> crate::command_error::CommandResult<TerminalSnapshot> {
-    ensure_terminal_id(&request.id)?;
-    ensure_room_id(&request.room_id)?;
-    ensure_terminal_input(&request.input)?;
-    let mut sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Terminal state is unavailable".to_string())?;
-    let session = sessions
-        .get_mut(&request.id)
-        .ok_or_else(|| format!("Terminal not found: {}", request.id))?;
+    ensure_terminal_id(&request.id)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    ensure_room_id(&request.room_id)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    ensure_terminal_input(&request.input)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    let mut sessions = state.sessions.lock().map_err(|_| {
+        crate::command_error::CommandError::unavailable("Terminal state is unavailable")
+    })?;
+    let session = sessions.get_mut(&request.id).ok_or_else(|| {
+        crate::command_error::CommandError::not_found("Terminal session was not found")
+    })?;
     if session.room_id != request.room_id {
-        return Err("Terminal does not belong to the confirmed room".into());
+        return Err(crate::command_error::CommandError::unauthorized(
+            "Terminal does not belong to the confirmed room",
+        ));
     }
     if !existing_is_running(session) {
-        return Err(format!("Terminal {} is not running", session.name).into());
+        return Err(crate::command_error::CommandError::unavailable(format!(
+            "Terminal {} is not running",
+            session.name
+        )));
     }
-    write!(session.writer, "{}", request.input)
-        .map_err(|error| format!("Failed to write terminal input: {error}"))?;
-    session
-        .writer
-        .flush()
-        .map_err(|error| format!("Failed to flush terminal input: {error}"))?;
-    Ok(snapshot_terminal(
-        &request.id,
-        session,
-        request.after_revision,
-    )?)
+    write!(session.writer, "{}", request.input).map_err(|error| {
+        crate::command_error::CommandError::process(format!(
+            "Failed to write terminal input: {error}"
+        ))
+    })?;
+    session.writer.flush().map_err(|error| {
+        crate::command_error::CommandError::process(format!(
+            "Failed to flush terminal input: {error}"
+        ))
+    })?;
+    snapshot_terminal(&request.id, session, request.after_revision)
+        .map_err(crate::command_error::CommandError::process)
 }
 
 #[typed_tauri_command::command]
@@ -276,16 +304,15 @@ pub(crate) fn terminal_stop(
     state: State<'_, TerminalState>,
     id: String,
 ) -> crate::command_error::CommandResult<TerminalSnapshot> {
-    ensure_terminal_id(&id)?;
-    let mut sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Terminal state is unavailable".to_string())?;
-    let session = sessions
-        .get_mut(&id)
-        .ok_or_else(|| format!("Terminal not found: {id}"))?;
+    ensure_terminal_id(&id).map_err(crate::command_error::CommandError::invalid_argument)?;
+    let mut sessions = state.sessions.lock().map_err(|_| {
+        crate::command_error::CommandError::unavailable("Terminal state is unavailable")
+    })?;
+    let session = sessions.get_mut(&id).ok_or_else(|| {
+        crate::command_error::CommandError::not_found("Terminal session was not found")
+    })?;
     terminate_terminal_child(session.child.as_mut());
-    Ok(snapshot_terminal(&id, session, None)?)
+    snapshot_terminal(&id, session, None).map_err(crate::command_error::CommandError::process)
 }
 
 fn terminal_id(room_id: &str, name: &str) -> String {

@@ -230,7 +230,9 @@ export function buildTerminalMarkdown(
 ): string {
   const title = terminal ? terminal.name : "Room terminal log";
   const visibleLines = lines.filter(
-    (line) => isRetainableTerminalLine(line) && !(line.stream === "system" && line.text.trim() === "$ exec zsh -f")
+    (line) =>
+      isRetainableTerminalLine(line) &&
+      !(line.stream === "system" && ["$ exec zsh -f", "$SHELL -l"].includes(line.text.trim()))
   );
   const output = visibleLines.length
     ? visibleLines

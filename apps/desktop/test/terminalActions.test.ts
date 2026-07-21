@@ -36,7 +36,7 @@ const runningTerminal: TerminalSnapshot = {
   roomId: room.id,
   name: "shell",
   cwd: room.projectPath,
-  command: "exec zsh -f",
+  command: "interactive-login-shell",
   running: true,
   exitStatus: null,
   startedAt: "2026-07-09T12:00:00.000Z",
@@ -141,7 +141,7 @@ test("interactive terminal startup opens the selected room workspace without a n
           roomId: room.id,
           name: "shell",
           cwd: room.projectPath,
-          command: "exec zsh -f"
+          command: "interactive-login-shell"
         }
       }
     }

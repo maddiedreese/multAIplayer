@@ -118,12 +118,14 @@ export function TerminalPanel({
     const terminalFont =
       window.getComputedStyle?.(document.documentElement).getPropertyValue("--font-mono").trim() ||
       '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+    const resolvedTerminalFont = terminalFont.includes("SFMono-Regular")
+      ? 'Menlo, Monaco, Consolas, "Liberation Mono", monospace'
+      : terminalFont;
+    host.style.setProperty("--terminal-font-family", resolvedTerminalFont);
     const xterm = new XTerm({
       cursorBlink: true,
       convertEol: false,
-      fontFamily: terminalFont.includes("SFMono-Regular")
-        ? 'Menlo, Monaco, Consolas, "Liberation Mono", monospace'
-        : terminalFont,
+      fontFamily: resolvedTerminalFont,
       fontSize: 13,
       letterSpacing: 0,
       lineHeight: 1.2,
@@ -172,6 +174,7 @@ export function TerminalPanel({
       window.cancelAnimationFrame(initialFocusFrame);
       dataDisposable.dispose();
       xterm.dispose();
+      host.style.removeProperty("--terminal-font-family");
       xtermRef.current = null;
       fitAddonRef.current = null;
       renderedTerminalIdRef.current = null;
@@ -525,7 +528,7 @@ function TerminalCommandRequest({
 function writeTerminalLine(terminal: XTermInstance, line: TerminalLine) {
   if (line.stream === "stdin") return;
   if (line.stream === "system") {
-    if (line.text.trim() === "$ exec zsh -f") return;
+    if (line.text.trim() === "$ exec zsh -f" || line.text.trim() === "$SHELL -l") return;
     terminal.writeln(line.text);
     return;
   }
