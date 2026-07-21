@@ -12,6 +12,7 @@ _No changes recorded._
 
 - The terminal now retries its automatic shell launch when an existing room receives or changes its project folder, instead of leaving a failed pre-project attempt selected as “Opening shell…” indefinitely.
 - “Opening shell…” is shown only while a terminal start is actually in progress; failed starts remain actionable and a recovered shell accepts ordinary keyboard input immediately.
+- macOS terminals resolve the account's configured login shell instead of trusting a stale inherited `SHELL` variable, so a zsh account opens zsh exactly as Terminal.app does.
 
 ## [0.1.0-alpha.18] - 2026-07-21
 
