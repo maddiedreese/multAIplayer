@@ -122,11 +122,10 @@ test("terminal actions preserve the invocation-time in-flight safeguard", async 
   assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.busy ?? false, false);
 });
 
-test("interactive terminal startup binds authorization and execution to the selected room workspace", async () => {
+test("interactive terminal startup opens the selected room workspace without a native confirmation dialog", async () => {
   const calls: Array<{ command: string; args: unknown }> = [];
   nativeInvoke = async (command, args) => {
     calls.push({ command, args });
-    if (command === "authorize_shell_execution") return "interactive-token";
     if (command === "terminal_start") return runningTerminal;
     throw new Error(`Unexpected native command: ${command}`);
   };
@@ -136,26 +135,13 @@ test("interactive terminal startup binds authorization and execution to the sele
 
   assert.deepEqual(calls, [
     {
-      command: "authorize_shell_execution",
-      args: {
-        request: {
-          roomId: room.id,
-          cwd: room.projectPath,
-          command: "exec zsh -f",
-          kind: "interactive_terminal",
-          requesterLabel: "Local host"
-        }
-      }
-    },
-    {
       command: "terminal_start",
       args: {
         request: {
           roomId: room.id,
           name: "shell",
           cwd: room.projectPath,
-          command: "exec zsh -f",
-          authorizationToken: "interactive-token"
+          command: "exec zsh -f"
         }
       }
     }
@@ -164,11 +150,11 @@ test("interactive terminal startup binds authorization and execution to the sele
   assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.busy ?? false, false);
 });
 
-test("native terminal authorization failure cannot start a process and always clears busy state", async () => {
+test("native terminal startup failure cannot start a process and always clears busy state", async () => {
   const calls: string[] = [];
   nativeInvoke = async (command) => {
     calls.push(command);
-    if (command === "authorize_shell_execution") {
+    if (command === "terminal_start") {
       throw { code: "unauthorized", message: "workspace authorization expired" };
     }
     throw new Error(`Unexpected native command: ${command}`);
@@ -177,7 +163,7 @@ test("native terminal authorization failure cannot start a process and always cl
 
   await actions.openInteractiveTerminal({ reuseExisting: false });
 
-  assert.deepEqual(calls, ["authorize_shell_execution"]);
+  assert.deepEqual(calls, ["terminal_start"]);
   assert.equal(useAppStore.getState().terminals.length, 0);
   assert.equal(useAppStore.getState().terminalRuntimeByRoom[room.id]?.busy ?? false, false);
   assert.match(
@@ -228,12 +214,11 @@ test("terminal approvals discard attacker-selected working directories", () => {
   assert.equal(approved.command, "cat ../../.env");
 });
 
-test("terminal input crosses the native authorization boundary exactly once", async () => {
+test("terminal input writes directly without a native confirmation dialog", async () => {
   const secretInput = "export GH_TOKEN=ghp_attacker_shaped_secret\n";
   const calls: Array<{ command: string; args: unknown }> = [];
   nativeInvoke = async (command, args) => {
     calls.push({ command, args });
-    if (command === "authorize_terminal_input") return "terminal-input-token";
     if (command === "terminal_write") {
       return {
         ...runningTerminal,
@@ -250,24 +235,12 @@ test("terminal input crosses the native authorization boundary exactly once", as
 
   assert.deepEqual(calls, [
     {
-      command: "authorize_terminal_input",
-      args: {
-        request: {
-          roomId: room.id,
-          terminalId: runningTerminal.id,
-          input: secretInput,
-          requesterLabel: "Local host"
-        }
-      }
-    },
-    {
       command: "terminal_write",
       args: {
         request: {
           roomId: room.id,
           id: runningTerminal.id,
-          input: secretInput,
-          authorizationToken: "terminal-input-token"
+          input: secretInput
         }
       }
     }
@@ -284,17 +257,13 @@ test("late terminal input completion cannot overwrite state after a room switch"
     name: "Other terminal room",
     projectPath: "/tmp/terminal-other"
   };
-  let finishAuthorization: ((token: string) => void) | undefined;
-  const authorization = new Promise<string>((resolve) => {
-    finishAuthorization = resolve;
+  let finishWrite: ((snapshot: typeof runningTerminal) => void) | undefined;
+  const pendingWrite = new Promise<typeof runningTerminal>((resolve) => {
+    finishWrite = resolve;
   });
   nativeInvoke = async (command) => {
-    if (command === "authorize_terminal_input") return authorization;
     if (command === "terminal_write") {
-      return {
-        ...runningTerminal,
-        lines: [{ stream: "stdout", text: "late secret-shaped output" }]
-      };
+      return pendingWrite;
     }
     throw new Error(`Unexpected native command: ${command}`);
   };
@@ -308,7 +277,10 @@ test("late terminal input completion cannot overwrite state after a room switch"
   await Promise.resolve();
   selectedRoomIdRef.current = otherRoom.id;
   useAppStore.setState({ selectedRoomId: otherRoom.id });
-  finishAuthorization?.("late-token");
+  finishWrite?.({
+    ...runningTerminal,
+    lines: [{ stream: "stdout", text: "late secret-shaped output" }]
+  });
   await writing;
 
   assert.deepEqual(useAppStore.getState().terminals.find((item) => item.id === runningTerminal.id)?.lines, []);

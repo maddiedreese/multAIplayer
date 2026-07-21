@@ -27,13 +27,13 @@ test.beforeEach(() => {
 
 test("room notice dismissals resolve store actions when invoked", () => {
   const store = useAppStore.getState();
-  store.setHostMessageForRoom(room.id, "Host notice");
-  store.setChatMessageForRoom(room.id, "Chat notice");
+  store.setHostMessageForRoom(room.id, "Host operation failed.");
+  store.setChatMessageForRoom(room.id, "Chat is unavailable.");
 
   const notices = buildRoomNotices({
     roomId: room.id,
-    hostMessage: "Host notice",
-    chatMessage: "Chat notice"
+    hostMessage: "Host operation failed.",
+    chatMessage: "Chat is unavailable."
   });
   notices[0]?.onDismiss();
   notices[1]?.onDismiss();

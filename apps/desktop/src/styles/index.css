@@ -3,8 +3,8 @@
 @import "./project-files.css";
 @import "./terminal-approvals.css";
 @import "./shell-controls.css";
-@import "./theme.css";
 @import "./typography-navigation.css";
+@import "./theme.css";
 @import "./inspector.css";
 @import "./sidebar-density.css";
 @import "./resizable-shell.css";

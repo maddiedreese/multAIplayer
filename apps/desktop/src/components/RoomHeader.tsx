@@ -225,13 +225,11 @@ function CodexHeaderSelectors(
       <HeaderSelector
         label="Codex host model"
         value={props.selectedModel}
-        fallbackValue="custom"
+        fallbackValue={props.selectedModel}
         fallbackLabel={props.modelLabel}
         options={props.modelOptions}
         disabled={disabled}
-        onChange={(value) => {
-          if (value !== "custom") props.onSelectModel(value);
-        }}
+        onChange={props.onSelectModel}
       />
       <HeaderSelector
         label="Codex reasoning"
@@ -286,7 +284,7 @@ function HeaderSelector({
             {option.label}
           </option>
         ))}
-        {!known && <option value={fallbackValue === "custom" ? "custom" : value}>{fallbackLabel}</option>}
+        {!known && <option value={value}>{fallbackLabel}</option>}
       </select>
     </label>
   );

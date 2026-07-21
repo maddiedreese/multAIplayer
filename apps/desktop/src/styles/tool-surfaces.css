@@ -66,7 +66,7 @@
   border: 0;
   background: transparent;
   padding: 10px 14px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
 }
 
 .team-button span {
@@ -629,23 +629,13 @@
   line-height: 1.35;
 }
 
-@media (max-width: 980px) {
-  .team-button {
-    grid-template-columns: minmax(0, 1fr) minmax(58px, max-content);
-  }
-
-  .team-button svg {
-    display: none;
-  }
-}
-
 .sidebar .team-button {
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: 28px minmax(0, 1fr) max-content;
   gap: 12px;
 }
 
-.sidebar .team-button svg {
-  display: none;
+.sidebar .team-button .team-disclosure svg {
+  display: block;
 }
 
 .sidebar .team-button span {

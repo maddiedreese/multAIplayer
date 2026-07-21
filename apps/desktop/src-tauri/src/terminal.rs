@@ -1,6 +1,5 @@
-use crate::host_sandbox::sandboxed_terminal_program;
+use crate::host_sandbox::interactive_terminal_program;
 use crate::output::redact_known_secrets;
-use crate::shell_authorization::{ShellAuthorizationState, ShellExecutionKind};
 use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -13,7 +12,7 @@ use crate::validation::{
     ensure_room_id, ensure_terminal_command, ensure_terminal_id, ensure_terminal_input,
     ensure_terminal_name,
 };
-use crate::workspace::ensure_existing_dir;
+use crate::workspace::canonical_project_root;
 
 #[derive(Default)]
 pub(crate) struct TerminalState {
@@ -60,7 +59,6 @@ pub(crate) struct TerminalStartRequest {
     name: String,
     cwd: String,
     command: String,
-    authorization_token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,26 +67,21 @@ pub(crate) struct TerminalWriteRequest {
     id: String,
     room_id: String,
     input: String,
-    authorization_token: String,
 }
 
 #[typed_tauri_command::command]
 pub(crate) fn terminal_start(
     state: State<'_, TerminalState>,
-    authorization_state: State<'_, ShellAuthorizationState>,
     request: TerminalStartRequest,
 ) -> crate::command_error::CommandResult<TerminalSnapshot> {
     ensure_room_id(&request.room_id)?;
-    ensure_existing_dir(&request.cwd)?;
     ensure_terminal_name(&request.name)?;
     ensure_terminal_command(&request.command)?;
-    let canonical_cwd = authorization_state.consume(
-        &request.authorization_token,
-        &request.room_id,
-        &request.cwd,
-        &request.command,
-        ShellExecutionKind::InteractiveTerminal,
-    )?;
+    let canonical_cwd = canonical_project_root(&request.cwd)?;
+    let canonical_cwd = canonical_cwd
+        .to_str()
+        .ok_or_else(|| "Project path must be valid UTF-8".to_string())?
+        .to_string();
 
     let id = terminal_id(&request.room_id, &request.name);
     let mut sessions = state
@@ -115,7 +108,7 @@ pub(crate) fn terminal_start(
         })
         .map_err(|error| format!("Failed to open terminal pty: {error}"))?;
     let (program, arguments) =
-        sandboxed_terminal_program(&shell, &canonical_cwd, &request.command)?;
+        interactive_terminal_program(&shell, &canonical_cwd, &request.command)?;
     let mut command = CommandBuilder::new(program);
     command.cwd(&canonical_cwd);
     for argument in arguments {
@@ -133,10 +126,16 @@ pub(crate) fn terminal_start(
         .master
         .take_writer()
         .map_err(|error| format!("Failed to write terminal pty: {error}"))?;
-    let output = Arc::new(Mutex::new(vec![TerminalLine {
-        stream: "system".to_string(),
-        text: format!("$ {}", request.command),
-    }]));
+    let output = Arc::new(Mutex::new(vec![
+        TerminalLine {
+            stream: "system".to_string(),
+            text: format!("Working in {canonical_cwd}"),
+        },
+        TerminalLine {
+            stream: "system".to_string(),
+            text: format!("$ {}", request.command),
+        },
+    ]));
 
     capture_terminal_stream(reader, "stdout", Arc::clone(&output));
 
@@ -197,18 +196,11 @@ pub(crate) fn terminal_read(
 #[typed_tauri_command::command]
 pub(crate) fn terminal_write(
     state: State<'_, TerminalState>,
-    authorization_state: State<'_, ShellAuthorizationState>,
     request: TerminalWriteRequest,
 ) -> crate::command_error::CommandResult<TerminalSnapshot> {
     ensure_terminal_id(&request.id)?;
     ensure_room_id(&request.room_id)?;
     ensure_terminal_input(&request.input)?;
-    authorization_state.consume_terminal_input(
-        &request.authorization_token,
-        &request.room_id,
-        &request.id,
-        &request.input,
-    )?;
     let mut sessions = state
         .sessions
         .lock()

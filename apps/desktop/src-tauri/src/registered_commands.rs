@@ -41,7 +41,6 @@ macro_rules! with_registered_commands {
                 run_shell_command,
                 authorize_shell_execution,
                 clear_shell_execution_grants,
-                authorize_terminal_input,
                 terminal_start,
                 terminal_list,
                 terminal_read,

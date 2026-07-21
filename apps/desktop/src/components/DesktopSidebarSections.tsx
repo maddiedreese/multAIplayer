@@ -210,37 +210,39 @@ export function SidebarTeamsTitle({
   const label = searchActive ? "Matching teams" : showArchived ? "Archived" : "Teams";
   return (
     <div className="section-title">
-      <button
-        type="button"
-        className="section-disclosure"
-        aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
-        aria-expanded={!collapsed}
-        onClick={onToggleCollapsed}
-      >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-        <span>{label}</span>
-      </button>
-      {!searchActive && (
-        <div className="section-title-actions">
-          <button
-            onClick={onToggleArchived}
-            aria-label={showArchived ? "Show active teams" : "Show archived teams and rooms"}
-            aria-pressed={showArchived}
-            title={showArchived ? "Show active teams" : "Show archived"}
-          >
-            {showArchived ? <UsersRound size={14} /> : <Archive size={14} />}
-          </button>
-          {!showArchived && (
+      <span>{label}</span>
+      <div className="section-title-actions">
+        <button
+          type="button"
+          className="section-disclosure"
+          aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
+          aria-expanded={!collapsed}
+          onClick={onToggleCollapsed}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {!searchActive && (
+          <>
             <button
-              onClick={onToggleTeamCreate}
-              aria-label={teamCreateOpen ? "Hide team form" : "New team"}
-              aria-expanded={teamCreateOpen}
+              onClick={onToggleArchived}
+              aria-label={showArchived ? "Show active teams" : "Show archived teams and rooms"}
+              aria-pressed={showArchived}
+              title={showArchived ? "Show active teams" : "Show archived"}
             >
-              {teamCreateOpen ? <X size={14} /> : <Plus size={15} />}
+              {showArchived ? <UsersRound size={14} /> : <Archive size={14} />}
             </button>
-          )}
-        </div>
-      )}
+            {!showArchived && (
+              <button
+                onClick={onToggleTeamCreate}
+                aria-label={teamCreateOpen ? "Hide team form" : "New team"}
+                aria-expanded={teamCreateOpen}
+              >
+                {teamCreateOpen ? <X size={14} /> : <Plus size={15} />}
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

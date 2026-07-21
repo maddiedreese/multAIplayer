@@ -214,7 +214,7 @@
 .project-card {
   border: 1px solid #e1e1e1;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface-strong);
   padding: 13px 14px;
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);

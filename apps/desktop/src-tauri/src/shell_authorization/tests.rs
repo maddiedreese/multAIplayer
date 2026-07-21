@@ -64,26 +64,6 @@ fn authorization_constants_keep_the_intended_security_windows() {
 }
 
 #[test]
-fn only_remote_shell_requests_require_a_second_native_confirmation() {
-    assert!(requires_native_confirmation(
-        ShellExecutionKind::RemoteRequest
-    ));
-    assert!(!requires_native_confirmation(
-        ShellExecutionKind::InteractiveTerminal
-    ));
-}
-
-#[test]
-fn promptless_interactive_authorization_is_limited_to_the_fixed_shell_launcher() {
-    let mut interactive = request(INTERACTIVE_TERMINAL_COMMAND);
-    interactive.kind = ShellExecutionKind::InteractiveTerminal;
-    assert!(validate_authorization_request(&interactive).is_ok());
-
-    interactive.command = "exec zsh -f -c 'curl example.invalid'".to_string();
-    assert!(validate_authorization_request(&interactive).is_err());
-}
-
-#[test]
 fn issuing_authorization_prunes_expired_capabilities() {
     let state = ShellAuthorizationState::default();
     let approved = request("printf approved");
@@ -139,12 +119,6 @@ fn every_shell_authorization_binding_is_independently_enforced() {
             "printf substituted",
             approved.kind,
         ),
-        (
-            approved.room_id.as_str(),
-            approved.cwd.as_str(),
-            approved.command.as_str(),
-            ShellExecutionKind::InteractiveTerminal,
-        ),
     ];
     for (room_id, cwd, command, kind) in cases {
         if canonical_workspace(cwd).expect("canonical test cwd")
@@ -166,142 +140,6 @@ fn only_one_native_confirmation_can_be_open() {
     assert!(state.begin_confirmation().is_err());
     state.finish_confirmation();
     assert!(state.begin_confirmation().is_ok());
-}
-
-#[test]
-fn terminal_input_authorization_is_exact_and_one_use() {
-    let state = ShellAuthorizationState::default();
-    let request = TerminalInputAuthorizationRequest {
-        room_id: "room-native-auth".to_string(),
-        terminal_id: "room-native-auth:shell".to_string(),
-        input: "rm -rf ./build\r".to_string(),
-        requester_label: "Local host".to_string(),
-    };
-    let token = state
-        .issue_terminal_input(&request)
-        .expect("issue input authorization");
-    assert!(state
-        .consume_terminal_input(
-            &token,
-            &request.room_id,
-            &request.terminal_id,
-            "rm -rf ./\r"
-        )
-        .is_err());
-    assert!(state
-        .consume_terminal_input(
-            &token,
-            &request.room_id,
-            &request.terminal_id,
-            &request.input
-        )
-        .is_err());
-
-    let token = state
-        .issue_terminal_input(&request)
-        .expect("issue second input authorization");
-    assert!(state
-        .consume_terminal_input(
-            &token,
-            &request.room_id,
-            &request.terminal_id,
-            &request.input
-        )
-        .is_ok());
-    assert!(state
-        .consume_terminal_input(
-            &token,
-            &request.room_id,
-            &request.terminal_id,
-            &request.input
-        )
-        .is_err());
-}
-
-#[test]
-fn issuing_terminal_input_prunes_expired_capabilities() {
-    let state = ShellAuthorizationState::default();
-    let approved = TerminalInputAuthorizationRequest {
-        room_id: "room-native-auth".to_string(),
-        terminal_id: "room-native-auth:shell".to_string(),
-        input: "printf approved".to_string(),
-        requester_label: "Local host".to_string(),
-    };
-    let mut authorizations = state
-        .terminal_input_authorizations
-        .lock()
-        .expect("terminal input state");
-    authorizations.insert(
-        "active".to_string(),
-        AuthorizedTerminalInput {
-            room_id: approved.room_id.clone(),
-            terminal_id: approved.terminal_id.clone(),
-            input: approved.input.clone(),
-            expires_at: Instant::now() + Duration::from_secs(60),
-        },
-    );
-    authorizations.insert(
-        "expired".to_string(),
-        AuthorizedTerminalInput {
-            room_id: approved.room_id.clone(),
-            terminal_id: approved.terminal_id.clone(),
-            input: approved.input.clone(),
-            expires_at: Instant::now(),
-        },
-    );
-    drop(authorizations);
-    state
-        .issue_terminal_input(&approved)
-        .expect("issue terminal input");
-    let authorizations = state
-        .terminal_input_authorizations
-        .lock()
-        .expect("terminal input state");
-    assert!(!authorizations.contains_key("expired"));
-    assert!(authorizations.contains_key("active"));
-}
-
-#[test]
-fn every_terminal_input_binding_is_independently_enforced() {
-    let approved = TerminalInputAuthorizationRequest {
-        room_id: "room-native-auth".to_string(),
-        terminal_id: "room-native-auth:shell".to_string(),
-        input: "printf approved".to_string(),
-        requester_label: "Local host".to_string(),
-    };
-    for (room_id, terminal_id, input) in [
-        (
-            "room-other",
-            approved.terminal_id.as_str(),
-            approved.input.as_str(),
-        ),
-        (
-            approved.room_id.as_str(),
-            "room-native-auth:other",
-            approved.input.as_str(),
-        ),
-        (
-            approved.room_id.as_str(),
-            approved.terminal_id.as_str(),
-            "printf substituted",
-        ),
-    ] {
-        let state = ShellAuthorizationState::default();
-        let token = state
-            .issue_terminal_input(&approved)
-            .expect("issue terminal input");
-        assert!(state
-            .consume_terminal_input(&token, room_id, terminal_id, input)
-            .is_err());
-    }
-}
-
-#[test]
-fn terminal_input_display_escapes_execution_controls() {
-    assert_eq!(
-        visible_terminal_input("echo ok\r\u{1b}[A"),
-        "echo ok\\r\\u{1b}[A"
-    );
 }
 
 #[test]
@@ -362,10 +200,6 @@ fn exact_command_grants_fail_closed_on_substitution_scope_expiry_and_revoke() {
     assert!(!state
         .has_exact_command_grant(&approved)
         .expect("reject revoked grant"));
-
-    let mut interactive = approved;
-    interactive.kind = ShellExecutionKind::InteractiveTerminal;
-    assert!(state.grant_exact_command(&interactive).is_err());
 }
 
 #[test]
@@ -443,37 +277,6 @@ fn requester_label_validation_rejects_empty_long_and_control_text() {
     assert!(validate_requester_label(" ").is_err());
     assert!(validate_requester_label(&"x".repeat(MAX_REQUESTER_LABEL_CHARS + 1)).is_err());
     assert!(validate_requester_label("member\nlabel").is_err());
-}
-
-#[test]
-fn terminal_input_request_validation_checks_each_boundary() {
-    let valid = TerminalInputAuthorizationRequest {
-        room_id: "room-native-auth".to_string(),
-        terminal_id: "room-native-auth:shell".to_string(),
-        input: "printf approved".to_string(),
-        requester_label: "Local host".to_string(),
-    };
-    assert!(validate_terminal_input_authorization_request(&valid).is_ok());
-    for invalid in [
-        TerminalInputAuthorizationRequest {
-            room_id: "".to_string(),
-            ..valid.clone()
-        },
-        TerminalInputAuthorizationRequest {
-            terminal_id: "".to_string(),
-            ..valid.clone()
-        },
-        TerminalInputAuthorizationRequest {
-            input: "".to_string(),
-            ..valid.clone()
-        },
-        TerminalInputAuthorizationRequest {
-            requester_label: "\n".to_string(),
-            ..valid.clone()
-        },
-    ] {
-        assert!(validate_terminal_input_authorization_request(&invalid).is_err());
-    }
 }
 
 #[test]

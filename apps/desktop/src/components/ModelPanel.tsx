@@ -53,21 +53,13 @@ export function ModelPanel({
       </div>
       <label>
         <span>Codex host model</span>
-        <select
-          value={knownModelSelected ? selectedModel : "custom"}
-          disabled={disabled}
-          onChange={(event) => {
-            if (event.target.value !== "custom") {
-              onSelectModel(event.target.value);
-            }
-          }}
-        >
+        <select value={selectedModel} disabled={disabled} onChange={(event) => onSelectModel(event.target.value)}>
           {modelOptions.map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
             </option>
           ))}
-          <option value="custom">Custom</option>
+          {!knownModelSelected && <option value={selectedModel}>{selectedModelLabel}</option>}
         </select>
       </label>
       <label className="checkbox-row">

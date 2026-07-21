@@ -950,6 +950,20 @@ fn terminal_redaction_bounds_newline_free_output_and_flushes_safely() {
 
 #[cfg(target_os = "macos")]
 #[test]
+fn interactive_terminal_uses_the_users_shell_directly() {
+    let (program, args) = crate::host_sandbox::interactive_terminal_program(
+        "/bin/zsh",
+        "/tmp/room-project",
+        "exec zsh -f",
+    )
+    .expect("interactive terminal program");
+
+    assert_eq!(program, "/bin/zsh");
+    assert_eq!(args, vec!["-c", "exec zsh -f"]);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
 fn host_sandbox_allows_project_work_and_blocks_outside_project_files() {
     let workspace = test_temp_dir("sandbox-workspace");
     let outside = test_temp_dir("sandbox-outside");

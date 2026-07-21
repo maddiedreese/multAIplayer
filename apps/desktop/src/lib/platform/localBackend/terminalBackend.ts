@@ -10,17 +10,8 @@ export async function startTerminal(
   command: string
 ): Promise<TerminalSnapshot> {
   if (!isTauriRuntime()) return requireNativeRuntime("Terminals");
-  const authorizationToken = await invokeNative<string>("authorize_shell_execution", {
-    request: {
-      roomId,
-      cwd,
-      command,
-      kind: "interactive_terminal",
-      requesterLabel: "Local host"
-    }
-  });
   return invokeNative<TerminalSnapshot>("terminal_start", {
-    request: { roomId, name, cwd, command, authorizationToken }
+    request: { roomId, name, cwd, command }
   });
 }
 
@@ -36,11 +27,8 @@ export async function readTerminal(id: string): Promise<TerminalSnapshot> {
 
 export async function writeTerminal(roomId: string, id: string, input: string): Promise<TerminalSnapshot> {
   if (!isTauriRuntime()) return requireNativeRuntime("Terminals");
-  const authorizationToken = await invokeNative<string>("authorize_terminal_input", {
-    request: { roomId, terminalId: id, input, requesterLabel: "Local host" }
-  });
   return invokeNative<TerminalSnapshot>("terminal_write", {
-    request: { roomId, id, input, authorizationToken }
+    request: { roomId, id, input }
   });
 }
 

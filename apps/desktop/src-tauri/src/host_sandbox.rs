@@ -22,22 +22,19 @@ pub(crate) fn sandboxed_shell_command(
     }
 }
 
-pub(crate) fn sandboxed_terminal_program(
+pub(crate) fn interactive_terminal_program(
     shell: &str,
     workspace: &str,
     command: &str,
 ) -> Result<(String, Vec<String>), String> {
+    let _ = workspace;
     #[cfg(target_os = "macos")]
     {
+        // This PTY is controlled directly by the local user. Start their shell in the
+        // room cwd so normal job control works; remote room commands remain sandboxed.
         Ok((
-            "/usr/bin/sandbox-exec".to_string(),
-            vec![
-                "-p".to_string(),
-                macos_profile(workspace),
-                shell.to_string(),
-                "-c".to_string(),
-                command.to_string(),
-            ],
+            shell.to_string(),
+            vec!["-c".to_string(), command.to_string()],
         ))
     }
     #[cfg(not(target_os = "macos"))]

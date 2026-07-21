@@ -133,8 +133,8 @@ button:not(:disabled):active {
   padding: 9px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
-  color: #1f1f1f;
+  background: var(--surface-strong);
+  color: var(--text);
   box-shadow: none;
 }
 
@@ -206,10 +206,6 @@ button:not(:disabled):active {
   border-color: var(--border);
   background: var(--surface-muted);
   color: var(--text-muted);
-}
-
-.team-button svg {
-  display: none;
 }
 
 .team-button.active,

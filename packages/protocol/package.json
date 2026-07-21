@@ -1,7 +1,7 @@
 {
   "name": "@multaiplayer/protocol",
   "private": true,
-  "version": "0.1.0-alpha.15",
+  "version": "0.1.0-alpha.16",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
