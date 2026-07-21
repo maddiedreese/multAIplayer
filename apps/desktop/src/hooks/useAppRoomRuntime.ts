@@ -271,6 +271,7 @@ export function useAppRoomRuntime({
         terminalBusy,
         roomTerminalCount: roomTerminals.length,
         selectedRoomId: roomId,
+        selectedRoomProjectPath: roomSelection.projectPath,
         terminalAutoOpenedRoomsRef
       },
       roomDraftCleanup: {

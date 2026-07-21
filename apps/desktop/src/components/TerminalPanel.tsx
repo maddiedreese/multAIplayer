@@ -301,7 +301,7 @@ export function TerminalPanel({
         {terminalRisks.length > 0 && <InlineSecretWarning risks={terminalRisks} compact />}
         <div className="xterm-host" ref={terminalHostRef} />
         {codexRunning && <div className="terminal-active">Codex is preparing a foreground terminal...</div>}
-        {!selectedTerminal && <div className="terminal-active">Opening shell...</div>}
+        {!selectedTerminal && terminalBusy && <div className="terminal-active">Opening shell...</div>}
       </div>
 
       {selectedTerminal && (

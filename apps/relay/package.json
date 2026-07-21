@@ -1,7 +1,7 @@
 {
   "name": "@multaiplayer/relay",
   "private": true,
-  "version": "0.1.0-alpha.18",
+  "version": "0.1.0-alpha.19",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -17,7 +17,7 @@
     "test:soak": "tsx --test test/soak/relay-chaos.test.ts"
   },
   "dependencies": {
-    "@multaiplayer/protocol": "0.1.0-alpha.18",
+    "@multaiplayer/protocol": "0.1.0-alpha.19",
     "better-sqlite3": "12.11.1",
     "cookie": "2.0.1",
     "cookie-parser": "1.4.7",
