@@ -6,6 +6,15 @@ All notable user-visible and security-relevant changes are curated here. A relea
 
 _No changes recorded._
 
+## [0.1.0-alpha.18] - 2026-07-21
+
+### Fixed
+
+- Interactive terminals now launch the user's login shell directly in the room project, execute and display typed input, and use identical font metrics for XTerm measurement and rendering so terminal cells remain aligned.
+- Native project and terminal failures now preserve actionable error messages instead of collapsing into a generic `NativeCommandError` notice.
+- Profile and Help use the app's compact type scale and responsive spacing; room approval controls remain fully visible at narrow widths; and the room-control collapse button accepts every click reliably.
+- Codex Apps, MCP server inventory, and device-wide app approval settings are no longer duplicated in multAIplayer Profile; those integrations remain managed in Codex.
+
 ## [0.1.0-alpha.17] - 2026-07-20
 
 ### Fixed

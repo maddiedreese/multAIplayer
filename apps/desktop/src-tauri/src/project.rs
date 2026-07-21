@@ -84,12 +84,15 @@ pub(crate) struct GitDiffResult {
 pub(crate) async fn project_files(
     request: ProjectFileSearchRequest,
 ) -> crate::command_error::CommandResult<Vec<ProjectFileEntry>> {
-    ensure_existing_dir(&request.cwd)?;
-    let root = canonical_project_root(&request.cwd)?;
+    ensure_existing_dir(&request.cwd)
+        .map_err(crate::command_error::CommandError::invalid_argument)?;
+    let root = canonical_project_root(&request.cwd)
+        .map_err(crate::command_error::CommandError::unavailable)?;
     let query = request.query.trim().to_lowercase();
     let limit = request.limit.unwrap_or(80).clamp(1, 200);
     let mut results = Vec::new();
-    collect_project_files(&root, &root, &query, limit, &mut results)?;
+    collect_project_files(&root, &root, &query, limit, &mut results)
+        .map_err(crate::command_error::CommandError::storage)?;
     results.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(results)
 }

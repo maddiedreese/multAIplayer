@@ -205,11 +205,11 @@ test("Codex account view renders native capabilities and dispatches account acti
 
   fireEvent.click(view.getByRole("button", { name: "Refresh Codex account" }));
   fireEvent.click(view.getByRole("button", { name: "Sign in with ChatGPT" }));
-  fireEvent.click(view.getByRole("button", { name: "Connect" }));
-  fireEvent.change(view.getByRole("combobox"), { target: { value: "writes" } });
 
-  assert.deepEqual(events, ["refresh", "login:browser", "mcp:docs", "approval:writes"]);
-  assert.match(view.getByText("Drive").parentElement?.textContent ?? "", /Sign-in needed/);
+  assert.deepEqual(events, ["refresh", "login:browser"]);
+  assert.equal(view.queryByText("Drive"), null);
+  assert.equal(view.queryByText("MCP servers (1)"), null);
+  assert.equal(view.queryByRole("combobox"), null);
 });
 
 test("Monaco maps supported file extensions and worker labels", () => {

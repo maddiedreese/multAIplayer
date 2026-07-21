@@ -144,6 +144,9 @@ select {
   background: var(--surface);
   color: var(--text-muted);
   transform: translateY(-50%);
+  z-index: 18;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .room-controls-toggle:hover {

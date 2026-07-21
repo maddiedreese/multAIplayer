@@ -9,7 +9,8 @@
 /* Terminal cells require monospaced metrics to stay aligned and readable. */
 .xterm,
 .xterm * {
-  font-family: var(--font-mono) !important;
+  /* This must match XTerm's measured font exactly or glyphs drift between cells. */
+  font-family: var(--terminal-font-family, var(--font-mono)) !important;
 }
 
 input[type="checkbox"],

@@ -954,12 +954,12 @@ fn interactive_terminal_uses_the_users_shell_directly() {
     let (program, args) = crate::host_sandbox::interactive_terminal_program(
         "/bin/zsh",
         "/tmp/room-project",
-        "exec zsh -f",
+        "interactive-login-shell",
     )
     .expect("interactive terminal program");
 
     assert_eq!(program, "/bin/zsh");
-    assert_eq!(args, vec!["-c", "exec zsh -f"]);
+    assert_eq!(args, vec!["-l"]);
 }
 
 #[cfg(target_os = "macos")]

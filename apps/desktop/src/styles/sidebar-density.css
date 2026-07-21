@@ -327,3 +327,53 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+/* Drawer text uses the same compact type scale as the rest of the application. */
+.sidebar-drawer {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sidebar-drawer .drawer-content,
+.sidebar-drawer .drawer-section,
+.sidebar-drawer .drawer-section :where(p, li, code, a, label, span) {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sidebar-drawer .drawer-section :where(strong, h3),
+.sidebar-drawer .panel-title strong {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.sidebar-drawer .drawer-section small,
+.sidebar-drawer .panel-title small {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sidebar-drawer .help-drawer-panel {
+  gap: 12px;
+}
+
+.sidebar-drawer .help-drawer-panel .drawer-section {
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.sidebar-drawer .help-drawer-panel .panel-title > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sidebar-drawer .help-drawer-panel .panel-title small {
+  display: block;
+  color: var(--text-muted);
+  white-space: normal;
+}
+
+.sidebar-drawer .help-drawer-panel p {
+  margin: 0;
+}

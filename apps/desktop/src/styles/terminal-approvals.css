@@ -235,6 +235,7 @@
 .policy-options {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .panel-subtitle {
@@ -247,6 +248,8 @@
 }
 
 .policy-options button {
+  width: 100%;
+  min-width: 0;
   min-height: 34px;
   padding: 7px 9px;
   border: 1px solid #dcdcdc;
@@ -267,6 +270,7 @@
 .model-options {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .model-options button {
@@ -279,6 +283,8 @@
   background: #ffffff;
   color: #2e2e2e;
   text-align: left;
+  width: 100%;
+  min-width: 0;
 }
 
 .model-options button.active {
@@ -289,9 +295,30 @@
 
 .model-options strong,
 .model-options span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.policy-panel,
+.policy-panel .panel-title,
+.policy-panel .panel-title > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.policy-panel .panel-title {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.policy-panel .panel-title > :last-child {
+  overflow-wrap: anywhere;
+  text-align: end;
+  white-space: normal;
 }
 
 .model-options strong {

@@ -6,7 +6,6 @@
 @import "./typography-navigation.css";
 @import "./theme.css";
 @import "./inspector.css";
-@import "./sidebar-density.css";
 @import "./resizable-shell.css";
 @import "./tool-surfaces.css";
 @import "./collaboration.css";
@@ -14,3 +13,4 @@
 @import "./thread-activity.css";
 @import "./global-controls.css";
 @import "./onboarding.css";
+@import "./sidebar-density.css";

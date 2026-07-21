@@ -14,7 +14,7 @@ test("structured Tauri rejections become Error instances with stable codes", asy
       error instanceof NativeCommandError &&
       error.code === "requires_rejoin" &&
       error.message === "Copy can change" &&
-      String(error) === "NativeCommandError: Copy can change"
+      String(error) === "Copy can change"
   );
 });
 
