@@ -23,7 +23,7 @@ tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
 age = { version = "=0.12.1", default-features = false }
-base64 = "=0.22.1"
+base64 = "=0.23.0"
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }
 codex-activity-projection = { path = "crates/codex-activity-projection" }
 libc = "=0.2.186"
