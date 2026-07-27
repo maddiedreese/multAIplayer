@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@multaiplayer/protocol": "0.1.0-alpha.19",
-    "better-sqlite3": "12.11.1",
+    "better-sqlite3": "13.0.1",
     "cookie": "2.0.1",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
