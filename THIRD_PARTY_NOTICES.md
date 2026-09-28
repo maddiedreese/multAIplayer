@@ -26,7 +26,7 @@ Tauri and Wry provide the native desktop shell and in-room WebView surface. The 
 ## MLS, HPKE, And Encrypted Storage
 
 - `mls-rs` 0.55.2, `mls-rs-core` 0.27.0, `mls-rs-crypto-awslc` 0.25.0, and `mls-rs-provider-sqlite` 0.23.0 - Apache-2.0 OR MIT - https://github.com/awslabs/mls-rs
-- `hpke` 0.14.0 - MIT OR Apache-2.0 - https://github.com/rozbb/rust-hpke
+- `hpke` 0.14.1 - MIT OR Apache-2.0 - https://github.com/rozbb/rust-hpke
 - `aws-lc-rs` 1.16.3 - ISC AND (Apache-2.0 OR ISC) - https://github.com/aws/aws-lc-rs
 - `libsqlite3-sys` 0.35.0 - MIT - https://github.com/rusqlite/rusqlite
 

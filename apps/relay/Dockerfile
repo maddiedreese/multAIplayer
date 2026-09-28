@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+ARG NODE_IMAGE=node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
 ARG RUST_IMAGE=rust:1.89-bookworm@sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff
 ARG SOURCE_DATE_EPOCH=0
 FROM ${RUST_IMAGE} AS mls-validator
@@ -17,11 +17,16 @@ ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.base.json ./
+COPY package.json package-lock.json tsconfig.base.json .npmrc ./
 COPY packages/protocol ./packages/protocol
 COPY apps/relay ./apps/relay
 COPY tools/release/relay-runtime-dependency-closure.mjs ./tools/release/relay-runtime-dependency-closure.mjs
 
+# better-sqlite3 13 builds its native addon from source. These tools stay in
+# the build stage and are never copied into the production runtime.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 RUN npm install --global npm@11.16.0 --ignore-scripts
 RUN npm ci --workspace @multaiplayer/relay --include-workspace-root
 RUN npm run build -w @multaiplayer/protocol
