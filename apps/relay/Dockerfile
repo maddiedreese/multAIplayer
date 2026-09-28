@@ -1,14 +1,10 @@
-ARG NODE_IMAGE=node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+ARG NODE_IMAGE=node:24.21.0-trixie-slim@sha256:8ec5d7557396cfe32d21c3f9c13072355ceab22b584578ca4bb28af31120cffe
 ARG RUST_IMAGE=rust:1.89-bookworm@sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff
 ARG SOURCE_DATE_EPOCH=0
 FROM ${RUST_IMAGE} AS mls-validator
 WORKDIR /src/apps/desktop/src-tauri
 COPY apps/desktop/src-tauri ./
-RUN cargo build --locked --release -p mls-core --bin mls-keypackage-validator && \
-    validator_crypto="$(ldd target/release/mls-keypackage-validator | awk '$1 == "libcrypto.so.3" { print $3 }')" && \
-    test -n "$validator_crypto" && \
-    mkdir -p /validator-runtime-libs && \
-    cp "$validator_crypto" /validator-runtime-libs/libcrypto.so.3
+RUN cargo build --locked --release -p mls-core --bin mls-keypackage-validator
 
 FROM ${NODE_IMAGE} AS build
 
@@ -45,14 +41,18 @@ ENV NODE_ENV=production
 ENV PORT=4321
 ENV MULTAIPLAYER_RELAY_DATA_PATH=/data/relay-store.sqlite
 ENV MULTAIPLAYER_MLS_VALIDATOR_PATH=/app/bin/mls-keypackage-validator
-ENV LD_LIBRARY_PATH=/app/lib
 
 WORKDIR /app
 
 # The production image executes Node directly and does not need npm. Removing
 # the bundled package manager also removes its independent dependency tree from
 # the relay's runtime attack surface.
-RUN rm -rf /usr/local/lib/node_modules/npm && \
+# Use the runtime distribution's maintained OpenSSL, not the Rust builder's
+# older libcrypto. The validator's libcrypto.so.3 ABI is checked below.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libssl3t64 && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /usr/local/lib/node_modules/npm && \
     rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=build /app/node_modules ./node_modules
@@ -64,7 +64,6 @@ COPY --from=build /app/apps/relay/package.json ./apps/relay/package.json
 COPY --from=build /app/apps/relay/node_modules ./apps/relay/node_modules
 COPY --from=build /app/apps/relay/dist ./apps/relay/dist
 COPY --from=mls-validator /src/apps/desktop/src-tauri/target/release/mls-keypackage-validator /app/bin/mls-keypackage-validator
-COPY --from=mls-validator /validator-runtime-libs/libcrypto.so.3 /app/lib/libcrypto.so.3
 
 RUN node tools/release/relay-runtime-dependency-closure.mjs \
       verify node_modules relay-runtime-dependencies.json && \
