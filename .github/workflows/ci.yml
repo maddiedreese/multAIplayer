@@ -28,7 +28,7 @@ jobs:
       protected_release: ${{ steps.paths.outputs.protected_release }}
     steps:
       - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Validate squash-commit title
@@ -48,7 +48,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Set up Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Install documentation-check dependency
@@ -64,7 +64,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install checksum-pinned actionlint 1.7.7
         shell: bash
         run: |
@@ -87,7 +87,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Set up locked Node and npm
@@ -110,7 +110,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Set up locked Node and npm
@@ -140,7 +140,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Set up locked Node and npm
         uses: ./.github/actions/setup-node-npm
       - name: Install dependencies

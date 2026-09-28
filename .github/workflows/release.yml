@@ -30,9 +30,10 @@ jobs:
       prerelease: ${{ steps.release.outputs.prerelease }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
-      - name: Check out release history
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Check out trusted release resolver and history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: main
           fetch-depth: 0
       - name: Resolve the tag once and require a main-reachable commit
         id: release
@@ -53,7 +54,7 @@ jobs:
       contents: read
     steps:
       - name: Check out release source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           ref: ${{ needs.resolve.outputs.commit }}
@@ -113,7 +114,7 @@ jobs:
       VITE_RELAY_URL: ${{ vars.OFFICIAL_RELAY_WS_URL }}
     steps:
       - name: Check out repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           ref: ${{ needs.resolve.outputs.commit }}
@@ -126,17 +127,6 @@ jobs:
 
       - name: Install Apple silicon Rust target
         run: rustup target add aarch64-apple-darwin
-
-      - name: Cache Cargo registry and build output
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            apps/desktop/src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
 
       - name: Install dependencies
         run: npm ci
@@ -579,7 +569,7 @@ jobs:
       contents: write
     steps:
       - name: Check out the released contract and validation tooling
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.build.outputs.commit }}
       - name: Set up locked Node and npm
@@ -609,7 +599,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Check out released channel validation tooling
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.build.outputs.commit }}
       - name: Set up locked Node and npm

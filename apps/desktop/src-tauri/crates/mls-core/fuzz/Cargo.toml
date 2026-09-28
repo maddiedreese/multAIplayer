@@ -8,7 +8,7 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
-base64 = "=0.22.1"
+base64 = "=0.23.0"
 codex-activity-projection = { path = "../../codex-activity-projection" }
 libfuzzer-sys = "=0.4.13"
 mls-core = { path = ".." }
