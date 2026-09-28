@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@multaiplayer/protocol": "0.1.0-alpha.19",
-    "better-sqlite3": "13.0.1",
+    "better-sqlite3": "13.0.3",
     "cookie": "2.0.1",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
@@ -32,10 +32,10 @@
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
-    "@types/node": "24.13.5",
+    "@types/node": "24.13.6",
     "@types/ws": "8.18.1",
-    "fast-check": "4.10.1",
-    "tsx": "4.23.13",
+    "fast-check": "4.10.2",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   }
 }
