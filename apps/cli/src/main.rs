@@ -2116,11 +2116,9 @@ fn run_auth(command: Command) -> ExitCode {
     let result = match command {
         Command::AuthLogin { open } => login(&client, open),
         Command::AuthStatus => match client.restore_session() {
-            Ok(Some(session)) => {
-                println!(
-                    "Signed in as {} ({})",
-                    session.user.login, session.relay_origin
-                );
+            Ok(Some(_)) => {
+                // Status is safe to capture in diagnostics without exposing account identity.
+                println!("Signed in.");
                 Ok(())
             }
             Ok(None) => {

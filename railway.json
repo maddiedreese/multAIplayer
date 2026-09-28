@@ -14,7 +14,8 @@
       "/package.json",
       "/package-lock.json",
       "/tsconfig.base.json",
-      "/railway.json"
+      "/railway.json",
+      "/.npmrc"
     ]
   },
   "deploy": {

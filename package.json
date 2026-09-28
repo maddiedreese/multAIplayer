@@ -10,12 +10,12 @@
     "node": ">=24 <25"
   },
   "allowScripts": {
-    "better-sqlite3@12.11.1": true,
-    "esbuild@0.28.1": true,
-    "edgedriver@6.3.0": false,
+    "better-sqlite3@13.0.1": true,
+    "esbuild@0.28.2": true,
+    "edgedriver@6.3.1": false,
     "fsevents@2.3.2": false,
     "fsevents@2.3.3": false,
-    "geckodriver@6.1.0": false
+    "geckodriver@6.1.1": false
   },
   "workspaces": [
     "apps/*",
@@ -62,44 +62,46 @@
     "tauri:build": "npm run tauri:build -w @multaiplayer/desktop"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.12.1",
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.61.1",
-    "@vitejs/plugin-react": "6.0.3",
-    "@wdio/cli": "9.29.1",
-    "@wdio/globals": "9.29.1",
-    "@wdio/local-runner": "9.29.1",
-    "@wdio/mocha-framework": "9.29.1",
-    "@wdio/spec-reporter": "9.29.1",
-    "@wdio/tauri-plugin": "1.2.0",
-    "@wdio/tauri-service": "1.2.0",
-    "concurrently": "10.0.3",
-    "dompurify": "3.4.12",
-    "eslint": "10.7.0",
+    "@playwright/test": "1.63.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "@wdio/cli": "9.31.9",
+    "@wdio/globals": "9.31.3",
+    "@wdio/local-runner": "9.31.9",
+    "@wdio/mocha-framework": "9.31.9",
+    "@wdio/spec-reporter": "9.31.2",
+    "@wdio/tauri-plugin": "1.4.0",
+    "@wdio/tauri-service": "1.4.0",
+    "concurrently": "10.0.5",
+    "dompurify": "3.4.15",
+    "eslint": "10.10.0",
     "eslint-plugin-react-hooks": "7.1.1",
-    "globals": "17.7.0",
-    "prettier": "3.9.5",
+    "globals": "17.12.0",
+    "prettier": "3.9.8",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.65.0",
-    "webdriverio": "9.29.1",
-    "yaml": "2.9.0"
+    "typescript-eslint": "8.70.0",
+    "webdriverio": "9.31.9",
+    "yaml": "2.9.1"
   },
   "overrides": {
-    "@wdio/native-utils": "2.5.0",
+    "@wdio/native-utils": "2.7.0",
     "encoding-sniffer": "1.0.2",
     "glob": "13.0.6",
     "shell-quote": "1.10.0",
     "serialize-javascript": "7.0.5",
     "monaco-editor": {
       "dompurify": "$dompurify"
-    }
+    },
+    "@puppeteer/browsers": "3.2.3",
+    "deepmerge-ts": "8.0.2"
   },
   "optionalDependencies": {
-    "@esbuild/darwin-arm64": "0.28.1",
-    "@esbuild/darwin-x64": "0.28.1",
-    "@esbuild/linux-arm64": "0.28.1",
-    "@esbuild/linux-x64": "0.28.1",
-    "@esbuild/win32-arm64": "0.28.1",
-    "@esbuild/win32-x64": "0.28.1"
+    "@esbuild/darwin-arm64": "0.28.2",
+    "@esbuild/darwin-x64": "0.28.2",
+    "@esbuild/linux-arm64": "0.28.2",
+    "@esbuild/linux-x64": "0.28.2",
+    "@esbuild/win32-arm64": "0.28.2",
+    "@esbuild/win32-x64": "0.28.2"
   }
 }
