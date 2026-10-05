@@ -21,8 +21,8 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "fast-check": "4.10.1",
-    "tsx": "4.23.13",
+    "fast-check": "4.10.2",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   }
 }
