@@ -49,7 +49,7 @@ jobs:
         run: npm run test:ui-contract
       - name: Upload journey failure artifacts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-shell-journey-failures
           path: test-results
@@ -95,7 +95,7 @@ jobs:
         run: xvfb-run -a npm run test:e2e:native
       - name: Upload native journey duration metrics
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-shell-journey-metrics
           path: reports/native-shell-e2e/duration.json
@@ -103,7 +103,7 @@ jobs:
           retention-days: 30
       - name: Upload native journey failure artifacts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-shell-journey-failures
           path: |
@@ -133,7 +133,7 @@ jobs:
           npx tsx --test --test-reporter=junit apps/relay/test/live-native-relay-journey.test.ts > reports/macos-two-client/junit.xml
       - name: Upload two-client journey result
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-two-client-journey
           path: reports/macos-two-client/junit.xml
@@ -164,7 +164,7 @@ jobs:
         run: npm run test:soak -w @multaiplayer/relay
       - name: Upload relay soak evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: relay-chaos-soak
           path: apps/relay/reports/soak
@@ -198,7 +198,7 @@ jobs:
         run: cargo +nightly-2026-07-18 fuzz run codex_app_server_projection -- -max_total_time=120
       - name: Upload minimized fuzz artifacts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mls-deserialization-fuzz-artifacts
           path: apps/desktop/src-tauri/crates/mls-core/fuzz/artifacts
@@ -243,7 +243,7 @@ jobs:
         run: npm run test:e2e:native:macos-smoke
       - name: Upload macOS WKWebView smoke evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-wkwebview-smoke
           path: reports/native-macos-smoke
@@ -264,7 +264,7 @@ jobs:
           bash scripts/verify-macos-deployment-target.sh "$app_path"
           npm run verify:macos-associated-domains -- "$app_path"
       - name: Upload macOS packages
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: multaiplayer-macos-packages
           path: |
